@@ -20,8 +20,15 @@ set_full_path(THIS_DIR_HEADERS
 set_full_path(THIS_DIR_SOURCES
   exception.cpp
   file.cpp
-  omp_diagnostics.cpp
 )
+
+# Add OpenMP diagnostics only if OpenMP is available
+if (DR_EVT_HAS_OPENMP)
+  set_full_path(THIS_DIR_OMP_SOURCES
+    omp_diagnostics.cpp
+  )
+  set(THIS_DIR_SOURCES "${THIS_DIR_SOURCES}" "${THIS_DIR_OMP_SOURCES}")
+endif()
 
 # Add the subdirectories
 #if (DR_EVT_WITH_UNIT_TESTING)

@@ -186,7 +186,7 @@ endif("${isSystemDir}" STREQUAL "-1")
 include(GNUInstallDirs)
 include(ExternalProject)
 include(SetupCXX)
-include(SetupProtobuf)
+include(SetupProtobufConan)
 
 ################################################################
 # Initialize dependencies
@@ -210,21 +210,8 @@ if (NOT DR_EVT_HAS_PROTOBUF)
   endif (BUILD_PROTOBUF)
 endif (NOT DR_EVT_HAS_PROTOBUF)
 
-if (DEFINED BOOST_ROOT)
-    message(STATUS "BOOST_ROOT: " ${BOOST_ROOT})
-    set(Boost_NO_SYSTEM_PATHS ON)
-else ()
-    if (DEFINED ENV{BOOST_ROOT})
-        message(STATUS "ENV BOOST_ROOT: " $ENV{BOOST_ROOT})
-        set(Boost_NO_SYSTEM_PATHS ON)
-    endif ()
-endif ()
-
-# boost::multi_index is needed but it is header-only
-find_package(Boost
-    #         HINTS ${BOOST_ROOT} $ENV{BOOST_ROOT}
-             REQUIRED COMPONENTS
-             regex filesystem system program_options)
+# Setup Boost (will use FetchContent if not found)
+include(SetupBoost)
 
 message(STATUS "Boost_INCLUDE_DIRS: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost_LIBRARY_DIRS: " ${Boost_LIBRARY_DIRS})
@@ -309,7 +296,9 @@ target_include_directories(dr_evt PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_include_directories(dr_evt SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
+target_include_directories(dr_evt SYSTEM PUBLIC
+  $<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # Use the IMPORTED targets when possible.
 

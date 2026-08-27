@@ -57,6 +57,9 @@ class Trace {
 
   public:
     Trace(const std::string& fname);
+    Trace(const std::string& fname, const std::string& format);
+    Trace(const std::string& fname, const std::string& format,
+          const std::string& timestamp_format, const std::string& timezone);
 
     /// Allow access to the header info and column filter
     const Data_Columns& dcols() const { return m_dcols; }

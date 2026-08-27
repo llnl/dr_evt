@@ -24,7 +24,10 @@ namespace dr_evt {
 Data_Columns::Data_Columns()
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
-    m_queue_idx(static_cast<col_no_t>(0u))
+    m_queue_idx(static_cast<col_no_t>(0u)),
+    m_trace_format("lassen"),
+    m_timestamp_format("iso"),
+    m_timezone_str("America/Los_Angeles")
 {
     // TODO: This should be read from an input file
     // Define the data columns to read. The rest will be not collected to
@@ -35,6 +38,65 @@ Data_Columns::Data_Columns()
         {29, "job_submit_time"}, {30, "queue"}, {32, "time_limit"}
     };
     m_col_to_avoid = "user_script";
+    init();
+}
+
+Data_Columns::Data_Columns(const std::string& format)
+  : m_cur_tz(nullptr),
+    m_total_columns(static_cast<num_cols_t>(0u)),
+    m_queue_idx(static_cast<col_no_t>(0u)),
+    m_trace_format(format),
+    m_timestamp_format("iso"),
+    m_timezone_str("America/Los_Angeles")
+{
+    if (format == "simple") {
+        // Simple format file columns: [job_submit_time, begin_time, end_time, num_nodes, exit_status, queue, time_limit]
+        // Job_Record expects: [num_nodes, begin_time, end_time, job_submit_time, queue, time_limit]
+        // After sorting by column index, we need to remap to Job_Record order
+        // We define in Job_Record's expected order here, but need different column indices:
+        m_cols_to_read = {
+            {3, "num_nodes"},        // File column 3 -> Job_Record field 0
+            {1, "begin_time"},       // File column 1 -> Job_Record field 1
+            {2, "end_time"},         // File column 2 -> Job_Record field 2
+            {0, "job_submit_time"},  // File column 0 -> Job_Record field 3
+            {5, "queue"},            // File column 5 -> Job_Record field 4
+            {6, "time_limit"}        // File column 6 -> Job_Record field 5
+        };
+        m_col_to_avoid = "";  // No problematic columns in simple format
+    } else {
+        // Lassen format (default)
+        m_cols_to_read = {
+            {11, "num_nodes"}, {23, "begin_time"}, {24, "end_time"},
+            {29, "job_submit_time"}, {30, "queue"}, {32, "time_limit"}
+        };
+        m_col_to_avoid = "user_script";
+    }
+    init();
+}
+
+Data_Columns::Data_Columns(const std::string& format, const std::string& timestamp_format, const std::string& timezone)
+  : m_cur_tz(nullptr),
+    m_total_columns(static_cast<num_cols_t>(0u)),
+    m_queue_idx(static_cast<col_no_t>(0u)),
+    m_trace_format(format),
+    m_timestamp_format(timestamp_format),
+    m_timezone_str(timezone)
+{
+    if (format == "simple") {
+        // Simple format: [arrival_time, start_time, end_time, num_nodes, exit_status, queue, time_limit]
+        m_cols_to_read = {
+            {3, "num_nodes"}, {1, "begin_time"}, {2, "end_time"},
+            {0, "job_submit_time"}, {5, "queue"}, {6, "time_limit"}
+        };
+        m_col_to_avoid = "";
+    } else {
+        // Lassen format
+        m_cols_to_read = {
+            {11, "num_nodes"}, {23, "begin_time"}, {24, "end_time"},
+            {29, "job_submit_time"}, {30, "queue"}, {32, "time_limit"}
+        };
+        m_col_to_avoid = "user_script";
+    }
     init();
 }
 
@@ -71,8 +133,11 @@ void Data_Columns::init()
         }
     }
 
-    // Make sure the colums are in the order of increasing index
-    std::sort(m_cols_to_read.begin(), m_cols_to_read.end());
+    // Make sure the columns are in the order of increasing index
+    // NOTE: For simple format, we keep them in Job_Record's expected order, not file order
+    if (m_trace_format != "simple") {
+        std::sort(m_cols_to_read.begin(), m_cols_to_read.end());
+    }
 
     Job_Record::set_num_inputs(static_cast<unsigned>(size()));
 

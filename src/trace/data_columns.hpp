@@ -61,7 +61,12 @@ class Data_Columns {
 
   public:
     Data_Columns();
+    Data_Columns(const std::string& format);  // "simple" or "lassen"
+    Data_Columns(const std::string& format, const std::string& timestamp_format, const std::string& timezone);
     virtual ~Data_Columns();
+
+    std::string get_timestamp_format() const { return m_timestamp_format; }
+    std::string get_timezone() const { return m_timezone_str; }
 
     /// Allow read-only access to the column filter
     const data_columns_t& get_cols_to_read() const { return m_cols_to_read; }
@@ -87,6 +92,10 @@ class Data_Columns {
 
   protected:
     void init();
+
+    std::string m_trace_format;      // "simple" or "lassen"
+    std::string m_timestamp_format;  // "epoch" or "iso"
+    std::string m_timezone_str;  // Timezone string
 };
 
 /**@}*/

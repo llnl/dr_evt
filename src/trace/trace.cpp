@@ -23,6 +23,25 @@ Trace::Trace(const std::string& fname)
     }
 }
 
+Trace::Trace(const std::string& fname, const std::string& format)
+  : m_fname(fname), m_dcols(format)
+{
+    if (!m_dcols.check_header(fname)) {
+        std::string err = "Failed to initialize data columns";
+        throw std::runtime_error {err.c_str()};
+    }
+}
+
+Trace::Trace(const std::string& fname, const std::string& format,
+             const std::string& timestamp_format, const std::string& timezone)
+  : m_fname(fname), m_dcols(format, timestamp_format, timezone)
+{
+    if (!m_dcols.check_header(fname)) {
+        std::string err = "Failed to initialize data columns";
+        throw std::runtime_error {err.c_str()};
+    }
+}
+
 int Trace::load_data(num_jobs_t n_lines_to_read)
 {
     int rc = load(m_fname, m_dcols, m_data, n_lines_to_read);

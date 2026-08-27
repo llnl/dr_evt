@@ -94,7 +94,18 @@ function (dr_evt_remove_default_include_paths_from_list OUTPUT_VAR INCL_LIST)
 endfunction ()
 
 function (dr_evt_remove_default_include_paths_from_target TARGET)
+  # Check if target exists and is not an ALIAS
+  if (NOT TARGET ${TARGET})
+    return()
+  endif ()
+
   get_target_property(_target_type ${TARGET} TYPE)
+  get_target_property(_aliased_target ${TARGET} ALIASED_TARGET)
+
+  # Skip ALIAS targets - they cannot have properties set
+  if ("${_target_type}" STREQUAL "ALIAS" OR _aliased_target)
+    return()
+  endif ()
 
   set(_interface_prop_names
     INTERFACE_INCLUDE_DIRECTORIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES)

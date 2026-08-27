@@ -216,14 +216,24 @@ bool sync_directory(const std::string& path)
 // https://stackoverflow.com/questions/676787/how-to-do-fsync-on-an-ofstream
 void fsync_ofstream(std::ofstream& os)
 {
+    os.flush();
+
+#if defined(__GLIBCXX__) || defined(__GLIBCPP__)
+    // GCC/libstdc++ implementation
     class my_filebuf : public std::filebuf
     {
      public:
         int handle() { return _M_file.fd(); }
     };
-
-    os.flush();
     fsync(static_cast<my_filebuf&>(*os.rdbuf()).handle());
+#elif defined(_LIBCPP_VERSION)
+    // libc++ (Apple/Clang) - no direct access to file descriptor
+    // Just flush to OS buffers, can't force disk sync from ofstream
+    os.flush();
+#else
+    // Other implementations - just flush
+    os.flush();
+#endif
 }
 
 /**@}*/
