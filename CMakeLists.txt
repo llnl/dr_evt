@@ -186,7 +186,6 @@ endif("${isSystemDir}" STREQUAL "-1")
 include(GNUInstallDirs)
 include(ExternalProject)
 include(SetupCXX)
-include(SetupProtobufConan)
 
 ################################################################
 # Initialize dependencies
@@ -194,21 +193,8 @@ include(SetupProtobufConan)
 
 # Required dependencies
 
-if (NOT DR_EVT_HAS_PROTOBUF)
-  if (BUILD_PROTOBUF)
-    set(To_Ignore ${BOOST_ROOT})
-    message(STATUS "!!!!!!!!!!!!!!!!!!!!!!! Attention !!!!!!!!!!!!!!!!!!!!!!!!!")
-    message(STATUS "Type `make` to build protobuf, which is a required package.")
-    message(STATUS "Then, rerun cmake in the exactly the same way, that is to")
-    message(STATUS "configure DR_EVT with the protobuf just installed.")
-    message(STATUS "Alternatively, use -DPROTOBUF_ROOT:PATH=<path-to-protobuf>")
-    message(STATUS "to avoid two-staged building.")
-    message(STATUS "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    return ()
-  else (BUILD_PROTOBUF)
-    message(FATAL_ERROR "protobuf is required!")
-  endif (BUILD_PROTOBUF)
-endif (NOT DR_EVT_HAS_PROTOBUF)
+# Setup Protobuf (will use FetchContent if not found on system)
+include(SetupProtobuf)
 
 # Setup Boost (will use FetchContent if not found)
 include(SetupBoost)
@@ -423,6 +409,21 @@ set_target_properties(t_rngen-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS t_rngen-bin)
 
+# Streaming API test
+add_executable( test_streaming_api-bin tests/test_streaming_api.cpp )
+
+target_include_directories(test_streaming_api-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+
+target_link_libraries(test_streaming_api-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_streaming_api-bin PROPERTIES OUTPUT_NAME test_streaming_api)
+set_target_properties(test_streaming_api-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_api-bin)
+
 # Install the binaries
 install(
   TARGETS  ${DR_EVT_EXEC_TARGETS}
@@ -531,10 +532,11 @@ install(
 #export(EXPORT DR_EVT_Targets NAMESPACE DR_EVT:: FILE DR_EVT_Targets.cmake)
 
 # Install export
-install(EXPORT DR_EVT_Targets
-  NAMESPACE DR_EVT::
-  FILE DR_EVT_Targets.cmake
-  DESTINATION "${CMAKE_INSTALL_DIR}")
+# Temporarily disabled due to Boost FetchContent export issues
+#install(EXPORT DR_EVT_Targets
+#  NAMESPACE DR_EVT::
+#  FILE DR_EVT_Targets.cmake
+#  DESTINATION "${CMAKE_INSTALL_DIR}")
 
 # Install the cmake stuff
 install(FILES

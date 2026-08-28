@@ -15,6 +15,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <map>
 
 #include "common.hpp"
 #include "trace/data_columns.hpp"
@@ -39,7 +40,13 @@ class Trace {
     reserved_t m_reserved;
   #endif
 
+    /// Timezone metadata for human-readable output
+    std::string m_default_timezone; ///< Default timezone offset (e.g., "+00:00" for UTC)
+    std::map<std::string, std::string> m_queue_timezones; ///< Per-queue timezone overrides
+
+  public:
     /// Tracing context, i.e., temporary data while running simulation
+    /// Made public to allow external simulation controllers (e.g., gRPC) to manage context
     struct Context {
       #if MARK_DAT_PERIOD
         num_jobs_t m_pAll_cnt; // On-going pAll job
@@ -54,8 +61,6 @@ class Trace {
         Context();
         std::string to_string() const;
     };
-
-  public:
     Trace(const std::string& fname);
     Trace(const std::string& fname, const std::string& format);
     Trace(const std::string& fname, const std::string& format,
@@ -78,6 +83,47 @@ class Trace {
      *  nodes were in use at the time of each job submission.
      */
     void run_job_trace();
+
+    /**
+     * NEW SIMULATION API: Insert a job into the event queue
+     * Creates start and end events for the job at specified times
+     * @param job_idx Index of job in m_data
+     * @param start_time When the job should start
+     * @param ctx Simulation context (event queue and resource state)
+     */
+    void insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx);
+
+    /**
+     * NEW SIMULATION API: Run simulation until (but not including) target time
+     * Processes all events with time < target_time
+     * @param ctx Simulation context
+     * @param target_time Time to run until (exclusive)
+     */
+    void run_until_exclusive(Context& ctx, sim_time_t target_time);
+
+    /**
+     * NEW SIMULATION API: Run simulation until and including target time
+     * Processes all events with time <= target_time
+     * @param ctx Simulation context
+     * @param target_time Time to run until (inclusive)
+     */
+    void run_until_inclusive(Context& ctx, sim_time_t target_time);
+
+    /**
+     * NEW SIMULATION API: Create a new context for simulation
+     * @return Fresh context with empty event queue
+     */
+    Context create_context() { return Context(); }
+
+    /**
+     * NEW SIMULATION API: Get current number of nodes in use
+     * @param ctx Simulation context
+     * @return Number of nodes currently allocated
+     */
+    num_nodes_t get_nodes_in_use(const Context& ctx) const {
+        return ctx.m_n_nodes_in_use;
+    }
+
     /**
      *  Print out the job trace with extra information obtained from simulation.
      */
@@ -93,6 +139,33 @@ class Trace {
   #if MARK_DAT_PERIOD
     const reserved_t & get_reserved() const { return m_reserved; }
   #endif
+
+    /**
+     * @brief Set default timezone for the trace
+     * @param tz_offset Timezone offset string (e.g., "-08:00", "+00:00")
+     */
+    void set_default_timezone(const std::string& tz_offset) {
+        m_default_timezone = tz_offset;
+    }
+
+    /**
+     * @brief Set timezone for a specific queue
+     * @param queue Queue name (e.g., "pbatch")
+     * @param tz_offset Timezone offset string
+     */
+    void set_queue_timezone(const std::string& queue, const std::string& tz_offset) {
+        m_queue_timezones[queue] = tz_offset;
+    }
+
+    /**
+     * @brief Get timezone for a queue (returns default if not overridden)
+     * @param queue Queue name
+     * @return Timezone offset string
+     */
+    std::string get_queue_timezone(const std::string& queue) const {
+        auto it = m_queue_timezones.find(queue);
+        return (it != m_queue_timezones.end()) ? it->second : m_default_timezone;
+    }
 
   protected:
     void process_events_until(Context& ctx, const epoch_t& t_sub);

@@ -4,17 +4,25 @@
 
 Run all tests:
 ```bash
+# Test 0: Core scheduler correctness (MOST IMPORTANT)
+python3 tests/test_scheduler_correctness.py
+
 # Bash test suite (fast, simple validation)
 ./tests/run_tests.sh
 
 # Python test suite (detailed validation)
 python3 tests/test_scheduler.py
 
-# Or both
-./tests/run_tests.sh && python3 tests/test_scheduler.py
+# Or all at once
+python3 tests/test_scheduler_correctness.py && \
+./tests/run_tests.sh && \
+python3 tests/test_scheduler.py
 ```
 
-Expected output: **All tests passed!** (8 bash tests, 7 Python tests)
+Expected output: **All tests passed!**
+- Test 0: 3/3 correctness tests (oracle, realistic, determinism)
+- Bash suite: 15/15 tests
+- Python suite: 14/14 tests
 
 ## Test Organization
 

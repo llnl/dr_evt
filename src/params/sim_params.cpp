@@ -19,21 +19,26 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:v"
 static const struct option longopts[] = {
-    {"help",             no_argument,        0, 'h'},
-    {"infile",           required_argument,  0, 'i'},
-    {"max_jobs",         required_argument,  0, 'j'},
-    {"total_nodes",      required_argument,  0, 'n'},
-    {"outfile",          required_argument,  0, 'o'},
-    {"seed",             required_argument,  0, 's'},
-    {"max_time",         required_argument,  0, 't'},
-    {"backfill_policy",  required_argument,  0, 'b'},
-    {"priority_policy",  required_argument,  0, 'p'},
-    {"runtime_mode",     required_argument,  0, 'r'},
-    {"trace_format",     required_argument,  0, 'f'},
-    {"timestamp_format", required_argument,  0, 'T'},
-    {"timezone",         required_argument,  0, 'z'},
+    {"help",                  no_argument,        0, 'h'},
+    {"infile",                required_argument,  0, 'i'},
+    {"max_jobs",              required_argument,  0, 'j'},
+    {"total_nodes",           required_argument,  0, 'n'},
+    {"outfile",               required_argument,  0, 'o'},
+    {"seed",                  required_argument,  0, 's'},
+    {"max_time",              required_argument,  0, 't'},
+    {"backfill_policy",       required_argument,  0, 'b'},
+    {"priority_policy",       required_argument,  0, 'p'},
+    {"runtime_mode",          required_argument,  0, 'r'},
+    {"trace_format",          required_argument,  0, 'f'},
+    {"timestamp_format",      required_argument,  0, 'T'},
+    {"timezone",              required_argument,  0, 'z'},
+    {"duration_mode",         required_argument,  0, 'd'},
+    {"duration_distribution", required_argument,  0, 'D'},
+    {"duration_scale",        required_argument,  0, 'S'},
+    {"duration_stddev",       required_argument,  0, 'V'},
+    {"verbose",               no_argument,        0, 'v'},
     { 0, 0, 0, 0 },
 };
 
@@ -48,7 +53,12 @@ Sim_Params::Sim_Params()
     m_total_nodes(dr_evt::total_nodes),
     m_trace_format("lassen"),  // Default to Lassen format for backward compatibility
     m_timestamp_format("iso"),  // Default to ISO/human-readable timestamps
-    m_timezone("America/Los_Angeles")  // Default timezone
+    m_timezone("America/Los_Angeles"),  // Default timezone
+    m_duration_mode(DurationMode::EXACT),  // Default: jobs run exactly time_limit
+    m_duration_distribution(DistributionType::NORMAL),
+    m_duration_scale(1.0),  // Default: 100% of time_limit
+    m_duration_stddev(0.0),  // Default: no variation
+    m_verbose(false)  // Default: production mode (quiet)
 {}
 
 void Sim_Params::getopt(int& argc, char** &argv)
@@ -148,6 +158,45 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'z': /* --timezone */
                 m_timezone = optarg;
                 break;
+            case 'd': /* --duration_mode */
+                {
+                    std::string mode(optarg);
+                    if (mode == "column") {
+                        m_duration_mode = DurationMode::FROM_COLUMN;
+                    } else if (mode == "exact") {
+                        m_duration_mode = DurationMode::EXACT;
+                    } else if (mode == "distribution") {
+                        m_duration_mode = DurationMode::DISTRIBUTION;
+                    } else {
+                        std::cerr << "Unknown duration mode: " << mode << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'D': /* --duration_distribution */
+                {
+                    std::string dist(optarg);
+                    if (dist == "normal") {
+                        m_duration_distribution = DistributionType::NORMAL;
+                    } else if (dist == "lognormal") {
+                        m_duration_distribution = DistributionType::LOGNORMAL;
+                    } else if (dist == "uniform") {
+                        m_duration_distribution = DistributionType::UNIFORM;
+                    } else {
+                        std::cerr << "Unknown distribution type: " << dist << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'S': /* --duration_scale */
+                m_duration_scale = std::stod(optarg);
+                break;
+            case 'V': /* --duration_stddev */
+                m_duration_stddev = std::stod(optarg);
+                break;
+            case 'v': /* --verbose */
+                m_verbose = true;
+                break;
             default:
                 print_usage(argv[0], 1);
                 break;
@@ -227,6 +276,33 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Timezone for timestamp parsing (default: America/Los_Angeles).\n"
         "        Examples: UTC, America/New_York, America/Los_Angeles\n"
         "        Only used when timestamp_format=iso\n"
+        "\n"
+        "    -d, --duration_mode {column|exact|distribution}\n"
+        "        How to determine actual job duration in simulation mode (default: exact).\n"
+        "        column: Read from actual_duration column in trace\n"
+        "        exact: Jobs run exactly time_limit (perfect estimation)\n"
+        "        distribution: Sample from statistical distribution\n"
+        "\n"
+        "    -D, --duration_distribution {normal|lognormal|uniform}\n"
+        "        Distribution type when duration_mode=distribution (default: normal).\n"
+        "        normal: Normal distribution N(limit*scale, limit*stddev)\n"
+        "        lognormal: Lognormal with median=limit*scale\n"
+        "        uniform: Uniform in [limit*scale, limit*(scale+stddev)]\n"
+        "\n"
+        "    -S, --duration_scale FACTOR\n"
+        "        Scale factor for duration sampling (default: 1.0).\n"
+        "        Example: 0.8 means jobs run 80% of their time_limit on average\n"
+        "\n"
+        "    -V, --duration_stddev FACTOR\n"
+        "        Standard deviation factor for duration sampling (default: 0.0).\n"
+        "        For normal: std dev = limit * stddev\n"
+        "        For lognormal: shape parameter\n"
+        "        For uniform: upper bound offset\n"
+        "\n"
+        "    -v, --verbose\n"
+        "        Enable verbose output for debugging and testing.\n"
+        "        Shows detailed simulation progress, scheduling decisions,\n"
+        "        and resource usage. Disabled by default for production runs.\n"
         "\n";
     exit(code);
 }
@@ -263,6 +339,21 @@ void Sim_Params::print() const
     msg += " - trace_format: " + m_trace_format + "\n";
     msg += " - timestamp_format: " + m_timestamp_format + "\n";
     msg += " - timezone: " + m_timezone + "\n";
+
+    msg += " - duration_mode: ";
+    if (m_duration_mode == DurationMode::FROM_COLUMN) msg += "FROM_COLUMN";
+    else if (m_duration_mode == DurationMode::EXACT) msg += "EXACT";
+    else msg += "DISTRIBUTION";
+    msg += "\n";
+
+    msg += " - duration_distribution: ";
+    if (m_duration_distribution == DistributionType::NORMAL) msg += "NORMAL";
+    else if (m_duration_distribution == DistributionType::LOGNORMAL) msg += "LOGNORMAL";
+    else msg += "UNIFORM";
+    msg += "\n";
+
+    msg += " - duration_scale: " + to_string(m_duration_scale) + "\n";
+    msg += " - duration_stddev: " + to_string(m_duration_stddev) + "\n";
 
     std::cout << msg << std::endl;
 }

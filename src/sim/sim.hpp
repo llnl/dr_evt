@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <memory> // unique_ptr
 #include <iostream>
+#include <random>
 
 #include "common.hpp"
 #include "params/sim_params.hpp"
@@ -58,6 +59,21 @@ class Simulation {
     num_jobs_t m_jobs_completed;
     num_jobs_t m_jobs_submitted;
 
+    /// Random number generator for duration sampling
+    std::mt19937 m_rng;
+
+    /// Replay context for event processing
+    Trace::Context m_replay_ctx;
+
+    /// Waiting queue for streaming mode (jobs submitted but not yet started)
+    std::set<job_no_t> m_wait_queue;
+
+    /// Running jobs for streaming mode (job_idx -> start_time)
+    std::map<job_no_t, sim_time_t> m_running_jobs;
+
+    /// Resource state history: (time, free_nodes, allocated_nodes) for verification
+    mutable std::vector<std::tuple<sim_time_t, num_nodes_t, num_nodes_t>> m_resource_history;
+
   public:
     /**
      * Constructor
@@ -75,6 +91,73 @@ class Simulation {
      * Print simulation statistics
      */
     void print_stats(std::ostream& os) const;
+
+    /**
+     * Write simulated job trace to CSV file
+     */
+    void write_simulated_trace() const;
+
+    /**
+     * Get resource state history for verification
+     * Returns: vector of (time, free_nodes, allocated_nodes)
+     */
+    const std::vector<std::tuple<sim_time_t, num_nodes_t, num_nodes_t>>& get_resource_history() const {
+        return m_resource_history;
+    }
+
+    /**
+     * Write resource state trace to file
+     */
+    void write_resource_trace(const std::string& filename) const;
+
+    /**
+     * Submit a job to the scheduler's waiting queue (streaming mode)
+     * The internal scheduler will decide when to start the job based on
+     * resources and backfilling policy.
+     *
+     * @param job_idx Job index to submit
+     * @param submit_time When the job is submitted (must be >= current_time)
+     *
+     * NOTE: This only adds the job to the waiting queue. Call advance_to()
+     * to let the scheduler make decisions and advance simulation time.
+     */
+    void submit_job(job_no_t job_idx, sim_time_t submit_time);
+
+    /**
+     * Advance simulation to target time (streaming mode)
+     * Processes all events up to target_time and lets the scheduler make
+     * decisions about which jobs to start.
+     *
+     * @param target_time Time to advance to (must be >= current_time)
+     *
+     * PRECONDITION: Caller guarantees no jobs will be submitted with
+     * submit_time < target_time. This means either:
+     * - All jobs have already been submitted, OR
+     * - External tool knows the next job arrival is at >= target_time
+     *
+     * POSTCONDITION: m_current_time == target_time, and all scheduling
+     * decisions have been made up to that time.
+     */
+    void advance_to(sim_time_t target_time);
+
+    /**
+     * Get number of nodes currently in use (for monitoring)
+     * @return Number of allocated nodes
+     */
+    num_nodes_t get_nodes_in_use() const;
+
+    /**
+     * Get current simulation time (for monitoring)
+     * @return Current simulation time
+     */
+    sim_time_t get_current_time() const { return m_current_time; }
+
+    /**
+     * Get trace data (for external access in streaming mode)
+     * @return Reference to trace object
+     */
+    Trace& get_trace() { return m_trace; }
+    const Trace& get_trace() const { return m_trace; }
 
   protected:
     /**
@@ -119,6 +202,25 @@ class Simulation {
      * @param start_time When the job started
      */
     void schedule_end_event(job_no_t job_idx, sim_time_t start_time);
+
+    /**
+     * Determine actual durations for all jobs (simulation mode only)
+     * Called during initialization before simulation starts
+     */
+    void determine_job_durations();
+
+    /**
+     * Sample job duration from distribution
+     * @param time_limit User-provided time limit
+     * @param dist Distribution type
+     * @param scale Scale factor
+     * @param stddev Standard deviation factor
+     * @return Sampled duration
+     */
+    tdiff_t sample_duration(tdiff_t time_limit,
+                            DistributionType dist,
+                            double scale,
+                            double stddev);
 };
 
 /**@}*/

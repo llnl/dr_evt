@@ -52,6 +52,15 @@ class Sim_Params {
     std::string m_timestamp_format;  // "epoch" or "iso"
     std::string m_timezone;  // e.g., "UTC", "America/Los_Angeles", "America/New_York"
 
+    // Duration determination (simulation mode)
+    DurationMode m_duration_mode;
+    DistributionType m_duration_distribution;
+    double m_duration_scale;    // Scale factor (e.g., 0.8 = jobs run 80% of estimate)
+    double m_duration_stddev;   // Std deviation factor
+
+    // Output control
+    bool m_verbose;  // Enable verbose/debug output (default: false for production)
+
  private:
     std::string m_outfile;
 };

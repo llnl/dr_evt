@@ -25,6 +25,27 @@ message DR_EVT_Params {
 
         string infile = 4;
         string outfile = 5;
+
+        // Enable verbose output for debugging and testing
+        // (default: false for production runs)
+        bool verbose = 6;
+
+        // Scheduling parameters
+        uint32 total_nodes = 7;         // System node count (default: 795)
+        string backfill_policy = 8;     // "easy" or "conservative" (default: "easy")
+        string priority_policy = 9;     // "fcfs", "sjf", or "ljf" (default: "fcfs")
+        string runtime_mode = 10;       // "limit" or "actual" (default: "limit")
+
+        // Trace format parameters
+        string trace_format = 11;       // "simple" or "lassen" (default: "lassen")
+        string timestamp_format = 12;   // "epoch" or "iso" (default: "iso")
+        string timezone = 13;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
+
+        // Duration simulation parameters
+        string duration_mode = 14;      // "column", "exact", or "distribution" (default: "exact")
+        string duration_distribution = 15; // "normal", "lognormal", or "uniform" (default: "normal")
+        double duration_scale = 16;     // Scale factor (default: 1.0)
+        double duration_stddev = 17;    // Standard deviation factor (default: 0.0)
     }
 
     message Tracing_Params {

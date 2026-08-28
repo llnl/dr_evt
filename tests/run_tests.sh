@@ -192,6 +192,11 @@ run_test "iso_timestamps" \
     3 3 100 \
     "--trace_format simple --timestamp_format iso"
 
+run_test "timezone_offsets" \
+    "$TEST_DIR/timezone_offsets.csv" \
+    3 3 100 \
+    "--trace_format simple --timestamp_format iso"
+
 echo ""
 echo "=== Stress Tests ==="
 echo ""

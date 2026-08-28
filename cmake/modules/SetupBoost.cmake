@@ -16,15 +16,25 @@ endif ()
 
 find_package(Boost QUIET COMPONENTS regex filesystem system program_options)
 
-if(NOT Boost_FOUND)
+# Check if all required component libraries were actually found
+set(BOOST_LIBS_FOUND TRUE)
+if(Boost_FOUND)
+    foreach(component REGEX FILESYSTEM SYSTEM PROGRAM_OPTIONS)
+        if(NOT Boost_${component}_LIBRARY_RELEASE AND NOT Boost_${component}_LIBRARY)
+            set(BOOST_LIBS_FOUND FALSE)
+            message(STATUS "Boost component ${component} library not found")
+        endif()
+    endforeach()
+endif()
+
+if(NOT Boost_FOUND OR NOT BOOST_LIBS_FOUND)
     # If Boost is missing, install it via FetchContent
     message(STATUS "Installing Boost via FetchContent (this may take 10-15 minutes)...")
     include(FetchContent)
 
     FetchContent_Declare(
         Boost
-        URL https://sourceforge.net/projects/boost/files/boost/1.84.0/boost_1_84_0.tar.bz2/download
-        DOWNLOAD_NAME boost_1_84_0.tar.bz2
+        URL https://github.com/boostorg/boost/releases/download/boost-1.85.0/boost-1.85.0-cmake.tar.xz
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
 
@@ -60,4 +70,21 @@ if(NOT Boost_FOUND)
 else()
     message(STATUS "Found Boost: ${Boost_INCLUDE_DIRS}")
     message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
+
+    # If find_package used the old FindBoost.cmake module (not BoostConfig.cmake),
+    # it may not have created IMPORTED targets. Check and create them if needed.
+    if(NOT TARGET Boost::regex)
+        message(STATUS "Creating Boost IMPORTED targets (FindBoost didn't create them)")
+
+        foreach(component regex filesystem system program_options)
+            string(TOUPPER ${component} component_upper)
+            if(Boost_${component_upper}_LIBRARY)
+                add_library(Boost::${component} UNKNOWN IMPORTED)
+                set_target_properties(Boost::${component} PROPERTIES
+                    IMPORTED_LOCATION "${Boost_${component_upper}_LIBRARY}"
+                    INTERFACE_INCLUDE_DIRECTORIES "${Boost_INCLUDE_DIRS}")
+                message(STATUS "  Created Boost::${component} -> ${Boost_${component_upper}_LIBRARY}")
+            endif()
+        endforeach()
+    endif()
 endif()

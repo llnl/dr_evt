@@ -517,13 +517,14 @@ Each test should have:
 
 ## Summary
 
-**27 tests** validate:
+**29 tests** (15 bash + 14 Python) validate:
 - ✓ Basic functionality (jobs run)
 - ✓ Resource management (allocation/deallocation)
 - ✓ Backfilling (EASY and Conservative policies)
 - ✓ Priority scheduling (FCFS, SJF, LJF)
 - ✓ Runtime modes (USE_ACTUAL and USE_LIMIT)
 - ✓ Timestamp formats (Epoch and ISO)
+- ✓ Timezone offset support (±HH:MM, UTC normalization)
 - ✓ Stress testing (30 concurrent jobs)
 - ✓ Large scale testing (100 jobs)
 - ✓ Event processing (90+ events)

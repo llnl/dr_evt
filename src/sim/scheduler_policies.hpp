@@ -69,6 +69,39 @@ enum class RuntimeEstimateMode {
     USE_ACTUAL
 };
 
+/**
+ * @brief How to determine actual job duration in simulation mode
+ *
+ * In simulation mode, the scheduler computes start times but actual job
+ * duration must be determined. This enum controls the method.
+ */
+enum class DurationMode {
+    FROM_COLUMN,    ///< Read actual_duration from trace column
+    EXACT,          ///< Use time_limit as actual duration (perfect estimation)
+    DISTRIBUTION    ///< Sample from statistical distribution
+};
+
+/**
+ * @brief Statistical distribution for sampling job durations
+ *
+ * Used when DurationMode::DISTRIBUTION is selected.
+ */
+enum class DistributionType {
+    NORMAL,      ///< Normal distribution N(limit*scale, limit*stddev)
+    LOGNORMAL,   ///< Lognormal distribution with median=limit*scale
+    UNIFORM      ///< Uniform distribution [limit*scale_min, limit*scale_max]
+};
+
+/**
+ * @brief Trace processing mode
+ *
+ * Automatically detected based on columns present in trace file.
+ */
+enum class TraceMode {
+    REPLAY,      ///< Has begin_time column - replay historical execution
+    SIMULATION   ///< No begin_time column - scheduler computes start times
+};
+
 /**@}*/
 } // end of namespace dr_evt
 #endif // DR_EVT_SIM_SCHEDULER_POLICIES_HPP

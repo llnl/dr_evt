@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include "common.hpp"
 #include "trace/column_id.hpp"
+#include "sim/scheduler_policies.hpp"  // For TraceMode
 
 namespace dr_evt {
 /** \addtogroup dr_evt_trace
@@ -67,6 +68,7 @@ class Data_Columns {
 
     std::string get_timestamp_format() const { return m_timestamp_format; }
     std::string get_timezone() const { return m_timezone_str; }
+    TraceMode get_trace_mode() const { return m_trace_mode; }
 
     /// Allow read-only access to the column filter
     const data_columns_t& get_cols_to_read() const { return m_cols_to_read; }
@@ -96,6 +98,9 @@ class Data_Columns {
     std::string m_trace_format;      // "simple" or "lassen"
     std::string m_timestamp_format;  // "epoch" or "iso"
     std::string m_timezone_str;  // Timezone string
+
+    /// Trace mode (replay or simulation) detected from columns
+    TraceMode m_trace_mode;
 };
 
 /**@}*/

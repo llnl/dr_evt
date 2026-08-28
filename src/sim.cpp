@@ -31,6 +31,22 @@ int main(int argc, char** argv)
         dr_evt::Simulation sim(cfg);
         sim.run();
 
+        // Write simulated trace
+        sim.write_simulated_trace();
+
+        // Write resource trace
+        std::string resource_file = cfg.get_outfile();
+        if (!resource_file.empty()) {
+            // Replace .csv with _resources.csv
+            size_t pos = resource_file.rfind(".csv");
+            if (pos != std::string::npos) {
+                resource_file = resource_file.substr(0, pos) + "_resources.csv";
+            } else {
+                resource_file += "_resources.csv";
+            }
+            sim.write_resource_trace(resource_file);
+        }
+
         // Print statistics
         std::cout << std::endl;
         sim.print_stats(std::cout);

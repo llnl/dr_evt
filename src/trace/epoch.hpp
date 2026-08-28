@@ -71,6 +71,26 @@ bool is_timestamp(const std::string& time_str);
 epoch_t convert_time(const std::string& time_str);
 
 /**
+ * @brief Parse ISO timestamp with timezone offset and convert to UTC
+ *
+ * Parses timestamps like "2024-01-01T12:00:00-08:00" and converts to UTC.
+ * Returns both the UTC epoch and the extracted timezone offset string.
+ *
+ * @param time_str ISO timestamp with timezone (e.g., "2024-01-01T12:00:00-08:00")
+ * @return pair<epoch_t, string> UTC epoch and timezone offset (e.g., "-08:00")
+ */
+std::pair<epoch_t, std::string> parse_time_with_timezone(const std::string& time_str);
+
+/**
+ * @brief Convert epoch_t to local time string with timezone offset
+ *
+ * @param t UTC epoch time
+ * @param tz_offset Timezone offset string (e.g., "-08:00")
+ * @return Local time string (e.g., "2024-01-01 12:00:00")
+ */
+std::string to_local_time_string(const epoch_t& t, const std::string& tz_offset);
+
+/**
  *  Return the hour index of a given time, which is the number of hours passed
  *  since the beginning of the week.
  */

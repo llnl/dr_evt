@@ -97,7 +97,20 @@ void set_by(epoch_t& t, const std::string& str) {
         }
     } else {
         // Parse as ISO/human-readable timestamp
-        t = convert_time(str);
+        // Check if it has timezone offset (±HH:MM or Z)
+        bool has_timezone = (str.find_last_of("+-Z") != std::string::npos &&
+                             str.find_last_of("+-Z") > 10);
+
+        if (has_timezone) {
+            // Parse with timezone and convert to UTC
+            auto [utc_time, tz_offset] = parse_time_with_timezone(str);
+            t = utc_time;
+            // Note: timezone offset is extracted but not returned here
+            // It would need to be stored separately if needed for display
+        } else {
+            // No timezone, use existing parser
+            t = convert_time(str);
+        }
     }
 }
 

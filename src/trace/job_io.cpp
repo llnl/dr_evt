@@ -61,6 +61,13 @@ int load(const string& fname,
         if (cnt++ >= max_cnt) {
             break;
         }
+
+        // Strip trailing whitespace (including \r from Windows line endings)
+        while (!line.empty() && (line.back() == ' ' || line.back() == '\t' ||
+                                  line.back() == '\r' || line.back() == '\n')) {
+            line.pop_back();
+        }
+
         vector<string> rec_str;
         rec_str.reserve(record_sz);
 

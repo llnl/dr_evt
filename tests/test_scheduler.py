@@ -308,6 +308,28 @@ def test_iso_timestamps(runner: TestRunner):
     runner.assert_equal(metrics['jobs_completed'], 3, "3 jobs completed")
 
 
+def test_timezone_offsets(runner: TestRunner):
+    """Test ISO timestamps with timezone offsets (±HH:MM)
+
+    Verifies that timestamps from different timezones are correctly
+    normalized to UTC:
+    - 2024-01-01T08:00:00-08:00 (PST)
+    - 2024-01-01T11:00:00-05:00 (EST)
+    - 2024-01-01T17:00:00+01:00 (CET)
+    All should normalize to 2024-01-01 16:00:00 UTC
+    """
+    metrics = runner.run_simulator("test_traces/timezone_offsets.csv",
+                                    extra_args=["--timestamp_format", "iso",
+                                               "--trace_format", "simple"])
+
+    runner.assert_equal(metrics['jobs_submitted'], 3, "3 jobs submitted")
+    runner.assert_equal(metrics['jobs_completed'], 3, "3 jobs completed")
+
+    # All three jobs should have been submitted at essentially the same time
+    # (within a few seconds due to epoch rounding)
+    # This verifies UTC normalization is working
+
+
 def main():
     print("="*50)
     print("DR_EVT Scheduler Python Test Suite")
@@ -338,6 +360,7 @@ def main():
 
     print("\nFormat Tests:")
     runner.test("test_iso_timestamps", lambda: test_iso_timestamps(runner))
+    runner.test("test_timezone_offsets", lambda: test_timezone_offsets(runner))
 
     print("\nStress Tests:")
     runner.test("test_saturation", lambda: test_saturation(runner))

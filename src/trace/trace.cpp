@@ -15,7 +15,7 @@
 namespace dr_evt {
 
 Trace::Trace(const std::string& fname)
-  : m_fname(fname)
+  : m_fname(fname), m_default_timezone("+00:00")
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -24,7 +24,7 @@ Trace::Trace(const std::string& fname)
 }
 
 Trace::Trace(const std::string& fname, const std::string& format)
-  : m_fname(fname), m_dcols(format)
+  : m_fname(fname), m_dcols(format), m_default_timezone("+00:00")
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -34,7 +34,8 @@ Trace::Trace(const std::string& fname, const std::string& format)
 
 Trace::Trace(const std::string& fname, const std::string& format,
              const std::string& timestamp_format, const std::string& timezone)
-  : m_fname(fname), m_dcols(format, timestamp_format, timezone)
+  : m_fname(fname), m_dcols(format, timestamp_format, timezone),
+    m_default_timezone("+00:00")  // Default to UTC
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -177,6 +178,67 @@ void Trace::run_job_trace()
     // Process all the remaiing events. Use any time later than any timestamp
     // in the trace for flushing.
     process_events_until(ctx, convert_time(max_tstamp));
+}
+
+void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
+{
+    auto& job = m_data[job_idx];
+
+    // Ensure job has actual_duration set
+    // In streaming mode, this would be determined here
+    // For now, it should already be set by determine_job_durations()
+    if (job.get_actual_duration() <= 0.0) {
+        // Fallback: use time limit if duration not set
+        job.set_actual_duration(job.get_limit_time());
+    }
+
+    // Convert sim_time_t to epoch_t
+    time_t start_sec = static_cast<time_t>(start_time);
+    float start_frac = start_time - start_sec;
+    epoch_t start_epoch = {start_sec, start_frac};
+
+    // Calculate end time using actual duration
+    tdiff_t duration = job.get_exec_time();
+    sim_time_t end_time = start_time + duration;
+    time_t end_sec = static_cast<time_t>(end_time);
+    float end_frac = end_time - end_sec;
+    epoch_t end_epoch = {end_sec, end_frac};
+
+    // Insert events into queue (will be automatically sorted by event_q_t)
+    ctx.m_evtq.emplace(job_idx, start_epoch, arrival);
+    ctx.m_evtq.emplace(job_idx, end_epoch, departure);
+
+    // Update job record with computed times (for output)
+    m_data[job_idx].set_begin_time(start_epoch);
+    m_data[job_idx].compute_end_time();
+}
+
+void Trace::run_until_exclusive(Context& ctx, sim_time_t target_time)
+{
+    // Convert sim_time_t to epoch_t for comparison
+    time_t target_sec = static_cast<time_t>(target_time);
+    float target_frac = target_time - target_sec;
+    epoch_t target_epoch = {target_sec, target_frac};
+
+    // Process events until we reach target_time (exclusive)
+    process_events_until(ctx, target_epoch);
+}
+
+void Trace::run_until_inclusive(Context& ctx, sim_time_t target_time)
+{
+    // Process events at and before target_time
+    while (!ctx.m_evtq.empty()) {
+        const auto& event = *ctx.m_evtq.begin();
+        sim_time_t event_time = static_cast<sim_time_t>(event.get_time().first) +
+                               event.get_time().second;
+
+        if (event_time > target_time) {
+            break;  // Stop after processing all events <= target_time
+        }
+
+        // Process this event by running slightly past it
+        process_events_until(ctx, event.get_time());
+    }
 }
 
 std::ostream& Trace::print(std::ostream& os) const
