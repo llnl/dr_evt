@@ -304,14 +304,49 @@ void Simulation::advance_to(sim_time_t target_time)
                                 " but current_time=" + std::to_string(m_current_time));
     }
 
+    // Before entering the main loop: check if any jobs arrive at current_time (initially 0)
+    // This handles the case where jobs submit at t=0
+    if (!m_wait_queue.empty()) {
+        bool has_arrivals_now = false;
+        for (job_no_t job_idx : m_wait_queue) {
+            const auto& job = m_trace.data()[job_idx];
+            const auto& ts = job.get_submit_time();
+            sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
+            if (submit == m_current_time) {
+                has_arrivals_now = true;
+                break;
+            }
+        }
+
+        if (has_arrivals_now) {
+            // Call scheduler to evaluate newly arriving jobs
+            while (true) {
+                num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
+                auto jobs_to_run = m_scheduler.schedule(m_wait_queue, free_nodes,
+                                                        m_running_jobs, m_current_time);
+                if (jobs_to_run.empty()) {
+                    break;
+                }
+
+                for (job_no_t job : jobs_to_run) {
+                    m_trace.insert_job(job, m_current_time, m_replay_ctx);
+                    m_running_jobs[job] = m_current_time;
+                    m_jobs_submitted++;
+                }
+
+                m_trace.run_until_inclusive(m_replay_ctx, m_current_time);
+            }
+        }
+    }
+
     // Main event loop - process events and make scheduling decisions until target_time
     while (m_current_time < target_time || !m_wait_queue.empty()) {
         // Find next event time from waiting jobs and replay events
         sim_time_t next_arrival = std::numeric_limits<sim_time_t>::max();
         for (job_no_t job_idx : m_wait_queue) {
             const auto& job = m_trace.data()[job_idx];
-            sim_time_t submit = static_cast<sim_time_t>(job.get_submit_time().first) +
-                               job.get_submit_time().second;
+            const auto& ts = job.get_submit_time();
+            sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
             if (submit > m_current_time && submit <= target_time) {
                 next_arrival = std::min(next_arrival, submit);
             }
@@ -322,8 +357,8 @@ void Simulation::advance_to(sim_time_t target_time)
         if (next_arrival == std::numeric_limits<sim_time_t>::max() && !m_wait_queue.empty()) {
             for (job_no_t job_idx : m_wait_queue) {
                 const auto& job = m_trace.data()[job_idx];
-                sim_time_t submit = static_cast<sim_time_t>(job.get_submit_time().first) +
-                                   job.get_submit_time().second;
+                const auto& ts = job.get_submit_time();
+                sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
                 if (submit <= m_current_time) {
                     have_eligible_jobs_now = true;
                     break;

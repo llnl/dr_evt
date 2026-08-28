@@ -42,8 +42,8 @@ std::vector<job_no_t> Scheduler::schedule(
     std::set<job_no_t> eligible_jobs;
     for (job_no_t job_idx : wait_queue) {
         const auto& job = (*m_job_data_ptr)[job_idx];
-        sim_time_t submit_time = static_cast<sim_time_t>(job.get_submit_time().first) +
-                                 job.get_submit_time().second;
+        const auto& ts = job.get_submit_time();
+        sim_time_t submit_time = static_cast<sim_time_t>(ts.first) + ts.second;
         if (submit_time <= current_time) {
             eligible_jobs.insert(job_idx);
         }
