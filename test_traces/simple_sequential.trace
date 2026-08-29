@@ -1,8 +1,0 @@
-# Simple sequential trace: 3 jobs that don't overlap
-# Format: num_nodes  begin_time  end_time  submit_time  queue  time_limit
-# Job 0: arrives at 0, needs 10 nodes, runs for 100 seconds
-10	0	100	0	batch	100
-# Job 1: arrives at 50, needs 10 nodes, runs for 50 seconds
-10	0	0	50	batch	50
-# Job 2: arrives at 120, needs 10 nodes, runs for 80 seconds
-10	0	0	120	batch	80

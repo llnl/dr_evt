@@ -1,11 +1,25 @@
 # Discrete Resource Event Modeling and Multi-cluster Scheduling Simulator
- Discrete resource event modeling and multi-cluster scheduling simulator
- (DR_EVT) aims to provide a computational environment for simulating job
- scheduling and resource management using a set of heterogenous clusters.
- Currently, we proivde means to load and process job trace files, and
- are working on to build a worklod model based on the trace data.
- Once we have a workload model, we will use it feed a mult-cluster
- simulator that will be developed.
+
+Discrete resource event modeling and multi-cluster scheduling simulator
+(DR_EVT) aims to provide a computational environment for simulating job
+scheduling and resource management using a set of heterogenous clusters.
+
+## Features
+
+- **Verified Scheduler Implementation**: EASY backfilling algorithm verified against hand-traced oracles (23 correctness tests)
+- **Streaming API**: Online simulation with dynamic job submission (`insert_job`, `run_until_inclusive`, `run_until_exclusive`)
+- **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
+- **Replay and Simulation Modes**: Replay historical traces or simulate with runtime distributions
+- **Comprehensive Testing**: 54 tests covering correctness, unit, feature, replay, and scale scenarios
+- **Real HPC Trace Support**: Load and process job traces from production HPC systems
+- **CI/CD Integration**: Automated testing with GitHub Actions
+
+## Documentation
+
+- **[Complete Documentation](docs/)** - User guides, API reference, verification
+- **[Streaming API Guide](docs/STREAMING_API.md)** - Online simulation API
+- **[Test Suite](tests/README.md)** - 54 organized tests
+- **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
 
 ## Current Requirements:
  + **Platforms targeted**: Linux-based systems
