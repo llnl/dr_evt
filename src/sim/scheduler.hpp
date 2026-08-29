@@ -11,9 +11,10 @@
 #ifndef DR_EVT_SIM_SCHEDULER_HPP
 #define DR_EVT_SIM_SCHEDULER_HPP
 
-#include <vector>
-#include <set>
+#include <deque>
 #include <map>
+#include <set>
+#include <vector>
 #include "common.hpp"
 #include "trace/job_record.hpp"
 #include "sim/scheduler_policies.hpp"
@@ -78,14 +79,14 @@ class Scheduler {
      * Main scheduling decision function
      * Called on job arrival or job completion
      *
-     * @param wait_queue Jobs waiting to be scheduled (will be modified - jobs scheduled are removed)
+     * @param wait_queue Jobs waiting (pairs of job_idx, removed_flag). Scheduled jobs marked as removed.
      * @param free_nodes Currently available nodes
      * @param running_jobs Map of currently running jobs (job_idx -> start_time)
      * @param current_time Current simulation time
      * @return List of jobs that should be fed to replay engine
      */
     std::vector<job_no_t> schedule(
-        std::set<job_no_t>& wait_queue,
+        std::deque<std::pair<job_no_t, bool>>& wait_queue,
         num_nodes_t free_nodes,
         const std::map<job_no_t, sim_time_t>& running_jobs,
         sim_time_t current_time);

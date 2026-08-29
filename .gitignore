@@ -63,6 +63,8 @@ test_streaming*.csv
 # Generated reference test outputs (from python_reference_scheduler.py)
 *_reference.csv
 *_reference_resources.csv
+*_python.csv
+*_python_resources.csv
 
 # Session state notes (local only)
 SESSION_STATE.md

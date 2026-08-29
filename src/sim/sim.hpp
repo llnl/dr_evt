@@ -18,6 +18,7 @@
 #endif
 
 #include <cmath>
+#include <deque>
 #include <limits>
 #include <unordered_map>
 #include <memory> // unique_ptr
@@ -66,7 +67,9 @@ class Simulation {
     Trace::Context m_replay_ctx;
 
     /// Waiting queue for streaming mode (jobs submitted but not yet started)
-    std::set<job_no_t> m_wait_queue;
+    /// Pairs: (job_idx, removed_flag). Sorted by submit_time.
+    /// removed_flag: false = active, true = scheduled (lazy deletion)
+    std::deque<std::pair<job_no_t, bool>> m_wait_queue;
 
     /// Running jobs for streaming mode (job_idx -> start_time)
     std::map<job_no_t, sim_time_t> m_running_jobs;
