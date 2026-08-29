@@ -56,7 +56,7 @@ void test_basic_insert_and_run() {
 
     // Manually initialize (normally done in run())
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;
-    int rc = sim.get_trace().load_data(max_num_jobs);
+    [[maybe_unused]] int rc = sim.get_trace().load_data(max_num_jobs);
     assert(rc == EXIT_SUCCESS);
 
     std::cout << "Loaded " << sim.get_trace().data().size() << " jobs" << std::endl;
@@ -272,7 +272,7 @@ void test_no_resource_leaks() {
         sim.run_until_inclusive(start_time);
 
         // Check nodes in use
-        num_nodes_t expected_nodes = 10 * std::min(i + 1, 2);  // Max 2 jobs overlap
+        [[maybe_unused]] num_nodes_t expected_nodes = 10 * std::min(i + 1, 2);  // Max 2 jobs overlap
         std::cout << "  t=" << start_time << ": "
                  << sim.get_nodes_in_use() << " nodes in use" << std::endl;
     }

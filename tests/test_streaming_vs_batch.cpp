@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <algorithm>
 
 using namespace dr_evt;
 
@@ -66,7 +67,7 @@ std::map<job_no_t, std::pair<sim_time_t, sim_time_t>> run_batch_simulation(const
 
     Sim_Params params;
     params.m_infile = trace_file;
-    params.m_outfile = "batch_output.csv";
+    params.set_outfile("batch_output.csv");
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
@@ -101,7 +102,7 @@ std::map<job_no_t, std::pair<sim_time_t, sim_time_t>> run_streaming_simulation(c
 
     Sim_Params params;
     params.m_infile = trace_file;
-    params.m_outfile = "streaming_output.csv";
+    params.set_outfile("streaming_output.csv");
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
