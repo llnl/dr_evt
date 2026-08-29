@@ -20,7 +20,7 @@ This created an inconsistent resource view. Jobs started in step 2 only saw the 
 DR_EVT correctly batched all END events at the same timestamp before calling the scheduler, giving a consistent view of all freed resources.
 
 ## Fix
-Modified `minimal_easy_oracle.py` to batch all END events at the same timestamp:
+Modified `python_reference_scheduler.py` to batch all END events at the same timestamp:
 
 ```python
 elif event.type == 'END':

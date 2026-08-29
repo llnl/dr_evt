@@ -25,7 +25,7 @@ These are properties we can actually test and verify:
 
 **How to verify:**
 ```bash
-python3 minimal_easy_oracle.py input.csv --output expected.csv
+python3 python_reference_scheduler.py input.csv --output expected.csv
 ./simulator input.csv --outfile actual.csv
 compare(expected.csv, actual.csv)
 ```

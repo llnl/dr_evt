@@ -290,7 +290,7 @@ tests/test_traces/correctness/
 ```bash
 # Generate reference outputs
 for i in {01..10}; do
-    python3 scripts/minimal_easy_oracle.py \
+    python3 scripts/python_reference_scheduler.py \
       tests/test_traces/correctness/bf${i}_*_input.csv \
       --nodes 100 --output bf${i}_reference.csv
 done
@@ -321,7 +321,7 @@ echo "Now testing on large-scale trace..."
 python3 scripts/generate_large_test.py --jobs 2000 --output large_test.csv
 
 # Run oracle
-python3 scripts/minimal_easy_oracle.py large_test.csv \
+python3 scripts/python_reference_scheduler.py large_test.csv \
   --nodes 100 --output large_oracle.csv
 
 # Run DR_EVT

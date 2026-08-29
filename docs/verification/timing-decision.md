@@ -34,7 +34,7 @@ if (current_time + runtime_est < m_fcfs_reservation_time) {
 
 ### Reference Implementation (Python):
 ```python
-# minimal_easy_oracle.py
+# python_reference_scheduler.py
 estimated_completion = self.current_time + job.duration
 if estimated_completion >= reservation_time:
     return False  # Cannot backfill

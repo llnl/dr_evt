@@ -8,7 +8,7 @@ DR_EVT correctness is verified through a two-phase approach:
 
 Both phases test **both implementations**:
 - C++ implementation (DR_EVT simulator)
-- Python reference implementation (scripts/minimal_easy_oracle.py)
+- Python reference implementation (scripts/python_reference_scheduler.py)
 
 ## Phase 1: Analytical Verification (19 tests)
 
@@ -125,7 +125,7 @@ Hand-traced using EASY backfilling rules:
 See: `scripts/generate_all_analytical_oracles.py`
 
 ### Python Reference Implementation
-- File: `scripts/minimal_easy_oracle.py`
+- File: `scripts/python_reference_scheduler.py`
 - Event-driven simulation
 - Implements EASY backfilling exactly as specified
 - Used for both oracle generation and cross-validation
@@ -155,7 +155,7 @@ Last verified: 2026-08-28
 
 ### For Large Tests (Cross-validation)
 1. Create input trace: `tests/test_traces/correctness/<name>_input.csv`
-2. Generate oracle: `python3 scripts/minimal_easy_oracle.py <input> <oracle>`
+2. Generate oracle: `python3 scripts/python_reference_scheduler.py <input> <oracle>`
 3. Run verification: `python3 scripts/verify_against_analytical.py`
 
 ## References

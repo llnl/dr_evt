@@ -60,7 +60,7 @@ In `scripts/`:
 
 ```bash
 verify_against_analytical.py           # Main verification (23 tests)
-minimal_easy_oracle.py                 # Python reference implementation
+python_reference_scheduler.py                 # Python reference implementation
 generate_all_analytical_oracles.py     # Generate analytical oracles
 ```
 
