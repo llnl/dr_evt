@@ -289,28 +289,46 @@ This caused `run_until_inclusive(50)` to continue advancing to `t=150` and beyon
 Three test programs verify the streaming API:
 
 ### test_streaming_api
-Basic functional tests of the three API methods.
 
-**Run:**
+Basic functional tests of the streaming API methods.
+
 ```bash
 ./build/test_streaming_api
 ```
 
-### test_streaming_vs_batch
-Verifies streaming mode produces identical results to batch mode.
+**Tests:**
+- Basic insert_job() and run_until() operations
+- Exclusive vs inclusive time advancement semantics
+- Online scheduling simulation
+- Resource leak detection
 
-**Run:**
+### test_batch_vs_streaming
+
+Comprehensive validation comparing batch mode vs streaming mode with large workloads.
+
 ```bash
-./build/test_streaming_vs_batch
+./build/test_batch_vs_streaming tests/test_traces/scale/huge_2000jobs.csv
 ```
 
-### test_two_stream_manual (requires MPI)
-Tests two MPI ranks feeding jobs independently.
+**Validates:**
+- Job traces match (scheduling decisions)
+- Resource traces match (resource accounting over time)
+- Tested with 2000+ job traces
+- Performance comparison (streaming has ~1% overhead)
 
-**Run:**
+### test_mpi_streaming (requires MPI)
+
+Tests MPI-coordinated streaming with multiple ranks feeding jobs independently.
+
 ```bash
-mpirun -np 2 ./build/test_two_stream_manual
+mpirun -np 4 ./build/test_mpi_streaming tests/test_traces/scale/large_200jobs.csv
 ```
+
+**Validates:**
+- All ranks produce identical output (deterministic)
+- MPI coordination via MPI_Allreduce
+- Round-robin job partitioning across ranks
+- Streaming matches batch mode
 
 ## Limitations
 

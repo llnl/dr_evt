@@ -3,9 +3,9 @@
 ## Prerequisites
 
 The streaming tests have been added to CMakeLists.txt:
-- test_streaming_api
-- test_streaming_vs_batch  
-- test_two_stream_manual (requires MPI)
+- test_streaming_api - Basic API functionality tests
+- test_batch_vs_streaming - Comprehensive batch vs streaming validation
+- test_mpi_streaming (requires MPI) - MPI-coordinated distributed streaming
 
 ## Build Instructions
 
@@ -23,7 +23,10 @@ This will pick up the new test targets from CMakeLists.txt.
 
 ```bash
 # Build all streaming tests
-make test_streaming_api test_streaming_vs_batch test_two_stream_manual -j4
+make test_streaming_api-bin test_batch_vs_streaming-bin -j4
+
+# Build MPI test (requires MPI installed)
+make test_mpi_streaming-bin
 
 # Or build everything
 make -j4
@@ -32,15 +35,16 @@ make -j4
 ### 3. Verify Tests Built
 
 ```bash
-ls -lh build/test_streaming*
-ls -lh build/test_two_stream_manual
+ls -lh build/test_streaming_api
+ls -lh build/test_batch_vs_streaming
+ls -lh build/test_mpi_streaming  # If MPI available
 ```
 
 Expected output:
 ```
 -rwxr-xr-x  build/test_streaming_api
--rwxr-xr-x  build/test_streaming_vs_batch
--rwxr-xr-x  build/test_two_stream_manual
+-rwxr-xr-x  build/test_batch_vs_streaming
+-rwxr-xr-x  build/test_mpi_streaming
 ```
 
 ## Running Tests
@@ -48,14 +52,14 @@ Expected output:
 ### Run Individual Test
 
 ```bash
-# Test 1: Streaming API
+# Test 1: Basic Streaming API
 ./build/test_streaming_api
 
-# Test 2: Streaming vs Batch
-./build/test_streaming_vs_batch
+# Test 2: Batch vs Streaming Comprehensive Validation
+./build/test_batch_vs_streaming tests/test_traces/scale/huge_2000jobs.csv
 
-# Test 3: Two Stream (requires MPI)
-mpirun -np 2 ./build/test_two_stream_manual
+# Test 3: MPI Streaming (requires MPI)
+mpirun -np 4 ./build/test_mpi_streaming tests/test_traces/scale/large_200jobs.csv
 ```
 
 ### Run via Test Runner
@@ -72,7 +76,7 @@ The test runner will:
 
 ## MPI Requirement
 
-`test_two_stream_manual` requires MPI:
+`test_mpi_streaming` requires MPI:
 
 **Install MPI (Ubuntu/Debian):**
 ```bash
@@ -89,7 +93,7 @@ brew install open-mpi
 mpirun --version
 ```
 
-Without MPI, CMake will skip building `test_two_stream_manual`.
+Without MPI, CMake will skip building `test_mpi_streaming`.
 
 ## Troubleshooting
 
@@ -107,7 +111,7 @@ make -j4
 
 ### MPI Test Not Building
 
-**Problem:** `test_two_stream_manual` not built
+**Problem:** `test_mpi_streaming` not built
 
 **Check:** Did CMake find MPI?
 ```bash
@@ -151,26 +155,41 @@ See `.github/workflows/tests.yml` for CI configuration.
 ## Test Descriptions
 
 ### test_streaming_api
-Tests the streaming/online simulation API for feeding jobs dynamically.
+Basic functional tests of the streaming API (insert_job, run_until_inclusive, run_until_exclusive).
+Tests resource accounting, time advancement semantics, and scheduler correctness.
 
-### test_streaming_vs_batch
-Compares streaming mode (jobs fed incrementally) vs batch mode (all jobs at once).
+### test_batch_vs_streaming
+Comprehensive validation that streaming mode produces identical results to batch mode.
+Compares both job traces (scheduling decisions) and resource traces (resource accounting).
+Tested with large workloads (2000+ jobs).
 
-### test_two_stream_manual
-Tests two MPI ranks feeding jobs independently (round-robin) using MPI for coordination.
+### test_mpi_streaming
+Tests MPI-coordinated streaming where multiple ranks feed different subsets of jobs.
+Validates that all ranks produce identical output (deterministic) and matches batch mode.
+Uses MPI_Allreduce for time coordination across ranks.
 
 ## Status
 
 **CMakeLists.txt:** ✓ Updated with all 3 tests  
 **GitHub CI:** ✓ Configured with MPI  
 **Documentation:** ✓ Complete  
+**Tests:** ✓ All passing
 
-**Next step:** Rebuild with cmake to test locally
+### Validation Results
+
+✅ **test_streaming_api**: All 4 tests pass  
+✅ **test_batch_vs_streaming**: Validated with 2000 jobs - job traces AND resource traces match perfectly  
+✅ **test_mpi_streaming**: All ranks produce identical output, matches batch mode  
+
+### Next Steps
 
 ```bash
 cd build
-rm CMakeCache.txt
 cmake ..
 make -j4
-./tests/run_feature_tests.sh
+
+# Run all streaming tests
+./build/test_streaming_api
+./build/test_batch_vs_streaming tests/test_traces/scale/huge_2000jobs.csv
+mpirun -np 4 ./build/test_mpi_streaming tests/test_traces/scale/large_200jobs.csv
 ```

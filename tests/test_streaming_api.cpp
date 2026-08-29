@@ -19,6 +19,9 @@
 #include "sim/sim.hpp"
 #include <iostream>
 #include <fstream>
+#include <string>
+#include <vector>
+#include <utility>
 #include <cassert>
 #include <cmath>
 
