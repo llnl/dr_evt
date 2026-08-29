@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 #include "common.hpp"
 #include "trace/job_record.hpp"
 #include "sim/scheduler_policies.hpp"
