@@ -286,8 +286,8 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         throw std::runtime_error("Invalid job_idx: " + std::to_string(job_idx));
     }
 
-    // Add to waiting queue
-    m_wait_queue.insert(job_idx);
+    // Add to waiting queue (jobs submitted in sorted order by submit_time)
+    m_wait_queue.push_back({job_idx, false});
 }
 
 void Simulation::advance_to(sim_time_t target_time)
@@ -303,8 +303,9 @@ void Simulation::advance_to(sim_time_t target_time)
     // This handles the case where jobs submit at t=0
     if (!m_wait_queue.empty()) {
         bool has_arrivals_now = false;
-        for (job_no_t job_idx : m_wait_queue) {
-            const auto& job = m_trace.data()[job_idx];
+        for (const auto& entry : m_wait_queue) {
+            if (entry.second) continue;  // Skip removed
+            const auto& job = m_trace.data()[entry.first];
             const auto& ts = job.get_submit_time();
             sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
             if (submit == m_current_time) {
@@ -341,15 +342,26 @@ void Simulation::advance_to(sim_time_t target_time)
     }
 
     // Main event loop - process events and make scheduling decisions until complete
+    // Helper: count active (non-removed) jobs in wait_queue
+    auto count_active_jobs = [this]() {
+        size_t count = 0;
+        for (const auto& entry : m_wait_queue) {
+            if (!entry.second) count++;
+        }
+        return count;
+    };
+
     // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running)
-    while (!m_wait_queue.empty() || !m_replay_ctx.m_evtq.empty()) {
+    while (count_active_jobs() > 0 || !m_replay_ctx.m_evtq.empty()) {
         // Find next event time from waiting jobs and replay events
-        // Scan wait_queue once: find next_arrival and collect jobs arriving then
+        // Scan wait_queue once: find next_arrival, skip removed jobs
         sim_time_t next_arrival = std::numeric_limits<sim_time_t>::max();
         bool have_eligible_jobs_now = false;
-        std::vector<job_no_t> jobs_at_next_arrival;
 
-        for (job_no_t job_idx : m_wait_queue) {
+        for (const auto& entry : m_wait_queue) {
+            if (entry.second) continue;  // Skip removed jobs
+
+            job_no_t job_idx = entry.first;
             const auto& job = m_trace.data()[job_idx];
             const auto& ts = job.get_submit_time();
             sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
@@ -358,13 +370,8 @@ void Simulation::advance_to(sim_time_t target_time)
                 // Job has already arrived and is eligible
                 have_eligible_jobs_now = true;
             } else if (submit < next_arrival) {
-                // Found earlier arrival - reset collection
+                // Found earlier arrival
                 next_arrival = submit;
-                jobs_at_next_arrival.clear();
-                jobs_at_next_arrival.push_back(job_idx);
-            } else if (submit == next_arrival) {
-                // Another job arriving at same time
-                jobs_at_next_arrival.push_back(job_idx);
             }
         }
 

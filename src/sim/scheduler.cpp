@@ -30,7 +30,7 @@ Scheduler::Scheduler(num_nodes_t total_nodes,
 {}
 
 std::vector<job_no_t> Scheduler::schedule(
-    std::set<job_no_t>& wait_queue,
+    std::deque<std::pair<job_no_t, bool>>& wait_queue,
     num_nodes_t free_nodes,
     const std::map<job_no_t, sim_time_t>& running_jobs,
     sim_time_t current_time)
@@ -39,12 +39,24 @@ std::vector<job_no_t> Scheduler::schedule(
         return {};
     }
 
-    // Sort jobs by policy, but only consider eligible ones (submit_time <= current_time)
-    // No need to copy - just filter during sorting
+    // Helper: mark job as removed (lazy deletion)
+    auto mark_removed = [&wait_queue](job_no_t job_idx) {
+        for (auto& entry : wait_queue) {
+            if (entry.first == job_idx && !entry.second) {
+                entry.second = true;
+                return;
+            }
+        }
+    };
+
+    // Sort jobs by policy, but only consider eligible ones (submit_time <= current_time and not removed)
     std::vector<job_no_t> sorted_jobs;
     sorted_jobs.reserve(wait_queue.size());
 
-    for (job_no_t job_idx : wait_queue) {
+    for (const auto& entry : wait_queue) {
+        if (entry.second) continue;  // Skip removed
+
+        job_no_t job_idx = entry.first;
         const auto& job = (*m_job_data_ptr)[job_idx];
         const auto& ts = job.get_submit_time();
         sim_time_t submit_time = static_cast<sim_time_t>(ts.first) + ts.second;
@@ -73,7 +85,7 @@ std::vector<job_no_t> Scheduler::schedule(
         jobs_to_run.push_back(fcfs_head);
 
         // Remove from wait queue before returning
-        wait_queue.erase(fcfs_head);
+        mark_removed(fcfs_head);
         return jobs_to_run;
     }
 
@@ -113,7 +125,7 @@ std::vector<job_no_t> Scheduler::schedule(
         if (completion < m_fcfs_reservation_time) {
             // Can backfill! Return this ONE job
             jobs_to_run.push_back(job_idx);
-            wait_queue.erase(job_idx);
+            mark_removed(job_idx);
             return jobs_to_run;  // Return immediately, let sim.cpp call us again
         } else {
             // Check if window too short for ALL remaining
@@ -130,7 +142,7 @@ std::vector<job_no_t> Scheduler::schedule(
 
     // Remove scheduled jobs from wait queue
     for (job_no_t job_idx : jobs_to_run) {
-        wait_queue.erase(job_idx);
+        mark_removed(job_idx);
     }
 
     return jobs_to_run;
