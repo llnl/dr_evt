@@ -2,6 +2,7 @@
 # Test that configuration files produce same results as command-line options
 #
 # Verifies that all CLI options are supported via config files and behave identically
+# NOTE: Requires Protobuf support (cmake -DDR_EVT_ENABLE_PROTOBUF=ON)
 
 set -e
 
@@ -22,6 +23,13 @@ if [ ! -f "./build/simulator" ]; then
     echo "Error: ./build/simulator not found"
     echo "Please build first: cd build && cmake .. && make"
     exit 1
+fi
+
+# Check if simulator supports --config option (requires Protobuf)
+if ! ./build/simulator --help 2>&1 | grep -q -- "--config"; then
+    echo "Simulator built without Protobuf support (no --config option)"
+    echo "Skipping config tests (require -DDR_EVT_ENABLE_PROTOBUF=ON)"
+    exit 0
 fi
 
 # Test trace
@@ -63,7 +71,8 @@ echo "Test 2: Full config"
     --trace_format simple \
     --timestamp_format epoch \
     --duration_mode exact \
-    --policy easy \
+    --backfill_policy easy \
+    --priority_policy fcfs \
     --outfile /tmp/cli_full.csv
 
 ./build/simulator "$TEST_TRACE" \
@@ -85,7 +94,7 @@ echo "Test 3: Conservative policy config"
     --trace_format simple \
     --timestamp_format epoch \
     --duration_mode exact \
-    --policy conservative \
+    --backfill_policy conservative \
     --outfile /tmp/cli_conservative.csv
 
 ./build/simulator "$TEST_TRACE" \

@@ -16,10 +16,14 @@
 #include "utils/file.hpp"
 #include "params/sim_params.hpp"
 
+#if defined(DR_EVT_HAS_PROTOBUF)
+#include "proto/dr_evt_params.hpp"
+#endif
+
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:v"
+#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -39,6 +43,7 @@ static const struct option longopts[] = {
     {"duration_scale",        required_argument,  0, 'S'},
     {"duration_stddev",       required_argument,  0, 'V'},
     {"verbose",               no_argument,        0, 'v'},
+    {"config",                required_argument,  0, 'c'},
     { 0, 0, 0, 0 },
 };
 
@@ -197,6 +202,18 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'v': /* --verbose */
                 m_verbose = true;
                 break;
+            case 'c': /* --config */
+                {
+#if defined(DR_EVT_HAS_PROTOBUF)
+                    std::string config_file(optarg);
+                    read_proto_params(config_file, *this, m_verbose);
+#else
+                    std::cerr << "Error: --config option requires Protobuf support" << std::endl;
+                    std::cerr << "Rebuild with -DDR_EVT_ENABLE_PROTOBUF=ON" << std::endl;
+                    exit(1);
+#endif
+                }
+                break;
             default:
                 print_usage(argv[0], 1);
                 break;
@@ -303,7 +320,15 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Enable verbose output for debugging and testing.\n"
         "        Shows detailed simulation progress, scheduling decisions,\n"
         "        and resource usage. Disabled by default for production runs.\n"
-        "\n";
+        "\n"
+#if defined(DR_EVT_HAS_PROTOBUF)
+        "    -c, --config CONFIGFILE\n"
+        "        Load parameters from Protobuf configuration file (.pb).\n"
+        "        Config file values are loaded first, then overridden by any\n"
+        "        command-line options specified after --config.\n"
+        "\n"
+#endif
+        ;
     exit(code);
 }
 

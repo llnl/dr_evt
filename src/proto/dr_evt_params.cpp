@@ -38,17 +38,16 @@ static void set_sim_options(
     sp.m_infile = cfg.infile();
     sp.set_outfile(cfg.outfile());
 
-    // Verbose flag
-    if (cfg.has_verbose()) {
-        sp.m_verbose = cfg.verbose();
-    }
+    // Verbose flag (always set in proto3, use the value directly)
+    sp.m_verbose = cfg.verbose();
 
-    // Scheduling parameters
-    if (cfg.has_total_nodes()) {
+    // Scheduling parameters (0 means use default from Sim_Params constructor)
+    if (cfg.total_nodes() > 0) {
         sp.m_total_nodes = cfg.total_nodes();
     }
 
-    if (cfg.has_backfill_policy()) {
+    // Backfill policy (default: EASY)
+    if (!cfg.backfill_policy().empty()) {
         std::string policy = cfg.backfill_policy();
         if (policy == "easy") {
             sp.m_backfill_policy = BackfillPolicy::EASY;
@@ -57,10 +56,14 @@ static void set_sim_options(
         } else {
             std::cerr << "Warning: Unknown backfill_policy in protobuf: " << policy
                      << " (using default: easy)" << std::endl;
+            sp.m_backfill_policy = BackfillPolicy::EASY;
         }
+    } else {
+        sp.m_backfill_policy = BackfillPolicy::EASY;
     }
 
-    if (cfg.has_priority_policy()) {
+    // Priority policy (default: FCFS)
+    if (!cfg.priority_policy().empty()) {
         std::string policy = cfg.priority_policy();
         if (policy == "fcfs") {
             sp.m_priority_policy = PriorityPolicy::FCFS;
@@ -71,10 +74,14 @@ static void set_sim_options(
         } else {
             std::cerr << "Warning: Unknown priority_policy in protobuf: " << policy
                      << " (using default: fcfs)" << std::endl;
+            sp.m_priority_policy = PriorityPolicy::FCFS;
         }
+    } else {
+        sp.m_priority_policy = PriorityPolicy::FCFS;
     }
 
-    if (cfg.has_runtime_mode()) {
+    // Runtime estimate mode (default: USE_LIMIT)
+    if (!cfg.runtime_mode().empty()) {
         std::string mode = cfg.runtime_mode();
         if (mode == "limit") {
             sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
@@ -83,24 +90,50 @@ static void set_sim_options(
         } else {
             std::cerr << "Warning: Unknown runtime_mode in protobuf: " << mode
                      << " (using default: limit)" << std::endl;
+            sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
         }
+    } else {
+        sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
     }
 
-    // Trace format parameters
-    if (cfg.has_trace_format()) {
-        sp.m_trace_format = cfg.trace_format();
+    // Trace format (options: "simple" or "lassen", default: "lassen")
+    if (!cfg.trace_format().empty()) {
+        std::string format = cfg.trace_format();
+        if (format == "simple" || format == "lassen") {
+            sp.m_trace_format = format;
+        } else {
+            std::cerr << "Warning: Unknown trace_format in protobuf: " << format
+                     << " (using default: lassen)" << std::endl;
+            sp.m_trace_format = "lassen";
+        }
+    } else {
+        sp.m_trace_format = "lassen";
     }
 
-    if (cfg.has_timestamp_format()) {
-        sp.m_timestamp_format = cfg.timestamp_format();
+    // Timestamp format (options: "epoch" or "iso", default: "iso")
+    if (!cfg.timestamp_format().empty()) {
+        std::string format = cfg.timestamp_format();
+        if (format == "epoch" || format == "iso") {
+            sp.m_timestamp_format = format;
+        } else {
+            std::cerr << "Warning: Unknown timestamp_format in protobuf: " << format
+                     << " (using default: iso)" << std::endl;
+            sp.m_timestamp_format = "iso";
+        }
+    } else {
+        sp.m_timestamp_format = "iso";
     }
 
-    if (cfg.has_timezone()) {
+    // Timezone (examples: "UTC", "America/Los_Angeles", "America/New_York", default: "America/Los_Angeles")
+    // Accepts any valid IANA timezone string
+    if (!cfg.timezone().empty()) {
         sp.m_timezone = cfg.timezone();
+    } else {
+        sp.m_timezone = "America/Los_Angeles";
     }
 
-    // Duration simulation parameters
-    if (cfg.has_duration_mode()) {
+    // Duration mode (default: EXACT)
+    if (!cfg.duration_mode().empty()) {
         std::string mode = cfg.duration_mode();
         if (mode == "column") {
             sp.m_duration_mode = DurationMode::FROM_COLUMN;
@@ -111,10 +144,14 @@ static void set_sim_options(
         } else {
             std::cerr << "Warning: Unknown duration_mode in protobuf: " << mode
                      << " (using default: exact)" << std::endl;
+            sp.m_duration_mode = DurationMode::EXACT;
         }
+    } else {
+        sp.m_duration_mode = DurationMode::EXACT;
     }
 
-    if (cfg.has_duration_distribution()) {
+    // Duration distribution (default: NORMAL)
+    if (!cfg.duration_distribution().empty()) {
         std::string dist = cfg.duration_distribution();
         if (dist == "normal") {
             sp.m_duration_distribution = DistributionType::NORMAL;
@@ -125,15 +162,28 @@ static void set_sim_options(
         } else {
             std::cerr << "Warning: Unknown duration_distribution in protobuf: " << dist
                      << " (using default: normal)" << std::endl;
+            sp.m_duration_distribution = DistributionType::NORMAL;
         }
+    } else {
+        sp.m_duration_distribution = DistributionType::NORMAL;
     }
 
-    if (cfg.has_duration_scale()) {
+    // Duration scale (default: 1.0 = jobs run 100% of time_limit)
+    // 0.0 doesn't make sense (zero duration), treat as "use default"
+    if (cfg.duration_scale() > 0.0) {
         sp.m_duration_scale = cfg.duration_scale();
+    } else {
+        sp.m_duration_scale = 1.0;
     }
 
-    if (cfg.has_duration_stddev()) {
+    // Duration stddev (default: 0.0 = no variation)
+    // Negative values don't make sense, treat as "use default"
+    if (cfg.duration_stddev() >= 0.0) {
         sp.m_duration_stddev = cfg.duration_stddev();
+    } else {
+        std::cerr << "Warning: Negative duration_stddev in protobuf: " << cfg.duration_stddev()
+                 << " (using default: 0.0)" << std::endl;
+        sp.m_duration_stddev = 0.0;
     }
 
     // Handle defaults

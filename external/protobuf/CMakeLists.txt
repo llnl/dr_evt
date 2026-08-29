@@ -7,7 +7,8 @@ set(PROTOBUF_URL "https://github.com/protocolbuffers/protobuf.git"
     CACHE STRING "The URL from which to clone PROTOBUF")
 
 # ... then the tag.
-set(PROTOBUF_TAG "v3.12.4"
+# Updated to v21.12 (compatible with modern CMake)
+set(PROTOBUF_TAG "v21.12"
   CACHE STRING "The git tag or hash to checkout for PROTOBUF")
 
 set(PROTOBUF_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}"
@@ -15,6 +16,9 @@ set(PROTOBUF_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}"
 
 set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
 #set(CMAKE_GENERATOR "Ninja" CACHE INTERNAL "" FORCE)
+
+# Ensure install directory exists and is writable
+file(MAKE_DIRECTORY "${CMAKE_INSTALL_PREFIX}")
 
 message(STATUS "INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 include(ExternalProject)
