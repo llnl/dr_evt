@@ -6,285 +6,168 @@ Complete documentation for the DR_EVT HPC Job Scheduler Simulator.
 
 ```
 docs/
-├── USER_GUIDE.md              # Complete user guide
-├── TEST_DESCRIPTIONS.md       # Detailed test explanations
-├── Doxyfile                   # Doxygen configuration
-├── README.md                  # This file
-├── build_docs.sh             # Build all documentation
-├── sphinx/                   # Sphinx documentation
-│   ├── conf.py              # Sphinx configuration
-│   └── index.rst            # Documentation index
-└── api/                     # Generated API docs (Doxygen output)
-    └── html/
-        └── index.html       # API documentation entry point
+├── index.md                    # Main documentation index
+├── getting-started/            # New user guides
+│   ├── quickstart.md          # 5-minute quick start
+│   ├── installation.md        # Build and install
+│   └── tutorial.md            # Step-by-step tutorial
+├── user-guide/                 # Complete user manual
+│   ├── overview.md            # User guide overview
+│   ├── command-line.md        # All CLI options
+│   ├── trace-formats.md       # Input file formats
+│   ├── scheduling-policies.md # Algorithm explanations
+│   └── simulation-modes.md    # Replay vs simulation
+├── verification/               # Correctness verification
+│   ├── summary.md             # ✓ 23/23 tests pass
+│   ├── analytical.md          # Hand-traced verification
+│   ├── easy-backfilling.md    # Algorithm properties
+│   └── test-descriptions.md   # Test explanations
+├── development/                # Developer documentation
+│   ├── algorithm.md           # Simulation algorithm
+│   ├── architecture.md        # System design
+│   ├── design-decisions/      # Why we made choices
+│   └── contributing.md        # How to contribute
+├── reference/                  # Technical reference
+│   ├── terminology.md         # Terms and definitions
+│   └── config-files.md        # Configuration formats
+└── api/                        # API documentation
+    └── index.md               # C++ API reference
 ```
 
-## Available Documentation
+## Quick Navigation
 
-### User Documentation
+### For New Users
+1. [Quick Start](getting-started/quickstart.md) - Get running in 5 minutes
+2. [Installation](getting-started/installation.md) - Build from source
+3. [Tutorial](getting-started/tutorial.md) - Your first simulation
 
-1. **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user manual
-   - Quick start examples
-   - Command-line options
-   - Trace file formats
-   - Scheduler policies explained
-   - Troubleshooting guide
+### For Regular Users
+1. [User Guide](user-guide/overview.md) - Complete manual
+2. [Command-Line Options](user-guide/command-line.md) - All options
+3. [Trace Formats](user-guide/trace-formats.md) - Input files
 
-2. **[../TESTING.md](../TESTING.md)** - Testing guide
-   - Running test suite
-   - Understanding test results
-   - Adding new tests
+### For Researchers
+1. [Verification Summary](verification/summary.md) - ✓ All tests pass
+2. [EASY Backfilling](verification/easy-backfilling.md) - Algorithm
+3. [Analytical Verification](verification/analytical.md) - Ground truth
 
-3. **[TEST_DESCRIPTIONS.md](TEST_DESCRIPTIONS.md)** - Test explanations
-   - What each test validates
-   - Why tests are important
-   - How to interpret failures
-
-### Reference Documentation
-
-4. **[../TRACE_FORMAT.md](../TRACE_FORMAT.md)** - Trace format specification
-   - Simple format (7 columns)
-   - Lassen format (33 columns)
-   - Timestamp formats
-
-5. **[../QUICKSTART.md](../QUICKSTART.md)** - Quick reference
-   - Common commands
-   - Quick examples
-
-### Test Results
-
-6. **[../TEST_SUMMARY.md](../TEST_SUMMARY.md)** - Comprehensive test results
-7. **[../BACKFILL_VERIFICATION.md](../BACKFILL_VERIFICATION.md)** - Backfill validation
-8. **[../SATURATION_TEST_RESULTS.md](../SATURATION_TEST_RESULTS.md)** - Stress test analysis
+### For Developers
+1. [Algorithm](development/algorithm.md) - How it works
+2. [Architecture](development/architecture.md) - System design
+3. [Design Decisions](development/design-decisions.md) - Why
 
 ## Building Documentation
 
 ### Prerequisites
 
-Install documentation tools:
 ```bash
-# Doxygen (for C++ API docs)
-# macOS
-brew install doxygen graphviz
-
-# Ubuntu/Debian
-sudo apt-get install doxygen graphviz
-
-# Sphinx (for Python/general docs)
-pip3 install sphinx sphinx-rtd-theme myst-parser
+pip install -r requirements.txt
 ```
 
-### Build All Documentation
+Installs:
+- Sphinx (documentation generator)
+- sphinx-rtd-theme (ReadTheDocs theme)
+- myst-parser (Markdown support)
+
+### Build HTML Documentation
 
 ```bash
-# From project root
-./docs/build_docs.sh
-
-# Or manually
 cd docs
-
-# Build Doxygen (C++ API)
-doxygen Doxyfile
-
-# Build Sphinx (Python/general)
-cd sphinx
-make html
-cd ..
+sphinx-build -b html . _build/html
 ```
 
-### View Documentation
+View at: `_build/html/index.html`
+
+### Build PDF
 
 ```bash
-# API documentation (Doxygen)
-open docs/api/html/index.html
-
-# General documentation (Sphinx)
-open docs/sphinx/_build/html/index.html
-
-# Or with Python HTTP server
-cd docs/api/html && python3 -m http.server 8000
-# Visit http://localhost:8000
+sphinx-build -b latex . _build/latex
+cd _build/latex
+make
 ```
 
-## Documentation for Different Audiences
+Output: `DR_EVT.pdf`
 
-### End Users (Running Simulations)
+### Auto-rebuild on Changes
 
-Start with:
-1. [USER_GUIDE.md](USER_GUIDE.md) - Complete usage guide
-2. [../QUICKSTART.md](../QUICKSTART.md) - Quick examples
-3. [../TRACE_FORMAT.md](../TRACE_FORMAT.md) - Creating trace files
+```bash
+pip install sphinx-autobuild
+sphinx-autobuild . _build/html
+```
 
-### Testers (Validating Scheduler)
+Opens browser with live reload at `http://localhost:8000`
 
-Start with:
-1. [../TESTING.md](../TESTING.md) - Running tests
-2. [TEST_DESCRIPTIONS.md](TEST_DESCRIPTIONS.md) - Understanding tests
-3. [../TEST_SUMMARY.md](../TEST_SUMMARY.md) - Test results
+## ReadTheDocs
 
-### Developers (Modifying Code)
+Documentation is automatically built and published at:
+https://dr-evt.readthedocs.io/
 
-Start with:
-1. `api/html/index.html` - Doxygen API documentation
-2. [../BUILD_SETUP.md](../BUILD_SETUP.md) - Build instructions
-3. Source code comments (Doxygen-formatted)
-
-### Researchers (Understanding Algorithms)
-
-Start with:
-1. [USER_GUIDE.md](USER_GUIDE.md) - Scheduler policies section
-2. [../BACKFILL_VERIFICATION.md](../BACKFILL_VERIFICATION.md) - Algorithm analysis
-3. `src/sim/scheduler.hpp` - Implementation details
+Configuration: `.readthedocs.yaml`
 
 ## Documentation Standards
 
-### Code Comments (Doxygen)
+### Markdown Format
 
-C++ files use Doxygen format:
-```cpp
-/**
- * @brief Brief description
- *
- * Detailed description with examples.
- *
- * @param param_name Parameter description
- * @return Return value description
- *
- * @code
- * Example usage code
- * @endcode
- *
- * @see RelatedClass
- */
-void function(int param_name);
-```
+- Use ATX headers (`#` not underlines)
+- Code blocks with language hints:
+  ````markdown
+  ```bash
+  ./simulator trace.csv
+  ```
+  ````
+- Link to other docs with relative paths:
+  ```markdown
+  [User Guide](user-guide/overview.md)
+  ```
 
-### Markdown Files
+### Structure
 
-- Use ATX-style headers (`#` not underlines)
-- Code blocks with language hints
-- Link to other documentation
-- Include examples
+Each major section should have:
+1. **Overview** - What this section covers
+2. **Examples** - Concrete code examples
+3. **Reference** - Technical details
+4. **See Also** - Links to related docs
 
-### Test Documentation
+### Code Examples
 
-Each test should document:
-- **What it tests** - Feature/behavior being validated
-- **Expected behavior** - Step-by-step execution
-- **What it validates** - Specific assertions
-- **Why it's important** - Context and motivation
+All code examples should:
+- Be runnable (test them!)
+- Include expected output
+- Explain what's happening
 
-## Updating Documentation
+### Updates
 
-### When Code Changes
+When code changes:
+1. **New feature** → Update user guide + add example
+2. **New test** → Update verification docs
+3. **API change** → Update API reference
+4. **Bug fix** → Update development notes
 
-1. **New feature** → Update USER_GUIDE.md
-2. **New test** → Update TEST_DESCRIPTIONS.md
-3. **API change** → Update code comments (Doxygen)
-4. **Bug fix** → Add to test documentation
+## Contributing
 
-### Rebuild Documentation
+To add/improve documentation:
 
-```bash
-./docs/build_docs.sh
-```
-
-### Check Documentation
-
-```bash
-# Check Doxygen warnings
-doxygen Doxyfile 2>&1 | grep -i warning
-
-# Check Sphinx warnings
-cd sphinx
-make html 2>&1 | grep -i warning
-```
+1. Follow existing structure and style
+2. Add to appropriate section
+3. Update navigation/index files
+4. Test build locally: `sphinx-build -b html . _build/html`
+5. Submit pull request
 
 ## Documentation Checklist
 
-Before committing documentation changes:
-
+Before committing:
 - [ ] All links work (no 404s)
 - [ ] Code examples tested
-- [ ] Screenshots up-to-date
-- [ ] Doxygen builds without warnings
-- [ ] Sphinx builds without warnings
-- [ ] New features documented
-- [ ] Test descriptions updated
-
-## Contributing Documentation
-
-### Adding New Documentation
-
-1. Create Markdown file in `docs/`
-2. Add link to relevant index files
-3. Follow existing format and style
-4. Include examples
-5. Test build: `./build_docs.sh`
-
-### Improving Existing Documentation
-
-1. Fix errors or outdated information
-2. Add missing examples
-3. Clarify confusing sections
-4. Add cross-references
-5. Test build: `./build_docs.sh`
-
-## Documentation TODOs
-
-### Needed Documentation
-
-- [ ] Architecture overview diagram
-- [ ] Performance tuning guide
-- [ ] Large-scale simulation guide
-- [ ] Python bindings tutorial (when available)
-- [ ] Contribution guidelines
-- [ ] Release notes
-
-### Documentation Improvements
-
-- [ ] More code examples
-- [ ] Video tutorials
-- [ ] Interactive examples
-- [ ] FAQ section
-- [ ] Glossary of terms
-
-## Documentation Tools
-
-### Doxygen
-
-- **Purpose**: C++ API documentation
-- **Input**: C++ source files with Doxygen comments
-- **Output**: HTML, LaTeX
-- **Config**: `Doxyfile`
-
-### Sphinx
-
-- **Purpose**: General/Python documentation
-- **Input**: RST and Markdown files
-- **Output**: HTML, PDF, EPUB
-- **Config**: `sphinx/conf.py`
-
-### Markdown
-
-- **Purpose**: Simple text documentation
-- **Input**: `.md` files
-- **Output**: Rendered on GitHub, converted by Sphinx
-- **Standard**: CommonMark with GFM extensions
-
-## Online Documentation
-
-Once published, documentation will be available at:
-- **GitHub Pages**: `https://username.github.io/dr_evt/`
-- **Read the Docs**: `https://dr-evt.readthedocs.io/`
+- [ ] Builds without warnings
+- [ ] Added to navigation/index
+- [ ] Follows style guide
 
 ## Support
 
 For documentation issues:
-1. Check this README
-2. Review existing documentation
-3. File issue with documentation feedback
+- File issue: https://github.com/LLNL/dr_evt/issues
+- Tag with: `documentation`
 
 ## License
 
-Documentation is licensed under MIT License, same as source code.
+Documentation licensed under MIT License, same as source code.

@@ -181,6 +181,6 @@ Expected output should show:
 
 ## See Also
 
-- [QUICKSTART.md](QUICKSTART.md) - User guide
+- [QUICKSTART.md](../../QUICKSTART.md) - User guide
 - [TEST_STATUS.md](TEST_STATUS.md) - Testing status and blockers
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) - Technical implementation details
