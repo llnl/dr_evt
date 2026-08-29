@@ -378,7 +378,7 @@ void Simulation::advance_to(sim_time_t target_time)
         // Find next replay event time
         bool has_replay_event = !m_replay_ctx.m_evtq.empty();
         sim_time_t next_replay_time = std::numeric_limits<sim_time_t>::max();
-        bool next_is_start = false;
+        [[maybe_unused]] bool next_is_start = false;
         if (has_replay_event) {
             const auto& event = *m_replay_ctx.m_evtq.begin();
             next_replay_time = static_cast<sim_time_t>(event.get_time().first) +
@@ -529,7 +529,7 @@ Simulation::Statistics Simulation::get_statistics() const
 
         // Only count completed jobs (those with non-zero begin_time)
         if (begin_time.first > 0 || begin_time.second > 0) {
-            const auto& submit_time = job.get_submit_time();
+            [[maybe_unused]] const auto& submit_time = job.get_submit_time();
             tdiff_t wait = job.get_wait_time();
             tdiff_t exec = job.get_exec_time();
 
