@@ -202,6 +202,9 @@ include(SetupBoost)
 message(STATUS "Boost_INCLUDE_DIRS: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost_LIBRARY_DIRS: " ${Boost_LIBRARY_DIRS})
 
+# Setup Python bindings (optional)
+include(SetupPybind11)
+
 # This shouldn't be here, but is ok for now. This will occasionally be
 # part of another TPL's libraries (e.g., MKL), but it's no
 # guarantee. There's no harm including it multiple times.
@@ -424,37 +427,38 @@ set_target_properties(test_streaming_api-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_api-bin)
 
-# Streaming vs batch test
-add_executable( test_streaming_vs_batch-bin tests/test_streaming_vs_batch.cpp )
 
-target_include_directories(test_streaming_vs_batch-bin PUBLIC
+# Batch vs Streaming equivalence test
+add_executable( test_batch_vs_streaming-bin tests/test_batch_vs_streaming.cpp )
+
+target_include_directories(test_batch_vs_streaming-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(test_streaming_vs_batch-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-set_target_properties(test_streaming_vs_batch-bin PROPERTIES OUTPUT_NAME test_streaming_vs_batch)
-set_target_properties(test_streaming_vs_batch-bin PROPERTIES CMAKE_INSTALL_RPATH
+target_link_libraries(test_batch_vs_streaming-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_batch_vs_streaming-bin PROPERTIES OUTPUT_NAME test_batch_vs_streaming)
+set_target_properties(test_batch_vs_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_vs_batch-bin)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_batch_vs_streaming-bin)
 
-# Two stream manual test (requires MPI)
+# MPI streaming test (requires MPI)
 if(MPI_CXX_FOUND)
-  add_executable( test_two_stream_manual-bin tests/test_two_stream_manual.cpp )
+  add_executable( test_mpi_streaming-bin tests/test_mpi_streaming.cpp )
 
-  target_include_directories(test_two_stream_manual-bin PUBLIC
+  target_include_directories(test_mpi_streaming-bin PUBLIC
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
     ${MPI_CXX_INCLUDE_DIRS})
 
-  target_link_libraries(test_two_stream_manual-bin PRIVATE dr_evt ${LIB_FILESYSTEM} ${MPI_CXX_LIBRARIES})
-  set_target_properties(test_two_stream_manual-bin PROPERTIES OUTPUT_NAME test_two_stream_manual)
-  set_target_properties(test_two_stream_manual-bin PROPERTIES CMAKE_INSTALL_RPATH
+  target_link_libraries(test_mpi_streaming-bin PRIVATE dr_evt ${LIB_FILESYSTEM} ${MPI_CXX_LIBRARIES})
+  set_target_properties(test_mpi_streaming-bin PROPERTIES OUTPUT_NAME test_mpi_streaming)
+  set_target_properties(test_mpi_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_two_stream_manual-bin)
+  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_mpi_streaming-bin)
 endif()
 
 # Install the binaries
@@ -717,3 +721,36 @@ configure_file(
 install(FILES "${CMAKE_BINARY_DIR}/dr_evt_module.lua.install"
   RENAME "${DR_EVT_MODULEFILE_NAME}"
   DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/modulefiles")
+
+################################################################
+# Python bindings (optional)
+################################################################
+
+if(DR_EVT_HAS_PYBIND11)
+  message(STATUS "Building Python bindings...")
+
+  pybind11_add_module(dr_evt_python
+    python/dr_evt_bindings.cpp
+  )
+
+  target_link_libraries(dr_evt_python PRIVATE dr_evt)
+
+  target_include_directories(dr_evt_python PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_BINARY_DIR}/src
+  )
+
+  # Set output name
+  set_target_properties(dr_evt_python PROPERTIES
+    OUTPUT_NAME dr_evt
+    PREFIX "${PYTHON_MODULE_PREFIX}"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+  )
+
+  # Install to Python site-packages
+  install(TARGETS dr_evt_python
+    LIBRARY DESTINATION ${Python3_SITELIB}
+  )
+
+  message(STATUS "Python module will be installed to: ${Python3_SITELIB}")
+endif()
