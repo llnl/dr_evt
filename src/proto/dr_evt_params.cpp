@@ -38,6 +38,11 @@ static void set_sim_options(
     sp.m_infile = cfg.infile();
     sp.set_outfile(cfg.outfile());
 
+    // Resource trace file (optional)
+    if (!cfg.resource_trace().empty()) {
+        sp.set_resource_trace(cfg.resource_trace());
+    }
+
     // Verbose flag (always set in proto3, use the value directly)
     sp.m_verbose = cfg.verbose();
 

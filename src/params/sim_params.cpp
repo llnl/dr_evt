@@ -23,7 +23,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:R:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -44,6 +44,7 @@ static const struct option longopts[] = {
     {"duration_stddev",       required_argument,  0, 'V'},
     {"verbose",               no_argument,        0, 'v'},
     {"config",                required_argument,  0, 'c'},
+    {"resource_trace",        required_argument,  0, 'R'},
     { 0, 0, 0, 0 },
 };
 
@@ -214,6 +215,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
 #endif
                 }
                 break;
+            case 'R': /* --resource_trace */
+                m_resource_trace = std::string(optarg);
+                break;
             default:
                 print_usage(argv[0], 1);
                 break;
@@ -328,6 +332,11 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        command-line options specified after --config.\n"
         "\n"
 #endif
+        "    -R, --resource_trace FILENAME\n"
+        "        Write resource usage trace to file.\n"
+        "        Output format: time,free_nodes,allocated_nodes\n"
+        "        Useful for visualizing resource utilization over time.\n"
+        "\n"
         ;
     exit(code);
 }
@@ -398,6 +407,16 @@ void Sim_Params::set_outfile(const std::string& ofname)
 std::string Sim_Params::get_outfile() const
 {
     return m_outfile;
+}
+
+void Sim_Params::set_resource_trace(const std::string& rfname)
+{
+    m_resource_trace = rfname;
+}
+
+std::string Sim_Params::get_resource_trace() const
+{
+    return m_resource_trace;
 }
 
 } // end of namespace dr_evt
