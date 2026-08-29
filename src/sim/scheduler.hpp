@@ -100,6 +100,7 @@ class Scheduler {
     /**
      * Sort jobs according to priority policy
      */
+    void apply_priority_policy(std::vector<job_no_t>& jobs) const;
     std::vector<job_no_t> sort_jobs(const std::set<job_no_t>& jobs) const;
 
     /**

@@ -110,6 +110,14 @@ class Trace {
     void run_until_inclusive(Context& ctx, sim_time_t target_time);
 
     /**
+     * NEW SIMULATION API: Process exactly one event from the replay queue
+     * Processes the earliest event in the queue, regardless of its time
+     * @param ctx Simulation context
+     * @return true if an event was processed, false if queue was empty
+     */
+    bool process_single_event(Context& ctx);
+
+    /**
      * NEW SIMULATION API: Create a new context for simulation
      * @return Fresh context with empty event queue
      */

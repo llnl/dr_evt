@@ -9,6 +9,7 @@
  ******************************************************************************/
 
 #include <algorithm>
+#include <fstream>
 #include "trace/job_io.hpp"
 #include "trace/trace.hpp"
 
@@ -239,6 +240,31 @@ void Trace::run_until_inclusive(Context& ctx, sim_time_t target_time)
         // Process this event by running slightly past it
         process_events_until(ctx, event.get_time());
     }
+}
+
+bool Trace::process_single_event(Context& ctx)
+{
+    if (ctx.m_evtq.empty()) {
+        return false;
+    }
+
+    // Get and remove the earliest event
+    auto it = ctx.m_evtq.begin();
+    auto event = *it;  // Copy before erase
+    ctx.m_evtq.erase(it);
+
+    // Process this event using replay engine's accounting logic
+    const auto& job = m_data[event.get_job_idx()];
+
+    if (event.is_arrival()) {
+        // START event: allocate nodes (same logic as process_events_until)
+        ctx.m_n_nodes_in_use += job.get_num_nodes();
+    } else {
+        // END event: free nodes (same logic as process_events_until)
+        ctx.m_n_nodes_in_use -= job.get_num_nodes();
+    }
+
+    return true;
 }
 
 std::ostream& Trace::print(std::ostream& os) const

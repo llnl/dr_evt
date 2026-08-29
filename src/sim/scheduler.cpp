@@ -10,6 +10,7 @@
 
 #include "sim/scheduler.hpp"
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <map>
 
@@ -38,45 +39,52 @@ std::vector<job_no_t> Scheduler::schedule(
         return {};
     }
 
-    // Filter to only eligible jobs (submit_time <= current_time)
-    std::set<job_no_t> eligible_jobs;
+    // Sort jobs by policy, but only consider eligible ones (submit_time <= current_time)
+    // No need to copy - just filter during sorting
+    std::vector<job_no_t> sorted_jobs;
+    sorted_jobs.reserve(wait_queue.size());
+
     for (job_no_t job_idx : wait_queue) {
         const auto& job = (*m_job_data_ptr)[job_idx];
         const auto& ts = job.get_submit_time();
         sim_time_t submit_time = static_cast<sim_time_t>(ts.first) + ts.second;
         if (submit_time <= current_time) {
-            eligible_jobs.insert(job_idx);
+            sorted_jobs.push_back(job_idx);
         }
     }
 
-    if (eligible_jobs.empty()) {
+    if (sorted_jobs.empty()) {
         return {};
     }
 
+    // Apply priority policy sorting
+    apply_priority_policy(sorted_jobs);
+
     std::vector<job_no_t> jobs_to_run;
-    std::vector<job_no_t> sorted_jobs = sort_jobs(eligible_jobs);
 
-    // Track available nodes as we schedule
-    num_nodes_t available_nodes = free_nodes;
-
-    // EASY Backfilling: FCFS head first
+    // EASY Backfilling: Check FCFS head first
     job_no_t fcfs_head = sorted_jobs[0];
     const auto& head_job = (*m_job_data_ptr)[fcfs_head];
     num_nodes_t head_nodes = head_job.get_num_nodes();
 
     // Can FCFS head start now?
-    if (head_nodes <= available_nodes) {
-        // FCFS head can run
+    if (head_nodes <= free_nodes) {
+        // FCFS head can run - return it and let sim.cpp call us again for the next FCFS head
         jobs_to_run.push_back(fcfs_head);
-        available_nodes -= head_nodes;
-        m_fcfs_reservation_time = current_time;
-    } else {
-        // FCFS head can't fit - calculate when it CAN start
-        m_fcfs_reservation_time = calculate_fcfs_reservation(
-            fcfs_head, free_nodes, running_jobs, current_time);
+
+        // Remove from wait queue before returning
+        wait_queue.erase(fcfs_head);
+        return jobs_to_run;
     }
 
-    // Try backfilling with remaining jobs
+    // FCFS head can't fit - calculate reservation for backfilling
+    m_fcfs_reservation_time = calculate_fcfs_reservation(
+        fcfs_head, free_nodes, running_jobs, current_time);
+
+    // Track available nodes as we try to backfill
+    num_nodes_t available_nodes = free_nodes;
+
+    // Try backfilling with remaining jobs (starting from index 1, skipping the waiting FCFS head)
     for (size_t i = 1; i < sorted_jobs.size(); i++) {
         job_no_t job_idx = sorted_jobs[i];
         const auto& job = (*m_job_data_ptr)[job_idx];
@@ -100,10 +108,13 @@ std::vector<job_no_t> Scheduler::schedule(
 
         // Check 2: Completes before FCFS reservation?
         tdiff_t runtime_est = get_runtime_estimate(job_idx);
-        if (current_time + runtime_est <= m_fcfs_reservation_time) {
-            // Can backfill!
+        sim_time_t completion = current_time + runtime_est;
+
+        if (completion < m_fcfs_reservation_time) {
+            // Can backfill! Return this ONE job
             jobs_to_run.push_back(job_idx);
-            available_nodes -= nodes;
+            wait_queue.erase(job_idx);
+            return jobs_to_run;  // Return immediately, let sim.cpp call us again
         } else {
             // Check if window too short for ALL remaining
             tdiff_t shortest_remaining = runtime_est;
@@ -125,14 +136,12 @@ std::vector<job_no_t> Scheduler::schedule(
     return jobs_to_run;
 }
 
-std::vector<job_no_t> Scheduler::sort_jobs(const std::set<job_no_t>& jobs) const
+void Scheduler::apply_priority_policy(std::vector<job_no_t>& jobs) const
 {
-    std::vector<job_no_t> sorted(jobs.begin(), jobs.end());
-
     switch (m_priority_policy) {
         case PriorityPolicy::FCFS:
-            // Sort by submit time (FCFS = First Come First Served)
-            std::sort(sorted.begin(), sorted.end(),
+            // Sort by submit time, then by job index for stable ordering
+            std::sort(jobs.begin(), jobs.end(),
                 [this](job_no_t a, job_no_t b) {
                     const auto& job_a = (*m_job_data_ptr)[a];
                     const auto& job_b = (*m_job_data_ptr)[b];
@@ -140,13 +149,17 @@ std::vector<job_no_t> Scheduler::sort_jobs(const std::set<job_no_t>& jobs) const
                                           job_a.get_submit_time().second;
                     sim_time_t submit_b = static_cast<sim_time_t>(job_b.get_submit_time().first) +
                                           job_b.get_submit_time().second;
-                    return submit_a < submit_b;
+                    if (submit_a != submit_b) {
+                        return submit_a < submit_b;
+                    }
+                    // Tie-breaker: use job index (file order)
+                    return a < b;
                 });
             break;
 
         case PriorityPolicy::SJF:
             // Shortest Job First
-            std::sort(sorted.begin(), sorted.end(),
+            std::sort(jobs.begin(), jobs.end(),
                 [this](job_no_t a, job_no_t b) {
                     return get_runtime_estimate(a) < get_runtime_estimate(b);
                 });
@@ -154,13 +167,18 @@ std::vector<job_no_t> Scheduler::sort_jobs(const std::set<job_no_t>& jobs) const
 
         case PriorityPolicy::LJF:
             // Longest Job First
-            std::sort(sorted.begin(), sorted.end(),
+            std::sort(jobs.begin(), jobs.end(),
                 [this](job_no_t a, job_no_t b) {
                     return get_runtime_estimate(a) > get_runtime_estimate(b);
                 });
             break;
     }
+}
 
+std::vector<job_no_t> Scheduler::sort_jobs(const std::set<job_no_t>& jobs) const
+{
+    std::vector<job_no_t> sorted(jobs.begin(), jobs.end());
+    apply_priority_policy(sorted);
     return sorted;
 }
 
