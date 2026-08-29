@@ -30,8 +30,10 @@ docs/
 ├── reference/                  # Technical reference
 │   ├── terminology.md         # Terms and definitions
 │   └── config-files.md        # Configuration formats
-└── api/                        # API documentation
-    └── index.md               # C++ API reference
+├── api/                        # API documentation
+│   ├── index.md               # C++ API reference
+│   └── streaming-api.md       # Streaming/Online API
+└── STREAMING_API.md            # Streaming API guide (NEW)
 ```
 
 ## Quick Navigation
@@ -55,6 +57,7 @@ docs/
 1. [Algorithm](development/algorithm.md) - How it works
 2. [Architecture](development/architecture.md) - System design
 3. [Design Decisions](development/design-decisions.md) - Why
+4. [Streaming API](STREAMING_API.md) - Online simulation API (NEW)
 
 ## Building Documentation
 

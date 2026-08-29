@@ -159,6 +159,46 @@ class Simulation {
     Trace& get_trace() { return m_trace; }
     const Trace& get_trace() const { return m_trace; }
 
+    /**
+     * Insert a job into the simulation (alias for submit_job for backwards compatibility)
+     * @param job_idx Job index to insert
+     * @param submit_time When the job is submitted
+     */
+    void insert_job(job_no_t job_idx, sim_time_t submit_time) {
+        submit_job(job_idx, submit_time);
+    }
+
+    /**
+     * Run simulation until target_time, processing all events at target_time (inclusive)
+     * @param target_time Time to run until (inclusive)
+     */
+    void run_until_inclusive(sim_time_t target_time) {
+        advance_to(target_time);
+    }
+
+    /**
+     * Run simulation until just before target_time, excluding events at target_time
+     * @param target_time Time to run until (exclusive)
+     */
+    void run_until_exclusive(sim_time_t target_time) {
+        // Advance to just before target_time
+        // Events at exactly target_time will not be processed
+        if (target_time > m_current_time) {
+            // Find the last event time < target_time
+            sim_time_t advance_time = m_current_time;
+            for (const auto& evt : m_event_queue) {
+                const auto& ts = evt.get_time();
+                sim_time_t evt_time = static_cast<sim_time_t>(ts.first) + ts.second;
+                if (evt_time < target_time && evt_time > advance_time) {
+                    advance_time = evt_time;
+                }
+            }
+            if (advance_time > m_current_time) {
+                advance_to(advance_time);
+            }
+        }
+    }
+
   protected:
     /**
      * Initialize simulation

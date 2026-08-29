@@ -40,6 +40,7 @@ For contributors and developers:
 - **[Architecture](development/architecture.md)** - System design
 - **[Algorithm Details](development/algorithm.md)** - Simulation algorithm
 - **[Design Decisions](development/design-decisions.md)** - Why we made certain choices
+- **[Streaming API](STREAMING_API.md)** - Online simulation API (NEW)
 - **[Contributing](development/contributing.md)** - How to contribute
 
 ### Reference
@@ -47,6 +48,7 @@ For contributors and developers:
 Technical reference material:
 
 - **[API Documentation](api/index.md)** - C++ API reference
+- **[Streaming API](STREAMING_API.md)** - Online simulation API
 - **[Terminology](reference/terminology.md)** - Terms and definitions
 - **[Configuration Files](reference/config-files.md)** - Protobuf configs
 
@@ -59,8 +61,9 @@ Technical reference material:
 ## Project Status
 
 **Version:** 1.0  
-**Status:** ✓ Verified Correct (23/23 tests pass)  
-**Scheduling Policies:** EASY Backfilling (verified), FCFS, SJF, LJF  
+**Status:** ✓ Verified Correct (54 tests pass)  
+**Scheduling Policies:** EASY Backfilling (verified), Conservative Backfilling, FCFS, SJF, LJF  
+**API:** Streaming API for online simulation (NEW)  
 **Last Updated:** 2026-08-28
 
 ## About
@@ -68,7 +71,9 @@ Technical reference material:
 DR_EVT simulates discrete event-driven HPC job scheduling with:
 - Verified EASY backfilling algorithm
 - Both replay and simulation modes
+- Streaming API for online/incremental simulation
 - Support for real HPC traces (Lassen format)
+- Comprehensive test suite (54 tests)
 - Analytical verification against hand-traced oracles
 
 Developed at Lawrence Livermore National Laboratory.

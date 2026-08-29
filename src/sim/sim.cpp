@@ -349,14 +349,7 @@ void Simulation::advance_to(sim_time_t target_time)
     }
 
     // Main event loop - process events and make scheduling decisions until target_time
-    static int loop_count = 0;
-    while (m_current_time < target_time || !m_wait_queue.empty()) {
-        if (loop_count < 50 || (loop_count % 100 == 0)) {
-            std::cerr << "Loop " << loop_count << ": t=" << m_current_time
-                      << ", target=" << target_time << ", wait_queue=" << m_wait_queue.size()
-                      << ", replay_queue=" << m_replay_ctx.m_evtq.size() << std::endl;
-        }
-        loop_count++;
+    while (m_current_time < target_time) {
         // Find next event time from waiting jobs and replay events
         // OPTIMIZATION: Only scan jobs that haven't been scheduled yet
         sim_time_t next_arrival = std::numeric_limits<sim_time_t>::max();
@@ -478,12 +471,8 @@ void Simulation::advance_to(sim_time_t target_time)
                         m_running_jobs[job] = m_current_time;
                         m_jobs_submitted++;
 
-                        // Extend target_time if this job will complete after it
-                        const auto& job_rec = m_trace.data()[job];
-                        sim_time_t job_end = m_current_time + job_rec.get_limit_time();
-                        if (job_end > target_time) {
-                            target_time = job_end;
-                        }
+                        // NOTE: Do NOT extend target_time for streaming mode
+                        // The caller controls when to advance, not the simulation
                     }
                     m_trace.run_until_inclusive(m_replay_ctx, m_current_time);
                     continue;  // Go to next iteration - may have created new replay events
@@ -517,12 +506,8 @@ void Simulation::advance_to(sim_time_t target_time)
                     m_running_jobs[job] = m_current_time;
                     m_jobs_submitted++;
 
-                    // Extend target_time if this job will complete after it
-                    const auto& job_rec = m_trace.data()[job];
-                    sim_time_t job_end = m_current_time + job_rec.get_limit_time();
-                    if (job_end > target_time) {
-                        target_time = job_end;
-                    }
+                    // NOTE: Do NOT extend target_time for streaming mode
+                    // The caller controls when to advance, not the simulation
                 }
 
                 // Process START events that were just created at current_time
