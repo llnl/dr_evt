@@ -162,6 +162,59 @@ class Simulation {
     Trace& get_trace() { return m_trace; }
     const Trace& get_trace() const { return m_trace; }
 
+    // ========================================================================
+    // Monitoring and Statistics API for Python/External Tools
+    // ========================================================================
+
+    /**
+     * Get number of available (free) nodes
+     * @return Number of nodes not currently allocated
+     */
+    num_nodes_t get_available_nodes() const {
+        return m_params.m_total_nodes - get_nodes_in_use();
+    }
+
+    /**
+     * Get size of waiting queue
+     * @return Number of jobs waiting to be scheduled
+     */
+    size_t get_wait_queue_size() const {
+        return m_wait_queue.size();
+    }
+
+    /**
+     * Get estimated time for FCFS head to start
+     * Returns the shadow time (earliest time head of queue can start)
+     * @return Estimated start time, or -1 if queue is empty
+     */
+    sim_time_t get_fcfs_head_shadow_time() const {
+        if (m_wait_queue.empty()) {
+            return -1.0;
+        }
+        return m_scheduler.get_fcfs_reservation_time();
+    }
+
+    /**
+     * Get detailed scheduling statistics
+     * @return Structure with wait times, turnaround, utilization
+     */
+    struct Statistics {
+        num_jobs_t jobs_submitted;
+        num_jobs_t jobs_completed;
+        num_jobs_t jobs_running;
+        num_jobs_t jobs_waiting;
+        sim_time_t current_time;
+        num_nodes_t total_nodes;
+        num_nodes_t nodes_in_use;
+        num_nodes_t nodes_available;
+        double utilization;  // nodes_in_use / total_nodes
+        tdiff_t avg_wait_time;
+        tdiff_t avg_turnaround_time;
+        sim_time_t makespan;
+    };
+
+    Statistics get_statistics() const;
+
     /**
      * Insert a job into the simulation (alias for submit_job for backwards compatibility)
      * @param job_idx Job index to insert
