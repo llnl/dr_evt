@@ -286,7 +286,8 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         throw std::runtime_error("Invalid job_idx: " + std::to_string(job_idx));
     }
 
-    // Add to waiting queue (jobs submitted in sorted order by submit_time)
+    // Add to waiting queue
+    // Assumes jobs submitted in non-decreasing order by submit_time for FCFS correctness
     m_wait_queue.push_back({job_idx, false});
 }
 

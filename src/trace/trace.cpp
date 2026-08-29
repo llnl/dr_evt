@@ -54,6 +54,8 @@ int Trace::load_data(num_jobs_t n_lines_to_read)
   #endif
 
     // Order job records by the submit time
+    // IMPORTANT: FCFS policy implementation in sim/scheduler.cpp depends on this
+    // sorting to avoid re-sorting on every schedule() call
     std::stable_sort(m_data.begin(), m_data.end());
 
     return rc;
