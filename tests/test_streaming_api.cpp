@@ -79,7 +79,6 @@ void test_basic_insert_and_run() {
     sim.run_until_inclusive(50.0);  // Process START event
 
     // Now 30 nodes in use (10 + 20)
-    std::cout << "DEBUG: nodes_in_use=" << sim.get_nodes_in_use() << " (expected 30)" << std::endl;
     assert(sim.get_nodes_in_use() == 30);
     std::cout << "✓ After inserting job 1: 30 nodes in use" << std::endl;
 

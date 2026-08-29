@@ -424,6 +424,39 @@ set_target_properties(test_streaming_api-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_api-bin)
 
+# Streaming vs batch test
+add_executable( test_streaming_vs_batch-bin tests/test_streaming_vs_batch.cpp )
+
+target_include_directories(test_streaming_vs_batch-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+
+target_link_libraries(test_streaming_vs_batch-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_streaming_vs_batch-bin PROPERTIES OUTPUT_NAME test_streaming_vs_batch)
+set_target_properties(test_streaming_vs_batch-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_vs_batch-bin)
+
+# Two stream manual test (requires MPI)
+if(MPI_CXX_FOUND)
+  add_executable( test_two_stream_manual-bin tests/test_two_stream_manual.cpp )
+
+  target_include_directories(test_two_stream_manual-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
+    ${MPI_CXX_INCLUDE_DIRS})
+
+  target_link_libraries(test_two_stream_manual-bin PRIVATE dr_evt ${LIB_FILESYSTEM} ${MPI_CXX_LIBRARIES})
+  set_target_properties(test_two_stream_manual-bin PROPERTIES OUTPUT_NAME test_two_stream_manual)
+  set_target_properties(test_two_stream_manual-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_two_stream_manual-bin)
+endif()
+
 # Install the binaries
 install(
   TARGETS  ${DR_EVT_EXEC_TARGETS}
