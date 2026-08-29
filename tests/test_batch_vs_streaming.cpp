@@ -19,6 +19,7 @@
 #include "sim/sim.hpp"
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <cassert>
 #include <cmath>
@@ -277,7 +278,7 @@ void run_streaming_mode(const std::string& input_file, const std::string& output
 
     // Load trace
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;
-    int rc = sim.get_trace().load_data(max_num_jobs);
+    [[maybe_unused]] int rc = sim.get_trace().load_data(max_num_jobs);
     assert(rc == EXIT_SUCCESS);
 
     size_t num_jobs = sim.get_trace().data().size();
