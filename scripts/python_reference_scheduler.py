@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Minimal EASY Backfilling Oracle
+Python Reference EASY Backfilling Scheduler
 
 Pure implementation of EASY backfilling algorithm for verification.
 No dependencies, no fancy features - just correct EASY logic.
@@ -287,7 +287,7 @@ def write_resource_trace(jobs: List[Job], filename: str, total_nodes: int):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: minimal_easy_oracle.py <trace.csv> [--verbose] [--nodes N]")
+        print("Usage: python_reference_scheduler.py <trace.csv> [--verbose] [--nodes N]")
         print("\nGenerates oracle output for EASY backfilling verification")
         sys.exit(1)
 
@@ -315,14 +315,14 @@ def main():
     jobs = oracle.simulate(jobs)
 
     # Write output
-    output_file = trace_file.replace('.csv', '_oracle.csv')
+    output_file = trace_file.replace('.csv', '_reference.csv')
     write_oracle_output(jobs, output_file)
 
     # Write resource trace
-    resource_file = trace_file.replace('.csv', '_oracle_resources.csv')
+    resource_file = trace_file.replace('.csv', '_reference_resources.csv')
     write_resource_trace(jobs, resource_file, total_nodes)
 
-    print(f"\nOracle output written to: {output_file}")
+    print(f"\nReference output written to: {output_file}")
     print(f"Resource trace written to: {resource_file}")
     print(f"Final simulation time: {oracle.current_time}")
 

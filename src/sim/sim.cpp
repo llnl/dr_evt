@@ -60,17 +60,9 @@ void Simulation::run()
         submit_job(i, submit_time);
     }
 
-    // Find the latest time in the trace (to know when to stop)
-    sim_time_t max_time = 0.0;
-    for (const auto& job : m_trace.data()) {
-        sim_time_t submit = static_cast<sim_time_t>(job.get_submit_time().first) +
-                           job.get_submit_time().second;
-        sim_time_t duration = job.get_limit_time();
-        max_time = std::max(max_time, submit + duration * 2);  // Conservative upper bound
-    }
-
-    // Advance simulation to process all jobs
-    advance_to(max_time);
+    // Batch mode: advance to infinity to process all jobs
+    // The loop will exit when both wait_queue and event_queue are empty
+    advance_to(std::numeric_limits<sim_time_t>::max());
 
     // Count actual completions from trace data
     m_jobs_completed = 0;
@@ -331,11 +323,11 @@ void Simulation::advance_to(sim_time_t target_time)
                     break;
                 }
 
-                for (job_no_t job : jobs_to_run) {
-                    m_trace.insert_job(job, m_current_time, m_replay_ctx);
-                    m_running_jobs[job] = m_current_time;
-                    m_jobs_submitted++;
-                }
+                // Scheduler returns at most 1 job
+                job_no_t job = jobs_to_run.front();
+                m_trace.insert_job(job, m_current_time, m_replay_ctx);
+                m_running_jobs[job] = m_current_time;
+                m_jobs_submitted++;
 
                 m_trace.run_until_inclusive(m_replay_ctx, m_current_time);
 
@@ -348,12 +340,14 @@ void Simulation::advance_to(sim_time_t target_time)
         }
     }
 
-    // Main event loop - process events and make scheduling decisions until target_time
-    while (m_current_time < target_time) {
+    // Main event loop - process events and make scheduling decisions until complete
+    // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running)
+    while (!m_wait_queue.empty() || !m_replay_ctx.m_evtq.empty()) {
         // Find next event time from waiting jobs and replay events
-        // OPTIMIZATION: Only scan jobs that haven't been scheduled yet
+        // Scan wait_queue once: find next_arrival and collect jobs arriving then
         sim_time_t next_arrival = std::numeric_limits<sim_time_t>::max();
         bool have_eligible_jobs_now = false;
+        std::vector<job_no_t> jobs_at_next_arrival;
 
         for (job_no_t job_idx : m_wait_queue) {
             const auto& job = m_trace.data()[job_idx];
@@ -363,9 +357,14 @@ void Simulation::advance_to(sim_time_t target_time)
             if (submit <= m_current_time) {
                 // Job has already arrived and is eligible
                 have_eligible_jobs_now = true;
-            } else if (submit <= target_time) {
-                // Future arrival within target range
-                next_arrival = std::min(next_arrival, submit);
+            } else if (submit < next_arrival) {
+                // Found earlier arrival - reset collection
+                next_arrival = submit;
+                jobs_at_next_arrival.clear();
+                jobs_at_next_arrival.push_back(job_idx);
+            } else if (submit == next_arrival) {
+                // Another job arriving at same time
+                jobs_at_next_arrival.push_back(job_idx);
             }
         }
 
@@ -381,7 +380,7 @@ void Simulation::advance_to(sim_time_t target_time)
         }
 
         // Decide which event to process
-        bool should_reschedule = false;
+        bool should_schedule = false;
 
         if (has_replay_event && next_replay_time <= next_arrival && next_replay_time <= target_time) {
             // Process replay events at this time
@@ -402,6 +401,7 @@ void Simulation::advance_to(sim_time_t target_time)
                 }
 
                 bool is_end = !event.is_arrival();
+                job_no_t event_job_idx = event.get_job_idx();
 
                 // Process this event (END or START)
                 m_trace.process_single_event(m_replay_ctx);
@@ -412,84 +412,37 @@ void Simulation::advance_to(sim_time_t target_time)
                                                 m_params.m_total_nodes - allocated,
                                                 allocated);
 
-                // If END event: update running_jobs
+                // If END event: remove from running_jobs
                 if (is_end) {
                     processed_end_event = true;
-
-                    auto it = m_running_jobs.begin();
-                    while (it != m_running_jobs.end()) {
-                        const auto& job = m_trace.data()[it->first];
-                        sim_time_t end_time = static_cast<sim_time_t>(job.get_end_time().first) +
-                                              job.get_end_time().second;
-                        if (end_time <= m_current_time) {
-                            it = m_running_jobs.erase(it);
-                            m_jobs_completed++;
-                        } else {
-                            ++it;
-                        }
-                    }
+                    m_running_jobs.erase(event_job_idx);
+                    m_jobs_completed++;
                 }
             }
 
             // Only call scheduler if we processed END events (resources freed)
-            should_reschedule = processed_end_event;
+            should_schedule = processed_end_event;
 
         } else if (next_arrival <= target_time) {
             // Job arrival - advance time FIRST
             m_current_time = next_arrival;
 
-            // For arrivals: only evaluate newly arriving jobs
-            // Resources haven't changed, so other jobs still can't start
-            // Collect jobs arriving at current_time
-            std::vector<job_no_t> new_arrivals;
-            for (job_no_t job_idx : m_wait_queue) {
-                const auto& job = m_trace.data()[job_idx];
-                const auto& ts = job.get_submit_time();
-                sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
-                if (submit == m_current_time) {
-                    new_arrivals.push_back(job_idx);
-                }
-            }
-
-            // Evaluate only new arrivals (TODO: need scheduler method for this)
-            // For now, just set flag to reschedule
-            should_reschedule = true;
+            // jobs_at_next_arrival already collected during wait_queue scan
+            // TODO: Pass jobs_at_next_arrival to scheduler for efficient evaluation
+            // For now, just set flag to schedule
+            should_schedule = true;
         } else {
             // No more events before target_time
-            // But if we have eligible jobs, try scheduling once more
-            // (they may have become eligible since last check)
+            // Try scheduling eligible jobs one more time, then stop
             if (have_eligible_jobs_now) {
-                // Last attempt to schedule before breaking
-                num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
-                auto jobs_to_run = m_scheduler.schedule(m_wait_queue, free_nodes,
-                                                        m_running_jobs, m_current_time);
-
-                if (!jobs_to_run.empty()) {
-                    // Some jobs can start - schedule them and continue loop
-                    for (job_no_t job : jobs_to_run) {
-                        m_trace.insert_job(job, m_current_time, m_replay_ctx);
-                        m_running_jobs[job] = m_current_time;
-                        m_jobs_submitted++;
-
-                        // NOTE: Do NOT extend target_time for streaming mode
-                        // The caller controls when to advance, not the simulation
-                    }
-                    m_trace.run_until_inclusive(m_replay_ctx, m_current_time);
-                    continue;  // Go to next iteration - may have created new replay events
-                }
+                should_schedule = true;
             }
-
-            // No events and scheduler can't start anything
-            // Fast-forward to target_time
-            if (m_current_time < target_time) {
-                m_trace.run_until_inclusive(m_replay_ctx, target_time);
-                m_current_time = target_time;
-            }
+            // After scheduling (or if no eligible jobs), break - reached target_time
             break;
         }
 
         // Scheduling loop - let scheduler make decisions after processing END events
-        if (should_reschedule) {
+        if (should_schedule) {
             // Keep calling scheduler until it can't start any more jobs
             while (true) {
                 num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
@@ -500,15 +453,12 @@ void Simulation::advance_to(sim_time_t target_time)
                 if (jobs_to_run.empty()) {
                     break;  // Scheduler can't start anything else
                 }
-                // Start the jobs that scheduler selected
-                for (job_no_t job : jobs_to_run) {
-                    m_trace.insert_job(job, m_current_time, m_replay_ctx);
-                    m_running_jobs[job] = m_current_time;
-                    m_jobs_submitted++;
 
-                    // NOTE: Do NOT extend target_time for streaming mode
-                    // The caller controls when to advance, not the simulation
-                }
+                // Scheduler returns at most 1 job - start it
+                job_no_t job = jobs_to_run.front();
+                m_trace.insert_job(job, m_current_time, m_replay_ctx);
+                m_running_jobs[job] = m_current_time;
+                m_jobs_submitted++;
 
                 // Process START events that were just created at current_time
                 while (!m_replay_ctx.m_evtq.empty()) {

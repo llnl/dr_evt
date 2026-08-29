@@ -27,9 +27,9 @@ if [ ! -f "./build/simulator" ]; then
     exit 1
 fi
 
-# Check Python oracle exists
-if [ ! -f "scripts/minimal_easy_oracle.py" ]; then
-    echo "Error: scripts/minimal_easy_oracle.py not found"
+# Check Python reference scheduler exists
+if [ ! -f "scripts/python_reference_scheduler.py" ]; then
+    echo "Error: scripts/python_reference_scheduler.py not found"
     exit 1
 fi
 

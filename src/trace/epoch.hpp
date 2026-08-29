@@ -43,7 +43,7 @@ inline bool operator==(const epoch_t& t1, const epoch_t& t2)
     return ((t1.first == t2.first) && (t1.second == t2.second));
 }
 
-inline bool operator< (const period_t& t1, const period_t& t2)
+inline bool operator<(const period_t& t1, const period_t& t2)
 {
     return ((t1.first < t2.first) ||
             ((t1.first == t2.first) &&
@@ -69,6 +69,12 @@ bool is_timestamp(const std::string& time_str);
  *  fractional second.
  */
 epoch_t convert_time(const std::string& time_str);
+
+template <typename T = double>
+inline T convert_epoch(const epoch_t& e)
+{
+   return static_cast<T>(e.first) + static_cast<T>(e.second);
+}
 
 /**
  * @brief Parse ISO timestamp with timezone offset and convert to UTC

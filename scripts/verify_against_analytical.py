@@ -46,13 +46,14 @@ def run_drevt(input_file, output_file):
         '--trace_format', 'simple',
         '--timestamp_format', 'epoch',
         '--duration_mode', 'exact',
+        '--max_jobs', '10000',  # Process all jobs, not just first 10
         '--outfile', output_file
     ]
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 def run_python(input_file):
     """Run Python reference implementation."""
-    cmd = ['python3', 'scripts/minimal_easy_oracle.py', input_file, '--nodes', '100']
+    cmd = ['python3', 'scripts/python_reference_scheduler.py', input_file, '--nodes', '100']
     subprocess.run(cmd, stdout=subprocess.DEVNULL, check=True)
 
 def verify_analytical(test_name):
@@ -61,7 +62,7 @@ def verify_analytical(test_name):
     input_file = f"{base}.csv"
     analytical_file = f"{base}_analytical.csv"
     drevt_out = f"/tmp/{test_name}_drevt.csv"
-    python_out = f"{base}_oracle.csv"
+    python_out = f"{base}_reference.csv"
 
     # Check if analytical oracle exists
     if not Path(analytical_file).exists():
@@ -92,7 +93,7 @@ def cross_validate(test_name):
     base = f"tests/test_traces/correctness/{test_name}"
     input_file = f"{base}.csv"
     drevt_out = f"/tmp/{test_name}_drevt.csv"
-    python_out = f"{base}_oracle.csv"
+    python_out = f"{base}_reference.csv"
 
     # Run implementations
     run_drevt(input_file, drevt_out)

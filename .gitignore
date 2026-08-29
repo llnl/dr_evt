@@ -56,3 +56,13 @@ cmake/modules/SetupProtobufConan.cmake
 
 # Temporary test trace files created by test_streaming_api
 test_streaming*.csv
+
+# macOS system files
+.DS_Store
+
+# Generated reference test outputs (from python_reference_scheduler.py)
+*_reference.csv
+*_reference_resources.csv
+
+# Session state notes (local only)
+SESSION_STATE.md
