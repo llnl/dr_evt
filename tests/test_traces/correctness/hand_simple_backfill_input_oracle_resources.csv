@@ -1,0 +1,5 @@
+time,free_nodes,allocated_nodes
+0.0,20,80
+10.0,10,90
+30.0,20,80
+100.0,100,0

@@ -12,7 +12,12 @@
 #define  DR_EVT_UTILS_FILE_HPP
 #include <string>
 #include <sys/stat.h> // mode_t
+
+#if defined(__linux__)
 #include <linux/limits.h> // PATH_MAX
+#elif defined(__APPLE__)
+#include <sys/syslimits.h> // PATH_MAX on macOS
+#endif
 
 #if !defined(PATH_MAX)
 #define PATH_MAX 4096

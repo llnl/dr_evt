@@ -186,7 +186,6 @@ endif("${isSystemDir}" STREQUAL "-1")
 include(GNUInstallDirs)
 include(ExternalProject)
 include(SetupCXX)
-include(SetupProtobuf)
 
 ################################################################
 # Initialize dependencies
@@ -194,40 +193,17 @@ include(SetupProtobuf)
 
 # Required dependencies
 
-if (NOT DR_EVT_HAS_PROTOBUF)
-  if (BUILD_PROTOBUF)
-    set(To_Ignore ${BOOST_ROOT})
-    message(STATUS "!!!!!!!!!!!!!!!!!!!!!!! Attention !!!!!!!!!!!!!!!!!!!!!!!!!")
-    message(STATUS "Type `make` to build protobuf, which is a required package.")
-    message(STATUS "Then, rerun cmake in the exactly the same way, that is to")
-    message(STATUS "configure DR_EVT with the protobuf just installed.")
-    message(STATUS "Alternatively, use -DPROTOBUF_ROOT:PATH=<path-to-protobuf>")
-    message(STATUS "to avoid two-staged building.")
-    message(STATUS "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    return ()
-  else (BUILD_PROTOBUF)
-    message(FATAL_ERROR "protobuf is required!")
-  endif (BUILD_PROTOBUF)
-endif (NOT DR_EVT_HAS_PROTOBUF)
+# Setup Protobuf (will use FetchContent if not found on system)
+include(SetupProtobuf)
 
-if (DEFINED BOOST_ROOT)
-    message(STATUS "BOOST_ROOT: " ${BOOST_ROOT})
-    set(Boost_NO_SYSTEM_PATHS ON)
-else ()
-    if (DEFINED ENV{BOOST_ROOT})
-        message(STATUS "ENV BOOST_ROOT: " $ENV{BOOST_ROOT})
-        set(Boost_NO_SYSTEM_PATHS ON)
-    endif ()
-endif ()
-
-# boost::multi_index is needed but it is header-only
-find_package(Boost
-    #         HINTS ${BOOST_ROOT} $ENV{BOOST_ROOT}
-             REQUIRED COMPONENTS
-             regex filesystem system program_options)
+# Setup Boost (will use FetchContent if not found)
+include(SetupBoost)
 
 message(STATUS "Boost_INCLUDE_DIRS: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost_LIBRARY_DIRS: " ${Boost_LIBRARY_DIRS})
+
+# Setup Python bindings (optional)
+include(SetupPybind11)
 
 # This shouldn't be here, but is ok for now. This will occasionally be
 # part of another TPL's libraries (e.g., MKL), but it's no
@@ -309,7 +285,9 @@ target_include_directories(dr_evt PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_include_directories(dr_evt SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
+target_include_directories(dr_evt SYSTEM PUBLIC
+  $<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # Use the IMPORTED targets when possible.
 
@@ -434,6 +412,55 @@ set_target_properties(t_rngen-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS t_rngen-bin)
 
+# Streaming API test
+add_executable( test_streaming_api-bin tests/test_streaming_api.cpp )
+
+target_include_directories(test_streaming_api-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+
+target_link_libraries(test_streaming_api-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_streaming_api-bin PROPERTIES OUTPUT_NAME test_streaming_api)
+set_target_properties(test_streaming_api-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_api-bin)
+
+
+# Batch vs Streaming equivalence test
+add_executable( test_batch_vs_streaming-bin tests/test_batch_vs_streaming.cpp )
+
+target_include_directories(test_batch_vs_streaming-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+
+target_link_libraries(test_batch_vs_streaming-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_batch_vs_streaming-bin PROPERTIES OUTPUT_NAME test_batch_vs_streaming)
+set_target_properties(test_batch_vs_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_batch_vs_streaming-bin)
+
+# MPI streaming test (requires MPI)
+if(MPI_CXX_FOUND)
+  add_executable( test_mpi_streaming-bin tests/test_mpi_streaming.cpp )
+
+  target_include_directories(test_mpi_streaming-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
+    ${MPI_CXX_INCLUDE_DIRS})
+
+  target_link_libraries(test_mpi_streaming-bin PRIVATE dr_evt ${LIB_FILESYSTEM} ${MPI_CXX_LIBRARIES})
+  set_target_properties(test_mpi_streaming-bin PROPERTIES OUTPUT_NAME test_mpi_streaming)
+  set_target_properties(test_mpi_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_mpi_streaming-bin)
+endif()
+
 # Install the binaries
 install(
   TARGETS  ${DR_EVT_EXEC_TARGETS}
@@ -542,10 +569,11 @@ install(
 #export(EXPORT DR_EVT_Targets NAMESPACE DR_EVT:: FILE DR_EVT_Targets.cmake)
 
 # Install export
-install(EXPORT DR_EVT_Targets
-  NAMESPACE DR_EVT::
-  FILE DR_EVT_Targets.cmake
-  DESTINATION "${CMAKE_INSTALL_DIR}")
+# Temporarily disabled due to Boost FetchContent export issues
+#install(EXPORT DR_EVT_Targets
+#  NAMESPACE DR_EVT::
+#  FILE DR_EVT_Targets.cmake
+#  DESTINATION "${CMAKE_INSTALL_DIR}")
 
 # Install the cmake stuff
 install(FILES
@@ -693,3 +721,36 @@ configure_file(
 install(FILES "${CMAKE_BINARY_DIR}/dr_evt_module.lua.install"
   RENAME "${DR_EVT_MODULEFILE_NAME}"
   DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/modulefiles")
+
+################################################################
+# Python bindings (optional)
+################################################################
+
+if(DR_EVT_HAS_PYBIND11)
+  message(STATUS "Building Python bindings...")
+
+  pybind11_add_module(dr_evt_python
+    python/dr_evt_bindings.cpp
+  )
+
+  target_link_libraries(dr_evt_python PRIVATE dr_evt)
+
+  target_include_directories(dr_evt_python PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_BINARY_DIR}/src
+  )
+
+  # Set output name
+  set_target_properties(dr_evt_python PROPERTIES
+    OUTPUT_NAME dr_evt
+    PREFIX "${PYTHON_MODULE_PREFIX}"
+    SUFFIX "${PYTHON_MODULE_EXTENSION}"
+  )
+
+  # Install to Python site-packages
+  install(TARGETS dr_evt_python
+    LIBRARY DESTINATION ${Python3_SITELIB}
+  )
+
+  message(STATUS "Python module will be installed to: ${Python3_SITELIB}")
+endif()

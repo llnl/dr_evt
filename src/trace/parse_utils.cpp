@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <map>
+#include <cctype>
 #include "trace/parse_utils.hpp"
 
 namespace dr_evt {
@@ -67,7 +68,50 @@ std::map<job_queue_t, std::string> jobq2str {
 };
 
 void set_by(epoch_t& t, const std::string& str) {
-    t = convert_time(str);
+    // Auto-detect format: if string contains only digits (and optional minus sign),
+    // treat as Unix epoch seconds; otherwise parse as ISO timestamp
+    if (str.empty()) {
+        t = {0, 0.0f};
+        return;
+    }
+
+    bool is_epoch = true;
+    for (char c : str) {
+        if (!std::isdigit(c) && c != '-' && c != '.') {
+            is_epoch = false;
+            break;
+        }
+    }
+
+    if (is_epoch) {
+        // Parse as Unix epoch seconds
+        try {
+            size_t pos;
+            double seconds = std::stod(str, &pos);
+            time_t sec_int = static_cast<time_t>(seconds);
+            float sec_frac = static_cast<float>(seconds - sec_int);
+            t = {sec_int, sec_frac};
+        } catch (...) {
+            // Fallback to ISO parsing if epoch parsing fails
+            t = convert_time(str);
+        }
+    } else {
+        // Parse as ISO/human-readable timestamp
+        // Check if it has timezone offset (±HH:MM or Z)
+        bool has_timezone = (str.find_last_of("+-Z") != std::string::npos &&
+                             str.find_last_of("+-Z") > 10);
+
+        if (has_timezone) {
+            // Parse with timezone and convert to UTC
+            auto [utc_time, tz_offset] = parse_time_with_timezone(str);
+            t = utc_time;
+            // Note: timezone offset is extracted but not returned here
+            // It would need to be stored separately if needed for display
+        } else {
+            // No timezone, use existing parser
+            t = convert_time(str);
+        }
+    }
 }
 
 void set_by(unsigned& v, const std::string& str) {

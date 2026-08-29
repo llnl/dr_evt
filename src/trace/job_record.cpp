@@ -22,8 +22,10 @@ Job_Record::Job_Record(const Job_Record& o)
     m_t_end(o.m_t_end),
     m_t_submit(o.m_t_submit),
     m_t_limit(o.m_t_limit),
+    m_actual_duration(o.m_actual_duration),
     m_num_nodes(o.m_num_nodes),
     m_q(o.m_q),
+    m_is_simulated(o.m_is_simulated),
   #if SHOW_ORG_NO
     m_org_no(o.m_org_no),
   #endif
@@ -38,8 +40,10 @@ Job_Record::Job_Record(Job_Record&& o) noexcept
     m_t_end(std::move(o.m_t_end)),
     m_t_submit(std::move(o.m_t_submit)),
     m_t_limit(std::move(o.m_t_limit)),
+    m_actual_duration(std::move(o.m_actual_duration)),
     m_num_nodes(std::move(o.m_num_nodes)),
     m_q(std::move(o.m_q)),
+    m_is_simulated(std::move(o.m_is_simulated)),
   #if SHOW_ORG_NO
     m_org_no(std::move(o.m_org_no)),
   #endif
@@ -56,8 +60,10 @@ Job_Record& Job_Record::operator=(const Job_Record& o)
         m_t_end = o.m_t_end;
         m_t_submit = o.m_t_submit;
         m_t_limit = o.m_t_limit;
+        m_actual_duration = o.m_actual_duration;
         m_num_nodes = o.m_num_nodes;
         m_q = o.m_q;
+        m_is_simulated = o.m_is_simulated;
       #if SHOW_ORG_NO
         m_org_no = o.m_org_no;
       #endif
@@ -76,8 +82,10 @@ Job_Record& Job_Record::operator=(Job_Record&& o) noexcept
         m_t_end = std::move(o.m_t_end);
         m_t_submit = std::move(o.m_t_submit);
         m_t_limit = std::move(o.m_t_limit);
+        m_actual_duration = std::move(o.m_actual_duration);
         m_num_nodes = std::move(o.m_num_nodes);
         m_q = std::move(o.m_q);
+        m_is_simulated = std::move(o.m_is_simulated);
       #if SHOW_ORG_NO
         m_org_no = std::move(o.m_org_no);
       #endif
@@ -125,28 +133,58 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
     }
   #endif
 
-    set_by(m_t_begin, *it++);
-    set_by(m_t_end, *it++);
-    set_by(m_t_submit, *it++);
+    // Check mode based on number of fields:
+    // Replay mode (6): num_nodes, begin_time, end_time, submit_time, queue, time_limit
+    // Simulation mode (4 or 5): num_nodes, submit_time, queue, time_limit[, actual_duration]
+    bool is_replay_mode = (num_inputs == 6);
+    bool has_actual_duration = (num_inputs == 5 || num_inputs == 7);
 
-  #if EVENT_TIME_ORDER
-    if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
-        m_t_submit = convert_time(dr_evt::to_string(m_t_submit));
-        m_t_begin  = convert_time(dr_evt::to_string(m_t_begin));
-        m_t_end  = convert_time(dr_evt::to_string(m_t_end));
+    if (is_replay_mode) {
+        // Replay mode: has begin_time and end_time
+        set_by(m_t_begin, *it++);
+        set_by(m_t_end, *it++);
+        set_by(m_t_submit, *it++);
 
+      #if EVENT_TIME_ORDER
         if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
-            throw std::domain_error
-                {"Job event times are incorrect! " +
-                 dr_evt::to_string(m_t_submit) + " < " +
-                 dr_evt::to_string(m_t_begin) + " < " +
-                 dr_evt::to_string(m_t_end)};
-        }
-    }
-  #endif
+            m_t_submit = convert_time(dr_evt::to_string(m_t_submit));
+            m_t_begin  = convert_time(dr_evt::to_string(m_t_begin));
+            m_t_end  = convert_time(dr_evt::to_string(m_t_end));
 
-    set_by(m_q, *it++);
-    set_by(m_t_limit, *it++);
+            if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
+                throw std::domain_error
+                    {"Job event times are incorrect! " +
+                     dr_evt::to_string(m_t_submit) + " < " +
+                     dr_evt::to_string(m_t_begin) + " < " +
+                     dr_evt::to_string(m_t_end)};
+            }
+        }
+      #endif
+
+        set_by(m_q, *it++);
+        set_by(m_t_limit, *it++);
+
+        // Compute actual_duration from recorded times
+        m_actual_duration = static_cast<tdiff_t>(m_t_end - m_t_begin);
+        m_is_simulated = false;
+    } else {
+        // Simulation mode: no begin_time or end_time in input
+        // Initialize to zero - will be set by scheduler
+        m_t_begin = {0, 0.0f};
+        m_t_end = {0, 0.0f};
+
+        set_by(m_t_submit, *it++);
+        set_by(m_q, *it++);
+        set_by(m_t_limit, *it++);
+
+        // If actual_duration provided, read it; otherwise will be set by determine_job_durations()
+        if (has_actual_duration) {
+            set_by(m_actual_duration, *it++);
+        } else {
+            m_actual_duration = 0.0;
+        }
+        m_is_simulated = true;
+    }
 }
 
 std::string Job_Record::get_header_str()

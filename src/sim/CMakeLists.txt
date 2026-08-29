@@ -3,10 +3,16 @@ set_full_path(THIS_DIR_HEADERS
     job_submit_common.hpp
     job_submit_model.hpp
     multi_platform_runs.hpp
+    scheduler_policies.hpp
+    schedule_windows.hpp
+    scheduler.hpp
     sim.hpp
 )
 
 set_full_path(THIS_DIR_SOURCES
+    schedule_windows.cpp
+    scheduler.cpp
+    sim.cpp
 )
 
 # Propagate the files up the tree

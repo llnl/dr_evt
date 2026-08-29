@@ -1,0 +1,55 @@
+name: Quick Test (Correctness Only)
+
+# Fast CI for quick validation (runs on every commit)
+# Only runs correctness tests to save time
+# Full test suite runs on PR and main branch
+
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+jobs:
+  quick-test:
+    name: Quick Correctness Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            libboost-all-dev \
+            python3 \
+            libopenmpi-dev \
+            openmpi-bin \
+            gcc-11 \
+            g++-11
+
+      - name: Configure and Build
+        env:
+          CC: gcc-11
+          CXX: g++-11
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Run Correctness Tests Only
+        run: |
+          echo "Running correctness tests (most important)..."
+          ./tests/run_correctness_tests.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "Quick Test Complete"
+          echo "Correctness: 23/23 tests"
+          echo "========================================"

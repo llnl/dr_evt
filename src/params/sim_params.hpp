@@ -19,6 +19,7 @@
 
 #include <string>
 #include "dr_evt_types.hpp"
+#include "sim/scheduler_policies.hpp"
 
 namespace dr_evt {
 /** \addtogroup dr_evt_params
@@ -41,6 +42,24 @@ class Sim_Params {
 
     bool m_is_jobs_set;
     bool m_is_time_set;
+
+    // Scheduling parameters
+    BackfillPolicy m_backfill_policy;
+    PriorityPolicy m_priority_policy;
+    RuntimeEstimateMode m_runtime_mode;
+    num_nodes_t m_total_nodes;
+    std::string m_trace_format;  // "simple" or "lassen"
+    std::string m_timestamp_format;  // "epoch" or "iso"
+    std::string m_timezone;  // e.g., "UTC", "America/Los_Angeles", "America/New_York"
+
+    // Duration determination (simulation mode)
+    DurationMode m_duration_mode;
+    DistributionType m_duration_distribution;
+    double m_duration_scale;    // Scale factor (e.g., 0.8 = jobs run 80% of estimate)
+    double m_duration_stddev;   // Std deviation factor
+
+    // Output control
+    bool m_verbose;  // Enable verbose/debug output (default: false for production)
 
  private:
     std::string m_outfile;

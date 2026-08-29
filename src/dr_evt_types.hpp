@@ -11,6 +11,7 @@
 #ifndef DR_EVT_DR_EVT_TYPES_HPP
 #define DR_EVT_DR_EVT_TYPES_HPP
 #include <limits>  // std::numeric_limits
+#include <cstddef> // size_t
 #include <cstdint> // uint64_t
 
 #if defined(DR_EVT_HAS_CONFIG)

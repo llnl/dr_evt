@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cassert>
+#include <map>
 #include "trace/data_columns.hpp"
 #include "trace/job_record.hpp"
 #include "trace/parse_utils.hpp"
@@ -24,7 +25,11 @@ namespace dr_evt {
 Data_Columns::Data_Columns()
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
-    m_queue_idx(static_cast<col_no_t>(0u))
+    m_queue_idx(static_cast<col_no_t>(0u)),
+    m_trace_format("lassen"),
+    m_timestamp_format("iso"),
+    m_timezone_str("America/Los_Angeles"),
+    m_trace_mode(TraceMode::REPLAY)  // Default to replay
 {
     // TODO: This should be read from an input file
     // Define the data columns to read. The rest will be not collected to
@@ -35,6 +40,68 @@ Data_Columns::Data_Columns()
         {29, "job_submit_time"}, {30, "queue"}, {32, "time_limit"}
     };
     m_col_to_avoid = "user_script";
+    init();
+}
+
+Data_Columns::Data_Columns(const std::string& format)
+  : m_cur_tz(nullptr),
+    m_total_columns(static_cast<num_cols_t>(0u)),
+    m_queue_idx(static_cast<col_no_t>(0u)),
+    m_trace_format(format),
+    m_timestamp_format("iso"),
+    m_timezone_str("America/Los_Angeles"),
+    m_trace_mode(TraceMode::REPLAY)  // Will be detected in check_header
+{
+    if (format == "simple") {
+        // Simple format file columns: [job_submit_time, begin_time, end_time, num_nodes, exit_status, queue, time_limit, actual_duration (optional)]
+        // Job_Record expects: [num_nodes, begin_time, end_time, job_submit_time, queue, time_limit, actual_duration]
+        // After sorting by column index, we need to remap to Job_Record order
+        // We define in Job_Record's expected order here, but need different column indices:
+        m_cols_to_read = {
+            {3, "num_nodes"},        // File column 3 -> Job_Record field 0
+            {1, "begin_time"},       // File column 1 -> Job_Record field 1
+            {2, "end_time"},         // File column 2 -> Job_Record field 2
+            {0, "job_submit_time"},  // File column 0 -> Job_Record field 3
+            {5, "queue"},            // File column 5 -> Job_Record field 4
+            {6, "time_limit"},       // File column 6 -> Job_Record field 5
+            {7, "actual_duration"}   // File column 7 -> Job_Record field 6 (optional)
+        };
+        m_col_to_avoid = "";  // No problematic columns in simple format
+    } else {
+        // Lassen format (default)
+        m_cols_to_read = {
+            {11, "num_nodes"}, {23, "begin_time"}, {24, "end_time"},
+            {29, "job_submit_time"}, {30, "queue"}, {32, "time_limit"}
+        };
+        m_col_to_avoid = "user_script";
+    }
+    init();
+}
+
+Data_Columns::Data_Columns(const std::string& format, const std::string& timestamp_format, const std::string& timezone)
+  : m_cur_tz(nullptr),
+    m_total_columns(static_cast<num_cols_t>(0u)),
+    m_queue_idx(static_cast<col_no_t>(0u)),
+    m_trace_format(format),
+    m_timestamp_format(timestamp_format),
+    m_timezone_str(timezone),
+    m_trace_mode(TraceMode::REPLAY)  // Will be detected in check_header
+{
+    if (format == "simple") {
+        // Simple format: [arrival_time, start_time, end_time, num_nodes, exit_status, queue, time_limit, actual_duration (optional)]
+        m_cols_to_read = {
+            {3, "num_nodes"}, {1, "begin_time"}, {2, "end_time"},
+            {0, "job_submit_time"}, {5, "queue"}, {6, "time_limit"}, {7, "actual_duration"}
+        };
+        m_col_to_avoid = "";
+    } else {
+        // Lassen format
+        m_cols_to_read = {
+            {11, "num_nodes"}, {23, "begin_time"}, {24, "end_time"},
+            {29, "job_submit_time"}, {30, "queue"}, {32, "time_limit"}
+        };
+        m_col_to_avoid = "user_script";
+    }
     init();
 }
 
@@ -71,8 +138,11 @@ void Data_Columns::init()
         }
     }
 
-    // Make sure the colums are in the order of increasing index
-    std::sort(m_cols_to_read.begin(), m_cols_to_read.end());
+    // Make sure the columns are in the order of increasing index
+    // NOTE: For simple format, we keep them in Job_Record's expected order, not file order
+    if (m_trace_format != "simple") {
+        std::sort(m_cols_to_read.begin(), m_cols_to_read.end());
+    }
 
     Job_Record::set_num_inputs(static_cast<unsigned>(size()));
 
@@ -120,6 +190,13 @@ bool Data_Columns::check_header(const std::string& fname)
     while (header.good()) { // Find the number of columns
         std::string substr;
         std::getline(header, substr, ',');
+
+        // Strip trailing whitespace (including \r from Windows line endings)
+        while (!substr.empty() && (substr.back() == ' ' || substr.back() == '\t' ||
+                                    substr.back() == '\r' || substr.back() == '\n')) {
+            substr.pop_back();
+        }
+
         col_names.emplace_back(substr);
 
         if (substr == m_col_to_avoid) {
@@ -129,16 +206,105 @@ bool Data_Columns::check_header(const std::string& fname)
         idx ++;
     }
 
+    // Build column name to index map from actual header
+    std::map<std::string, col_no_t> col_map;
+    for (col_no_t i = 0; i < col_names.size(); ++i) {
+        col_map[col_names[i]] = i;
+    }
+
+    // Detect trace mode from columns present
+    bool has_begin_time = col_map.find("begin_time") != col_map.end();
+    bool has_end_time = col_map.find("end_time") != col_map.end();
+
+    if (has_begin_time && has_end_time) {
+        m_trace_mode = TraceMode::REPLAY;
+    } else if (!has_begin_time && !has_end_time) {
+        m_trace_mode = TraceMode::SIMULATION;
+    } else {
+        throw std::invalid_argument("Ambiguous trace format: has one of begin_time/end_time but not both");
+    }
+
+    // Rebuild m_cols_to_read with actual column indices from header
+    m_cols_to_read.clear();
+
+    if (m_trace_mode == TraceMode::REPLAY) {
+        // Replay mode: need all columns including begin_time and end_time
+        m_cols_to_read = {
+            {col_map["num_nodes"], "num_nodes"},
+            {col_map["begin_time"], "begin_time"},
+            {col_map["end_time"], "end_time"},
+            {col_map["job_submit_time"], "job_submit_time"},
+            {col_map["queue"], "queue"},
+            {col_map["time_limit"], "time_limit"}
+        };
+    } else {
+        // Simulation mode: no begin_time or end_time
+        auto find_column = [&col_map](const std::string& name) -> col_no_t {
+            auto it = col_map.find(name);
+            if (it == col_map.end()) {
+                throw std::invalid_argument("Required column '" + name + "' not found in trace file");
+            }
+            return it->second;
+        };
+
+        col_no_t num_nodes_idx = find_column("num_nodes");
+        col_no_t submit_time_idx = find_column("job_submit_time");
+        col_no_t queue_idx = find_column("queue");
+        col_no_t time_limit_idx = find_column("time_limit");
+
+        m_cols_to_read = {
+            {num_nodes_idx, "num_nodes"},
+            {submit_time_idx, "job_submit_time"},
+            {queue_idx, "queue"},
+            {time_limit_idx, "time_limit"}
+        };
+
+        // Optional: actual_duration column for FROM_COLUMN mode
+        auto actual_duration_it = col_map.find("actual_duration");
+        if (actual_duration_it != col_map.end()) {
+            m_cols_to_read.push_back({actual_duration_it->second, "actual_duration"});
+        };
+    }
+
+    // Verify all required columns are present
     for (const auto& c: m_cols_to_read) {
-        if (col_names.at(c.first) != c.second) {
+        const std::string& col_name = c.second;
+        if (col_map.find(col_name) == col_map.end()) {
             std::string err_str =
-                "Column <" + std::to_string(c.first) + ' ' + c.second +
-                "> is not present!";
+                "Required column '" + col_name + "' is not present!";
             throw std::invalid_argument {err_str};
             return false;
         }
     }
     m_total_columns = static_cast<num_cols_t>(col_names.size());
+
+    // Sort columns by file index for proper extraction
+    // Exception: for simple format, keep in Job_Record expected order
+    if (m_trace_format != "simple") {
+        std::sort(m_cols_to_read.begin(), m_cols_to_read.end());
+    }
+
+    // Reinitialize after rebuilding m_cols_to_read
+    m_col_by_name.clear();
+
+    for (auto i = static_cast<num_cols_t>(0u); i < m_cols_to_read.size(); ++i) {
+        const auto& c = m_cols_to_read[i];
+        const auto result
+            = m_col_by_name.insert(
+                  std::make_pair(c.second,
+                                 std::make_pair(c.first, i)));
+
+        if (!result.second) {
+            std::string err("Possible duplicate column name with " + c.second);
+            throw std::invalid_argument {err.c_str()};
+        }
+        if (c.second == "queue") {
+            m_queue_idx = i;
+        }
+    }
+
+    // Update Job_Record with correct field count
+    Job_Record::set_num_inputs(static_cast<unsigned>(m_cols_to_read.size()));
 
     return true;
 }
