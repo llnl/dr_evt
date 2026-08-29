@@ -41,10 +41,10 @@ for test_file in tests/test_traces/unit/*.csv; do
         --duration_mode exact \
         --outfile /tmp/unit_$test_name.csv > /dev/null 2>&1; then
         echo "  ✓ PASS"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  ✗ FAIL"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 done
 

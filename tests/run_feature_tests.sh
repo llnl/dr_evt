@@ -53,10 +53,10 @@ for test_file in tests/test_traces/feature/*.csv tests/test_traces/feature/*.tra
         --duration_mode exact \
         --outfile /tmp/feature_$test_name.csv > /dev/null 2>&1; then
         echo "  ✓ PASS"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  ✗ FAIL"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 done
 
@@ -80,10 +80,10 @@ for cpp_test in tests/test_streaming_api.cpp tests/test_streaming_vs_batch.cpp t
         echo "Testing: $test_name"
         if ./build/$test_name > /dev/null 2>&1; then
             echo "  ✓ PASS"
-            ((PASS++))
+            PASS=$((PASS + 1))
         else
             echo "  ✗ FAIL"
-            ((FAIL++))
+            FAIL=$((FAIL + 1))
         fi
     else
         echo "Skipping: $test_name (not built)"

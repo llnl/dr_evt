@@ -50,10 +50,10 @@ echo "Test 1: Minimal config"
 
 if diff -q /tmp/cli_minimal.csv /tmp/pb_minimal.csv > /dev/null; then
     echo "  ✓ Minimal config matches CLI"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Minimal config differs from CLI"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 # Test 2: Full config vs CLI
@@ -72,10 +72,10 @@ echo "Test 2: Full config"
 
 if diff -q /tmp/cli_full.csv /tmp/pb_full.csv > /dev/null; then
     echo "  ✓ Full config matches CLI"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Full config differs from CLI"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 # Test 3: Conservative config vs CLI
@@ -94,10 +94,10 @@ echo "Test 3: Conservative policy config"
 
 if diff -q /tmp/cli_conservative.csv /tmp/pb_conservative.csv > /dev/null; then
     echo "  ✓ Conservative config matches CLI"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Conservative config differs from CLI"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 # Test 4: Distribution config
@@ -108,10 +108,10 @@ echo "Test 4: Distribution config"
 
 if [ -f /tmp/pb_distribution.csv ]; then
     echo "  ✓ Distribution config runs"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Distribution config failed"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 echo ""
