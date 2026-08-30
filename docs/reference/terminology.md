@@ -14,7 +14,7 @@ This is confusing! Let's fix it.
 **What it is:** Python implementation of EASY backfilling used to verify C++ implementation  
 **Call it:** "Reference implementation" or "Python reference"  
 **File naming:** `*_reference.csv` (output from reference implementation)  
-**Script:** `scripts/minimal_easy_oracle.py` (historical name, kept for now)
+**Script:** `scripts/python_reference_scheduler.py` (historical name, kept for now)
 
 ### 2. Job Duration Modes
 **What it is:** How job durations are determined in simulation  
@@ -67,7 +67,7 @@ Example: `easy_5jobs_reference.csv`
 ## Code/Script Names
 
 **Scripts:**
-- `scripts/minimal_easy_oracle.py` - Reference implementation (historical name)
+- `scripts/python_reference_scheduler.py` - Reference implementation (historical name)
 - `scripts/compare_with_oracle.py` - Comparison tool (historical name)
 
 **Better names (if renaming):**
@@ -103,7 +103,7 @@ compare_with_oracle.py oracle.csv output.csv
 ### ✅ Clear (New)
 ```bash
 # Generate reference output
-python3 scripts/minimal_easy_oracle.py input.csv
+python3 scripts/python_reference_scheduler.py input.csv
 
 # Run in exact duration mode  
 ./simulator --duration_mode exact input.csv
@@ -126,7 +126,7 @@ python3 scripts/compare_with_oracle.py reference.csv output.csv
 
 **Files to rename (optional):**
 - None currently - our current `*_reference.csv` naming is correct
-- Script names (`minimal_easy_oracle.py`) are historical but acceptable
+- Script names (`python_reference_scheduler.py`) are historical but acceptable
 
 **Documentation to update:**
 - Replace "oracle mode" → "exact duration mode"

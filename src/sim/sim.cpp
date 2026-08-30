@@ -286,7 +286,8 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         throw std::runtime_error("Invalid job_idx: " + std::to_string(job_idx));
     }
 
-    // Add to waiting queue (jobs submitted in sorted order by submit_time)
+    // Add to waiting queue
+    // Assumes jobs submitted in non-decreasing order by submit_time for FCFS correctness
     m_wait_queue.push_back({job_idx, false});
 }
 
@@ -378,7 +379,7 @@ void Simulation::advance_to(sim_time_t target_time)
         // Find next replay event time
         bool has_replay_event = !m_replay_ctx.m_evtq.empty();
         sim_time_t next_replay_time = std::numeric_limits<sim_time_t>::max();
-        bool next_is_start = false;
+        [[maybe_unused]] bool next_is_start = false;
         if (has_replay_event) {
             const auto& event = *m_replay_ctx.m_evtq.begin();
             next_replay_time = static_cast<sim_time_t>(event.get_time().first) +
@@ -496,6 +497,57 @@ void Simulation::advance_to(sim_time_t target_time)
 num_nodes_t Simulation::get_nodes_in_use() const
 {
     return m_trace.get_nodes_in_use(m_replay_ctx);
+}
+
+Simulation::Statistics Simulation::get_statistics() const
+{
+    Statistics stats;
+
+    // Basic counters
+    stats.jobs_submitted = m_jobs_submitted;
+    stats.jobs_completed = m_jobs_completed;
+    stats.jobs_running = m_running_jobs.size();
+    stats.jobs_waiting = m_wait_queue.size();
+    stats.current_time = m_current_time;
+
+    // Resource utilization
+    stats.total_nodes = m_params.m_total_nodes;
+    stats.nodes_in_use = get_nodes_in_use();
+    stats.nodes_available = stats.total_nodes - stats.nodes_in_use;
+    stats.utilization = (stats.total_nodes > 0) ?
+                       static_cast<double>(stats.nodes_in_use) / stats.total_nodes :
+                       0.0;
+
+    // Calculate wait times and turnaround times
+    tdiff_t total_wait = 0.0;
+    tdiff_t total_turnaround = 0.0;
+    sim_time_t max_completion = 0.0;
+    num_jobs_t completed_count = 0;
+
+    for (const auto& job : m_trace.data()) {
+        const auto& begin_time = job.get_begin_time();
+        const auto& end_time = job.get_end_time();
+
+        // Only count completed jobs (those with non-zero begin_time)
+        if (begin_time.first > 0 || begin_time.second > 0) {
+            [[maybe_unused]] const auto& submit_time = job.get_submit_time();
+            tdiff_t wait = job.get_wait_time();
+            tdiff_t exec = job.get_exec_time();
+
+            total_wait += wait;
+            total_turnaround += (wait + exec);
+
+            sim_time_t completion = static_cast<sim_time_t>(end_time.first) + end_time.second;
+            max_completion = std::max(max_completion, completion);
+            completed_count++;
+        }
+    }
+
+    stats.avg_wait_time = (completed_count > 0) ? total_wait / completed_count : 0.0;
+    stats.avg_turnaround_time = (completed_count > 0) ? total_turnaround / completed_count : 0.0;
+    stats.makespan = max_completion;
+
+    return stats;
 }
 
 } // namespace dr_evt

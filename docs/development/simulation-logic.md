@@ -508,4 +508,4 @@ Checks:
 - [sim.cpp](../src/sim/sim.cpp) - Main simulation engine
 - [scheduler.cpp](../src/sim/scheduler.cpp) - EASY backfilling implementation
 - [trace.cpp](../src/trace/trace.cpp) - Replay engine
-- [minimal_easy_oracle.py](../minimal_easy_oracle.py) - Reference implementation
+- [python_reference_scheduler.py](../python_reference_scheduler.py) - Reference implementation

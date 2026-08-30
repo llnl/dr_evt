@@ -43,10 +43,10 @@ python3 scripts/verify_against_analytical.py
 
 **Dependencies:**
 - Requires `build/simulator` executable
-- Calls `minimal_easy_oracle.py`
+- Calls `python_reference_scheduler.py`
 - Reads from `tests/test_traces/correctness/`
 
-### minimal_easy_oracle.py
+### python_reference_scheduler.py
 
 **Pure Python EASY backfilling reference implementation.**
 
@@ -56,12 +56,12 @@ python3 scripts/verify_against_analytical.py
 
 **Usage:**
 ```bash
-python3 scripts/minimal_easy_oracle.py <input.csv> --nodes <num_nodes>
+python3 scripts/python_reference_scheduler.py <input.csv> --nodes <num_nodes>
 ```
 
 **Example:**
 ```bash
-python3 scripts/minimal_easy_oracle.py \
+python3 scripts/python_reference_scheduler.py \
     tests/test_traces/correctness/bf01_basic_success_input.csv \
     --nodes 100
 ```
@@ -246,7 +246,7 @@ verify_against_analytical.py
     |
     +---> Runs: build/simulator (C++ implementation)
     |
-    +---> Runs: minimal_easy_oracle.py (Python reference)
+    +---> Runs: python_reference_scheduler.py (Python reference)
     |
     +---> Compares outputs vs analytical oracle
     |
@@ -266,7 +266,7 @@ generate_all_analytical_oracles.py
     v
 Creates: *_analytical.csv files (ground truth)
 
-minimal_easy_oracle.py
+python_reference_scheduler.py
     |
     v
 Creates: *_oracle.csv files (computed by Python reference)
@@ -280,7 +280,7 @@ Test files follow a naming pattern:
 tests/test_traces/correctness/
 ├── bf01_basic_success_input.csv          ← Input: jobs to schedule
 ├── bf01_basic_success_input_analytical.csv   ← Ground truth: expected results (hand-traced)
-├── bf01_basic_success_input_oracle.csv       ← Python output: computed by minimal_easy_oracle.py
+├── bf01_basic_success_input_oracle.csv       ← Python output: computed by python_reference_scheduler.py
 └── /tmp/bf01_basic_success_input_drevt.csv   ← C++ output: computed by DR_EVT simulator
 ```
 
@@ -342,7 +342,7 @@ All scripts require Python 3.6+. No external dependencies.
 3. Compare against analytical oracle to find discrepancy
 4. Fix either:
    - C++ implementation bug (in `src/`)
-   - Python reference bug (in `minimal_easy_oracle.py`)
+   - Python reference bug (in `python_reference_scheduler.py`)
    - Ground truth bug (in `generate_all_analytical_oracles.py`)
 
 **If adding new test scenarios:**

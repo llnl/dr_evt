@@ -44,7 +44,7 @@ for test_base in "${REPLAY_TESTS[@]}"; do
 
     if [ ! -f "$input_trace" ]; then
         echo "  ✗ Input not found: $input_trace"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
         continue
     fi
 
@@ -63,7 +63,7 @@ for test_base in "${REPLAY_TESTS[@]}"; do
 
     if [ ! -f "$sim_job_output" ] || [ ! -f "$sim_resource_output" ]; then
         echo "  ✗ Simulation failed"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
         continue
     fi
 
@@ -80,19 +80,19 @@ for test_base in "${REPLAY_TESTS[@]}"; do
 
     if [ ! -f "$replay_resource_output" ]; then
         echo "  ✗ Replay failed"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
         continue
     fi
 
     # Step 3: Compare resource traces
     if diff -q "$sim_resource_output" "$replay_resource_output" > /dev/null; then
         echo "  ✓ PASS - Resource traces match"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  ✗ FAIL - Resource traces differ"
         echo "    Simulation:  $sim_resource_output"
         echo "    Replay:      $replay_resource_output"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 done
 

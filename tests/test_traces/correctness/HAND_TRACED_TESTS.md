@@ -211,7 +211,7 @@ If DR_EVT fails but oracle passes, DR_EVT is wrong.
 # Verify oracle
 for test in hand_simple_backfill hand_backfill_blocked sequential_wait basic_2jobs; do
     echo "Testing $test..."
-    python3 scripts/minimal_easy_oracle.py \
+    python3 scripts/python_reference_scheduler.py \
       test_traces/correctness/${test}_input.csv --nodes 100
 done
 

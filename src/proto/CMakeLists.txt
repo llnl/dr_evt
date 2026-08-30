@@ -74,6 +74,8 @@ if (DR_EVT_HAS_PROTOBUF)
 endif (DR_EVT_HAS_PROTOBUF)
 
 
-# Propagate the files up the tree
-set(DR_EVT_HEADERS "${DR_EVT_HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
-set(DR_EVT_SOURCES "${DR_EVT_SOURCES}" "${THIS_DIR_SOURCES}" PARENT_SCOPE)
+# Propagate the files up the tree (only if protobuf is enabled)
+if (DR_EVT_HAS_PROTOBUF)
+    set(DR_EVT_HEADERS "${DR_EVT_HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
+    set(DR_EVT_SOURCES "${DR_EVT_SOURCES}" "${THIS_DIR_SOURCES}" PARENT_SCOPE)
+endif()

@@ -127,17 +127,8 @@ std::vector<job_no_t> Scheduler::schedule(
             jobs_to_run.push_back(job_idx);
             mark_removed(job_idx);
             return jobs_to_run;  // Return immediately, let sim.cpp call us again
-        } else {
-            // Check if window too short for ALL remaining
-            tdiff_t shortest_remaining = runtime_est;
-            for (size_t j = i + 1; j < sorted_jobs.size(); j++) {
-                shortest_remaining = std::min(shortest_remaining,
-                                             get_runtime_estimate(sorted_jobs[j]));
-            }
-            if (current_time + shortest_remaining > m_fcfs_reservation_time) {
-                break;  // Window too short
-            }
         }
+        // else: doesn't fit window, continue to next candidate
     }
 
     // Remove scheduled jobs from wait queue
@@ -152,21 +143,9 @@ void Scheduler::apply_priority_policy(std::vector<job_no_t>& jobs) const
 {
     switch (m_priority_policy) {
         case PriorityPolicy::FCFS:
-            // Sort by submit time, then by job index for stable ordering
-            std::sort(jobs.begin(), jobs.end(),
-                [this](job_no_t a, job_no_t b) {
-                    const auto& job_a = (*m_job_data_ptr)[a];
-                    const auto& job_b = (*m_job_data_ptr)[b];
-                    sim_time_t submit_a = static_cast<sim_time_t>(job_a.get_submit_time().first) +
-                                          job_a.get_submit_time().second;
-                    sim_time_t submit_b = static_cast<sim_time_t>(job_b.get_submit_time().first) +
-                                          job_b.get_submit_time().second;
-                    if (submit_a != submit_b) {
-                        return submit_a < submit_b;
-                    }
-                    // Tie-breaker: use job index (file order)
-                    return a < b;
-                });
+            // No sort needed: wait_queue is already in FCFS order (arrival order)
+            // Trace::load_data() sorts by submit_time (trace.cpp:57), ensuring
+            // jobs are added to wait_queue in non-decreasing submit_time order
             break;
 
         case PriorityPolicy::SJF:

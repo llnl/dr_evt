@@ -467,7 +467,7 @@ Uses property-based testing and invariant checking.
 """
 
 import sys
-from minimal_easy_oracle import simulate_easy
+from python_reference_scheduler import simulate_easy
 
 def test_hand_traced():
     """Test cases small enough to verify by hand."""

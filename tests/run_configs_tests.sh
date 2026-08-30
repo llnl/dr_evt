@@ -2,6 +2,7 @@
 # Test that configuration files produce same results as command-line options
 #
 # Verifies that all CLI options are supported via config files and behave identically
+# NOTE: Requires Protobuf support (cmake -DDR_EVT_ENABLE_PROTOBUF=ON)
 
 set -e
 
@@ -22,6 +23,13 @@ if [ ! -f "./build/simulator" ]; then
     echo "Error: ./build/simulator not found"
     echo "Please build first: cd build && cmake .. && make"
     exit 1
+fi
+
+# Check if simulator supports --config option (requires Protobuf)
+if ! ./build/simulator --help 2>&1 | grep -q -- "--config"; then
+    echo "Simulator built without Protobuf support (no --config option)"
+    echo "Skipping config tests (require -DDR_EVT_ENABLE_PROTOBUF=ON)"
+    exit 0
 fi
 
 # Test trace
@@ -50,10 +58,10 @@ echo "Test 1: Minimal config"
 
 if diff -q /tmp/cli_minimal.csv /tmp/pb_minimal.csv > /dev/null; then
     echo "  ✓ Minimal config matches CLI"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Minimal config differs from CLI"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 # Test 2: Full config vs CLI
@@ -63,7 +71,8 @@ echo "Test 2: Full config"
     --trace_format simple \
     --timestamp_format epoch \
     --duration_mode exact \
-    --policy easy \
+    --backfill_policy easy \
+    --priority_policy fcfs \
     --outfile /tmp/cli_full.csv
 
 ./build/simulator "$TEST_TRACE" \
@@ -72,10 +81,10 @@ echo "Test 2: Full config"
 
 if diff -q /tmp/cli_full.csv /tmp/pb_full.csv > /dev/null; then
     echo "  ✓ Full config matches CLI"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Full config differs from CLI"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 # Test 3: Conservative config vs CLI
@@ -85,7 +94,7 @@ echo "Test 3: Conservative policy config"
     --trace_format simple \
     --timestamp_format epoch \
     --duration_mode exact \
-    --policy conservative \
+    --backfill_policy conservative \
     --outfile /tmp/cli_conservative.csv
 
 ./build/simulator "$TEST_TRACE" \
@@ -94,10 +103,10 @@ echo "Test 3: Conservative policy config"
 
 if diff -q /tmp/cli_conservative.csv /tmp/pb_conservative.csv > /dev/null; then
     echo "  ✓ Conservative config matches CLI"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Conservative config differs from CLI"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 # Test 4: Distribution config
@@ -108,10 +117,10 @@ echo "Test 4: Distribution config"
 
 if [ -f /tmp/pb_distribution.csv ]; then
     echo "  ✓ Distribution config runs"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ✗ Distribution config failed"
-    ((FAIL++))
+    FAIL=$((FAIL + 1))
 fi
 
 echo ""

@@ -33,6 +33,8 @@ class Sim_Params {
     void print() const;
     void set_outfile(const std::string& ofname);
     std::string get_outfile() const;
+    void set_resource_trace(const std::string& rfname);
+    std::string get_resource_trace() const;
 
     unsigned m_seed;
     dr_evt::num_jobs_t m_max_jobs;
@@ -63,6 +65,7 @@ class Sim_Params {
 
  private:
     std::string m_outfile;
+    std::string m_resource_trace;  // Optional resource usage trace output
 };
 
 /**@}*/

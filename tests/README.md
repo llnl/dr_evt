@@ -129,7 +129,7 @@ Core verification in `scripts/`:
 
 ```bash
 verify_against_analytical.py    # Main correctness verification
-minimal_easy_oracle.py          # Python reference implementation
+python_reference_scheduler.py          # Python reference implementation
 generate_all_analytical_oracles.py  # Generates analytical oracles
 ```
 

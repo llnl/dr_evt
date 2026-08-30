@@ -300,7 +300,7 @@ def main():
         idx = sys.argv.index('--nodes')
         total_nodes = int(sys.argv[idx + 1])
 
-    print(f"=== Minimal EASY Backfilling Oracle ===")
+    print(f"=== Python Reference EASY Backfilling Scheduler ===")
     print(f"Trace: {trace_file}")
     print(f"Total nodes: {total_nodes}")
     print(f"Verbose: {verbose}")

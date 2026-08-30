@@ -81,7 +81,7 @@ void run_mpi_streaming(const std::string& trace_file, int total_nodes,
 
     // Load trace
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;
-    int rc = sim.get_trace().load_data(max_num_jobs);
+    [[maybe_unused]] int rc = sim.get_trace().load_data(max_num_jobs);
     assert(rc == EXIT_SUCCESS);
 
     std::stable_sort(sim.get_trace().data().begin(), sim.get_trace().data().end());

@@ -30,8 +30,8 @@ PASS=0
 FAIL=0
 
 echo "=== Trace-based feature tests ==="
-# Run each feature test trace
-for test_file in tests/test_traces/feature/*.csv tests/test_traces/feature/*.trace; do
+# Run each feature test trace (only CSV files - .trace files are documentation)
+for test_file in tests/test_traces/feature/*.csv; do
     if [ ! -f "$test_file" ]; then
         continue
     fi
@@ -39,12 +39,7 @@ for test_file in tests/test_traces/feature/*.csv tests/test_traces/feature/*.tra
     test_name=$(basename "$test_file")
     echo "Testing: $test_name"
 
-    # Determine format based on extension
-    if [[ "$test_file" == *.trace ]]; then
-        format="simple"
-    else
-        format="simple"
-    fi
+    format="simple"
 
     if ./build/simulator "$test_file" \
         --total_nodes 100 \
@@ -53,22 +48,30 @@ for test_file in tests/test_traces/feature/*.csv tests/test_traces/feature/*.tra
         --duration_mode exact \
         --outfile /tmp/feature_$test_name.csv > /dev/null 2>&1; then
         echo "  ✓ PASS"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  ✗ FAIL"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 done
 
 echo ""
 echo "=== Configuration tests ==="
-# Run config tests
-if ./tests/run_configs_tests.sh > /dev/null 2>&1; then
-    echo "  ✓ Config tests PASS"
-    ((PASS+=4))
+# Run config tests (may be skipped if Protobuf disabled)
+config_output=$(./tests/run_configs_tests.sh 2>&1)
+config_exit=$?
+
+if [ $config_exit -eq 0 ]; then
+    if echo "$config_output" | grep -q "Skipping config tests"; then
+        echo "  ⊘ Config tests SKIPPED (Protobuf disabled)"
+        # Don't count skipped tests in pass/fail
+    else
+        echo "  ✓ Config tests PASS"
+        PASS=$((PASS + 4))
+    fi
 else
     echo "  ✗ Config tests FAIL"
-    ((FAIL+=4))
+    FAIL=$((FAIL + 4))
 fi
 
 echo ""
@@ -80,10 +83,10 @@ for cpp_test in tests/test_streaming_api.cpp tests/test_streaming_vs_batch.cpp t
         echo "Testing: $test_name"
         if ./build/$test_name > /dev/null 2>&1; then
             echo "  ✓ PASS"
-            ((PASS++))
+            PASS=$((PASS + 1))
         else
             echo "  ✗ FAIL"
-            ((FAIL++))
+            FAIL=$((FAIL + 1))
         fi
     else
         echo "Skipping: $test_name (not built)"

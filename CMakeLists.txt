@@ -193,8 +193,11 @@ include(SetupCXX)
 
 # Required dependencies
 
-# Setup Protobuf (will use FetchContent if not found on system)
-include(SetupProtobuf)
+# Setup Protobuf (optional - can be disabled with -DDR_EVT_ENABLE_PROTOBUF=OFF)
+option(DR_EVT_ENABLE_PROTOBUF "Enable Protobuf support" OFF)
+if (DR_EVT_ENABLE_PROTOBUF)
+  include(SetupProtobuf)
+endif()
 
 # Setup Boost (will use FetchContent if not found)
 include(SetupBoost)
@@ -533,10 +536,12 @@ write_basic_package_version_file(
 set(INCLUDE_INSTALL_DIRS
   "${CMAKE_SOURCE_DIR}/src"
   "${CMAKE_SOURCE_DIR}/src/params"
-  "${CMAKE_SOURCE_DIR}/src/proto"
   "${CMAKE_SOURCE_DIR}/src/sim"
   "${CMAKE_SOURCE_DIR}/src/trace"
   "${CMAKE_SOURCE_DIR}/src/utils")
+if (DR_EVT_HAS_PROTOBUF)
+  list(APPEND INCLUDE_INSTALL_DIRS "${CMAKE_SOURCE_DIR}/src/proto")
+endif()
 set(LIB_INSTALL_DIR "${CMAKE_BINARY_DIR}")
 set(EXTRA_CMAKE_MODULE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 configure_package_config_file(cmake/configure_files/DR_EVT_Config.cmake.in
@@ -591,10 +596,12 @@ install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/src/params"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
-install(
-  DIRECTORY "${PROJECT_SOURCE_DIR}/src/proto"
-  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+if (DR_EVT_HAS_PROTOBUF)
+  install(
+    DIRECTORY "${PROJECT_SOURCE_DIR}/src/proto"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+endif()
 install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/src/trace"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"

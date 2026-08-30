@@ -34,16 +34,22 @@ int main(int argc, char** argv)
         // Write simulated trace
         sim.write_simulated_trace();
 
-        // Write resource trace
-        std::string resource_file = cfg.get_outfile();
-        if (!resource_file.empty()) {
-            // Replace .csv with _resources.csv
-            size_t pos = resource_file.rfind(".csv");
-            if (pos != std::string::npos) {
-                resource_file = resource_file.substr(0, pos) + "_resources.csv";
-            } else {
-                resource_file += "_resources.csv";
+        // Write resource trace (if --resource_trace specified or default location)
+        std::string resource_file = cfg.get_resource_trace();
+        if (resource_file.empty()) {
+            // Default: derive from output file
+            resource_file = cfg.get_outfile();
+            if (!resource_file.empty()) {
+                // Replace .csv with _resources.csv
+                size_t pos = resource_file.rfind(".csv");
+                if (pos != std::string::npos) {
+                    resource_file = resource_file.substr(0, pos) + "_resources.csv";
+                } else {
+                    resource_file += "_resources.csv";
+                }
             }
+        }
+        if (!resource_file.empty()) {
             sim.write_resource_trace(resource_file);
         }
 

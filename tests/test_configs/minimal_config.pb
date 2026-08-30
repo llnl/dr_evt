@@ -1,4 +1,3 @@
-sim_setup {
-  seed: 42
-  infile: "test_traces/backfill_test.csv"
-}
+total_nodes: 100
+trace_format: "simple"
+timestamp_format: "epoch"

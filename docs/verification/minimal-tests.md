@@ -183,11 +183,11 @@ job_idx,submit_time,start_time,end_time,nodes,duration
 
 2. **Generate reference outputs:**
    ```bash
-   python3 scripts/minimal_easy_oracle.py \
+   python3 scripts/python_reference_scheduler.py \
      tests/test_traces/correctness/sequential_wait_input.csv \
      --nodes 100 --output sequential_wait_reference.csv
    
-   python3 scripts/minimal_easy_oracle.py \
+   python3 scripts/python_reference_scheduler.py \
      tests/test_traces/correctness/backfill_blocked_input.csv \
      --nodes 100 --output backfill_blocked_reference.csv
    ```
