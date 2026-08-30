@@ -44,12 +44,12 @@ jobs:
       - name: Run Correctness Tests Only
         run: |
           echo "Running correctness tests (most important)..."
-          ./tests/run_correctness_tests.sh
+          ./tests/test_all_dr_evt.sh
 
       - name: Summary
         if: always()
         run: |
           echo "========================================"
           echo "Quick Test Complete"
-          echo "Correctness: 23/23 tests"
+          echo "Correctness: 34/34 tests"
           echo "========================================"

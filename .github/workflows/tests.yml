@@ -83,21 +83,21 @@ jobs:
       - name: Run Correctness Tests
         run: |
           echo "========================================"
-          echo "Running Correctness Tests (23 tests)"
+          echo "Running Correctness Tests (34 tests)"
           echo "========================================"
-          ./tests/run_correctness_tests.sh
+          ./tests/test_all_dr_evt.sh
 
       - name: Run Unit Tests
         run: |
           echo "========================================"
-          echo "Running Unit Tests (8 tests)"
+          echo "Running Unit Tests (7 tests)"
           echo "========================================"
           ./tests/run_unit_tests.sh
 
       - name: Run Feature Tests
         run: |
           echo "========================================"
-          echo "Running Feature Tests (13 tests)"
+          echo "Running Feature Tests (4 tests)"
           echo "========================================"
           ./tests/run_feature_tests.sh
 
@@ -135,13 +135,13 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Correctness: 23 tests"
-          echo "  Unit: 8 tests"
-          echo "  Feature: 13 tests"
+          echo "  Correctness: 34 tests"
+          echo "  Unit: 7 tests"
+          echo "  Feature: 4 tests"
           echo "  Replay: 3 tests"
-          echo "  Scale: 7 tests"
+          echo "  Scale: 7 tests (optional)"
           echo ""
-          echo "Total: 54 tests"
+          echo "Total: 48 tests"
           echo "========================================"
 
       - name: Upload test artifacts
