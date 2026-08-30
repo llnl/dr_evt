@@ -1,0 +1,27 @@
+{
+  "test_id": "03_backfill_blocked_resources",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      200
+    ],
+    [
+      1,
+      200,
+      250
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "no_backfill",
+      "job": 1,
+      "description": "Job 1 cannot backfill (resource constraint)"
+    },
+    {
+      "type": "fcfs_wait",
+      "job": 1,
+      "waits_for": 0
+    }
+  ]
+}

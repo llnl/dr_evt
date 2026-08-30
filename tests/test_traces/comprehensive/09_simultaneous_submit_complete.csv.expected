@@ -1,0 +1,7 @@
+Job submits at exact time another completes
+
+EXPECTED PROPERTIES:
+  - Job 0 ends at t=100
+  - Job 1 submits at t=100
+  - Job 1 starts at t=100 (resources just freed)
+  - No gap between job 0 end and job 1 start

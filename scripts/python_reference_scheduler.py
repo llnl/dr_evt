@@ -28,11 +28,17 @@ class Job:
     idx: int
     submit_time: float
     nodes: int
-    duration: float  # time_limit (what scheduler sees)
+    duration: float  # time_limit (what scheduler sees for planning)
+    actual_runtime: Optional[float] = None  # actual runtime (≤ duration), defaults to duration
 
     # Simulation results (filled in by scheduler)
     start_time: Optional[float] = None
     end_time: Optional[float] = None
+
+    def __post_init__(self):
+        # Default actual_runtime to duration if not specified
+        if self.actual_runtime is None:
+            self.actual_runtime = self.duration
 
 @dataclass
 class Event:
@@ -47,7 +53,7 @@ class Event:
             return self.time < other.time
         return self.job_idx < other.job_idx
 
-class MinimalEasyOracle:
+class EasyBackfillingScheduler:
     """
     Minimal EASY backfilling scheduler
 
@@ -62,11 +68,14 @@ class MinimalEasyOracle:
         # State
         self.current_time = 0.0
         self.wait_queue = []  # Jobs waiting to run (FCFS order)
-        self.running = {}  # job_idx -> (start_time, end_time, nodes)
+        self.running = {}  # job_idx -> (start_time, actual_end, pessimistic_end, nodes)
         self.completed = []  # List of completed jobs
 
         # Event queue
         self.events = []
+
+        # Resource tracking
+        self.resource_timeline = []  # List of (time, nodes_used, nodes_free, running_jobs)
 
     def log(self, msg: str):
         if self.verbose:
@@ -74,8 +83,21 @@ class MinimalEasyOracle:
 
     def get_free_nodes(self) -> int:
         """Calculate currently free nodes"""
-        used = sum(nodes for _, _, nodes in self.running.values())
+        used = sum(nodes for _, _, _, nodes in self.running.values())
         return self.total_nodes - used
+
+    def record_resource_state(self):
+        """Record current resource state to timeline"""
+        nodes_used = sum(nodes for _, _, _, nodes in self.running.values())
+        nodes_free = self.total_nodes - nodes_used
+        running_jobs = ','.join(str(idx) for idx in sorted(self.running.keys()))
+
+        self.resource_timeline.append((
+            self.current_time,
+            nodes_used,
+            nodes_free,
+            running_jobs if running_jobs else ''
+        ))
 
     def find_next_free_time(self, nodes_needed: int) -> float:
         """
@@ -91,9 +113,9 @@ class MinimalEasyOracle:
             return self.current_time
 
         # Find when enough nodes will be free
-        # Sort running jobs by end time
+        # Sort running jobs by PESSIMISTIC end time (based on time_limit, not actual_runtime)
         completions = sorted(
-            [(end_time, nodes) for _, end_time, nodes in self.running.values()]
+            [(pessimistic_end, nodes) for _, _, pessimistic_end, nodes in self.running.values()]
         )
 
         cumulative_freed = 0
@@ -111,7 +133,11 @@ class MinimalEasyOracle:
 
         Criteria:
         1. Fits in current free nodes
-        2. Will complete before reservation_time
+        2. Will complete before reservation_time (strictly before, not at)
+
+        Note: Resources don't become available instantly when a job completes.
+        If a job completes at exactly the reservation time, the FCFS head
+        must wait for that completion event, so we use < not <=.
         """
         if self.get_free_nodes() < job.nodes:
             return False
@@ -125,19 +151,27 @@ class MinimalEasyOracle:
     def start_job(self, job: Job):
         """Start a job running"""
         job.start_time = self.current_time
-        job.end_time = self.current_time + job.duration
+        job.end_time = self.current_time + job.actual_runtime  # Actual end time
+        pessimistic_end = self.current_time + job.duration  # Pessimistic end (for reservation calc)
 
-        self.running[job.idx] = (job.start_time, job.end_time, job.nodes)
+        # Store: (start, actual_end, pessimistic_end, nodes)
+        self.running[job.idx] = (job.start_time, job.end_time, pessimistic_end, job.nodes)
 
-        # Schedule END event
+        # Schedule END event based on ACTUAL runtime
         heapq.heappush(self.events, Event(job.end_time, 'END', job.idx))
 
-        self.log(f"START job {job.idx}: {job.nodes} nodes, duration={job.duration}")
+        self.log(f"START job {job.idx}: {job.nodes} nodes, time_limit={job.duration}, actual={job.actual_runtime}")
+
+        # Record resource state change
+        self.record_resource_state()
 
     def complete_job(self, job_idx: int):
         """Complete a job"""
-        start_time, end_time, nodes = self.running.pop(job_idx)
+        start_time, actual_end, pessimistic_end, nodes = self.running.pop(job_idx)
         self.log(f"END job {job_idx}: freed {nodes} nodes")
+
+        # Record resource state change
+        self.record_resource_state()
 
     def schedule(self, jobs: Dict[int, Job]):
         """
@@ -161,22 +195,27 @@ class MinimalEasyOracle:
 
         # 2. Try to start first job if possible
         if self.get_free_nodes() >= first_job.nodes:
+            # FCFS head can fit - start it
             self.wait_queue.pop(0)
             self.start_job(first_job)
-            # Recurse - might be able to start more
             self.schedule(jobs)
             return
 
-        # 3. Try backfilling other jobs
-        # Check each job in queue (after first) to see if it can backfill
+        # 3. FCFS head can't fit - try backfilling other jobs
+        # Backfill window is the FCFS head's reservation time
+        # (reservation_time already accounts for all running jobs and calculates
+        #  when ENOUGH resources will be available for the FCFS head)
+        backfill_window = reservation_time
+        self.log(f"Backfill window: {reservation_time} (FCFS head reservation)")
+
         backfilled = []
         for i in range(1, len(self.wait_queue)):
             job_idx = self.wait_queue[i]
             job = jobs[job_idx]
 
-            if self.can_backfill(job, reservation_time):
+            if self.can_backfill(job, backfill_window):
                 self.log(f"BACKFILL job {job_idx}: fits in {self.get_free_nodes()} free nodes, "
-                        f"completes at {self.current_time + job.duration} < {reservation_time}")
+                        f"completes at {self.current_time + job.duration} < {backfill_window}")
                 backfilled.append(i)
                 self.start_job(job)
 
@@ -241,8 +280,8 @@ def load_trace(filename: str) -> List[Job]:
             ))
     return jobs
 
-def write_oracle_output(jobs: List[Job], filename: str):
-    """Write oracle results in format comparable to DR_EVT"""
+def write_scheduler_output(jobs: List[Job], filename: str):
+    """Write scheduler results in format comparable to DR_EVT"""
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['job_idx', 'submit_time', 'start_time', 'end_time', 'nodes', 'duration'])
@@ -288,7 +327,7 @@ def write_resource_trace(jobs: List[Job], filename: str, total_nodes: int):
 def main():
     if len(sys.argv) < 2:
         print("Usage: python_reference_scheduler.py <trace.csv> [--verbose] [--nodes N]")
-        print("\nGenerates oracle output for EASY backfilling verification")
+        print("\nGenerates reference output for EASY backfilling verification")
         sys.exit(1)
 
     trace_file = sys.argv[1]
@@ -310,13 +349,13 @@ def main():
     jobs = load_trace(trace_file)
     print(f"Loaded {len(jobs)} jobs")
 
-    # Run oracle
-    oracle = MinimalEasyOracle(total_nodes, verbose=verbose)
-    jobs = oracle.simulate(jobs)
+    # Run scheduler
+    scheduler = EasyBackfillingScheduler(total_nodes, verbose=verbose)
+    jobs = scheduler.simulate(jobs)
 
     # Write output
     output_file = trace_file.replace('.csv', '_reference.csv')
-    write_oracle_output(jobs, output_file)
+    write_scheduler_output(jobs, output_file)
 
     # Write resource trace
     resource_file = trace_file.replace('.csv', '_reference_resources.csv')
@@ -324,7 +363,7 @@ def main():
 
     print(f"\nReference output written to: {output_file}")
     print(f"Resource trace written to: {resource_file}")
-    print(f"Final simulation time: {oracle.current_time}")
+    print(f"Final simulation time: {scheduler.current_time}")
 
     # Verify all jobs completed
     completed = sum(1 for job in jobs if job.start_time is not None)

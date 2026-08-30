@@ -1,0 +1,37 @@
+{
+  "test_id": "11_multiple_drains",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      50
+    ],
+    [
+      1,
+      200,
+      250
+    ],
+    [
+      2,
+      400,
+      450
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "idle_period",
+      "start": 50,
+      "end": 200
+    },
+    {
+      "type": "idle_period",
+      "start": 250,
+      "end": 400
+    },
+    {
+      "type": "idle_count",
+      "min": 2,
+      "description": "At least 2 separate idle periods"
+    }
+  ]
+}

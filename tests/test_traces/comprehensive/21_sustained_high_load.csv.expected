@@ -1,0 +1,9 @@
+50 jobs with high sustained load
+
+EXPECTED PROPERTIES:
+  - 50 jobs over 400s
+  - Variable sizes (15-45 nodes)
+  - Variable durations (80-160s)
+  - All jobs complete
+  - High utilization maintained
+  - No deadlock

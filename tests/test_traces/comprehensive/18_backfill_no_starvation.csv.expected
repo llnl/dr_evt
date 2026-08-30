@@ -1,0 +1,8 @@
+Backfilling small jobs doesn't starve FCFS head
+
+EXPECTED PROPERTIES:
+  - Job 0 runs t=0 to t=300
+  - Job 1 (50 nodes) cannot fit with job 0
+  - Jobs 2-11 backfill (10 nodes each)
+  - Job 1 must eventually start
+  - Backfills don't indefinitely delay job 1

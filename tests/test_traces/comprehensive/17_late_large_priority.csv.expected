@@ -1,0 +1,8 @@
+Late-arriving large job gets FCFS priority over later small jobs
+
+EXPECTED PROPERTIES:
+  - First 10 small jobs complete
+  - Large job (job 10) arrives at t=100
+  - Jobs 11-20 arrive at t=110+
+  - Large job must start before jobs 11-20
+  - FCFS order maintained

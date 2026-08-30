@@ -1,0 +1,32 @@
+{
+  "test_id": "10_queue_drain_idle",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      50
+    ],
+    [
+      1,
+      10,
+      60
+    ],
+    [
+      2,
+      500,
+      550
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "idle_period",
+      "start": 60,
+      "end": 500,
+      "description": "System completely idle"
+    },
+    {
+      "type": "all_complete",
+      "description": "All jobs must complete despite idle period"
+    }
+  ]
+}

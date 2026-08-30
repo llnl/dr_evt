@@ -1,0 +1,8 @@
+Multiple backfill candidates compete for limited resources
+
+EXPECTED PROPERTIES:
+  - Job 0 uses 70 nodes (30 free)
+  - Jobs 1,2,3 each need 15 nodes
+  - At most 2 can backfill simultaneously
+  - Jobs 1,2 backfill (FCFS order)
+  - Job 3 waits for resources

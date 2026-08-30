@@ -1,3 +1,0 @@
-job_submit_time,num_nodes,exit_status,queue,time_limit
-0,90,0,pbatch,100
-10,20,0,pbatch,30

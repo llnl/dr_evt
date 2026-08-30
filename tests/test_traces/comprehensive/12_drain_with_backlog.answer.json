@@ -1,0 +1,32 @@
+{
+  "test_id": "12_drain_with_backlog",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      100,
+      150
+    ],
+    [
+      2,
+      300,
+      350
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "resource_wait",
+      "job": 1,
+      "waits_for": 0
+    },
+    {
+      "type": "idle_period",
+      "start": 150,
+      "end": 300
+    }
+  ]
+}

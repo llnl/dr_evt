@@ -1,0 +1,39 @@
+{
+  "test_id": "02_backfill_blocked_time",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      100,
+      300
+    ],
+    [
+      2,
+      100,
+      250
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "no_backfill",
+      "job": 2,
+      "description": "Job 2 cannot backfill at t=20 (would complete at t=170 > t=100 reservation)"
+    },
+    {
+      "type": "fcfs_wait",
+      "job": 1,
+      "waits_for": 0,
+      "description": "Job 1 waits for job 0 to complete"
+    },
+    {
+      "type": "start_order",
+      "before": 1,
+      "after": 2,
+      "description": "Job 1 (FCFS head) starts before or with job 2"
+    }
+  ]
+}

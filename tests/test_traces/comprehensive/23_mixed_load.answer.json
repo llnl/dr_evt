@@ -1,0 +1,22 @@
+{
+  "test_id": "23_mixed_load",
+  "exact_schedule": null,
+  "constraints": [
+    {
+      "type": "job_count",
+      "expected": 30
+    },
+    {
+      "type": "all_complete"
+    },
+    {
+      "type": "no_starvation",
+      "description": "No job starves despite mixed sizes"
+    },
+    {
+      "type": "backfill_count",
+      "min": 10,
+      "description": "Significant backfilling occurs"
+    }
+  ]
+}

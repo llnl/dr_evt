@@ -1,0 +1,40 @@
+{
+  "test_id": "13_consecutive_fcfs",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      100,
+      200
+    ],
+    [
+      2,
+      200,
+      300
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "strict_fcfs",
+      "jobs": [
+        0,
+        1,
+        2
+      ],
+      "description": "Strict FCFS order, no backfilling"
+    },
+    {
+      "type": "sequential",
+      "jobs": [
+        0,
+        1,
+        2
+      ],
+      "description": "Jobs run sequentially (no overlap)"
+    }
+  ]
+}

@@ -1,4 +1,0 @@
-job_idx,submit_time,start_time,end_time,nodes,duration
-0,0.0,0.0,50.0,80,50.0
-1,0.0,50.0,80.0,60,30.0
-2,10.0,10.0,40.0,10,30.0

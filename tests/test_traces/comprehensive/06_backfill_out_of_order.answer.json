@@ -1,0 +1,38 @@
+{
+  "test_id": "06_backfill_out_of_order",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      100,
+      250
+    ],
+    [
+      2,
+      15,
+      65
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "start_order",
+      "before": 2,
+      "after": 1,
+      "description": "Job 2 starts before job 1 (out of arrival order)"
+    },
+    {
+      "type": "backfill",
+      "job": 2,
+      "description": "Job 2 backfills"
+    },
+    {
+      "type": "no_backfill",
+      "job": 1,
+      "description": "Job 1 is FCFS head, waits for resources"
+    }
+  ]
+}

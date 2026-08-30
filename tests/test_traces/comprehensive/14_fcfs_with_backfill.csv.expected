@@ -1,0 +1,7 @@
+Small job backfills between consecutive FCFS heads
+
+EXPECTED PROPERTIES:
+  - Job 0 starts at t=0
+  - Job 2 backfills at t=20 (finishes before job 1 reservation)
+  - Job 1 waits as FCFS head 2, starts at t=100
+  - Backfill doesn't delay FCFS head

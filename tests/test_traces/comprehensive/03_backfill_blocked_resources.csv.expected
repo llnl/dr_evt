@@ -1,0 +1,7 @@
+Backfill blocked by insufficient resources
+
+EXPECTED PROPERTIES:
+  - Job 0 occupies 60 nodes (40 free)
+  - Job 1 needs 45 nodes but only 40 available
+  - Job 1 waits until job 0 completes
+  - Job 1 starts at t=200

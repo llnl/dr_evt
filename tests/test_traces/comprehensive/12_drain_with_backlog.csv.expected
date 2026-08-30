@@ -1,0 +1,7 @@
+Queue drains after processing backlog
+
+EXPECTED PROPERTIES:
+  - Job 1 waits for job 0 (resource constraint)
+  - Both complete by t=150
+  - System idle t=150 to t=300
+  - Job 2 starts at t=300

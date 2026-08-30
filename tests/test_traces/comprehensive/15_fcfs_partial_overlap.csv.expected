@@ -1,0 +1,7 @@
+FCFS heads with partial resource overlap
+
+EXPECTED PROPERTIES:
+  - Job 0 starts at t=0 (50 nodes)
+  - Job 1 starts at t=10 (50 nodes) - both fit
+  - Job 2 waits (would need 150 total)
+  - Job 2 starts when first completes

@@ -1,0 +1,7 @@
+Multiple jobs backfill together when resources permit
+
+EXPECTED PROPERTIES:
+  - Job 0 uses 60 nodes (40 free)
+  - Jobs 1,2,3 each need 10 nodes (30 total)
+  - All 3 should backfill
+  - All 3 start at their submit times

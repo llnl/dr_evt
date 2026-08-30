@@ -30,8 +30,16 @@
 #include "trace/trace.hpp"
 #include "trace/dr_event.hpp"
 #include "sim/scheduler.hpp"
+#include "sim/scheduler_base.hpp"
 
 namespace dr_evt {
+
+// Forward declarations
+#ifdef USE_BLOCK_QUEUE
+class BlockWaitQueue;
+#endif
+class SchedulerBase;
+
 /** \addtogroup dr_evt_sim
  *  @{ */
 
@@ -47,8 +55,8 @@ class Simulation {
     /// Job trace data
     Trace m_trace;
 
-    /// Job scheduler
-    Scheduler m_scheduler;
+    /// Job scheduler (polymorphic - FCFS/SJF/LJF)
+    std::unique_ptr<SchedulerBase> m_scheduler;
 
     /// Event queue (submit, start, end events)
     event_q_t m_event_queue;
@@ -66,10 +74,7 @@ class Simulation {
     /// Replay context for event processing
     Trace::Context m_replay_ctx;
 
-    /// Waiting queue for streaming mode (jobs submitted but not yet started)
-    /// Pairs: (job_idx, removed_flag). Sorted by submit_time.
-    /// removed_flag: false = active, true = scheduled (lazy deletion)
-    std::deque<std::pair<job_no_t, bool>> m_wait_queue;
+    // NOTE: Wait queue now owned by scheduler (m_scheduler maintains internal queue)
 
     /// Running jobs for streaming mode (job_idx -> start_time)
     std::map<job_no_t, sim_time_t> m_running_jobs;
@@ -179,7 +184,7 @@ class Simulation {
      * @return Number of jobs waiting to be scheduled
      */
     size_t get_wait_queue_size() const {
-        return m_wait_queue.size();
+        return m_scheduler->wait_queue_size();
     }
 
     /**
@@ -188,10 +193,10 @@ class Simulation {
      * @return Estimated start time, or -1 if queue is empty
      */
     sim_time_t get_fcfs_head_shadow_time() const {
-        if (m_wait_queue.empty()) {
+        if (m_scheduler->wait_queue_size() == 0) {
             return -1.0;
         }
-        return m_scheduler.get_fcfs_reservation_time();
+        return m_scheduler->get_fcfs_reservation_time();
     }
 
     /**

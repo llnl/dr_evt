@@ -1,0 +1,8 @@
+Odd-sized jobs create resource fragmentation
+
+EXPECTED PROPERTIES:
+  - Job 0 uses 45 nodes (55 free)
+  - Job 1 uses 30 nodes (25 free)
+  - Job 2 needs 30 but only 25 free - waits
+  - Job 3 needs 20, fits in 25 free - starts
+  - Scheduler packs jobs efficiently despite fragmentation
