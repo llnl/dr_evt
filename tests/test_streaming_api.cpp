@@ -39,7 +39,7 @@ void test_basic_insert_and_run() {
     // Create minimal trace file for testing
     // For simulation mode (EXACT duration), don't include begin_time/end_time
     // The scheduler will compute them
-    std::ofstream ofs("test_streaming_basic.csv");
+    std::ofstream ofs("/tmp/test_streaming_basic.csv");
     ofs << "job_submit_time,num_nodes,exit_status,queue,time_limit\n";
     ofs << "0,10,0,pbatch,100\n";  // Job 0: 10 nodes, 100s duration
     ofs << "50,20,0,pbatch,100\n"; // Job 1: 20 nodes, 100s duration
@@ -47,7 +47,7 @@ void test_basic_insert_and_run() {
 
     // Setup simulation
     Sim_Params params;
-    params.m_infile = "test_streaming_basic.csv";
+    params.m_infile = "/tmp/test_streaming_basic.csv";
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
@@ -108,13 +108,13 @@ void test_exclusive_vs_inclusive() {
 
     // Create trace: job submitted at t=0, duration=10s
     // For simulation mode, don't include begin_time/end_time
-    std::ofstream ofs("test_streaming_exclusive.csv");
+    std::ofstream ofs("/tmp/test_streaming_exclusive.csv");
     ofs << "job_submit_time,num_nodes,exit_status,queue,time_limit\n";
     ofs << "0,10,0,pbatch,10\n";  // Submit at 0, 10 nodes, 10s duration
     ofs.close();
 
     Sim_Params params;
-    params.m_infile = "test_streaming_exclusive.csv";
+    params.m_infile = "/tmp/test_streaming_exclusive.csv";
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
@@ -156,7 +156,7 @@ void test_online_scheduling() {
     std::cout << "\n=== Test 3: Online Scheduling Simulation ===" << std::endl;
 
     // Create trace with 5 jobs of varying sizes
-    std::ofstream ofs("test_streaming_online.csv");
+    std::ofstream ofs("/tmp/test_streaming_online.csv");
     ofs << "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
     ofs << "0,0,50,30,0,pbatch,50\n";   // Job 0: big, arrives at t=0
     ofs << "10,10,60,20,0,pbatch,50\n"; // Job 1: medium, arrives at t=10
@@ -166,7 +166,7 @@ void test_online_scheduling() {
     ofs.close();
 
     Sim_Params params;
-    params.m_infile = "test_streaming_online.csv";
+    params.m_infile = "/tmp/test_streaming_online.csv";
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
@@ -248,7 +248,7 @@ void test_online_scheduling() {
 void test_no_resource_leaks() {
     std::cout << "\n=== Test 4: Resource Leak Detection ===" << std::endl;
 
-    std::ofstream ofs("test_streaming_leaks.csv");
+    std::ofstream ofs("/tmp/test_streaming_leaks.csv");
     ofs << "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
     for (int i = 0; i < 10; i++) {
         ofs << (i*10) << "," << (i*10) << "," << (i*10+20) << ",10,0,pbatch,20\n";
@@ -256,7 +256,7 @@ void test_no_resource_leaks() {
     ofs.close();
 
     Sim_Params params;
-    params.m_infile = "test_streaming_leaks.csv";
+    params.m_infile = "/tmp/test_streaming_leaks.csv";
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";

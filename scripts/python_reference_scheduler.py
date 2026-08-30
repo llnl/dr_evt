@@ -5,6 +5,9 @@ Python Reference EASY Backfilling Scheduler
 Pure implementation of EASY backfilling algorithm for verification.
 No dependencies, no fancy features - just correct EASY logic.
 
+IMPORTANT: This script writes output files to /tmp by default to avoid
+polluting the working directory. Use --outdir to specify a different location.
+
 Algorithm:
 1. Jobs arrive and enter wait queue (FCFS order)
 2. First job in queue gets a RESERVATION (guaranteed start time)
@@ -18,6 +21,7 @@ This is the REFERENCE implementation for verifying DR_EVT.
 
 import csv
 import sys
+import os
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 import heapq
@@ -79,7 +83,7 @@ class EasyBackfillingScheduler:
 
     def log(self, msg: str):
         if self.verbose:
-            print(f"[t={self.current_time:6.0f}] {msg}")
+            print(f"[t={self.current_time:6.0f}] {msg}", file=sys.stderr)
 
     def get_free_nodes(self) -> int:
         """Calculate currently free nodes"""
@@ -99,184 +103,159 @@ class EasyBackfillingScheduler:
             running_jobs if running_jobs else ''
         ))
 
-    def find_next_free_time(self, nodes_needed: int) -> float:
+    def calculate_reservation_time(self) -> Optional[float]:
         """
-        Find the next time when nodes_needed will be available.
+        Calculate when the FCFS head (first waiting job) can start
 
-        This is the RESERVATION time for the first job in queue.
-        """
-        if nodes_needed > self.total_nodes:
-            raise ValueError(f"Job needs {nodes_needed} but system only has {self.total_nodes}")
-
-        # If we have space now
-        if self.get_free_nodes() >= nodes_needed:
-            return self.current_time
-
-        # Find when enough nodes will be free
-        # Sort running jobs by PESSIMISTIC end time (based on time_limit, not actual_runtime)
-        completions = sorted(
-            [(pessimistic_end, nodes) for _, _, pessimistic_end, nodes in self.running.values()]
-        )
-
-        cumulative_freed = 0
-        for end_time, nodes in completions:
-            cumulative_freed += nodes
-            if self.get_free_nodes() + cumulative_freed >= nodes_needed:
-                return end_time
-
-        # Should never reach here if nodes_needed <= total_nodes
-        raise ValueError(f"Cannot find reservation time for {nodes_needed} nodes")
-
-    def can_backfill(self, job: Job, reservation_time: float) -> bool:
-        """
-        Check if job can backfill.
-
-        Criteria:
-        1. Fits in current free nodes
-        2. Will complete before reservation_time (strictly before, not at)
-
-        Note: Resources don't become available instantly when a job completes.
-        If a job completes at exactly the reservation time, the FCFS head
-        must wait for that completion event, so we use < not <=.
-        """
-        if self.get_free_nodes() < job.nodes:
-            return False
-
-        estimated_completion = self.current_time + job.duration
-        if estimated_completion >= reservation_time:
-            return False
-
-        return True
-
-    def start_job(self, job: Job):
-        """Start a job running"""
-        job.start_time = self.current_time
-        job.end_time = self.current_time + job.actual_runtime  # Actual end time
-        pessimistic_end = self.current_time + job.duration  # Pessimistic end (for reservation calc)
-
-        # Store: (start, actual_end, pessimistic_end, nodes)
-        self.running[job.idx] = (job.start_time, job.end_time, pessimistic_end, job.nodes)
-
-        # Schedule END event based on ACTUAL runtime
-        heapq.heappush(self.events, Event(job.end_time, 'END', job.idx))
-
-        self.log(f"START job {job.idx}: {job.nodes} nodes, time_limit={job.duration}, actual={job.actual_runtime}")
-
-        # Record resource state change
-        self.record_resource_state()
-
-    def complete_job(self, job_idx: int):
-        """Complete a job"""
-        start_time, actual_end, pessimistic_end, nodes = self.running.pop(job_idx)
-        self.log(f"END job {job_idx}: freed {nodes} nodes")
-
-        # Record resource state change
-        self.record_resource_state()
-
-    def schedule(self, jobs: Dict[int, Job]):
-        """
-        Run EASY backfilling scheduler.
-
-        Main scheduling logic - this is what we're verifying!
+        Returns None if no job is waiting
         """
         if not self.wait_queue:
-            self.log("No jobs in wait queue")
+            return None
+
+        fcfs_head = self.wait_queue[0]
+
+        # If it fits now, no need for reservation
+        if fcfs_head.nodes <= self.get_free_nodes():
+            return self.current_time
+
+        # Find earliest time when enough nodes will be free
+        # Look at running jobs and their pessimistic end times
+        events = []
+        for job_idx, (start_time, actual_end, pessimistic_end, nodes) in self.running.items():
+            events.append((pessimistic_end, +nodes, job_idx))
+
+        events.sort()
+
+        # Simulate freeing nodes over time
+        cumulative_free = self.get_free_nodes()
+        for time, freed_nodes, job_idx in events:
+            cumulative_free += freed_nodes
+            if cumulative_free >= fcfs_head.nodes:
+                return time
+
+        # Should never reach here if system is not oversubscribed
+        return None
+
+    def try_start_jobs(self):
+        """
+        Try to start jobs from wait queue
+
+        EASY algorithm:
+        1. FCFS head gets reservation
+        2. Other jobs can backfill if they fit AND finish before reservation
+        """
+        if not self.wait_queue:
             return
 
-        self.log(f"Scheduling: {len(self.wait_queue)} jobs waiting, {self.get_free_nodes()} nodes free")
+        reservation_time = self.calculate_reservation_time()
+        free_nodes = self.get_free_nodes()
 
-        # EASY Algorithm:
-        # 1. First job in queue gets reservation
-        first_job_idx = self.wait_queue[0]
-        first_job = jobs[first_job_idx]
+        # Try to start jobs
+        started = []
+        for i, job in enumerate(self.wait_queue):
+            if job.nodes <= free_nodes:
+                # Check backfill constraint
+                job_end = self.current_time + job.duration
 
-        reservation_time = self.find_next_free_time(first_job.nodes)
-        self.log(f"First job {first_job_idx} needs {first_job.nodes} nodes, reservation at t={reservation_time}")
+                if i == 0:
+                    # FCFS head - always start if it fits
+                    self.log(f"Starting FCFS head job {job.idx}")
+                    self.start_job(job)
+                    started.append(i)
+                    free_nodes -= job.nodes
+                elif reservation_time is not None and job_end < reservation_time:
+                    # Backfiller - only if it completes before reservation
+                    self.log(f"Backfilling job {job.idx} (ends at {job_end} < reservation {reservation_time})")
+                    self.start_job(job)
+                    started.append(i)
+                    free_nodes -= job.nodes
+                else:
+                    # Would interfere with FCFS head reservation
+                    self.log(f"Blocking job {job.idx} (would end at {job_end} >= reservation {reservation_time})")
 
-        # 2. Try to start first job if possible
-        if self.get_free_nodes() >= first_job.nodes:
-            # FCFS head can fit - start it
-            self.wait_queue.pop(0)
-            self.start_job(first_job)
-            self.schedule(jobs)
-            return
-
-        # 3. FCFS head can't fit - try backfilling other jobs
-        # Backfill window is the FCFS head's reservation time
-        # (reservation_time already accounts for all running jobs and calculates
-        #  when ENOUGH resources will be available for the FCFS head)
-        backfill_window = reservation_time
-        self.log(f"Backfill window: {reservation_time} (FCFS head reservation)")
-
-        backfilled = []
-        for i in range(1, len(self.wait_queue)):
-            job_idx = self.wait_queue[i]
-            job = jobs[job_idx]
-
-            if self.can_backfill(job, backfill_window):
-                self.log(f"BACKFILL job {job_idx}: fits in {self.get_free_nodes()} free nodes, "
-                        f"completes at {self.current_time + job.duration} < {backfill_window}")
-                backfilled.append(i)
-                self.start_job(job)
-
-        # Remove backfilled jobs from queue (in reverse order to preserve indices)
-        for i in reversed(backfilled):
+        # Remove started jobs from wait queue (in reverse to preserve indices)
+        for i in reversed(started):
             self.wait_queue.pop(i)
 
-        # If we backfilled anything, try scheduling again
-        if backfilled:
-            self.schedule(jobs)
+    def start_job(self, job: Job):
+        """Start a job immediately"""
+        job.start_time = self.current_time
+        job.end_time = self.current_time + job.actual_runtime
+
+        # Track both actual and pessimistic (scheduler's view) end times
+        pessimistic_end = self.current_time + job.duration
+        self.running[job.idx] = (self.current_time, job.end_time, pessimistic_end, job.nodes)
+
+        # Schedule END event
+        heapq.heappush(self.events, Event(job.end_time, 'END', job.idx))
+
+        self.record_resource_state()
+
+    def handle_submit(self, job: Job):
+        """Handle job submission"""
+        self.log(f"Job {job.idx} submitted (nodes={job.nodes}, duration={job.duration})")
+        self.wait_queue.append(job)
+        self.try_start_jobs()
+
+    def handle_end(self, job_idx: int):
+        """Handle job completion"""
+        if job_idx not in self.running:
+            return
+
+        start_time, actual_end, pessimistic_end, nodes = self.running.pop(job_idx)
+        self.log(f"Job {job_idx} completed")
+
+        self.record_resource_state()
+        self.try_start_jobs()
 
     def simulate(self, jobs: List[Job]) -> List[Job]:
         """
-        Run full simulation.
+        Run EASY backfilling simulation
 
-        Returns list of jobs with start_time and end_time filled in.
+        Returns jobs with start_time and end_time filled in
         """
-        # Create job dict for fast lookup
-        job_dict = {job.idx: job for job in jobs}
-
-        # Schedule all SUBMIT events
+        # Schedule SUBMIT events
         for job in jobs:
             heapq.heappush(self.events, Event(job.submit_time, 'SUBMIT', job.idx))
 
-        # Main event loop
+        # Create job lookup
+        job_map = {job.idx: job for job in jobs}
+
+        # Event loop
         while self.events:
             event = heapq.heappop(self.events)
             self.current_time = event.time
 
             if event.type == 'SUBMIT':
-                job = job_dict[event.job_idx]
-                self.log(f"SUBMIT job {event.job_idx}: {job.nodes} nodes, duration={job.duration}")
-                self.wait_queue.append(event.job_idx)
-                self.schedule(job_dict)
-
+                self.handle_submit(job_map[event.job_idx])
             elif event.type == 'END':
-                # Process ALL END events at current_time before scheduling
-                # This ensures consistent resource view
-                self.complete_job(event.job_idx)
+                self.handle_end(event.job_idx)
 
-                # Process remaining END events at same time
-                while self.events and self.events[0].time == self.current_time and self.events[0].type == 'END':
-                    next_event = heapq.heappop(self.events)
-                    self.complete_job(next_event.job_idx)
-
-                # Now call scheduler with all resources freed
-                self.schedule(job_dict)
-
-        return jobs
+        # Return jobs with simulation results
+        return list(job_map.values())
 
 def load_trace(filename: str) -> List[Job]:
-    """Load trace in DR_EVT format"""
+    """Load job trace from CSV"""
     jobs = []
     with open(filename, 'r') as f:
         reader = csv.DictReader(f)
         for idx, row in enumerate(reader):
+            # Handle both simple format and full format
+            submit_time = float(row.get('job_submit_time', row.get('submit_time', 0)))
+            nodes = int(row.get('num_nodes', row.get('nodes', 1)))
+            duration = float(row.get('time_limit', row.get('duration', 100)))
+
+            # Check for actual_duration column (for early completion tests)
+            actual_runtime = None
+            if 'actual_duration' in row and row['actual_duration']:
+                actual_runtime = float(row['actual_duration'])
+
             jobs.append(Job(
                 idx=idx,
-                submit_time=float(row['job_submit_time']),
-                nodes=int(row['num_nodes']),
-                duration=float(row['time_limit'])
+                submit_time=submit_time,
+                nodes=nodes,
+                duration=duration,
+                actual_runtime=actual_runtime
             ))
     return jobs
 
@@ -326,8 +305,17 @@ def write_resource_trace(jobs: List[Job], filename: str, total_nodes: int):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python_reference_scheduler.py <trace.csv> [--verbose] [--nodes N]")
-        print("\nGenerates reference output for EASY backfilling verification")
+        print("Usage: python_reference_scheduler.py <trace.csv> [--verbose] [--nodes N] [--outdir DIR]")
+        print()
+        print("Python reference EASY backfilling scheduler for verification")
+        print()
+        print("Options:")
+        print("  --verbose    Show detailed simulation progress")
+        print("  --nodes N    Total nodes in system (default: 1000)")
+        print("  --outdir DIR Output directory for generated files (default: /tmp)")
+        print()
+        print("Generates reference output for EASY backfilling verification")
+        print("Output files are written to /tmp by default to avoid directory pollution")
         sys.exit(1)
 
     trace_file = sys.argv[1]
@@ -339,41 +327,49 @@ def main():
         idx = sys.argv.index('--nodes')
         total_nodes = int(sys.argv[idx + 1])
 
-    print(f"=== Python Reference EASY Backfilling Scheduler ===")
-    print(f"Trace: {trace_file}")
-    print(f"Total nodes: {total_nodes}")
-    print(f"Verbose: {verbose}")
-    print()
+    # Parse output directory (default to /tmp to avoid pollution)
+    outdir = '/tmp'
+    if '--outdir' in sys.argv:
+        idx = sys.argv.index('--outdir')
+        outdir = sys.argv[idx + 1]
+
+    print(f"=== Python Reference EASY Backfilling Scheduler ===", file=sys.stderr)
+    print(f"Trace: {trace_file}", file=sys.stderr)
+    print(f"Total nodes: {total_nodes}", file=sys.stderr)
+    print(f"Output directory: {outdir}", file=sys.stderr)
+    print(f"Verbose: {verbose}", file=sys.stderr)
+    print(file=sys.stderr)
 
     # Load trace
     jobs = load_trace(trace_file)
-    print(f"Loaded {len(jobs)} jobs")
+    print(f"Loaded {len(jobs)} jobs", file=sys.stderr)
 
     # Run scheduler
     scheduler = EasyBackfillingScheduler(total_nodes, verbose=verbose)
     jobs = scheduler.simulate(jobs)
 
-    # Write output
-    output_file = trace_file.replace('.csv', '_reference.csv')
+    # Write output files to specified directory
+    basename = os.path.basename(trace_file).replace('.csv', '')
+    output_file = os.path.join(outdir, f'{basename}_reference.csv')
     write_scheduler_output(jobs, output_file)
 
     # Write resource trace
-    resource_file = trace_file.replace('.csv', '_reference_resources.csv')
+    resource_file = os.path.join(outdir, f'{basename}_reference_resources.csv')
     write_resource_trace(jobs, resource_file, total_nodes)
 
-    print(f"\nReference output written to: {output_file}")
-    print(f"Resource trace written to: {resource_file}")
-    print(f"Final simulation time: {scheduler.current_time}")
+    print(f"\nReference output written to: {output_file}", file=sys.stderr)
+    print(f"Resource trace written to: {resource_file}", file=sys.stderr)
+    print(f"Final simulation time: {scheduler.current_time}", file=sys.stderr)
 
     # Verify all jobs completed
     completed = sum(1 for job in jobs if job.start_time is not None)
-    print(f"Jobs completed: {completed}/{len(jobs)}")
+    print(f"Jobs completed: {completed}/{len(jobs)}", file=sys.stderr)
 
     if completed != len(jobs):
-        print("\n⚠ WARNING: Not all jobs completed!")
+        print("\n⚠ WARNING: Not all jobs completed!", file=sys.stderr)
         for job in jobs:
             if job.start_time is None:
-                print(f"  Job {job.idx}: never started")
+                print(f"  Job {job.idx}: never started", file=sys.stderr)
 
 if __name__ == '__main__':
     main()

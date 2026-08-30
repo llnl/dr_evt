@@ -1,14 +1,19 @@
 #!/bin/bash
-# Run all 27 comprehensive tests on DR_EVT C++ simulator
+# Run all 34 comprehensive tests on DR_EVT C++ simulator
 
-TRACE_DIR="$(dirname "$0")/../test_traces/comprehensive"
-SIMULATOR="./simulator"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_ROOT="$SCRIPT_DIR/.."
+
+cd "$REPO_ROOT"
+
+TRACE_DIR="tests/test_traces/comprehensive"
+SIMULATOR="./build/simulator"
 TOTAL_NODES=100
 
 # Check if simulator exists
 if [ ! -f "$SIMULATOR" ]; then
     echo "Error: Simulator not found: $SIMULATOR"
-    echo "Run 'make' first to build it"
+    echo "Build first: cd build && cmake .. && make"
     exit 1
 fi
 
@@ -65,8 +70,8 @@ echo ""
 for TEST in "${TESTS[@]}"; do
     INPUT="${TRACE_DIR}/${TEST}.csv"
     EXPECTED="${TRACE_DIR}/${TEST}.expected_output.csv"
-    OUTPUT="${TEST}.cpp_output.csv"
-    SIM_OUT="${TEST}.sim.out"
+    OUTPUT="/tmp/${TEST}.cpp_output.csv"
+    SIM_OUT="/tmp/${TEST}.sim.out"
 
     # Check if input exists
     if [ ! -f "$INPUT" ]; then
@@ -120,12 +125,12 @@ for TEST in "${TESTS[@]}"; do
         # Skip initial idle state (time=0, nodes_used=0) if present
         awk -F, 'NR==1 {print "time,nodes_used,nodes_free"; next}
                  NR==2 && $1=="0" && $3=="0" {next}
-                 {print $1","$3","$2}' "$ACTUAL_RESOURCES" > "${TEST}.cpp_resources.csv"
+                 {print $1","$3","$2}' "$ACTUAL_RESOURCES" > "/tmp/${TEST}.cpp_resources.csv"
 
         # Compare first 3 columns only (ignore running_jobs column)
-        awk -F, '{print $1","$2","$3}' "$EXPECTED_RESOURCES" > "${TEST}.expected_resources_compare.csv"
+        awk -F, '{print $1","$2","$3}' "$EXPECTED_RESOURCES" > "/tmp/${TEST}.expected_resources_compare.csv"
 
-        diff -w "${TEST}.expected_resources_compare.csv" "${TEST}.cpp_resources.csv" > /dev/null 2>&1
+        diff -w "/tmp/${TEST}.expected_resources_compare.csv" "/tmp/${TEST}.cpp_resources.csv" > /dev/null 2>&1
         RESOURCE_MATCH=$?
     fi
 
@@ -147,9 +152,9 @@ for TEST in "${TESTS[@]}"; do
         if [ -f "$EXPECTED_RESOURCES" ] && [ $RESOURCE_MATCH -ne 0 ]; then
             echo "  Resource trace mismatch:"
             echo "    Expected:"
-            head -10 "${TEST}.expected_resources_compare.csv" | sed 's/^/      /'
+            head -10 "/tmp/${TEST}.expected_resources_compare.csv" | sed 's/^/      /'
             echo "    Actual:"
-            head -10 "${TEST}.cpp_resources.csv" | sed 's/^/      /'
+            head -10 "/tmp/${TEST}.cpp_resources.csv" | sed 's/^/      /'
         fi
         echo ""
     fi

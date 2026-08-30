@@ -116,6 +116,8 @@ void Sim_Params::getopt(int& argc, char** &argv)
                     std::string policy(optarg);
                     if (policy == "fcfs") {
                         m_priority_policy = PriorityPolicy::FCFS;
+                    } else if (policy == "fcfs_alt") {
+                        m_priority_policy = PriorityPolicy::FCFS_ALT;
                     } else if (policy == "sjf") {
                         m_priority_policy = PriorityPolicy::SJF;
                     } else if (policy == "ljf") {
@@ -272,9 +274,10 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        easy: Only first job gets reservation\n"
         "        conservative: All jobs get reservations\n"
         "\n"
-        "    -p, --priority_policy {fcfs|sjf|ljf}\n"
+        "    -p, --priority_policy {fcfs|fcfs_alt|sjf|ljf}\n"
         "        Job priority/ordering policy (default: fcfs).\n"
         "        fcfs: First-Come-First-Served\n"
+        "        fcfs_alt: Alternative FCFS implementation (for testing)\n"
         "        sjf: Shortest-Job-First\n"
         "        ljf: Longest-Job-First\n"
         "\n"
@@ -362,6 +365,7 @@ void Sim_Params::print() const
 
     msg += " - priority_policy: ";
     if (m_priority_policy == PriorityPolicy::FCFS) msg += "FCFS";
+    else if (m_priority_policy == PriorityPolicy::FCFS_ALT) msg += "FCFS_ALT";
     else if (m_priority_policy == PriorityPolicy::SJF) msg += "SJF";
     else msg += "LJF";
     msg += "\n";

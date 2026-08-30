@@ -187,7 +187,7 @@ diff expected actual
 
 ### Python Reference Implementation
 ```
-27/27 tests PASSING ✅
+34/34 tests PASSING ✅
 ```
 
 Run tests:

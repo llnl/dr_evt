@@ -6,9 +6,9 @@ scheduling and resource management using a set of heterogenous clusters.
 
 ## Features
 
-- **Verified Scheduler Implementation**: EASY backfilling algorithm verified against analytical ground truth (27 comprehensive tests)
+- **Verified Scheduler Implementation**: EASY backfilling algorithm verified against analytical ground truth (34 comprehensive tests)
 - **Analytical Testing Framework**: Mathematical formulas generate test inputs, hand-calculated expected outputs provide ground truth
-- **Python Reference Implementation**: Verified EASY backfilling scheduler (27/27 tests passing)
+- **Python Reference Implementation**: Verified EASY backfilling scheduler (34/34 tests passing)
 - **Streaming API**: Online simulation with dynamic job submission (`insert_job`, `run_until_inclusive`, `run_until_exclusive`)
 - **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
 - **Replay and Simulation Modes**: Replay historical traces or simulate with runtime distributions
@@ -21,7 +21,7 @@ scheduling and resource management using a set of heterogenous clusters.
 
 - **[EASY Backfilling Algorithm](docs/EASY_BACKFILLING_ALGORITHM.md)** - Complete algorithm specification
 - **[Analytical Testing](tests/ANALYTICAL_TESTING.md)** - Testing framework and methodology
-- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 27 tests organized by complexity
+- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity
 - **[Complete Documentation](docs/)** - User guides, API reference, verification
 - **[Streaming API Guide](docs/STREAMING_API.md)** - Online simulation API
 - **[Test Suite](tests/README.md)** - All tests and validation

@@ -59,21 +59,32 @@ jobs:
           echo "=== Boost version ==="
           dpkg -l | grep libboost-dev
 
+      - name: Create Python virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+
       - name: Configure CMake
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
+          source venv/bin/activate
           mkdir -p build
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install
+            -DCMAKE_INSTALL_PREFIX=$PWD/install \
+            -DDR_EVT_BUILD_PYTHON=ON
 
       - name: Build
         run: |
+          source venv/bin/activate
           cd build
           make -j$(nproc)
+          # Build test binaries
+          make test_streaming_api-bin test_batch_vs_streaming-bin
 
       - name: Check build artifacts
         run: |
@@ -108,6 +119,28 @@ jobs:
           echo "========================================"
           ./tests/run_replay_tests.sh
 
+      - name: Run Config Tests
+        run: |
+          echo "========================================"
+          echo "Running Config Tests (4 tests)"
+          echo "========================================"
+          ./tests/run_configs_tests.sh
+
+      - name: Run Python API Tests
+        run: |
+          source venv/bin/activate
+          echo "========================================"
+          echo "Running Python API Tests (9 tests)"
+          echo "========================================"
+          ./tests/run_python_tests.sh
+
+      - name: Run Streaming API Tests
+        run: |
+          echo "========================================"
+          echo "Running Streaming API Tests (4 tests)"
+          echo "========================================"
+          ./tests/run_streaming_tests.sh
+
       - name: Run Scale Tests (Optional)
         continue-on-error: true
         run: |
@@ -139,9 +172,13 @@ jobs:
           echo "  Unit: 7 tests"
           echo "  Feature: 4 tests"
           echo "  Replay: 3 tests"
+          echo "  Config: 4 tests"
+          echo "  Python API: 9 tests"
+          echo "  Streaming API: 4 tests"
           echo "  Scale: 7 tests (optional)"
           echo ""
-          echo "Total: 48 tests"
+          echo "Total Required: 65 tests"
+          echo "Total Optional: 7 tests"
           echo "========================================"
 
       - name: Upload test artifacts

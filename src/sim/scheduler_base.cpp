@@ -10,6 +10,7 @@
 
 #include "sim/scheduler_base.hpp"
 #include "sim/scheduler_fcfs.hpp"
+#include "sim/scheduler_fcfs_alt.hpp"
 #include "sim/scheduler_sjf.hpp"
 #include "sim/scheduler_ljf.hpp"
 #include <algorithm>
@@ -69,6 +70,10 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     switch (priority_policy) {
         case PriorityPolicy::FCFS:
             return std::make_unique<FCFSScheduler>(
+                total_nodes, job_data, backfill_policy, runtime_mode);
+
+        case PriorityPolicy::FCFS_ALT:
+            return std::make_unique<FCFSAltScheduler>(
                 total_nodes, job_data, backfill_policy, runtime_mode);
 
         case PriorityPolicy::SJF:

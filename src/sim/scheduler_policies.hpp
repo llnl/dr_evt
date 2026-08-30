@@ -42,6 +42,9 @@ enum class PriorityPolicy {
     /** First-Come-First-Served: Order by submission time */
     FCFS,
 
+    /** Alternative FCFS implementation (for differential testing) */
+    FCFS_ALT,
+
     /** Shortest-Job-First: Order by estimated runtime (ascending) */
     SJF,
 

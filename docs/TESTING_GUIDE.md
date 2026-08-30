@@ -8,21 +8,20 @@ This ensures scheduler correctness is verified against **mathematical ground tru
 
 ## Test Suite Organization
 
-### 27 Comprehensive Tests (Tier 1-7)
+### 34 Comprehensive Tests (Tier 1-9)
 
 **Location**: `/tests/test_traces/comprehensive/`
 
 | Tier | Focus | Tests | Complexity |
 |------|-------|-------|------------|
-| 1 | FCFS Fundamentals | 4 | ⭐ |
-| 2 | Basic Backfilling | 4 | ⭐⭐ |
-| 3 | Backfill Competition | 3 | ⭐⭐⭐ |
-| 4 | Event Timing | 4 | ⭐⭐ |
-| 5 | Complex Backfilling | 3 | ⭐⭐⭐⭐ |
-| 6 | System Properties | 6 | ⭐⭐⭐⭐⭐ |
-| 7 | Early Completions | 3 | ⭐⭐⭐ |
+| 1-2 | FCFS & Basic Backfilling | 8 | ⭐⭐ |
+| 3-4 | Event Timing & Competition | 7 | ⭐⭐⭐ |
+| 5 | Multiple Simultaneous Backfills | 4 | ⭐⭐⭐⭐ |
+| 6-7 | Mixed Events & System Properties | 6 | ⭐⭐⭐⭐⭐ |
+| 8 | Large Scale (20-50 jobs) | 6 | ⭐⭐⭐⭐⭐ |
+| 9 | Early Completions | 3 | ⭐⭐⭐ |
 
-**Total**: 27 tests covering all EASY backfilling scenarios
+**Total**: 34 tests covering all EASY backfilling scenarios
 
 See `/tests/test_traces/comprehensive/TEST_ORDER.md` for detailed test listing.
 
@@ -33,14 +32,14 @@ See `/tests/test_traces/comprehensive/TEST_ORDER.md` for detailed test listing.
 ```bash
 cd build
 
-# Run all 27 tests in order
-python3 test_ordered.py
+# Run all 34 tests in order
+./tests/test_all_dr_evt.sh
 
 # Expected output:
-# Tier 1: FCFS ..................... 4/4 ✅
-# Tier 2: Basic Backfill ........... 4/4 ✅
+# ✓ 01_backfill_allowed
+# ✓ 02_backfill_blocked_time
 # ...
-# RESULTS: 27 passed, 0 failed, 0 skipped
+# Passed: 34
 # 🎉 ALL TESTS PASSED!
 ```
 
@@ -239,7 +238,7 @@ Edit `build/test_ordered.py`:
 python3 test_ordered.py
 ```
 
-Should show 28/28 passing.
+Should show 34/34 passing.
 
 ## Common Test Patterns
 
