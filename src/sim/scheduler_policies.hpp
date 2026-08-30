@@ -31,7 +31,9 @@ enum class BackfillPolicy {
      * Conservative backfilling: All queued jobs get reservations.
      * Backfilling jobs cannot delay ANY reservation.
      */
-    CONSERVATIVE
+    CONSERVATIVE,
+
+    NONE
 };
 
 /**
