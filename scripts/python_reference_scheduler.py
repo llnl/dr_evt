@@ -143,39 +143,60 @@ class EasyBackfillingScheduler:
         EASY algorithm:
         1. FCFS head gets reservation
         2. Other jobs can backfill if they fit AND finish before reservation
+
+        Step 1 loops internally: once a head starts (consuming some free
+        nodes), the *new* front of the queue is immediately re-checked and
+        started too if it fits. It must NOT be evaluated as a backfill
+        candidate against a reservation_time computed before the earlier
+        head started -- that stale reservation_time is what caused jobs to
+        be blocked even when free resources were actually available for them.
+
+        free_nodes is computed once here and decremented incrementally as
+        jobs start, rather than calling get_free_nodes() (an O(len(running))
+        sum) on every loop iteration.
         """
+        free_nodes = self.get_free_nodes()
+
+        # Step 1: keep starting the front of the queue as long as it fits.
+        while self.wait_queue and self.wait_queue[0].nodes <= free_nodes:
+            head = self.wait_queue.pop(0)
+            self.log(f"Starting FCFS head job {head.idx}")
+            self.start_job(head)
+            free_nodes -= head.nodes
+
         if not self.wait_queue:
             return
 
+        # Step 2/3: the head is now genuinely blocked - compute one
+        # reservation and try to backfill the rest of the queue against it.
+        # free_nodes still holds the correct current value from Step 1.
         reservation_time = self.calculate_reservation_time()
-        free_nodes = self.get_free_nodes()
 
-        # Try to start jobs
-        started = []
+        # Position 0 is the head; the loop above just proved it's blocked
+        # (that's why we're here), so it stays parked at the front.
+        # enumerate() gives a lightweight view over the existing list (no
+        # copy) - unlike wait_queue[1:], which would allocate a new list.
+        # Safe to iterate self.wait_queue directly here since nothing
+        # mutates it during the loop; we only build the separate
+        # `remaining` list and reassign self.wait_queue after the loop ends.
+        remaining = [self.wait_queue[0]]
         for i, job in enumerate(self.wait_queue):
+            if i == 0:
+                continue  # head - already handled above, skip
             if job.nodes <= free_nodes:
-                # Check backfill constraint
                 job_end = self.current_time + job.duration
-
-                if i == 0:
-                    # FCFS head - always start if it fits
-                    self.log(f"Starting FCFS head job {job.idx}")
-                    self.start_job(job)
-                    started.append(i)
-                    free_nodes -= job.nodes
-                elif reservation_time is not None and job_end < reservation_time:
+                if reservation_time is not None and job_end < reservation_time:
                     # Backfiller - only if it completes before reservation
                     self.log(f"Backfilling job {job.idx} (ends at {job_end} < reservation {reservation_time})")
                     self.start_job(job)
-                    started.append(i)
                     free_nodes -= job.nodes
+                    continue  # started - don't keep it in the queue
                 else:
                     # Would interfere with FCFS head reservation
                     self.log(f"Blocking job {job.idx} (would end at {job_end} >= reservation {reservation_time})")
+            remaining.append(job)
 
-        # Remove started jobs from wait queue (in reverse to preserve indices)
-        for i in reversed(started):
-            self.wait_queue.pop(i)
+        self.wait_queue = remaining
 
     def start_job(self, job: Job):
         """Start a job immediately"""
@@ -194,8 +215,30 @@ class EasyBackfillingScheduler:
     def handle_submit(self, job: Job):
         """Handle job submission"""
         self.log(f"Job {job.idx} submitted (nodes={job.nodes}, duration={job.duration})")
+
+        if not self.wait_queue:
+            # No existing FCFS head - this job becomes it. Needs the full
+            # head-start logic (may cascade if it fits and starts).
+            self.wait_queue.append(job)
+            self.try_start_jobs()
+            return
+
+        # An FCFS head is already queued, and by the invariant that
+        # try_start_jobs leaves every remaining job blocked until resources
+        # change, it's still blocked (a submit event frees nothing). So no
+        # existing queued job's status can have changed - only this new
+        # arrival is new information, and it can only ever be a backfill
+        # candidate (FCFS order means it can't jump ahead of the head).
+        reservation_time = self.calculate_reservation_time()
+        if job.nodes <= self.get_free_nodes():
+            job_end = self.current_time + job.duration
+            if reservation_time is not None and job_end < reservation_time:
+                self.log(f"Backfilling job {job.idx} (ends at {job_end} < reservation {reservation_time})")
+                self.start_job(job)
+                return
+            else:
+                self.log(f"Blocking job {job.idx} (would end at {job_end} >= reservation {reservation_time})")
         self.wait_queue.append(job)
-        self.try_start_jobs()
 
     def handle_end(self, job_idx: int):
         """Handle job completion"""

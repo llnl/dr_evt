@@ -115,8 +115,8 @@ FOR EACH job IN wait_queue[1:]:  // Skip FCFS head (index 0)
   
   // Check 2: Will it complete before reservation?
   estimated_completion = current_time + job.time_limit
-  IF estimated_completion > reservation_time:
-    CONTINUE  // Would delay FCFS head, skip
+  IF estimated_completion >= reservation_time:
+    CONTINUE  // Would delay FCFS head, skip (resources aren't freed instantly)
   
   // Both checks passed - backfill!
   START(job)
