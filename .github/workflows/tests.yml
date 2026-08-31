@@ -75,12 +75,27 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: |
           source venv/bin/activate
+          # Explicitly pin Python3_EXECUTABLE to the active venv's
+          # interpreter. find_package(Python3) in SetupPybind11.cmake
+          # does not reliably pick up an activated venv on its own across
+          # CMake versions/environments - without this, it can silently
+          # resolve to a different system Python (e.g. Ubuntu 24.04's
+          # default 3.12) even with the venv active, producing a
+          # dr_evt.cpython-312-*.so that the venv's own 3.9 interpreter
+          # can never import (compiled extension modules are ABI-specific
+          # to their build interpreter's version).
+          PYTHON_EXE=$(command -v python3)
+          echo "Building Python bindings against: $PYTHON_EXE ($($PYTHON_EXE --version))"
+          # Fresh build directory: avoids picking up a stale .so left over
+          # from an earlier configure against a different Python version.
+          rm -rf build
           mkdir -p build
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=$PWD/install \
-            -DDR_EVT_BUILD_PYTHON=ON
+            -DDR_EVT_BUILD_PYTHON=ON \
+            -DPython3_EXECUTABLE=$PYTHON_EXE
 
       - name: Build
         run: |
