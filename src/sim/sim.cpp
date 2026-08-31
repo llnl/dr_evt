@@ -158,6 +158,16 @@ void Simulation::print_stats(std::ostream& os) const
 
 num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
 {
+    // Clear any previously-loaded data first, so this method is safe to
+    // call more than once (directly, or via run() after an earlier
+    // explicit call - run() calls this internally too). Without this,
+    // Job_Io::load() only ever push_back()s and never clears the
+    // underlying vector itself, so a second call would silently append
+    // to, rather than replace, the first call's jobs - e.g. calling
+    // initialize_trace() explicitly and then run() would silently double
+    // every job's count.
+    m_trace.data().clear();
+
     // Load trace data
     const auto max_num_jobs = (max_jobs > 0u) ? max_jobs :
                               (m_params.m_is_jobs_set ?
