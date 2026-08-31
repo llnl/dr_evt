@@ -349,7 +349,6 @@ void Simulation::advance_to(sim_time_t target_time)
     // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running), OR (3) future job arrivals
     while (active_count > 0 || !m_replay_ctx.m_evtq.empty() || next_arrival < std::numeric_limits<sim_time_t>::max()) {
         // next_arrival already computed above
-        bool have_eligible_jobs_now = m_scheduler->has_eligible_jobs();
 
         // Find next replay event time
         bool has_replay_event = !m_replay_ctx.m_evtq.empty();
