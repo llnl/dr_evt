@@ -111,8 +111,8 @@ PYBIND11_MODULE(dr_evt, m) {
              "Get number of nodes currently available")
 
         // Monitoring - Queue status
-        .def("get_wait_queue_size", &Simulation::get_wait_queue_size,
-             "Get number of jobs in waiting queue")
+        .def("get_active_job_count", &Simulation::get_active_job_count,
+             "Get number of jobs currently active (arrived but not yet scheduled)")
 
         .def("get_fcfs_head_shadow_time", &Simulation::get_fcfs_head_shadow_time,
              "Get estimated start time for FCFS head (shadow time)")
