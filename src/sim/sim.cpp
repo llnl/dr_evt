@@ -265,7 +265,7 @@ void Simulation::write_resource_trace(const std::string& filename) const
 
     // Write resource state history
     for (const auto& entry : m_resource_history) {
-        ofs << std::get<0>(entry) << ","
+        ofs << static_cast<int64_t>(std::get<0>(entry)) << ","
             << std::get<1>(entry) << ","
             << std::get<2>(entry) << "\n";
     }
