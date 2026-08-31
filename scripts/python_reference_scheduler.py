@@ -52,9 +52,16 @@ class Event:
     job_idx: int
 
     def __lt__(self, other):
-        # Sort by time first, then by job_idx for stable ordering
+        # Sort by time first, then END before SUBMIT (freeing nodes takes
+        # effect before a same-timestamp new arrival is evaluated against
+        # them - matches the C++ simulator's explicit same-timestamp
+        # batching, which always processes completions before making new
+        # scheduling decisions), then by job_idx for stable ordering.
         if self.time != other.time:
             return self.time < other.time
+        if self.type != other.type:
+            type_order = {'END': 0, 'START': 1, 'SUBMIT': 2}
+            return type_order[self.type] < type_order[other.type]
         return self.job_idx < other.job_idx
 
 class EasyBackfillingScheduler:
@@ -213,35 +220,26 @@ class EasyBackfillingScheduler:
         self.record_resource_state()
 
     def handle_submit(self, job: Job):
-        """Handle job submission"""
+        """Handle job submission: just enqueue it. The scheduling decision
+        (does it fit, can it backfill) is made uniformly by try_start_jobs(),
+        called once after all same-timestamp events are drained - not here.
+        Making the decision here, immediately, was the bug: when multiple
+        jobs completed at the same timestamp as this submission, each
+        completion triggered its own try_start_jobs() call before the next
+        completion at the same instant was known about, letting backfill
+        candidates race ahead and consume capacity that should have gone
+        to the earlier-priority head first, once the full combined freed
+        capacity was known.
+        """
         self.log(f"Job {job.idx} submitted (nodes={job.nodes}, duration={job.duration})")
-
-        if not self.wait_queue:
-            # No existing FCFS head - this job becomes it. Needs the full
-            # head-start logic (may cascade if it fits and starts).
-            self.wait_queue.append(job)
-            self.try_start_jobs()
-            return
-
-        # An FCFS head is already queued, and by the invariant that
-        # try_start_jobs leaves every remaining job blocked until resources
-        # change, it's still blocked (a submit event frees nothing). So no
-        # existing queued job's status can have changed - only this new
-        # arrival is new information, and it can only ever be a backfill
-        # candidate (FCFS order means it can't jump ahead of the head).
-        reservation_time = self.calculate_reservation_time()
-        if job.nodes <= self.get_free_nodes():
-            job_end = self.current_time + job.duration
-            if reservation_time is not None and job_end < reservation_time:
-                self.log(f"Backfilling job {job.idx} (ends at {job_end} < reservation {reservation_time})")
-                self.start_job(job)
-                return
-            else:
-                self.log(f"Blocking job {job.idx} (would end at {job_end} >= reservation {reservation_time})")
         self.wait_queue.append(job)
 
     def handle_end(self, job_idx: int):
-        """Handle job completion"""
+        """Handle job completion: free its resources only. Does not call
+        try_start_jobs() itself - see handle_submit()'s docstring for why
+        scheduling decisions are deferred to a single batched call after
+        all same-timestamp events (multiple jobs can complete at the exact
+        same instant) are drained."""
         if job_idx not in self.running:
             return
 
@@ -249,7 +247,6 @@ class EasyBackfillingScheduler:
         self.log(f"Job {job_idx} completed")
 
         self.record_resource_state()
-        self.try_start_jobs()
 
     def simulate(self, jobs: List[Job]) -> List[Job]:
         """
@@ -269,10 +266,32 @@ class EasyBackfillingScheduler:
             event = heapq.heappop(self.events)
             self.current_time = event.time
 
-            if event.type == 'SUBMIT':
-                self.handle_submit(job_map[event.job_idx])
-            elif event.type == 'END':
-                self.handle_end(event.job_idx)
+            # Drain every event at this exact same timestamp before making
+            # any scheduling decision - see handle_submit()/handle_end()'s
+            # docstrings for why this matters. Event.__lt__ already orders
+            # END before SUBMIT for ties at the same timestamp, so this
+            # loop naturally processes all completions (freeing capacity)
+            # before any arrivals at the same instant are enqueued.
+            same_time_events = [event]
+            while self.events and self.events[0].time == self.current_time:
+                same_time_events.append(heapq.heappop(self.events))
+
+            # heapq.heappop already returns these in Event.__lt__ order
+            # (time, then END-before-SUBMIT, then job_idx), so this sort
+            # is a no-op in practice - but making the ordering explicit
+            # here means correctness doesn't rely on a reader trusting
+            # that heap-pop order coincides with intended processing
+            # order, and stays correct even if event storage is later
+            # refactored away from a heap.
+            same_time_events.sort()
+
+            for evt in same_time_events:
+                if evt.type == 'SUBMIT':
+                    self.handle_submit(job_map[evt.job_idx])
+                elif evt.type == 'END':
+                    self.handle_end(evt.job_idx)
+
+            self.try_start_jobs()
 
         # Return jobs with simulation results
         return list(job_map.values())

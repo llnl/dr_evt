@@ -171,6 +171,15 @@ jobs:
           # cannot be scheduled at all under 100. Using --total_nodes 100
           # here previously caused jobs to silently never start.
           for test_file in tests/test_traces/scale/*.csv; do
+            # The glob above also matches *.expected_output.csv and
+            # *.expected_resources.csv (they end in .csv too) - without
+            # this exclusion, the loop tries to run the simulator on an
+            # expected-output file as if it were an input trace, which
+            # fails with a parse error unrelated to the actual scale
+            # tests below.
+            case "$test_file" in
+              *.expected_output.csv|*.expected_resources.csv) continue ;;
+            esac
             test_name=$(basename "$test_file" .csv)
             echo "Testing: $test_name"
             ./build/simulator "$test_file" \
