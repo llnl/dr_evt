@@ -29,7 +29,6 @@
 #include "params/sim_params.hpp"
 #include "trace/trace.hpp"
 #include "trace/dr_event.hpp"
-#include "sim/scheduler.hpp"
 #include "sim/scheduler_base.hpp"
 
 namespace dr_evt {
