@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <string>
+#include <limits>
 #include "common.hpp"
 #include "trace/epoch.hpp"
 
@@ -21,6 +22,22 @@ namespace dr_evt {
  *  @{ */
 
 class Job_Record {
+  public:
+    /**
+     * Sentinel begin_time/end_time value for a simulation-mode job that
+     * hasn't been scheduled yet. Deliberately not (0, 0.0f): 0 is a
+     * legitimate, real timestamp for any job that starts at simulation
+     * time 0, so using it as a "never scheduled" marker made that
+     * genuinely common case indistinguishable from "not yet run" -
+     * silently excluding such jobs from completion counts and
+     * wait/turnaround statistics elsewhere in the codebase. The maximum
+     * representable time_t value can never collide with a real,
+     * computed simulation timestamp.
+     */
+    static epoch_t unscheduled_sentinel() {
+        return {std::numeric_limits<time_t>::max(), 0.0f};
+    }
+
   protected:
     epoch_t m_t_begin; ///< The starting time of the job execution
     epoch_t m_t_end; ///< The end time of job execution
@@ -70,6 +87,30 @@ class Job_Record {
     num_nodes_t get_num_nodes() const { return m_num_nodes; }
     num_nodes_t get_busy_nodes() const { return m_busy_nodes; }
     bool is_simulated() const { return m_is_simulated; }
+    /**
+     * True if this job has valid timing data to use for statistics -
+     * i.e. it actually ran (simulation mode) or came with timing built in
+     * (replay mode). Use this (not begin_time/end_time == 0) to check
+     * "did this job run" - see unscheduled_sentinel()'s comment for why
+     * not begin_time/end_time directly.
+     *
+     * Primarily relies on m_is_simulated, not the sentinel: m_is_simulated
+     * is an explicit bool that must be set correctly by whoever
+     * constructs/schedules the job, regardless of what any numeric field
+     * defaults to - notably, a protobuf-constructed job's unspecified
+     * begin_time/end_time would default to 0 (proto3's bool/numeric
+     * default), not max value, so a sentinel-only check would silently
+     * break the moment any code path populates a Job_Record from such a
+     * source. The sentinel comparison is kept as a fallback specifically
+     * for replay-mode jobs: m_is_simulated is correctly false for them
+     * (their times come from the input file, not "computed by scheduler"),
+     * but they always have valid timing (never touch the sentinel at all,
+     * since they're populated directly from the file's replay-format
+     * columns and never go through set_begin_time()) - so m_t_end will
+     * differ from the sentinel for any replay-mode job, correctly making
+     * this true for them via the fallback term.
+     */
+    bool is_scheduled() const { return m_is_simulated || (m_t_end != unscheduled_sentinel()); }
 
     // Setters for simulation mode
     void set_begin_time(const epoch_t& t) { m_t_begin = t; m_is_simulated = true; }

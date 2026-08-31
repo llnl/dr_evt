@@ -135,12 +135,7 @@ PYBIND11_MODULE(dr_evt, m) {
         }, "Get number of jobs in loaded trace")
 
         .def("initialize_trace", [](Simulation &sim, size_t max_jobs) {
-            auto& trace = sim.get_trace();
-            int rc = trace.load_data(static_cast<num_jobs_t>(max_jobs));
-            if (rc != EXIT_SUCCESS) {
-                throw std::runtime_error("Failed to load trace data");
-            }
-            return trace.data().size();
+            return sim.initialize_trace(static_cast<num_jobs_t>(max_jobs));
         }, py::arg("max_jobs") = 0,
            "Load trace data from file (must call before streaming)");
 

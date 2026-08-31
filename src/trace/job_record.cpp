@@ -168,10 +168,20 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         m_actual_duration = static_cast<tdiff_t>(m_t_end - m_t_begin);
         m_is_simulated = false;
     } else {
-        // Simulation mode: no begin_time or end_time in input
-        // Initialize to zero - will be set by scheduler
-        m_t_begin = {0, 0.0f};
-        m_t_end = {0, 0.0f};
+        // Simulation mode: no begin_time or end_time in input.
+        // Initialize to the unscheduled sentinel (not zero - see
+        // Job_Record::unscheduled_sentinel()'s comment for why) - will be
+        // set by scheduler via set_begin_time()/compute_end_time().
+        m_t_begin = unscheduled_sentinel();
+        m_t_end = unscheduled_sentinel();
+        // Was previously left unset here (only the replay-mode branch
+        // above set it), leaving m_is_simulated as indeterminate/
+        // undefined-behavior-uninitialized until set_begin_time() was
+        // eventually called - confirmed empirically to read back as
+        // true immediately after construction, before any scheduling
+        // had happened. false here matches "not yet computed by
+        // scheduler," consistent with the replay-mode branch's intent.
+        m_is_simulated = false;
 
         set_by(m_t_submit, *it++);
         set_by(m_q, *it++);
@@ -183,7 +193,13 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         } else {
             m_actual_duration = 0.0;
         }
-        m_is_simulated = true;
+        // m_is_simulated stays false here (set above) until the scheduler
+        // actually dispatches this job via set_begin_time(). This line
+        // previously set it unconditionally to true right after parsing -
+        // before any scheduling had happened - making m_is_simulated
+        // always true for every simulation-mode job regardless of actual
+        // status, which is exactly the bug that made it unreliable as a
+        // "was scheduled" check in the first place.
     }
 }
 

@@ -46,6 +46,17 @@ for test_file in "$TRACE_DIR"/*.csv; do
         continue
     fi
 
+    # Optional companion file: extra CLI args for this specific test only
+    # (e.g. --msec_output). Absent for every existing feature test, so
+    # this is purely additive - no effect on tests that don't have one.
+    EXTRA_ARGS=()
+    FLAGS_FILE="$TRACE_DIR/${test_name}.flags"
+    if [ -f "$FLAGS_FILE" ]; then
+        # Word-split intentionally: the .flags file holds space-separated
+        # CLI arguments, not a single opaque string.
+        read -r -a EXTRA_ARGS < "$FLAGS_FILE"
+    fi
+
     # Run simulator
     SIM_OUT="/tmp/feature_${test_name}.csv"
     SIM_RESOURCES="/tmp/feature_${test_name}_resources.csv"
@@ -57,8 +68,9 @@ for test_file in "$TRACE_DIR"/*.csv; do
         --duration_mode exact \
         --backfill_policy easy \
         --priority_policy fcfs \
+        "${EXTRA_ARGS[@]}" \
         --outfile "$SIM_OUT" \
-        --resource_trace "$SIM_RESOURCES" > /dev/null 2>&1
+        --resource_trace "$SIM_RESOURCES" > /dev/null 2>&1 || true
 
     if [ ! -f "$SIM_OUT" ]; then
         echo "  ✗ FAIL - Simulator did not produce output"

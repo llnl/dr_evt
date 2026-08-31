@@ -23,7 +23,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:R:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:R:M"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -43,6 +43,7 @@ static const struct option longopts[] = {
     {"duration_scale",        required_argument,  0, 'S'},
     {"duration_stddev",       required_argument,  0, 'V'},
     {"verbose",               no_argument,        0, 'v'},
+    {"msec_output",           no_argument,        0, 'M'},
     {"config",                required_argument,  0, 'c'},
     {"resource_trace",        required_argument,  0, 'R'},
     { 0, 0, 0, 0 },
@@ -64,7 +65,8 @@ Sim_Params::Sim_Params()
     m_duration_distribution(DistributionType::NORMAL),
     m_duration_scale(1.0),  // Default: 100% of time_limit
     m_duration_stddev(0.0),  // Default: no variation
-    m_verbose(false)  // Default: production mode (quiet)
+    m_verbose(false),  // Default: production mode (quiet)
+    m_msec_output(false)  // Default: integer-second output
 {}
 
 void Sim_Params::getopt(int& argc, char** &argv)
@@ -207,6 +209,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'v': /* --verbose */
                 m_verbose = true;
                 break;
+            case 'M': /* --msec_output */
+                m_msec_output = true;
+                break;
             case 'c': /* --config */
                 {
 #if defined(DR_EVT_HAS_PROTOBUF)
@@ -330,6 +335,12 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Enable verbose output for debugging and testing.\n"
         "        Shows detailed simulation progress, scheduling decisions,\n"
         "        and resource usage. Disabled by default for production runs.\n"
+        "\n"
+        "    -M, --msec_output\n"
+        "        Output timestamps (in the simulated trace and resource trace\n"
+        "        files) with millisecond precision (3 decimal places) instead\n"
+        "        of truncating to whole seconds. Disabled by default - existing\n"
+        "        traces and tests assume integer-second timestamps.\n"
         "\n"
 #if defined(DR_EVT_HAS_PROTOBUF)
         "    -c, --config CONFIGFILE\n"

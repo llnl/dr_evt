@@ -15,12 +15,32 @@
 #include <algorithm>
 #include <fstream>
 #include <queue>
+#include <sstream>
+#include <iomanip>
 
 #ifdef USE_BLOCK_QUEUE
 #include "sim/block_wait_queue.hpp"
 #endif
 
 namespace dr_evt {
+
+namespace {
+// Format a sim_time_t for trace/resource-trace output. Default (msec=false)
+// truncates to whole seconds as a plain integer, matching all existing
+// traces and tests, which only ever use integer-second submit times.
+// When msec=true, formats with millisecond precision (3 decimal places)
+// instead, for traces that need sub-second timing.
+std::string format_sim_time(sim_time_t t, bool msec)
+{
+    std::ostringstream oss;
+    if (msec) {
+        oss << std::fixed << std::setprecision(3) << t;
+    } else {
+        oss << static_cast<int64_t>(t);
+    }
+    return oss.str();
+}
+} // anonymous namespace
 
 Simulation::Simulation(const Sim_Params& params)
   : m_params(params),
@@ -47,7 +67,7 @@ void Simulation::run()
     }
 
     // Initialize: load jobs and determine durations
-    initialize();
+    initialize_trace();
 
     if (m_params.m_verbose) {
         std::cout << "Loaded " << m_trace.data().size() << " jobs from trace" << std::endl;
@@ -72,7 +92,7 @@ void Simulation::run()
     // Count actual completions from trace data
     m_jobs_completed = 0;
     for (const auto& job : m_trace.data()) {
-        if (convert_epoch<sim_time_t>(job.get_end_time()) > 0) {
+        if (job.is_scheduled()) {
             m_jobs_completed++;
         }
     }
@@ -90,7 +110,7 @@ void Simulation::print_stats(std::ostream& os) const
     os << "Total jobs: " << m_trace.data().size() << std::endl;
     os << "Jobs submitted: " << m_jobs_submitted << std::endl;
     os << "Jobs completed: " << m_jobs_completed << std::endl;
-    os << "Current time: " << m_current_time << std::endl;
+    os << "Current time: " << format_sim_time(m_current_time, m_params.m_msec_output) << std::endl;
     os << "Total nodes: " << m_params.m_total_nodes << std::endl;
 
     // Calculate metrics
@@ -100,7 +120,16 @@ void Simulation::print_stats(std::ostream& os) const
         sim_time_t makespan = 0.0;
 
         for (const auto& job : m_trace.data()) {
-            if (convert_epoch<sim_time_t>(job.get_begin_time()) == 0) continue;  // Job didn't start
+            // Job_Record::is_scheduled() (backed by a dedicated max-value
+            // sentinel, not end_time == 0) is the correct check here: a
+            // job legitimately starting at simulation time 0 previously
+            // got excluded by an end_time/begin_time == 0 check, since 0
+            // is also a real, valid timestamp - not a reliable "never
+            // ran" marker. This also keeps this loop's sum and
+            // m_jobs_completed (the denominator below) using the exact
+            // same criterion, since m_jobs_completed above is now also
+            // counted via is_scheduled().
+            if (!job.is_scheduled()) continue;  // Job never completed
 
             tdiff_t wait = job.get_wait_time();
             total_wait += wait;
@@ -112,18 +141,28 @@ void Simulation::print_stats(std::ostream& os) const
                 convert_epoch<sim_time_t>(job.get_begin_time()) + job.get_exec_time());
         }
 
+        // Unlike Current time/Makespan above, these are computed averages
+        // (division results), which commonly have a fractional part even
+        // with integer-second input data (e.g. 220/3 = 73.333...) - that
+        // precision is meaningful and was shown by default before
+        // msec_output existed, so it's preserved here regardless of
+        // msec_output's setting, rather than routed through
+        // format_sim_time (whose integer-truncation default is for
+        // matching existing trace-output files' conventions, not for
+        // these summary statistics).
         os << "Average wait time: " << (total_wait / m_jobs_completed) << " sec" << std::endl;
         os << "Average turnaround time: " << (total_turnaround / m_jobs_completed) << " sec" << std::endl;
-        os << "Makespan: " << makespan << " sec" << std::endl;
+        os << "Makespan: " << format_sim_time(makespan, m_params.m_msec_output) << " sec" << std::endl;
     }
 }
 
-void Simulation::initialize()
+num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
 {
     // Load trace data
-    const auto max_num_jobs = m_params.m_is_jobs_set ?
-                              m_params.m_max_jobs :
-                              static_cast<num_jobs_t>(0u);
+    const auto max_num_jobs = (max_jobs > 0u) ? max_jobs :
+                              (m_params.m_is_jobs_set ?
+                               m_params.m_max_jobs :
+                               static_cast<num_jobs_t>(0u));
 
     if (max_num_jobs == 0u) {
         m_trace.data().reserve(1467542u);
@@ -147,6 +186,8 @@ void Simulation::initialize()
     m_current_time = 0.0;
     m_jobs_submitted = 0;
     m_jobs_completed = 0;
+
+    return static_cast<num_jobs_t>(m_trace.data().size());
 }
 
 void Simulation::determine_job_durations()
@@ -233,13 +274,13 @@ void Simulation::write_simulated_trace() const
 
     // Write job records
     for (const auto& job : m_trace.data()) {
-        std::string line = std::to_string(static_cast<int64_t>(convert_epoch<sim_time_t>(job.get_submit_time()))) + "," +
-                           std::to_string(static_cast<int64_t>(convert_epoch<sim_time_t>(job.get_begin_time()))) + "," +
-                           std::to_string(static_cast<int64_t>(convert_epoch<sim_time_t>(job.get_end_time()))) + "," +
+        std::string line = format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_params.m_msec_output) + "," +
+                           format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_params.m_msec_output) + "," +
+                           format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_params.m_msec_output) + "," +
                            std::to_string(job.get_num_nodes()) + "," +
                            "0," +
                            dr_evt::to_string(job.get_queue()) + "," +
-                           std::to_string(static_cast<int64_t>(job.get_limit_time())) + "\n";
+                           format_sim_time(job.get_limit_time(), m_params.m_msec_output) + "\n";
         ofs << line;
     }
 
@@ -265,7 +306,7 @@ void Simulation::write_resource_trace(const std::string& filename) const
 
     // Write resource state history
     for (const auto& entry : m_resource_history) {
-        ofs << static_cast<int64_t>(std::get<0>(entry)) << ","
+        ofs << format_sim_time(std::get<0>(entry), m_params.m_msec_output) << ","
             << std::get<1>(entry) << ","
             << std::get<2>(entry) << "\n";
     }
@@ -524,8 +565,15 @@ Simulation::Statistics Simulation::get_statistics() const
     num_jobs_t completed_count = 0;
 
     for (const auto& job : m_trace.data()) {
-        // Only count completed jobs (those with non-zero begin_time)
-        if (convert_epoch<sim_time_t>(job.get_begin_time()) > 0) {
+        // Only count jobs that actually completed. Job_Record::is_scheduled()
+        // (backed by a dedicated max-value sentinel) is the correct check
+        // here: a job legitimately starting at simulation time 0 has
+        // begin_time/end_time == 0 under the old convention, which the
+        // previous begin_time-based check incorrectly treated as "never
+        // started," silently excluding it from these averages. This
+        // matches the same convention now used for m_jobs_completed
+        // above (see the end-of-run() completion count).
+        if (job.is_scheduled()) {
             tdiff_t wait = job.get_wait_time();
             tdiff_t exec = job.get_exec_time();
 

@@ -253,13 +253,30 @@ class Simulation {
         }
     }
 
-  protected:
     /**
-     * Initialize simulation
-     * Loads trace data and creates initial submit events
+     * Initialize simulation: load trace data, sort by submission time, and
+     * determine job durations (simulation mode only). Resets simulation
+     * state (m_current_time, job counters) for a fresh run.
+     *
+     * Public streaming callers (Python bindings, gRPC server) must call
+     * this instead of calling get_trace().load_data() directly - that
+     * skips the sort and duration-determination steps below, which was a
+     * real, previously undetected bug affecting both the existing Python
+     * bindings and an early gRPC server draft: jobs loaded that way get
+     * silently wrong actual-duration data, which cascades into wrong
+     * scheduling decisions and wrong avg_wait_time/avg_turnaround_time/
+     * makespan statistics, with no error raised anywhere.
+     *
+     * @param max_jobs Maximum number of jobs to load. 0 (the default)
+     *                 falls back to m_params.m_max_jobs if that was set,
+     *                 or no limit otherwise - this is what run() relies on
+     *                 for batch mode. Streaming callers should pass an
+     *                 explicit value here instead of relying on Sim_Params.
+     * @return number of jobs actually loaded
      */
-    void initialize();
+    num_jobs_t initialize_trace(num_jobs_t max_jobs = 0);
 
+  protected:
     /**
      * Process a job submission event
      * @param job_idx Index of job being submitted

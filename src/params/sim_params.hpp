@@ -62,6 +62,7 @@ class Sim_Params {
 
     // Output control
     bool m_verbose;  // Enable verbose/debug output (default: false for production)
+    bool m_msec_output;  // Output timestamps with millisecond precision (default: false, integer seconds)
 
  private:
     std::string m_outfile;
