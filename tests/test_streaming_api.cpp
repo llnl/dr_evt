@@ -32,9 +32,9 @@ bool approx_equal(double a, double b, double tol = 1e-6) {
     return std::abs(a - b) < tol;
 }
 
-// Test 1: Basic insert_job and run_until
+// Test 1: Basic submit_job and run_until
 void test_basic_insert_and_run() {
-    std::cout << "\n=== Test 1: Basic insert_job and run_until ===" << std::endl;
+    std::cout << "\n=== Test 1: Basic submit_job and run_until ===" << std::endl;
 
     // Create minimal trace file for testing
     // For simulation mode (EXACT duration), don't include begin_time/end_time
@@ -70,30 +70,30 @@ void test_basic_insert_and_run() {
     std::cout << "✓ Initial state: 0 nodes in use" << std::endl;
 
     // Insert first job at t=0
-    sim.insert_job(0, 0.0);
-    sim.run_until_inclusive(0.0);  // Process START event
+    sim.submit_job(0, 0.0);
+    sim.advance_to(0.0);  // Process START event
 
     // Now 10 nodes should be in use
     assert(sim.get_nodes_in_use() == 10);
     std::cout << "✓ After inserting job 0: 10 nodes in use" << std::endl;
 
     // Insert second job at t=50
-    sim.insert_job(1, 50.0);
-    sim.run_until_inclusive(50.0);  // Process START event
+    sim.submit_job(1, 50.0);
+    sim.advance_to(50.0);  // Process START event
 
     // Now 30 nodes in use (10 + 20)
     assert(sim.get_nodes_in_use() == 30);
     std::cout << "✓ After inserting job 1: 30 nodes in use" << std::endl;
 
     // Advance to t=100 (job 0 ends)
-    sim.run_until_inclusive(100.0);
+    sim.advance_to(100.0);
 
     // Only job 1 running (20 nodes)
     assert(sim.get_nodes_in_use() == 20);
     std::cout << "✓ After job 0 completes: 20 nodes in use" << std::endl;
 
     // Advance to t=150 (job 1 ends)
-    sim.run_until_inclusive(150.0);
+    sim.advance_to(150.0);
 
     // All jobs done
     assert(sim.get_nodes_in_use() == 0);
@@ -125,7 +125,7 @@ void test_exclusive_vs_inclusive() {
     sim.get_trace().load_data(max_num_jobs);
 
     // Insert job at t=0
-    sim.insert_job(0, 0.0);
+    sim.submit_job(0, 0.0);
 
     // run_until_exclusive(0) should NOT process the START event at t=0
     // (current_time is 0, so exclusive of 0 means don't advance)
@@ -133,20 +133,20 @@ void test_exclusive_vs_inclusive() {
     assert(sim.get_nodes_in_use() == 0);
     std::cout << "✓ run_until_exclusive(0): START not processed, 0 nodes" << std::endl;
 
-    // run_until_inclusive(0) should process the START event at t=0
-    sim.run_until_inclusive(0.0);
+    // advance_to(0) should process the START event at t=0
+    sim.advance_to(0.0);
     assert(sim.get_nodes_in_use() == 10);
-    std::cout << "✓ run_until_inclusive(0): START processed, 10 nodes" << std::endl;
+    std::cout << "✓ advance_to(0): START processed, 10 nodes" << std::endl;
 
     // run_until_exclusive(10) should NOT process END event at t=10
     sim.run_until_exclusive(10.0);
     assert(sim.get_nodes_in_use() == 10);
     std::cout << "✓ run_until_exclusive(10): END not processed, still 10 nodes" << std::endl;
 
-    // run_until_inclusive(10) should process END event at t=10
-    sim.run_until_inclusive(10.0);
+    // advance_to(10) should process END event at t=10
+    sim.advance_to(10.0);
     assert(sim.get_nodes_in_use() == 0);
-    std::cout << "✓ run_until_inclusive(10): END processed, 0 nodes" << std::endl;
+    std::cout << "✓ advance_to(10): END processed, 0 nodes" << std::endl;
 
     std::cout << "Test 2: PASSED" << std::endl;
 }
@@ -204,8 +204,8 @@ void test_online_scheduling() {
                          << ": Starting job " << job_idx
                          << " (needs " << job.get_num_nodes() << " nodes, "
                          << free_nodes << " free)" << std::endl;
-                sim.insert_job(job_idx, current_time);
-                sim.run_until_inclusive(current_time);
+                sim.submit_job(job_idx, current_time);
+                sim.advance_to(current_time);
                 running_jobs.push_back(job_idx);
             } else {
                 std::cout << "  t=" << current_time
@@ -221,7 +221,7 @@ void test_online_scheduling() {
         if (current_time > 100.0) break;
 
         // Process any completions
-        sim.run_until_inclusive(current_time);
+        sim.advance_to(current_time);
 
         // Update running jobs list
         auto it = running_jobs.begin();
@@ -271,8 +271,8 @@ void test_no_resource_leaks() {
     // Start all jobs and advance through their lifecycles
     for (int i = 0; i < 10; i++) {
         sim_time_t start_time = i * 10.0;
-        sim.insert_job(i, start_time);
-        sim.run_until_inclusive(start_time);
+        sim.submit_job(i, start_time);
+        sim.advance_to(start_time);
 
         // Check nodes in use
         [[maybe_unused]] num_nodes_t expected_nodes = 10 * std::min(i + 1, 2);  // Max 2 jobs overlap
@@ -281,7 +281,7 @@ void test_no_resource_leaks() {
     }
 
     // Advance to end
-    sim.run_until_inclusive(110.0);
+    sim.advance_to(110.0);
 
     // All resources should be freed
     assert(sim.get_nodes_in_use() == 0);

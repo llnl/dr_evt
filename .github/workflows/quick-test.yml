@@ -1,7 +1,7 @@
-name: Quick Test (Correctness Only)
+name: Quick Test (Comprehensive Only)
 
 # Fast CI for quick validation (runs on every commit)
-# Only runs correctness tests to save time
+# Only runs the comprehensive test suite to save time
 # Full test suite runs on PR and main branch
 
 on:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   quick-test:
-    name: Quick Correctness Check
+    name: Quick Comprehensive Check
     runs-on: ubuntu-latest
 
     steps:
@@ -41,9 +41,9 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
 
-      - name: Run Correctness Tests Only
+      - name: Run Comprehensive Tests Only
         run: |
-          echo "Running correctness tests (most important)..."
+          echo "Running comprehensive tests (most important)..."
           ./tests/test_all_dr_evt.sh
 
       - name: Summary
@@ -51,5 +51,6 @@ jobs:
         run: |
           echo "========================================"
           echo "Quick Test Complete"
-          echo "Correctness: 34/34 tests"
+          echo "Comprehensive: 34/34 tests (verified in a manual session pass;"
+          echo "this echo does not itself re-check the actual result above)"
           echo "========================================"

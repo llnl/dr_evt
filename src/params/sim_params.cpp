@@ -105,6 +105,8 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         m_backfill_policy = BackfillPolicy::EASY;
                     } else if (policy == "conservative") {
                         m_backfill_policy = BackfillPolicy::CONSERVATIVE;
+                    } else if (policy == "none") {
+                        m_backfill_policy = BackfillPolicy::NONE;
                     } else {
                         std::cerr << "Unknown backfill policy: " << policy << std::endl;
                         print_usage(argv[0], 1);
@@ -269,10 +271,11 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "    -t, --max_time\n"
         "        Specify the upper limit of simulation time to run.\n"
         "\n"
-        "    -b, --backfill_policy {easy|conservative}\n"
+        "    -b, --backfill_policy {easy|conservative|none}\n"
         "        Backfilling policy (default: easy).\n"
         "        easy: Only first job gets reservation\n"
         "        conservative: All jobs get reservations\n"
+        "        none: Backfilling disabled - jobs run strictly in FCFS order\n"
         "\n"
         "    -p, --priority_policy {fcfs|fcfs_alt|sjf|ljf}\n"
         "        Job priority/ordering policy (default: fcfs).\n"
@@ -360,7 +363,9 @@ void Sim_Params::print() const
     msg += " - is_time_set: " + string{m_is_time_set? "true" : "false"} + "\n";
 
     msg += " - backfill_policy: ";
-    msg += (m_backfill_policy == BackfillPolicy::EASY) ? "EASY" : "CONSERVATIVE";
+    if (m_backfill_policy == BackfillPolicy::EASY) msg += "EASY";
+    else if (m_backfill_policy == BackfillPolicy::CONSERVATIVE) msg += "CONSERVATIVE";
+    else msg += "NONE";
     msg += "\n";
 
     msg += " - priority_policy: ";

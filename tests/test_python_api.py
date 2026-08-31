@@ -164,17 +164,17 @@ def test_streaming_api(result):
         num_jobs = sim.initialize_trace()
         assert num_jobs == 2, f"Expected 2 jobs, got {num_jobs}"
 
-        # Test insert_job
-        sim.insert_job(0, 0.0)
-        sim.run_until_inclusive(0.0)
+        # Test submit_job
+        sim.submit_job(0, 0.0)
+        sim.advance_to(0.0)
         assert sim.get_nodes_in_use() == 10
-        result.record_pass("insert_job and run_until_inclusive")
+        result.record_pass("submit_job and advance_to")
 
         # Test run_until_exclusive
-        sim.insert_job(1, 50.0)
+        sim.submit_job(1, 50.0)
         sim.run_until_exclusive(50.0)
         # Job 1 not started yet (exclusive)
-        sim.run_until_inclusive(50.0)
+        sim.advance_to(50.0)
         assert sim.get_nodes_in_use() == 30
         result.record_pass("run_until_exclusive")
 
@@ -211,14 +211,14 @@ def test_monitoring_api(result):
         result.record_pass("Initial state monitoring")
 
         # After job starts
-        sim.insert_job(0, 0.0)
-        sim.run_until_inclusive(0.0)
+        sim.submit_job(0, 0.0)
+        sim.advance_to(0.0)
         assert sim.get_nodes_in_use() == 30
         assert sim.get_available_nodes() == 70
         result.record_pass("Active state monitoring")
 
         # Queue status
-        queue_size = sim.get_wait_queue_size()
+        queue_size = sim.get_active_job_count()
         shadow_time = sim.get_fcfs_head_shadow_time()
         result.record_pass("Queue status API")
 
@@ -253,17 +253,17 @@ def test_statistics(result):
         sim.initialize_trace()
 
         # Run complete simulation
-        sim.run_until_inclusive(0.0)
-        sim.insert_job(0, 0.0)
-        sim.run_until_inclusive(0.0)
+        sim.advance_to(0.0)
+        sim.submit_job(0, 0.0)
+        sim.advance_to(0.0)
 
-        sim.insert_job(1, 10.0)
-        sim.run_until_inclusive(10.0)
+        sim.submit_job(1, 10.0)
+        sim.advance_to(10.0)
 
-        sim.insert_job(2, 20.0)
-        sim.run_until_inclusive(20.0)
+        sim.submit_job(2, 20.0)
+        sim.advance_to(20.0)
 
-        sim.run_until_inclusive(100.0)
+        sim.advance_to(100.0)
 
         # Get statistics
         stats = sim.get_statistics()
@@ -318,10 +318,10 @@ def test_backfill_policies(result):
 
             sim = dr_evt.Simulation(params)
             sim.initialize_trace()
-            sim.insert_job(0, 0.0)
-            sim.run_until_inclusive(0.0)
-            sim.insert_job(1, 10.0)
-            sim.run_until_inclusive(200.0)
+            sim.submit_job(0, 0.0)
+            sim.advance_to(0.0)
+            sim.submit_job(1, 10.0)
+            sim.advance_to(200.0)
 
             stats = sim.get_statistics()
             assert stats.jobs_completed == 2
@@ -362,12 +362,12 @@ def test_priority_policies(result):
             sim = dr_evt.Simulation(params)
             sim.initialize_trace()
 
-            sim.insert_job(0, 0.0)
-            sim.run_until_inclusive(0.0)
-            sim.insert_job(1, 5.0)
-            sim.run_until_inclusive(5.0)
-            sim.insert_job(2, 10.0)
-            sim.run_until_inclusive(200.0)
+            sim.submit_job(0, 0.0)
+            sim.advance_to(0.0)
+            sim.submit_job(1, 5.0)
+            sim.advance_to(5.0)
+            sim.submit_job(2, 10.0)
+            sim.advance_to(200.0)
 
             stats = sim.get_statistics()
             assert stats.jobs_completed == 3

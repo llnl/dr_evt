@@ -5,7 +5,6 @@ set_full_path(THIS_DIR_HEADERS
     multi_platform_runs.hpp
     scheduler_policies.hpp
     schedule_windows.hpp
-    scheduler.hpp
     scheduler_base.hpp
     scheduler_fcfs.hpp
     scheduler_fcfs_alt.hpp
@@ -16,7 +15,6 @@ set_full_path(THIS_DIR_HEADERS
 
 set_full_path(THIS_DIR_SOURCES
     schedule_windows.cpp
-    scheduler.cpp
     scheduler_base.cpp
     scheduler_fcfs.cpp
     scheduler_fcfs_alt.cpp

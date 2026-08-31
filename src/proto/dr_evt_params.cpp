@@ -58,6 +58,8 @@ static void set_sim_options(
             sp.m_backfill_policy = BackfillPolicy::EASY;
         } else if (policy == "conservative") {
             sp.m_backfill_policy = BackfillPolicy::CONSERVATIVE;
+        } else if (policy == "none") {
+            sp.m_backfill_policy = BackfillPolicy::NONE;
         } else {
             std::cerr << "Warning: Unknown backfill_policy in protobuf: " << policy
                      << " (using default: easy)" << std::endl;

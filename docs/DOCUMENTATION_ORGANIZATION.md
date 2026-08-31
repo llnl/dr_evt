@@ -1,5 +1,16 @@
 # Documentation Organization
 
+> **Status note (added after discovering this caused real problems):** the
+> "New Structure" below was a *plan*, and its own "Next Steps" section
+> admits several pages (`trace-formats.md` etc.) were still to be created.
+> Most of `verification/` and much of `development/` described here were
+> never actually written - `docs/index.md` linked to this plan's paths as
+> if they existed, producing dead links across roughly two-thirds of its
+> navigation. If you're using this file to understand the *current*
+> structure, check the file actually exists first; if you're using it to
+> finish the reorganization, treat it as a to-do list, not a completed
+> migration record.
+
 Complete reorganization of DR_EVT documentation into ReadTheDocs-style structure.
 
 ## New Structure

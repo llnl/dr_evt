@@ -301,7 +301,7 @@ void run_streaming_mode(const std::string& input_file, const std::string& output
     }
 
     // Advance to completion
-    sim.run_until_inclusive(max_time);
+    sim.advance_to(max_time);
 
     // Write output
     sim.write_simulated_trace();

@@ -313,7 +313,7 @@ void Simulation::advance_to(sim_time_t target_time)
 
     // Before entering the main loop: check if any jobs are eligible at current_time (initially 0)
     // This handles the case where jobs submit at t=0
-    if (m_scheduler->has_eligible_jobs(m_current_time)) {
+    if (m_scheduler->has_eligible_jobs()) {
         // Call scheduler to evaluate newly arriving jobs
         while (true) {
             num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
@@ -343,13 +343,13 @@ void Simulation::advance_to(sim_time_t target_time)
 
     // Main event loop - process events and make scheduling decisions until complete
     // Compute loop state variables once before entering loop
-    size_t active_count = m_scheduler->active_job_count(m_current_time);
-    sim_time_t next_arrival = m_scheduler->get_next_arrival_time(m_current_time);
+    size_t active_count = m_scheduler->active_job_count();
+    sim_time_t next_arrival = m_scheduler->get_next_arrival_time();
 
     // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running), OR (3) future job arrivals
     while (active_count > 0 || !m_replay_ctx.m_evtq.empty() || next_arrival < std::numeric_limits<sim_time_t>::max()) {
         // next_arrival already computed above
-        bool have_eligible_jobs_now = m_scheduler->has_eligible_jobs(m_current_time);
+        bool have_eligible_jobs_now = m_scheduler->has_eligible_jobs();
 
         // Find next replay event time
         bool has_replay_event = !m_replay_ctx.m_evtq.empty();
@@ -368,6 +368,13 @@ void Simulation::advance_to(sim_time_t target_time)
             // Process replay events at this time
             // Advance time FIRST
             m_current_time = next_replay_time;
+            // Explicit sync: schedule() below only runs if an END event
+            // freed resources (should_schedule = processed_end_event).
+            // Without this call, a replay step that only processes START
+            // events would leave the scheduler's eligibility tracking
+            // stale relative to m_current_time, since nothing else
+            // would sync it before the queries below.
+            m_scheduler->sync_to(m_current_time);
 
             // Process ALL events at current_time before calling scheduler
             // This ensures END events are processed before START events created by scheduler
@@ -409,6 +416,12 @@ void Simulation::advance_to(sim_time_t target_time)
             // Note: Check next_arrival < infinity to avoid infinite loop
             // If no jobs arriving, scheduler should pick from waiting queue instead
             m_current_time = next_arrival;
+            // Explicit sync, matching the replay-event branch above for
+            // symmetry - should_schedule is always true in this branch
+            // (set unconditionally below), so schedule()'s own internal
+            // sync_to() call would already cover this in practice, but
+            // this doesn't rely on that.
+            m_scheduler->sync_to(m_current_time);
 
             // jobs_at_next_arrival already collected during wait_queue scan
             // TODO: Pass jobs_at_next_arrival to scheduler for efficient evaluation
@@ -417,7 +430,7 @@ void Simulation::advance_to(sim_time_t target_time)
         } else {
             // No arrivals and no replay events before target_time
             if (m_params.m_verbose) {
-                std::cout << "ELSE block: active=" << m_scheduler->active_job_count(m_current_time)
+                std::cout << "ELSE block: active=" << m_scheduler->active_job_count()
                           << " events=" << m_replay_ctx.m_evtq.size()
                           << " time=" << m_current_time << std::endl;
             }
@@ -467,8 +480,8 @@ void Simulation::advance_to(sim_time_t target_time)
         }
 
         // Update loop state variables at end of iteration
-        active_count = m_scheduler->active_job_count(m_current_time);
-        next_arrival = m_scheduler->get_next_arrival_time(m_current_time);
+        active_count = m_scheduler->active_job_count();
+        next_arrival = m_scheduler->get_next_arrival_time();
     }
 
     // Loop exited - log final state for debugging
@@ -494,7 +507,7 @@ Simulation::Statistics Simulation::get_statistics() const
     stats.jobs_submitted = m_jobs_submitted;
     stats.jobs_completed = m_jobs_completed;
     stats.jobs_running = m_running_jobs.size();
-    stats.jobs_waiting = m_scheduler->wait_queue_size();
+    stats.jobs_waiting = m_scheduler->active_job_count();
     stats.current_time = m_current_time;
 
     // Resource utilization

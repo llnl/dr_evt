@@ -40,36 +40,36 @@ public:
         const std::map<job_no_t, sim_time_t>& running_jobs,
         sim_time_t current_time) override;
 
-    size_t wait_queue_size() const override {
-        return m_wait_queue.size();
+    void sync_to(sim_time_t current_time) override {
+        update_eligible_jobs(current_time);
     }
 
-    size_t active_job_count(sim_time_t current_time) const override {
-        // Count non-removed jobs that have arrived
-        size_t count = 0;
-        for (const auto& pair : m_wait_queue) {
-            const JobEntry& entry = pair.second;
-            if (!entry.removed && entry.submit_time <= current_time) {
-                count++;
-            }
-        }
-        return count;
+    size_t active_job_count() override {
+        return m_eligible_jobs.size();
     }
 
-    sim_time_t get_next_arrival_time(sim_time_t current_time) const override {
+    sim_time_t get_next_arrival_time() override {
+        // m_current_tracked_time is exactly "whatever time this
+        // scheduler was last synced to via sync_to()" - using it here
+        // instead of a parameter is equivalent, given the caller has
+        // already synced before calling this.
         sim_time_t next = std::numeric_limits<sim_time_t>::max();
         for (const auto& pair : m_wait_queue) {
             const JobEntry& entry = pair.second;
-            if (entry.removed) continue;
-            if (entry.submit_time > current_time && entry.submit_time < next) {
+            if (entry.submit_time > m_current_tracked_time && entry.submit_time < next) {
                 next = entry.submit_time;
             }
         }
         return next;
     }
 
-    bool has_eligible_jobs(sim_time_t current_time) const override {
+    bool has_eligible_jobs() override {
         return !m_eligible_jobs.empty();
+    }
+
+protected:
+    size_t wait_queue_size() const override {
+        return m_wait_queue.size();
     }
 
 private:
@@ -78,7 +78,9 @@ private:
         sim_time_t submit_time;
         tdiff_t runtime;
         num_nodes_t nodes;
-        bool removed;
+        // No removed flag - see SJFScheduler for full reasoning.
+        // schedule() erases scheduled entries from m_wait_queue
+        // immediately via the iterator it already holds.
     };
 
     // Comparator for descending order (longest first)

@@ -12,7 +12,7 @@
  * Python bindings for DR_EVT streaming simulation API
  *
  * Provides Python interface to:
- * - Streaming API (insert_job, run_until_inclusive, run_until_exclusive)
+ * - Streaming API (submit_job, advance_to, run_until_exclusive)
  * - Monitoring API (resource status, queue status, statistics)
  */
 
@@ -87,26 +87,18 @@ PYBIND11_MODULE(dr_evt, m) {
              "Run batch simulation (all jobs at once)")
 
         // Streaming API - Job submission
-        .def("insert_job", &Simulation::insert_job,
-             py::arg("job_idx"), py::arg("submit_time"),
-             "Insert a job into simulation at specified time")
-
         .def("submit_job", &Simulation::submit_job,
              py::arg("job_idx"), py::arg("submit_time"),
              "Submit a job to scheduler's waiting queue")
 
         // Streaming API - Time advancement
-        .def("run_until_inclusive", &Simulation::run_until_inclusive,
-             py::arg("target_time"),
-             "Advance simulation to target_time, processing events AT target_time")
-
         .def("run_until_exclusive", &Simulation::run_until_exclusive,
              py::arg("target_time"),
              "Advance simulation to just before target_time, excluding events at target_time")
 
         .def("advance_to", &Simulation::advance_to,
              py::arg("target_time"),
-             "Advance simulation to target time")
+             "Advance simulation to target time, processing events AT target_time")
 
         // Monitoring - Basic state
         .def("get_current_time", &Simulation::get_current_time,

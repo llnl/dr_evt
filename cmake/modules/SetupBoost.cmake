@@ -41,7 +41,25 @@ if(NOT Boost_FOUND OR NOT BOOST_LIBS_FOUND)
     set(BOOST_INCLUDE_LIBRARIES regex filesystem system program_options serialization container multi_index)
     set(BOOST_ENABLE_CMAKE ON)
 
+    # Boost's own source (e.g. libs/thread/src/future.cpp, pulled in as a
+    # transitive dependency of the components above, not requested directly)
+    # triggers warnings under our project's warning flags - e.g.
+    # -Wnon-virtual-dtor on boost::thread_detail::future_error_category. These
+    # are Boost's own code, not ours, and not something we can fix here, so
+    # suppress warnings for Boost's build specifically rather than either
+    # seeing noise on every build or turning the warning off project-wide.
+    # Save/restore CMAKE_CXX_FLAGS around FetchContent_MakeAvailable rather
+    # than using FetchContent_Declare(... SYSTEM), which needs CMake 3.25+
+    # (this file only requires 3.16), or targeting Boost's internal target
+    # names directly, which aren't guaranteed stable across Boost's own
+    # CMake integration versions.
+    set(_dr_evt_saved_cxx_flags "${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
+
     FetchContent_MakeAvailable(Boost)
+
+    set(CMAKE_CXX_FLAGS "${_dr_evt_saved_cxx_flags}")
+    unset(_dr_evt_saved_cxx_flags)
 
     # Set the variables that DR_EVT expects
     set(Boost_FOUND TRUE CACHE BOOL "Boost found via FetchContent")

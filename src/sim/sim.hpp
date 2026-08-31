@@ -180,11 +180,22 @@ class Simulation {
     }
 
     /**
-     * Get size of waiting queue
+     * Get count of jobs currently active (arrived but not yet scheduled).
+     *
+     * Uses SchedulerBase::active_job_count(), which is correct for all four
+     * scheduler implementations - see SchedulerBase::sync_to() for the
+     * full explanation of how eligibility tracking stays fresh without
+     * this method needing to pass or check a time itself. Safe to call
+     * with no time argument because nothing can call this while
+     * advance_to() is mid-execution (single-threaded, no reentrancy) -
+     * by the time this runs, the scheduler is already synced to
+     * m_current_time from the last completed advance_to() call (or from
+     * construction, if none has run yet).
+     *
      * @return Number of jobs waiting to be scheduled
      */
-    size_t get_wait_queue_size() const {
-        return m_scheduler->wait_queue_size();
+    size_t get_active_job_count() const {
+        return m_scheduler->active_job_count();
     }
 
     /**
@@ -193,7 +204,7 @@ class Simulation {
      * @return Estimated start time, or -1 if queue is empty
      */
     sim_time_t get_fcfs_head_shadow_time() const {
-        if (m_scheduler->wait_queue_size() == 0) {
+        if (m_scheduler->active_job_count() == 0) {
             return -1.0;
         }
         return m_scheduler->get_fcfs_reservation_time();
@@ -219,23 +230,6 @@ class Simulation {
     };
 
     Statistics get_statistics() const;
-
-    /**
-     * Insert a job into the simulation (alias for submit_job for backwards compatibility)
-     * @param job_idx Job index to insert
-     * @param submit_time When the job is submitted
-     */
-    void insert_job(job_no_t job_idx, sim_time_t submit_time) {
-        submit_job(job_idx, submit_time);
-    }
-
-    /**
-     * Run simulation until target_time, processing all events at target_time (inclusive)
-     * @param target_time Time to run until (inclusive)
-     */
-    void run_until_inclusive(sim_time_t target_time) {
-        advance_to(target_time);
-    }
 
     /**
      * Run simulation until just before target_time, excluding events at target_time

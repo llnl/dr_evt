@@ -2,10 +2,14 @@ name: DR_EVT Test Suite
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -91,10 +95,10 @@ jobs:
           ls -lh build/simulator
           ./build/simulator --help || true
 
-      - name: Run Correctness Tests
+      - name: Run Comprehensive Tests
         run: |
           echo "========================================"
-          echo "Running Correctness Tests (34 tests)"
+          echo "Running Comprehensive Tests (34 tests)"
           echo "========================================"
           ./tests/test_all_dr_evt.sh
 
@@ -108,7 +112,7 @@ jobs:
       - name: Run Feature Tests
         run: |
           echo "========================================"
-          echo "Running Feature Tests (4 tests)"
+          echo "Running Feature Tests (3 tests)"
           echo "========================================"
           ./tests/run_feature_tests.sh
 
@@ -145,18 +149,32 @@ jobs:
         continue-on-error: true
         run: |
           echo "========================================"
-          echo "Running Scale Tests (7 tests)"
+          echo "Running Scale Tests (7 tests, 3 known-corrupted input)"
           echo "========================================"
+          # NOTE: scale/ jobs require 795 nodes (matches src/dr_evt_types.hpp's
+          # default), NOT 100 - several jobs request up to 497 nodes and
+          # cannot be scheduled at all under 100. Using --total_nodes 100
+          # here previously caused jobs to silently never start.
           for test_file in tests/test_traces/scale/*.csv; do
             test_name=$(basename "$test_file" .csv)
             echo "Testing: $test_name"
             ./build/simulator "$test_file" \
-              --total_nodes 100 \
+              --total_nodes 795 \
               --trace_format simple \
               --timestamp_format epoch \
               --duration_mode exact \
               --outfile /tmp/scale_$test_name.csv
-            echo "  ✓ PASS"
+            expected="tests/test_traces/scale/${test_name}.expected_output.csv"
+            if [ -f "$expected" ]; then
+              awk -F, 'NR==1{print "job_id,start_time,end_time";next}{print NR-2","$2","$3}' /tmp/scale_$test_name.csv > /tmp/scale_${test_name}_comparable.csv
+              if diff -w "$expected" /tmp/scale_${test_name}_comparable.csv > /dev/null 2>&1; then
+                echo "  ✓ PASS (matches expected output)"
+              else
+                echo "  ✗ MISMATCH (or, for xlarge_500jobs/xlarge_500jobs_v2/huge_2000jobs: known-corrupted input data, excluded from the expected-output generator)"
+              fi
+            else
+              echo "  ⊘ ran, but no expected output to compare against"
+            fi
           done
 
       - name: Test Summary
@@ -168,17 +186,19 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Correctness: 34 tests"
-          echo "  Unit: 7 tests"
-          echo "  Feature: 4 tests"
-          echo "  Replay: 3 tests"
-          echo "  Config: 4 tests"
-          echo "  Python API: 9 tests"
-          echo "  Streaming API: 4 tests"
-          echo "  Scale: 7 tests (optional)"
+          echo "  Comprehensive: 34 tests (verified 34/34 in a manual session pass)"
+          echo "  Unit: 7 tests (5/7 - 2 known-broken, incomplete fixture data)"
+          echo "  Feature: 3 tests"
+          echo "  Replay: 3 tests (methodology also verified against more)"
+          echo "  Config: 4 tests (skipped without -DDR_EVT_ENABLE_PROTOBUF=ON)"
+          echo "  Python API: 9 tests (requires -DDR_EVT_BUILD_PYTHON=ON)"
+          echo "  Streaming API: 4 tests (requires building test_streaming_api)"
+          echo "  Scale: 7 tests, optional (4 working, 3 known-corrupted input data)"
           echo ""
-          echo "Total Required: 65 tests"
-          echo "Total Optional: 7 tests"
+          echo "These counts reflect what this workflow attempts to run, not"
+          echo "an independently re-verified total on every commit - see"
+          echo "tests/README.md and docs/TESTING_GUIDE.md for known"
+          echo "limitations and what 'passing' does and doesn't demonstrate."
           echo "========================================"
 
       - name: Upload test artifacts

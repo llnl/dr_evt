@@ -57,6 +57,46 @@ public:
         sim_time_t current_time) = 0;
 
     /**
+     * Explicit command: advance this scheduler's internal eligibility
+     * tracking to current_time. Idempotent and cheap to call redundantly
+     * (implementations early-return if current_time hasn't advanced past
+     * what's already tracked) - schedule() calls this at its own top
+     * unconditionally, so it remains safe to call regardless of whether
+     * a caller has already synced.
+     *
+     * This is the ONLY place eligibility tracking advances. The query
+     * methods below (active_job_count, get_next_arrival_time,
+     * has_eligible_jobs) do NOT sync themselves - they trust that
+     * whoever cares about a particular current_time has already called
+     * sync_to(current_time) first. Simulation::advance_to() calls this
+     * explicitly immediately after each of its two m_current_time
+     * assignments, closing the one gap where schedule() itself might not
+     * run in the same step (see Simulation::advance_to() for the traced
+     * justification).
+     */
+    virtual void sync_to(sim_time_t current_time) = 0;
+
+    /**
+     * Count jobs that are WAITING to be scheduled (arrived but not yet
+     * scheduled), as of whatever time this scheduler was last synced to
+     * via sync_to(). Does not take a time parameter and does not sync
+     * itself - see sync_to() above for why that's safe here.
+     *
+     * @return Number of waiting jobs (arrived but not yet scheduled)
+     */
+    virtual size_t active_job_count() = 0;
+
+    // Query methods for advance_to() logic - see sync_to() above for why
+    // these don't take a time parameter or sync themselves.
+    virtual sim_time_t get_next_arrival_time() = 0;
+    virtual bool has_eligible_jobs() = 0;
+
+    sim_time_t get_fcfs_reservation_time() const {
+        return m_fcfs_reservation_time;
+    }
+
+protected:
+    /**
      * Return total size of the wait queue (all jobs, ALL states).
      *
      * Counts ALL jobs in the queue:
@@ -64,39 +104,14 @@ public:
      * - Waiting jobs (submit_time <= current_time AND !removed)
      * - Scheduled jobs (submit_time <= current_time AND removed)
      *
-     * For statistics/debugging only. To count only waiting jobs, use active_job_count().
+     * Internal utility only - no external caller needs the "including
+     * scheduled jobs" count. Use active_job_count() for the number of
+     * jobs actually waiting to be scheduled.
      *
      * @return Total jobs in wait queue (all states)
      */
     virtual size_t wait_queue_size() const = 0;
 
-    /**
-     * Count jobs that are WAITING to be scheduled.
-     *
-     * A job is "waiting" if it has arrived but not been scheduled:
-     * - Has arrived: submit_time <= current_time
-     * - Not scheduled: !removed
-     *
-     * Does NOT count:
-     * - Future arrivals (submit_time > current_time)
-     * - Already scheduled jobs (removed = true)
-     *
-     * Loop continues if: active_job_count() > 0 OR events pending.
-     *
-     * @param current_time Current simulation time
-     * @return Number of waiting jobs (arrived but not yet scheduled)
-     */
-    virtual size_t active_job_count(sim_time_t current_time) const = 0;
-
-    // Query methods for advance_to() logic
-    virtual sim_time_t get_next_arrival_time(sim_time_t current_time) const = 0;
-    virtual bool has_eligible_jobs(sim_time_t current_time) const = 0;
-
-    sim_time_t get_fcfs_reservation_time() const {
-        return m_fcfs_reservation_time;
-    }
-
-protected:
     tdiff_t get_runtime_estimate(job_no_t job_idx) const {
         const auto& job = (*m_job_data_ptr)[job_idx];
         if (m_runtime_mode == RuntimeEstimateMode::USE_ACTUAL) {

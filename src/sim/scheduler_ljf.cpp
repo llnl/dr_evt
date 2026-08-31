@@ -27,7 +27,7 @@ void LJFScheduler::insert_job(job_no_t job_id,
                                tdiff_t runtime,
                                num_nodes_t nodes)
 {
-    JobEntry entry{job_id, submit_time, runtime, nodes, false};
+    JobEntry entry{job_id, submit_time, runtime, nodes};
     m_wait_queue.insert({runtime, entry});
 
     // If already eligible, add to eligible set
@@ -44,8 +44,7 @@ void LJFScheduler::update_eligible_jobs(sim_time_t current_time)
 
     // Scan wait_queue for newly eligible jobs
     for (auto& pair : m_wait_queue) {
-        JobEntry& entry = pair.second;
-        if (entry.removed) continue;
+        const JobEntry& entry = pair.second;
         if (entry.submit_time <= current_time && entry.submit_time > m_current_tracked_time) {
             m_eligible_jobs.insert(entry.job_id);
         }
@@ -63,7 +62,6 @@ LJFScheduler::find_fcfs_head()
 
     for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
         const JobEntry& entry = it->second;
-        if (entry.removed) continue;
         if (m_eligible_jobs.count(entry.job_id) == 0) continue;
 
         if (entry.submit_time < earliest_submit) {
@@ -93,21 +91,25 @@ std::vector<job_no_t> LJFScheduler::schedule(
         return {};  // No eligible jobs
     }
 
-    const JobEntry& fcfs_head = fcfs_head_it->second;
+    // Copy out what's needed before any erase invalidates this iterator
+    // and the reference into it.
+    job_no_t head_job_id = fcfs_head_it->second.job_id;
+    num_nodes_t head_nodes = fcfs_head_it->second.nodes;
 
     // Check if FCFS head can run
-    if (fcfs_head.nodes <= free_nodes) {
-        // Start FCFS head
-        auto& entry = fcfs_head_it->second;
-        entry.removed = true;
-        m_eligible_jobs.erase(fcfs_head.job_id);
-        return {fcfs_head.job_id};
+    if (head_nodes <= free_nodes) {
+        // Start FCFS head - erase immediately rather than lazily marking
+        // (see SJFScheduler for full reasoning: multimap erase-by-iterator
+        // is O(1) amortized regardless of tree position).
+        m_eligible_jobs.erase(head_job_id);
+        m_wait_queue.erase(fcfs_head_it);
+        return {head_job_id};
     }
 
     // FCFS head blocked - try backfilling
     // Calculate FCFS reservation time
     sim_time_t reservation_time = calculate_fcfs_reservation(
-        fcfs_head.nodes, free_nodes, running_jobs, current_time);
+        head_nodes, free_nodes, running_jobs, current_time);
 
     if (reservation_time <= current_time) {
         return {};  // No valid reservation window
@@ -120,7 +122,6 @@ std::vector<job_no_t> LJFScheduler::schedule(
         if (it == fcfs_head_it) continue;  // Skip FCFS head
 
         const JobEntry& entry = it->second;
-        if (entry.removed) continue;
         if (m_eligible_jobs.count(entry.job_id) == 0) continue;
 
         // Check backfill constraints
@@ -130,20 +131,21 @@ std::vector<job_no_t> LJFScheduler::schedule(
         if (m_backfill_policy == BackfillPolicy::EASY) {
             // EASY: must fit both nodes AND window
             if (fits_nodes && fits_window) {
-                // Found backfill candidate
-                auto& mutable_entry = it->second;
-                mutable_entry.removed = true;
-                m_eligible_jobs.erase(entry.job_id);
-                return {entry.job_id};
+                // Found backfill candidate - copy id out before erasing,
+                // same reasoning as the head case above.
+                job_no_t id = entry.job_id;
+                m_eligible_jobs.erase(id);
+                m_wait_queue.erase(it);
+                return {id};
             }
         } else if (m_backfill_policy == BackfillPolicy::CONSERVATIVE) {
             // CONSERVATIVE: must not delay ANY waiting job
             // For now, only allow if fits window (conservative approximation)
             if (fits_nodes && fits_window) {
-                auto& mutable_entry = it->second;
-                mutable_entry.removed = true;
-                m_eligible_jobs.erase(entry.job_id);
-                return {entry.job_id};
+                job_no_t id = entry.job_id;
+                m_eligible_jobs.erase(id);
+                m_wait_queue.erase(it);
+                return {id};
             }
         }
     }
