@@ -1,3 +1,10 @@
+/******************************************************************************
+ *         Copyright 2023 Lawrence Livermore National Security, LLC           *
+ *         See the top-level LICENSE file for details.                        *
+ *                                                                            *
+ *         SPDX-License-Identifier: MIT                                       *
+ ******************************************************************************/
+
 // Minimal test for BlockWaitQueue - compiles with CMake
 
 #include "sim/block_wait_queue.hpp"

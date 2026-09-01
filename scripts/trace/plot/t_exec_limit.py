@@ -1,6 +1,9 @@
-# This scripts take as an input the output file from dr_event with
-# LIMIT_VS_EXEC_TIME_ONLY optiont set at compile time.
-# The option is changeable in common.hpp
+################################################################################
+#         Copyright 2023 Lawrence Livermore National Security, LLC             #
+#         See the top-level LICENSE file for details.                          #
+#                                                                              #
+#         SPDX-License-Identifier: MIT                                         #
+################################################################################
 
 import matplotlib.pyplot as plt
 import numpy as np

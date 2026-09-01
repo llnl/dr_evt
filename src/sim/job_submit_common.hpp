@@ -1,3 +1,10 @@
+/******************************************************************************
+ *         Copyright 2023 Lawrence Livermore National Security, LLC           *
+ *         See the top-level LICENSE file for details.                        *
+ *                                                                            *
+ *         SPDX-License-Identifier: MIT                                       *
+ ******************************************************************************/
+
 #ifndef DR_EVT_SIM_JOB_SUBMIT_COMMON_HPP
 #define DR_EVT_SIM_JOB_SUBMIT_COMMON_HPP
 #include <array>
