@@ -1,0 +1,18 @@
+{
+  "test_id": "22_bursty_load",
+  "exact_schedule": null,
+  "constraints": [
+    {
+      "type": "job_count",
+      "expected": 20
+    },
+    {
+      "type": "all_complete"
+    },
+    {
+      "type": "idle_count",
+      "min": 1,
+      "description": "At least one idle period between bursts"
+    }
+  ]
+}

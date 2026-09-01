@@ -37,12 +37,12 @@ cmake -DCMAKE_BUILD_TYPE=Debug ..
 
 # Release build (optimized)
 cmake -DCMAKE_BUILD_TYPE=Release ..
-
-# With tests
-cmake -DBUILD_TESTING=ON ..
-make
-make test
 ```
+
+(An earlier version of this document also listed a `-DBUILD_TESTING=ON`
+/ `make test` option here - there's no corresponding CTest integration in
+`CMakeLists.txt`, so that example never worked. See "Verification" below
+for how to actually run the test suite.)
 
 ## Installation
 
@@ -73,20 +73,28 @@ pip install -r requirements.txt
 Run tests to verify installation:
 
 ```bash
-# Quick test suite
+# Comprehensive test suite (34 tests)
 cd tests
-./test_all.sh
-
-# Full analytical verification
-python3 ../scripts/verify_against_analytical.py
+./test_all_dr_evt.sh
 ```
 
 Should see:
 ```
-✓ ALL TESTS PASSED
-Both implementations verified against analytical oracles!
-Total: 23/23 tests passed
+🎉 ALL TESTS PASSED!
+Passed:  34
+Failed:  0
+Missing: 0
+Total:   34
 ```
+
+(An earlier version of this document referenced `./test_all.sh` - no such
+script exists, the actual name is `test_all_dr_evt.sh` - and a
+`scripts/verify_against_analytical.py` step claiming "verified against
+analytical oracles" - that script was an unused remnant of an abandoned
+test-suite design and has been removed; "34 tests pass" means the C++
+simulator matches a from-scratch Python reference implementation, not
+independently-verified analytical ground truth. See
+`docs/TESTING_GUIDE.md` for what that distinction means.)
 
 ## Troubleshooting
 

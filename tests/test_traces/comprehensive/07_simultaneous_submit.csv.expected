@@ -1,0 +1,7 @@
+Multiple jobs submit at exactly the same time
+
+EXPECTED PROPERTIES:
+  - All 4 jobs submit at t=0
+  - All 4 start at t=0 (80 nodes used, 20 free)
+  - All 4 complete at t=100
+  - No starvation or ordering issues

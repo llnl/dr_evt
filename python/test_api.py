@@ -70,26 +70,26 @@ def test_basic_api():
     assert sim.get_current_time() == 0.0
     assert sim.get_nodes_in_use() == 0
     assert sim.get_available_nodes() == 100
-    assert sim.get_wait_queue_size() == 0
+    assert sim.get_active_job_count() == 0
     print("  ✓ Initial state correct")
 
     # Test streaming API
     print("\n7. Testing streaming API...")
-    sim.insert_job(0, 0.0)
-    sim.run_until_inclusive(0.0)
+    sim.submit_job(0, 0.0)
+    sim.advance_to(0.0)
     assert sim.get_nodes_in_use() == 10
     assert sim.get_available_nodes() == 90
     print("  ✓ Job 0 started, 10 nodes in use")
 
-    sim.insert_job(1, 50.0)
-    sim.run_until_inclusive(50.0)
+    sim.submit_job(1, 50.0)
+    sim.advance_to(50.0)
     assert sim.get_nodes_in_use() == 30  # Both jobs running
     assert sim.get_available_nodes() == 70
     print("  ✓ Job 1 started, 30 nodes in use")
 
     # Test wait queue
     print("\n8. Testing queue status...")
-    queue_size = sim.get_wait_queue_size()
+    queue_size = sim.get_active_job_count()
     print(f"  ✓ Wait queue size: {queue_size}")
 
     # Test shadow time
@@ -112,7 +112,7 @@ def test_basic_api():
 
     # Complete simulation
     print("\n11. Completing simulation...")
-    sim.run_until_inclusive(200.0)
+    sim.advance_to(200.0)
     final_stats = sim.get_statistics()
     assert final_stats.jobs_completed == 2
     assert final_stats.nodes_in_use == 0
@@ -132,14 +132,14 @@ def test_basic_api():
 
     sim2 = dr_evt.Simulation(params2)
     sim2.initialize_trace()
-    sim2.insert_job(0, 0.0)
+    sim2.submit_job(0, 0.0)
 
     # Exclusive should NOT process event at t=0
     sim2.run_until_exclusive(0.0)
     # Can't easily test this without knowing internal state
 
     # Inclusive SHOULD process event at t=0
-    sim2.run_until_inclusive(0.0)
+    sim2.advance_to(0.0)
     assert sim2.get_nodes_in_use() == 10
     print("  ✓ Exclusive vs inclusive works")
 

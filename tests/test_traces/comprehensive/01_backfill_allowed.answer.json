@@ -1,0 +1,28 @@
+{
+  "test_id": "01_backfill_allowed",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      200
+    ],
+    [
+      1,
+      10,
+      60
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "backfill",
+      "job": 1,
+      "description": "Job 1 must backfill (start at submit time)"
+    },
+    {
+      "type": "time_window",
+      "job": 1,
+      "end_before": 200,
+      "description": "Job 1 ends before FCFS reservation"
+    }
+  ]
+}

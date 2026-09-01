@@ -29,9 +29,16 @@
 #include "params/sim_params.hpp"
 #include "trace/trace.hpp"
 #include "trace/dr_event.hpp"
-#include "sim/scheduler.hpp"
+#include "sim/scheduler_base.hpp"
 
 namespace dr_evt {
+
+// Forward declarations
+#ifdef USE_BLOCK_QUEUE
+class BlockWaitQueue;
+#endif
+class SchedulerBase;
+
 /** \addtogroup dr_evt_sim
  *  @{ */
 
@@ -47,8 +54,8 @@ class Simulation {
     /// Job trace data
     Trace m_trace;
 
-    /// Job scheduler
-    Scheduler m_scheduler;
+    /// Job scheduler (polymorphic - FCFS/SJF/LJF)
+    std::unique_ptr<SchedulerBase> m_scheduler;
 
     /// Event queue (submit, start, end events)
     event_q_t m_event_queue;
@@ -66,10 +73,7 @@ class Simulation {
     /// Replay context for event processing
     Trace::Context m_replay_ctx;
 
-    /// Waiting queue for streaming mode (jobs submitted but not yet started)
-    /// Pairs: (job_idx, removed_flag). Sorted by submit_time.
-    /// removed_flag: false = active, true = scheduled (lazy deletion)
-    std::deque<std::pair<job_no_t, bool>> m_wait_queue;
+    // NOTE: Wait queue now owned by scheduler (m_scheduler maintains internal queue)
 
     /// Running jobs for streaming mode (job_idx -> start_time)
     std::map<job_no_t, sim_time_t> m_running_jobs;
@@ -175,11 +179,22 @@ class Simulation {
     }
 
     /**
-     * Get size of waiting queue
+     * Get count of jobs currently active (arrived but not yet scheduled).
+     *
+     * Uses SchedulerBase::active_job_count(), which is correct for all four
+     * scheduler implementations - see SchedulerBase::sync_to() for the
+     * full explanation of how eligibility tracking stays fresh without
+     * this method needing to pass or check a time itself. Safe to call
+     * with no time argument because nothing can call this while
+     * advance_to() is mid-execution (single-threaded, no reentrancy) -
+     * by the time this runs, the scheduler is already synced to
+     * m_current_time from the last completed advance_to() call (or from
+     * construction, if none has run yet).
+     *
      * @return Number of jobs waiting to be scheduled
      */
-    size_t get_wait_queue_size() const {
-        return m_wait_queue.size();
+    size_t get_active_job_count() const {
+        return m_scheduler->active_job_count();
     }
 
     /**
@@ -188,10 +203,10 @@ class Simulation {
      * @return Estimated start time, or -1 if queue is empty
      */
     sim_time_t get_fcfs_head_shadow_time() const {
-        if (m_wait_queue.empty()) {
+        if (m_scheduler->active_job_count() == 0) {
             return -1.0;
         }
-        return m_scheduler.get_fcfs_reservation_time();
+        return m_scheduler->get_fcfs_reservation_time();
     }
 
     /**
@@ -216,23 +231,6 @@ class Simulation {
     Statistics get_statistics() const;
 
     /**
-     * Insert a job into the simulation (alias for submit_job for backwards compatibility)
-     * @param job_idx Job index to insert
-     * @param submit_time When the job is submitted
-     */
-    void insert_job(job_no_t job_idx, sim_time_t submit_time) {
-        submit_job(job_idx, submit_time);
-    }
-
-    /**
-     * Run simulation until target_time, processing all events at target_time (inclusive)
-     * @param target_time Time to run until (inclusive)
-     */
-    void run_until_inclusive(sim_time_t target_time) {
-        advance_to(target_time);
-    }
-
-    /**
      * Run simulation until just before target_time, excluding events at target_time
      * @param target_time Time to run until (exclusive)
      */
@@ -255,13 +253,30 @@ class Simulation {
         }
     }
 
-  protected:
     /**
-     * Initialize simulation
-     * Loads trace data and creates initial submit events
+     * Initialize simulation: load trace data, sort by submission time, and
+     * determine job durations (simulation mode only). Resets simulation
+     * state (m_current_time, job counters) for a fresh run.
+     *
+     * Public streaming callers (Python bindings, gRPC server) must call
+     * this instead of calling get_trace().load_data() directly - that
+     * skips the sort and duration-determination steps below, which was a
+     * real, previously undetected bug affecting both the existing Python
+     * bindings and an early gRPC server draft: jobs loaded that way get
+     * silently wrong actual-duration data, which cascades into wrong
+     * scheduling decisions and wrong avg_wait_time/avg_turnaround_time/
+     * makespan statistics, with no error raised anywhere.
+     *
+     * @param max_jobs Maximum number of jobs to load. 0 (the default)
+     *                 falls back to m_params.m_max_jobs if that was set,
+     *                 or no limit otherwise - this is what run() relies on
+     *                 for batch mode. Streaming callers should pass an
+     *                 explicit value here instead of relying on Sim_Params.
+     * @return number of jobs actually loaded
      */
-    void initialize();
+    num_jobs_t initialize_trace(num_jobs_t max_jobs = 0);
 
+  protected:
     /**
      * Process a job submission event
      * @param job_idx Index of job being submitted

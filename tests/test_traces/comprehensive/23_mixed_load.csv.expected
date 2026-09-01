@@ -1,0 +1,8 @@
+Mixed workload with large and small jobs
+
+EXPECTED PROPERTIES:
+  - 6 large jobs (70 nodes, 150s)
+  - 24 small jobs (10 nodes, 50s)
+  - Small jobs backfill around large ones
+  - All jobs complete
+  - Efficient packing

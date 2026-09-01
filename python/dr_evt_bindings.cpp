@@ -12,7 +12,7 @@
  * Python bindings for DR_EVT streaming simulation API
  *
  * Provides Python interface to:
- * - Streaming API (insert_job, run_until_inclusive, run_until_exclusive)
+ * - Streaming API (submit_job, advance_to, run_until_exclusive)
  * - Monitoring API (resource status, queue status, statistics)
  */
 
@@ -87,26 +87,18 @@ PYBIND11_MODULE(dr_evt, m) {
              "Run batch simulation (all jobs at once)")
 
         // Streaming API - Job submission
-        .def("insert_job", &Simulation::insert_job,
-             py::arg("job_idx"), py::arg("submit_time"),
-             "Insert a job into simulation at specified time")
-
         .def("submit_job", &Simulation::submit_job,
              py::arg("job_idx"), py::arg("submit_time"),
              "Submit a job to scheduler's waiting queue")
 
         // Streaming API - Time advancement
-        .def("run_until_inclusive", &Simulation::run_until_inclusive,
-             py::arg("target_time"),
-             "Advance simulation to target_time, processing events AT target_time")
-
         .def("run_until_exclusive", &Simulation::run_until_exclusive,
              py::arg("target_time"),
              "Advance simulation to just before target_time, excluding events at target_time")
 
         .def("advance_to", &Simulation::advance_to,
              py::arg("target_time"),
-             "Advance simulation to target time")
+             "Advance simulation to target time, processing events AT target_time")
 
         // Monitoring - Basic state
         .def("get_current_time", &Simulation::get_current_time,
@@ -119,8 +111,8 @@ PYBIND11_MODULE(dr_evt, m) {
              "Get number of nodes currently available")
 
         // Monitoring - Queue status
-        .def("get_wait_queue_size", &Simulation::get_wait_queue_size,
-             "Get number of jobs in waiting queue")
+        .def("get_active_job_count", &Simulation::get_active_job_count,
+             "Get number of jobs currently active (arrived but not yet scheduled)")
 
         .def("get_fcfs_head_shadow_time", &Simulation::get_fcfs_head_shadow_time,
              "Get estimated start time for FCFS head (shadow time)")
@@ -143,12 +135,7 @@ PYBIND11_MODULE(dr_evt, m) {
         }, "Get number of jobs in loaded trace")
 
         .def("initialize_trace", [](Simulation &sim, size_t max_jobs) {
-            auto& trace = sim.get_trace();
-            int rc = trace.load_data(static_cast<num_jobs_t>(max_jobs));
-            if (rc != EXIT_SUCCESS) {
-                throw std::runtime_error("Failed to load trace data");
-            }
-            return trace.data().size();
+            return sim.initialize_trace(static_cast<num_jobs_t>(max_jobs));
         }, py::arg("max_jobs") = 0,
            "Load trace data from file (must call before streaming)");
 

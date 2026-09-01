@@ -1,0 +1,30 @@
+{
+  "test_id": "17_late_large_priority",
+  "exact_schedule": null,
+  "constraints": [
+    {
+      "type": "job_count",
+      "expected": 21
+    },
+    {
+      "type": "fcfs_order",
+      "job": 10,
+      "before_jobs": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "description": "Job 10 (large) starts before jobs 11-20"
+    },
+    {
+      "type": "all_complete"
+    }
+  ]
+}

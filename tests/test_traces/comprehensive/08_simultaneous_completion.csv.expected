@@ -1,0 +1,7 @@
+Multiple jobs complete at same time, freeing resources
+
+EXPECTED PROPERTIES:
+  - Jobs 0-3 all complete at t=100
+  - Job 4 waiting (needs 80 nodes)
+  - Job 4 starts at t=100 (when all resources freed)
+  - Scheduler handles simultaneous completions correctly

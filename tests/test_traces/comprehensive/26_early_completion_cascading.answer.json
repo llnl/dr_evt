@@ -1,0 +1,31 @@
+{
+  "test_id": "26_early_completion_cascading",
+  "exact_schedule": [
+    [0, 0, 30],
+    [1, 5, 55],
+    [2, 170, 470],
+    [3, 20, 170]
+  ],
+  "constraints": [
+    {
+      "type": "early_completion",
+      "job": 0,
+      "description": "Job 0 finishes at 30 (early, planned for 100)"
+    },
+    {
+      "type": "early_completion",
+      "job": 1,
+      "description": "Job 1 finishes at 55 (early, planned for 205)"
+    },
+    {
+      "type": "opportunistic_start",
+      "job": 2,
+      "description": "Job 2 starts at 55 when both Job 0 and Job 1 complete (planned for 205)"
+    },
+    {
+      "type": "backfill",
+      "job": 3,
+      "description": "Job 3 backfills based on time_limit=200 assumption"
+    }
+  ]
+}

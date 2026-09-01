@@ -23,7 +23,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:R:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:R:M"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -43,6 +43,7 @@ static const struct option longopts[] = {
     {"duration_scale",        required_argument,  0, 'S'},
     {"duration_stddev",       required_argument,  0, 'V'},
     {"verbose",               no_argument,        0, 'v'},
+    {"msec_output",           no_argument,        0, 'M'},
     {"config",                required_argument,  0, 'c'},
     {"resource_trace",        required_argument,  0, 'R'},
     { 0, 0, 0, 0 },
@@ -64,7 +65,8 @@ Sim_Params::Sim_Params()
     m_duration_distribution(DistributionType::NORMAL),
     m_duration_scale(1.0),  // Default: 100% of time_limit
     m_duration_stddev(0.0),  // Default: no variation
-    m_verbose(false)  // Default: production mode (quiet)
+    m_verbose(false),  // Default: production mode (quiet)
+    m_msec_output(false)  // Default: integer-second output
 {}
 
 void Sim_Params::getopt(int& argc, char** &argv)
@@ -105,6 +107,8 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         m_backfill_policy = BackfillPolicy::EASY;
                     } else if (policy == "conservative") {
                         m_backfill_policy = BackfillPolicy::CONSERVATIVE;
+                    } else if (policy == "none") {
+                        m_backfill_policy = BackfillPolicy::NONE;
                     } else {
                         std::cerr << "Unknown backfill policy: " << policy << std::endl;
                         print_usage(argv[0], 1);
@@ -116,6 +120,8 @@ void Sim_Params::getopt(int& argc, char** &argv)
                     std::string policy(optarg);
                     if (policy == "fcfs") {
                         m_priority_policy = PriorityPolicy::FCFS;
+                    } else if (policy == "fcfs_alt") {
+                        m_priority_policy = PriorityPolicy::FCFS_ALT;
                     } else if (policy == "sjf") {
                         m_priority_policy = PriorityPolicy::SJF;
                     } else if (policy == "ljf") {
@@ -203,6 +209,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'v': /* --verbose */
                 m_verbose = true;
                 break;
+            case 'M': /* --msec_output */
+                m_msec_output = true;
+                break;
             case 'c': /* --config */
                 {
 #if defined(DR_EVT_HAS_PROTOBUF)
@@ -267,14 +276,16 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "    -t, --max_time\n"
         "        Specify the upper limit of simulation time to run.\n"
         "\n"
-        "    -b, --backfill_policy {easy|conservative}\n"
+        "    -b, --backfill_policy {easy|conservative|none}\n"
         "        Backfilling policy (default: easy).\n"
         "        easy: Only first job gets reservation\n"
         "        conservative: All jobs get reservations\n"
+        "        none: Backfilling disabled - jobs run strictly in FCFS order\n"
         "\n"
-        "    -p, --priority_policy {fcfs|sjf|ljf}\n"
+        "    -p, --priority_policy {fcfs|fcfs_alt|sjf|ljf}\n"
         "        Job priority/ordering policy (default: fcfs).\n"
         "        fcfs: First-Come-First-Served\n"
+        "        fcfs_alt: Alternative FCFS implementation (for testing)\n"
         "        sjf: Shortest-Job-First\n"
         "        ljf: Longest-Job-First\n"
         "\n"
@@ -325,6 +336,12 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Shows detailed simulation progress, scheduling decisions,\n"
         "        and resource usage. Disabled by default for production runs.\n"
         "\n"
+        "    -M, --msec_output\n"
+        "        Output timestamps (in the simulated trace and resource trace\n"
+        "        files) with millisecond precision (3 decimal places) instead\n"
+        "        of truncating to whole seconds. Disabled by default - existing\n"
+        "        traces and tests assume integer-second timestamps.\n"
+        "\n"
 #if defined(DR_EVT_HAS_PROTOBUF)
         "    -c, --config CONFIGFILE\n"
         "        Load parameters from Protobuf configuration file (.pb).\n"
@@ -357,11 +374,14 @@ void Sim_Params::print() const
     msg += " - is_time_set: " + string{m_is_time_set? "true" : "false"} + "\n";
 
     msg += " - backfill_policy: ";
-    msg += (m_backfill_policy == BackfillPolicy::EASY) ? "EASY" : "CONSERVATIVE";
+    if (m_backfill_policy == BackfillPolicy::EASY) msg += "EASY";
+    else if (m_backfill_policy == BackfillPolicy::CONSERVATIVE) msg += "CONSERVATIVE";
+    else msg += "NONE";
     msg += "\n";
 
     msg += " - priority_policy: ";
     if (m_priority_policy == PriorityPolicy::FCFS) msg += "FCFS";
+    else if (m_priority_policy == PriorityPolicy::FCFS_ALT) msg += "FCFS_ALT";
     else if (m_priority_policy == PriorityPolicy::SJF) msg += "SJF";
     else msg += "LJF";
     msg += "\n";

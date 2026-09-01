@@ -1,0 +1,48 @@
+{
+  "test_id": "08_simultaneous_completion",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      0,
+      100
+    ],
+    [
+      2,
+      0,
+      100
+    ],
+    [
+      3,
+      0,
+      100
+    ],
+    [
+      4,
+      100,
+      150
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "simultaneous_end",
+      "jobs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "time": 100
+    },
+    {
+      "type": "immediate_start",
+      "job": 4,
+      "after_time": 100,
+      "description": "Job 4 starts immediately when resources free"
+    }
+  ]
+}

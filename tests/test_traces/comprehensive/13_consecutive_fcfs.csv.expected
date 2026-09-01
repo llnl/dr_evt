@@ -1,0 +1,7 @@
+FCFS heads scheduled consecutively without backfilling
+
+EXPECTED PROPERTIES:
+  - Job 0 starts at t=0 (fills all 100 nodes)
+  - Job 1 waits, starts at t=100
+  - Job 2 waits, starts at t=200
+  - Strict FCFS order, no backfilling possible

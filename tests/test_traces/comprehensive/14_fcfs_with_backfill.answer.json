@@ -1,0 +1,36 @@
+{
+  "test_id": "14_fcfs_with_backfill",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      100,
+      200
+    ],
+    [
+      2,
+      20,
+      70
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "backfill",
+      "job": 2
+    },
+    {
+      "type": "fcfs_priority",
+      "head": 1,
+      "description": "Job 1 is FCFS head 2, gets priority"
+    },
+    {
+      "type": "start_order",
+      "before": 2,
+      "after": 1
+    }
+  ]
+}

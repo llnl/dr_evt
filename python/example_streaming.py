@@ -38,17 +38,17 @@ def main():
     for job_idx in range(min(10, num_jobs)):
         # Submit job at time t = job_idx * 10
         submit_time = job_idx * 10.0
-        sim.insert_job(job_idx, submit_time)
+        sim.submit_job(job_idx, submit_time)
 
         # Advance to submit time
-        sim.run_until_inclusive(submit_time)
+        sim.advance_to(submit_time)
 
         # Monitor state after each job
         print(f"\nTime {sim.get_current_time():.1f}:")
         print(f"  Job {job_idx} submitted")
         print(f"  Nodes in use: {sim.get_nodes_in_use()}/{params.total_nodes}")
         print(f"  Available: {sim.get_available_nodes()}")
-        print(f"  Wait queue: {sim.get_wait_queue_size()} jobs")
+        print(f"  Wait queue: {sim.get_active_job_count()} jobs")
 
         # Get FCFS head shadow time (when head of queue can start)
         shadow_time = sim.get_fcfs_head_shadow_time()
@@ -63,7 +63,7 @@ def main():
     # Advance to end of simulation
     print(f"\n{'='*60}")
     print("Advancing to end of simulation...")
-    sim.run_until_inclusive(10000.0)
+    sim.advance_to(10000.0)
 
     # Final statistics
     print(f"\n{'='*60}")

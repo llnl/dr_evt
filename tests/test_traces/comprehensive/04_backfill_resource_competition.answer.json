@@ -1,0 +1,50 @@
+{
+  "test_id": "04_backfill_resource_competition",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      300
+    ],
+    [
+      1,
+      10,
+      60
+    ],
+    [
+      2,
+      11,
+      61
+    ],
+    [
+      3,
+      60,
+      110
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "max_concurrent",
+      "jobs": [
+        1,
+        2,
+        3
+      ],
+      "max": 2,
+      "description": "At most 2 of {1,2,3} run concurrently"
+    },
+    {
+      "type": "backfill_order",
+      "jobs": [
+        1,
+        2
+      ],
+      "description": "Jobs 1,2 backfill in FCFS order"
+    },
+    {
+      "type": "resource_wait",
+      "job": 3,
+      "description": "Job 3 waits for resources"
+    }
+  ]
+}

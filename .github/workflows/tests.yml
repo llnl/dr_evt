@@ -2,10 +2,14 @@ name: DR_EVT Test Suite
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -39,6 +43,8 @@ jobs:
             python3-pip \
             libopenmpi-dev \
             openmpi-bin \
+            libprotobuf-dev \
+            protobuf-compiler \
             ${{ matrix.cc }} \
             ${{ matrix.cxx }}
 
@@ -59,45 +65,72 @@ jobs:
           echo "=== Boost version ==="
           dpkg -l | grep libboost-dev
 
+      - name: Create Python virtual environment
+        run: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+
       - name: Configure CMake
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
+          source venv/bin/activate
+          # Explicitly pin Python3_EXECUTABLE to the active venv's
+          # interpreter. find_package(Python3) in SetupPybind11.cmake
+          # does not reliably pick up an activated venv on its own across
+          # CMake versions/environments - without this, it can silently
+          # resolve to a different system Python (e.g. Ubuntu 24.04's
+          # default 3.12) even with the venv active, producing a
+          # dr_evt.cpython-312-*.so that the venv's own 3.9 interpreter
+          # can never import (compiled extension modules are ABI-specific
+          # to their build interpreter's version).
+          PYTHON_EXE=$(command -v python3)
+          echo "Building Python bindings against: $PYTHON_EXE ($($PYTHON_EXE --version))"
+          # Fresh build directory: avoids picking up a stale .so left over
+          # from an earlier configure against a different Python version.
+          rm -rf build
           mkdir -p build
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install
+            -DCMAKE_INSTALL_PREFIX=$PWD/install \
+            -DDR_EVT_BUILD_PYTHON=ON \
+            -DDR_EVT_ENABLE_PROTOBUF=ON \
+            -DPython3_EXECUTABLE=$PYTHON_EXE
 
       - name: Build
         run: |
+          source venv/bin/activate
           cd build
           make -j$(nproc)
+          # Build test binaries
+          make test_streaming_api-bin test_batch_vs_streaming-bin
 
       - name: Check build artifacts
         run: |
           ls -lh build/simulator
           ./build/simulator --help || true
 
-      - name: Run Correctness Tests
+      - name: Run Comprehensive Tests
         run: |
           echo "========================================"
-          echo "Running Correctness Tests (23 tests)"
+          echo "Running Comprehensive Tests (34 tests)"
           echo "========================================"
-          ./tests/run_correctness_tests.sh
+          ./tests/test_all_dr_evt.sh
 
       - name: Run Unit Tests
         run: |
           echo "========================================"
-          echo "Running Unit Tests (8 tests)"
+          echo "Running Unit Tests (7 tests)"
           echo "========================================"
           ./tests/run_unit_tests.sh
 
       - name: Run Feature Tests
         run: |
           echo "========================================"
-          echo "Running Feature Tests (13 tests)"
+          echo "Running Feature Tests (3 tests)"
           echo "========================================"
           ./tests/run_feature_tests.sh
 
@@ -108,23 +141,35 @@ jobs:
           echo "========================================"
           ./tests/run_replay_tests.sh
 
+      - name: Run Config Tests
+        run: |
+          echo "========================================"
+          echo "Running Config Tests (4 tests)"
+          echo "========================================"
+          ./tests/run_configs_tests.sh
+
+      - name: Run Python API Tests
+        run: |
+          source venv/bin/activate
+          echo "========================================"
+          echo "Running Python API Tests (9 tests)"
+          echo "========================================"
+          ./tests/run_python_tests.sh
+
+      - name: Run Streaming API Tests
+        run: |
+          echo "========================================"
+          echo "Running Streaming API Tests (4 tests)"
+          echo "========================================"
+          ./tests/run_streaming_tests.sh
+
       - name: Run Scale Tests (Optional)
         continue-on-error: true
         run: |
           echo "========================================"
-          echo "Running Scale Tests (7 tests)"
+          echo "Running Scale Tests (6 tests)"
           echo "========================================"
-          for test_file in tests/test_traces/scale/*.csv; do
-            test_name=$(basename "$test_file" .csv)
-            echo "Testing: $test_name"
-            ./build/simulator "$test_file" \
-              --total_nodes 100 \
-              --trace_format simple \
-              --timestamp_format epoch \
-              --duration_mode exact \
-              --outfile /tmp/scale_$test_name.csv
-            echo "  ✓ PASS"
-          done
+          ./tests/run_scale_tests.sh
 
       - name: Test Summary
         if: always()
@@ -135,13 +180,19 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Correctness: 23 tests"
-          echo "  Unit: 8 tests"
-          echo "  Feature: 13 tests"
-          echo "  Replay: 3 tests"
-          echo "  Scale: 7 tests"
+          echo "  Comprehensive: 34 tests (verified 34/34 in a manual session pass)"
+          echo "  Unit: 7 tests (5/7 - 2 known-broken, incomplete fixture data)"
+          echo "  Feature: 3 tests"
+          echo "  Replay: 3 tests (methodology also verified against more)"
+          echo "  Config: 4 tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON, now enabled)"
+          echo "  Python API: 9 tests (requires -DDR_EVT_BUILD_PYTHON=ON)"
+          echo "  Streaming API: 4 tests (requires building test_streaming_api)"
+          echo "  Scale: 6 tests, optional (all working - see tests/run_scale_tests.sh)"
           echo ""
-          echo "Total: 54 tests"
+          echo "These counts reflect what this workflow attempts to run, not"
+          echo "an independently re-verified total on every commit - see"
+          echo "tests/README.md and docs/TESTING_GUIDE.md for known"
+          echo "limitations and what 'passing' does and doesn't demonstrate."
           echo "========================================"
 
       - name: Upload test artifacts

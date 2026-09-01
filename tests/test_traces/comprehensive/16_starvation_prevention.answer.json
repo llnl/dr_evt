@@ -1,0 +1,31 @@
+{
+  "test_id": "16_starvation_prevention",
+  "exact_schedule": null,
+  "constraints": [
+    {
+      "type": "must_complete",
+      "job": 0,
+      "description": "Large job (job 0) must complete"
+    },
+    {
+      "type": "fcfs_head",
+      "job": 0,
+      "description": "Job 0 is FCFS head"
+    },
+    {
+      "type": "start_time",
+      "job": 0,
+      "max": 0,
+      "description": "Job 0 starts at t=0 (FCFS priority)"
+    },
+    {
+      "type": "all_complete",
+      "description": "All 31 jobs complete (no deadlock)"
+    },
+    {
+      "type": "utilization",
+      "min": 0.8,
+      "description": "High utilization (>80%)"
+    }
+  ]
+}

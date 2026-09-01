@@ -1,0 +1,47 @@
+{
+  "test_id": "07_simultaneous_submit",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      0,
+      100
+    ],
+    [
+      2,
+      0,
+      100
+    ],
+    [
+      3,
+      0,
+      100
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "simultaneous_start",
+      "jobs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "time": 0
+    },
+    {
+      "type": "simultaneous_end",
+      "jobs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "time": 100
+    }
+  ]
+}

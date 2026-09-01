@@ -31,7 +31,9 @@ enum class BackfillPolicy {
      * Conservative backfilling: All queued jobs get reservations.
      * Backfilling jobs cannot delay ANY reservation.
      */
-    CONSERVATIVE
+    CONSERVATIVE,
+
+    NONE
 };
 
 /**
@@ -41,6 +43,9 @@ enum class BackfillPolicy {
 enum class PriorityPolicy {
     /** First-Come-First-Served: Order by submission time */
     FCFS,
+
+    /** Alternative FCFS implementation (for differential testing) */
+    FCFS_ALT,
 
     /** Shortest-Job-First: Order by estimated runtime (ascending) */
     SJF,

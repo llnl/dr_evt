@@ -1,0 +1,7 @@
+Small jobs utilize fragmented resources
+
+EXPECTED PROPERTIES:
+  - Jobs 0,1 run (70 nodes, 30 free)
+  - Job 2 can't fit (needs 35, only 30 free)
+  - Job 3 (5 nodes) fits in remaining space
+  - Idle resources minimized

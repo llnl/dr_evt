@@ -11,21 +11,47 @@
 #include "sim/sim.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
+#include "trace/epoch.hpp"
 #include <algorithm>
 #include <fstream>
 #include <queue>
+#include <sstream>
+#include <iomanip>
+
+#ifdef USE_BLOCK_QUEUE
+#include "sim/block_wait_queue.hpp"
+#endif
 
 namespace dr_evt {
+
+namespace {
+// Format a sim_time_t for trace/resource-trace output. Default (msec=false)
+// truncates to whole seconds as a plain integer, matching all existing
+// traces and tests, which only ever use integer-second submit times.
+// When msec=true, formats with millisecond precision (3 decimal places)
+// instead, for traces that need sub-second timing.
+std::string format_sim_time(sim_time_t t, bool msec)
+{
+    std::ostringstream oss;
+    if (msec) {
+        oss << std::fixed << std::setprecision(3) << t;
+    } else {
+        oss << static_cast<int64_t>(t);
+    }
+    return oss.str();
+}
+} // anonymous namespace
 
 Simulation::Simulation(const Sim_Params& params)
   : m_params(params),
     m_trace(params.m_infile, params.m_trace_format,
             params.m_timestamp_format, params.m_timezone),
-    m_scheduler(params.m_total_nodes,
-                m_trace.data(),
-                params.m_backfill_policy,
-                params.m_priority_policy,
-                params.m_runtime_mode),
+    m_scheduler(create_scheduler(
+        params.m_total_nodes,
+        m_trace.data(),
+        params.m_backfill_policy,
+        params.m_priority_policy,
+        params.m_runtime_mode)),
     m_current_time(0.0),
     m_jobs_completed(0),
     m_jobs_submitted(0),
@@ -41,7 +67,7 @@ void Simulation::run()
     }
 
     // Initialize: load jobs and determine durations
-    initialize();
+    initialize_trace();
 
     if (m_params.m_verbose) {
         std::cout << "Loaded " << m_trace.data().size() << " jobs from trace" << std::endl;
@@ -55,8 +81,7 @@ void Simulation::run()
     // This uses the streaming API internally
     for (num_jobs_t i = 0; i < m_trace.data().size(); ++i) {
         const auto& job = m_trace.data()[i];
-        sim_time_t submit_time = static_cast<sim_time_t>(job.get_submit_time().first) +
-                                 job.get_submit_time().second;
+        sim_time_t submit_time = convert_epoch<sim_time_t>(job.get_submit_time());
         submit_job(i, submit_time);
     }
 
@@ -67,7 +92,7 @@ void Simulation::run()
     // Count actual completions from trace data
     m_jobs_completed = 0;
     for (const auto& job : m_trace.data()) {
-        if (job.get_end_time().first > 0 || job.get_end_time().second > 0) {
+        if (job.is_scheduled()) {
             m_jobs_completed++;
         }
     }
@@ -85,7 +110,7 @@ void Simulation::print_stats(std::ostream& os) const
     os << "Total jobs: " << m_trace.data().size() << std::endl;
     os << "Jobs submitted: " << m_jobs_submitted << std::endl;
     os << "Jobs completed: " << m_jobs_completed << std::endl;
-    os << "Current time: " << m_current_time << std::endl;
+    os << "Current time: " << format_sim_time(m_current_time, m_params.m_msec_output) << std::endl;
     os << "Total nodes: " << m_params.m_total_nodes << std::endl;
 
     // Calculate metrics
@@ -95,7 +120,16 @@ void Simulation::print_stats(std::ostream& os) const
         sim_time_t makespan = 0.0;
 
         for (const auto& job : m_trace.data()) {
-            if (job.get_begin_time().first == 0) continue;  // Job didn't start
+            // Job_Record::is_scheduled() (backed by a dedicated max-value
+            // sentinel, not end_time == 0) is the correct check here: a
+            // job legitimately starting at simulation time 0 previously
+            // got excluded by an end_time/begin_time == 0 check, since 0
+            // is also a real, valid timestamp - not a reliable "never
+            // ran" marker. This also keeps this loop's sum and
+            // m_jobs_completed (the denominator below) using the exact
+            // same criterion, since m_jobs_completed above is now also
+            // counted via is_scheduled().
+            if (!job.is_scheduled()) continue;  // Job never completed
 
             tdiff_t wait = job.get_wait_time();
             total_wait += wait;
@@ -103,22 +137,42 @@ void Simulation::print_stats(std::ostream& os) const
             tdiff_t turnaround = wait + job.get_exec_time();
             total_turnaround += turnaround;
 
-            makespan = std::max(makespan, static_cast<sim_time_t>(
-                job.get_begin_time().first + job.get_exec_time()));
+            makespan = std::max(makespan,
+                convert_epoch<sim_time_t>(job.get_begin_time()) + job.get_exec_time());
         }
 
+        // Unlike Current time/Makespan above, these are computed averages
+        // (division results), which commonly have a fractional part even
+        // with integer-second input data (e.g. 220/3 = 73.333...) - that
+        // precision is meaningful and was shown by default before
+        // msec_output existed, so it's preserved here regardless of
+        // msec_output's setting, rather than routed through
+        // format_sim_time (whose integer-truncation default is for
+        // matching existing trace-output files' conventions, not for
+        // these summary statistics).
         os << "Average wait time: " << (total_wait / m_jobs_completed) << " sec" << std::endl;
         os << "Average turnaround time: " << (total_turnaround / m_jobs_completed) << " sec" << std::endl;
-        os << "Makespan: " << makespan << " sec" << std::endl;
+        os << "Makespan: " << format_sim_time(makespan, m_params.m_msec_output) << " sec" << std::endl;
     }
 }
 
-void Simulation::initialize()
+num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
 {
+    // Clear any previously-loaded data first, so this method is safe to
+    // call more than once (directly, or via run() after an earlier
+    // explicit call - run() calls this internally too). Without this,
+    // Job_Io::load() only ever push_back()s and never clears the
+    // underlying vector itself, so a second call would silently append
+    // to, rather than replace, the first call's jobs - e.g. calling
+    // initialize_trace() explicitly and then run() would silently double
+    // every job's count.
+    m_trace.data().clear();
+
     // Load trace data
-    const auto max_num_jobs = m_params.m_is_jobs_set ?
-                              m_params.m_max_jobs :
-                              static_cast<num_jobs_t>(0u);
+    const auto max_num_jobs = (max_jobs > 0u) ? max_jobs :
+                              (m_params.m_is_jobs_set ?
+                               m_params.m_max_jobs :
+                               static_cast<num_jobs_t>(0u));
 
     if (max_num_jobs == 0u) {
         m_trace.data().reserve(1467542u);
@@ -142,6 +196,8 @@ void Simulation::initialize()
     m_current_time = 0.0;
     m_jobs_submitted = 0;
     m_jobs_completed = 0;
+
+    return static_cast<num_jobs_t>(m_trace.data().size());
 }
 
 void Simulation::determine_job_durations()
@@ -228,13 +284,14 @@ void Simulation::write_simulated_trace() const
 
     // Write job records
     for (const auto& job : m_trace.data()) {
-        ofs << job.get_submit_time().first << ","
-            << job.get_begin_time().first << ","
-            << job.get_end_time().first << ","
-            << job.get_num_nodes() << ","
-            << "0,"
-            << dr_evt::to_string(job.get_queue()) << ","
-            << job.get_limit_time() << "\n";
+        std::string line = format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_params.m_msec_output) + "," +
+                           format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_params.m_msec_output) + "," +
+                           format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_params.m_msec_output) + "," +
+                           std::to_string(job.get_num_nodes()) + "," +
+                           "0," +
+                           dr_evt::to_string(job.get_queue()) + "," +
+                           format_sim_time(job.get_limit_time(), m_params.m_msec_output) + "\n";
+        ofs << line;
     }
 
     if (m_params.m_verbose) {
@@ -259,7 +316,7 @@ void Simulation::write_resource_trace(const std::string& filename) const
 
     // Write resource state history
     for (const auto& entry : m_resource_history) {
-        ofs << std::get<0>(entry) << ","
+        ofs << format_sim_time(std::get<0>(entry), m_params.m_msec_output) << ","
             << std::get<1>(entry) << ","
             << std::get<2>(entry) << "\n";
     }
@@ -286,9 +343,14 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         throw std::runtime_error("Invalid job_idx: " + std::to_string(job_idx));
     }
 
-    // Add to waiting queue
-    // Assumes jobs submitted in non-decreasing order by submit_time for FCFS correctness
-    m_wait_queue.push_back({job_idx, false});
+    // Submit to scheduler (scheduler maintains internal wait queue)
+    const auto& job = m_trace.data()[job_idx];
+    tdiff_t runtime_estimate = (m_params.m_runtime_mode == RuntimeEstimateMode::USE_ACTUAL)
+                               ? job.get_actual_duration()
+                               : job.get_limit_time();
+    num_nodes_t nodes = job.get_num_nodes();
+
+    m_scheduler->insert_job(job_idx, submit_time, runtime_estimate, nodes);
 }
 
 void Simulation::advance_to(sim_time_t target_time)
@@ -300,40 +362,28 @@ void Simulation::advance_to(sim_time_t target_time)
                                 " but current_time=" + std::to_string(m_current_time));
     }
 
-    // Before entering the main loop: check if any jobs arrive at current_time (initially 0)
+    // Before entering the main loop: check if any jobs are eligible at current_time (initially 0)
     // This handles the case where jobs submit at t=0
-    if (!m_wait_queue.empty()) {
-        bool has_arrivals_now = false;
-        for (const auto& entry : m_wait_queue) {
-            if (entry.second) continue;  // Skip removed
-            const auto& job = m_trace.data()[entry.first];
-            const auto& ts = job.get_submit_time();
-            sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
-            if (submit == m_current_time) {
-                has_arrivals_now = true;
+    if (m_scheduler->has_eligible_jobs()) {
+        // Call scheduler to evaluate newly arriving jobs
+        while (true) {
+            num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
+            auto jobs_to_run = m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+
+            if (jobs_to_run.empty()) {
                 break;
             }
-        }
 
-        if (has_arrivals_now) {
-            // Call scheduler to evaluate newly arriving jobs
-            while (true) {
-                num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
-                auto jobs_to_run = m_scheduler.schedule(m_wait_queue, free_nodes,
-                                                        m_running_jobs, m_current_time);
-                if (jobs_to_run.empty()) {
-                    break;
-                }
-
-                // Scheduler returns at most 1 job
-                job_no_t job = jobs_to_run.front();
+            // Process ALL jobs returned by scheduler (backfilling can return multiple)
+            // Record resource state after EACH job starts
+            for (job_no_t job : jobs_to_run) {
                 m_trace.insert_job(job, m_current_time, m_replay_ctx);
                 m_running_jobs[job] = m_current_time;
                 m_jobs_submitted++;
 
                 m_trace.run_until_inclusive(m_replay_ctx, m_current_time);
 
-                // Record resource state after starting jobs
+                // Record resource state after starting this job
                 num_nodes_t allocated = m_trace.get_nodes_in_use(m_replay_ctx);
                 m_resource_history.emplace_back(m_current_time,
                                                 m_params.m_total_nodes - allocated,
@@ -343,38 +393,13 @@ void Simulation::advance_to(sim_time_t target_time)
     }
 
     // Main event loop - process events and make scheduling decisions until complete
-    // Helper: count active (non-removed) jobs in wait_queue
-    auto count_active_jobs = [this]() {
-        size_t count = 0;
-        for (const auto& entry : m_wait_queue) {
-            if (!entry.second) count++;
-        }
-        return count;
-    };
+    // Compute loop state variables once before entering loop
+    size_t active_count = m_scheduler->active_job_count();
+    sim_time_t next_arrival = m_scheduler->get_next_arrival_time();
 
-    // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running)
-    while (count_active_jobs() > 0 || !m_replay_ctx.m_evtq.empty()) {
-        // Find next event time from waiting jobs and replay events
-        // Scan wait_queue once: find next_arrival, skip removed jobs
-        sim_time_t next_arrival = std::numeric_limits<sim_time_t>::max();
-        bool have_eligible_jobs_now = false;
-
-        for (const auto& entry : m_wait_queue) {
-            if (entry.second) continue;  // Skip removed jobs
-
-            job_no_t job_idx = entry.first;
-            const auto& job = m_trace.data()[job_idx];
-            const auto& ts = job.get_submit_time();
-            sim_time_t submit = static_cast<sim_time_t>(ts.first) + ts.second;
-
-            if (submit <= m_current_time) {
-                // Job has already arrived and is eligible
-                have_eligible_jobs_now = true;
-            } else if (submit < next_arrival) {
-                // Found earlier arrival
-                next_arrival = submit;
-            }
-        }
+    // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running), OR (3) future job arrivals
+    while (active_count > 0 || !m_replay_ctx.m_evtq.empty() || next_arrival < std::numeric_limits<sim_time_t>::max()) {
+        // next_arrival already computed above
 
         // Find next replay event time
         bool has_replay_event = !m_replay_ctx.m_evtq.empty();
@@ -382,8 +407,7 @@ void Simulation::advance_to(sim_time_t target_time)
         [[maybe_unused]] bool next_is_start = false;
         if (has_replay_event) {
             const auto& event = *m_replay_ctx.m_evtq.begin();
-            next_replay_time = static_cast<sim_time_t>(event.get_time().first) +
-                              event.get_time().second;
+            next_replay_time = convert_epoch<sim_time_t>(event.get_time());
             next_is_start = event.is_arrival();
         }
 
@@ -394,6 +418,13 @@ void Simulation::advance_to(sim_time_t target_time)
             // Process replay events at this time
             // Advance time FIRST
             m_current_time = next_replay_time;
+            // Explicit sync: schedule() below only runs if an END event
+            // freed resources (should_schedule = processed_end_event).
+            // Without this call, a replay step that only processes START
+            // events would leave the scheduler's eligibility tracking
+            // stale relative to m_current_time, since nothing else
+            // would sync it before the queries below.
+            m_scheduler->sync_to(m_current_time);
 
             // Process ALL events at current_time before calling scheduler
             // This ensures END events are processed before START events created by scheduler
@@ -401,8 +432,7 @@ void Simulation::advance_to(sim_time_t target_time)
 
             while (!m_replay_ctx.m_evtq.empty()) {
                 const auto& event = *m_replay_ctx.m_evtq.begin();
-                sim_time_t event_time = static_cast<sim_time_t>(event.get_time().first) +
-                                       event.get_time().second;
+                sim_time_t event_time = convert_epoch<sim_time_t>(event.get_time());
 
                 if (event_time != m_current_time) {
                     break;  // No more events at current_time
@@ -431,21 +461,30 @@ void Simulation::advance_to(sim_time_t target_time)
             // Only call scheduler if we processed END events (resources freed)
             should_schedule = processed_end_event;
 
-        } else if (next_arrival <= target_time) {
+        } else if (next_arrival < std::numeric_limits<sim_time_t>::max() && next_arrival <= target_time) {
             // Job arrival - advance time FIRST
+            // Note: Check next_arrival < infinity to avoid infinite loop
+            // If no jobs arriving, scheduler should pick from waiting queue instead
             m_current_time = next_arrival;
+            // Explicit sync, matching the replay-event branch above for
+            // symmetry - should_schedule is always true in this branch
+            // (set unconditionally below), so schedule()'s own internal
+            // sync_to() call would already cover this in practice, but
+            // this doesn't rely on that.
+            m_scheduler->sync_to(m_current_time);
 
             // jobs_at_next_arrival already collected during wait_queue scan
             // TODO: Pass jobs_at_next_arrival to scheduler for efficient evaluation
             // For now, just set flag to schedule
             should_schedule = true;
         } else {
-            // No more events before target_time
-            // Try scheduling eligible jobs one more time, then stop
-            if (have_eligible_jobs_now) {
-                should_schedule = true;
+            // No arrivals and no replay events before target_time
+            if (m_params.m_verbose) {
+                std::cout << "ELSE block: active=" << m_scheduler->active_job_count()
+                          << " events=" << m_replay_ctx.m_evtq.size()
+                          << " time=" << m_current_time << std::endl;
             }
-            // After scheduling (or if no eligible jobs), break - reached target_time
+            // No events to process - exit loop
             break;
         }
 
@@ -455,33 +494,33 @@ void Simulation::advance_to(sim_time_t target_time)
             while (true) {
                 num_nodes_t free_nodes = m_params.m_total_nodes - m_trace.get_nodes_in_use(m_replay_ctx);
 
-                auto jobs_to_run = m_scheduler.schedule(m_wait_queue, free_nodes,
-                                                        m_running_jobs, m_current_time);
+                auto jobs_to_run = m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
 
                 if (jobs_to_run.empty()) {
                     break;  // Scheduler can't start anything else
                 }
 
-                // Scheduler returns at most 1 job - start it
-                job_no_t job = jobs_to_run.front();
-                m_trace.insert_job(job, m_current_time, m_replay_ctx);
-                m_running_jobs[job] = m_current_time;
-                m_jobs_submitted++;
-
-                // Process START events that were just created at current_time
-                while (!m_replay_ctx.m_evtq.empty()) {
-                    const auto& event = *m_replay_ctx.m_evtq.begin();
-                    sim_time_t event_time = static_cast<sim_time_t>(event.get_time().first) +
-                                           event.get_time().second;
-
-                    // Only process START events at current_time
-                    if (event_time != m_current_time) break;
-                    if (!event.is_arrival()) break;  // Hit an END event, stop (shouldn't happen)
+                // Process ALL jobs returned by scheduler (backfilling can return multiple)
+                // Record resource state after EACH job starts
+                for (job_no_t job : jobs_to_run) {
+                    m_trace.insert_job(job, m_current_time, m_replay_ctx);
+                    m_running_jobs[job] = m_current_time;
+                    m_jobs_submitted++;
 
                     // Process this START event
-                    m_trace.process_single_event(m_replay_ctx);
+                    while (!m_replay_ctx.m_evtq.empty()) {
+                        const auto& event = *m_replay_ctx.m_evtq.begin();
+                        sim_time_t event_time = convert_epoch<sim_time_t>(event.get_time());
 
-                    // Record resource state after START
+                        // Only process START events at current_time for this job
+                        if (event_time != m_current_time) break;
+                        if (!event.is_arrival()) break;  // Hit an END event, stop (shouldn't happen)
+
+                        m_trace.process_single_event(m_replay_ctx);
+                        break;  // Process only one START event per job
+                    }
+
+                    // Record resource state after this job starts
                     num_nodes_t allocated = m_trace.get_nodes_in_use(m_replay_ctx);
                     m_resource_history.emplace_back(m_current_time,
                                                     m_params.m_total_nodes - allocated,
@@ -489,6 +528,17 @@ void Simulation::advance_to(sim_time_t target_time)
                 }
             }
         }
+
+        // Update loop state variables at end of iteration
+        active_count = m_scheduler->active_job_count();
+        next_arrival = m_scheduler->get_next_arrival_time();
+    }
+
+    // Loop exited - log final state for debugging
+    if (m_params.m_verbose) {
+        std::cout << "Loop exited: active=" << active_count
+                  << " events=" << m_replay_ctx.m_evtq.size()
+                  << " time=" << m_current_time << std::endl;
     }
 
     // Don't record spurious final state - last event already recorded the final state
@@ -507,7 +557,7 @@ Simulation::Statistics Simulation::get_statistics() const
     stats.jobs_submitted = m_jobs_submitted;
     stats.jobs_completed = m_jobs_completed;
     stats.jobs_running = m_running_jobs.size();
-    stats.jobs_waiting = m_wait_queue.size();
+    stats.jobs_waiting = m_scheduler->active_job_count();
     stats.current_time = m_current_time;
 
     // Resource utilization
@@ -525,19 +575,22 @@ Simulation::Statistics Simulation::get_statistics() const
     num_jobs_t completed_count = 0;
 
     for (const auto& job : m_trace.data()) {
-        const auto& begin_time = job.get_begin_time();
-        const auto& end_time = job.get_end_time();
-
-        // Only count completed jobs (those with non-zero begin_time)
-        if (begin_time.first > 0 || begin_time.second > 0) {
-            [[maybe_unused]] const auto& submit_time = job.get_submit_time();
+        // Only count jobs that actually completed. Job_Record::is_scheduled()
+        // (backed by a dedicated max-value sentinel) is the correct check
+        // here: a job legitimately starting at simulation time 0 has
+        // begin_time/end_time == 0 under the old convention, which the
+        // previous begin_time-based check incorrectly treated as "never
+        // started," silently excluding it from these averages. This
+        // matches the same convention now used for m_jobs_completed
+        // above (see the end-of-run() completion count).
+        if (job.is_scheduled()) {
             tdiff_t wait = job.get_wait_time();
             tdiff_t exec = job.get_exec_time();
 
             total_wait += wait;
             total_turnaround += (wait + exec);
 
-            sim_time_t completion = static_cast<sim_time_t>(end_time.first) + end_time.second;
+            sim_time_t completion = convert_epoch<sim_time_t>(job.get_end_time());
             max_completion = std::max(max_completion, completion);
             completed_count++;
         }

@@ -1,0 +1,5 @@
+time,nodes_used,nodes_free,running_jobs
+0,50,50,0
+100,0,100,
+100,50,50,1
+200,0,100,

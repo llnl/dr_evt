@@ -1,0 +1,8 @@
+System goes completely idle between job batches
+
+EXPECTED PROPERTIES:
+  - Jobs 0,1 complete by t=60
+  - No jobs arrive from t=60 to t=500
+  - System completely idle (0 running, 0 waiting)
+  - Simulation continues (doesn't exit early)
+  - Job 2 starts at t=500

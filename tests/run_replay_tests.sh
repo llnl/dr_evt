@@ -30,17 +30,17 @@ fi
 PASS=0
 FAIL=0
 
-# Use several correctness tests as replay test inputs
+# Use several comprehensive tests as replay test inputs
 REPLAY_TESTS=(
-    "bf01_basic_success_input"
-    "bf04_multiple_backfill_input"
-    "easy_5jobs_input"
+    "01_backfill_allowed"
+    "05_multiple_backfills"
+    "13_consecutive_fcfs"
 )
 
 for test_base in "${REPLAY_TESTS[@]}"; do
     echo "Testing: $test_base"
 
-    input_trace="tests/test_traces/correctness/${test_base}.csv"
+    input_trace="tests/test_traces/comprehensive/${test_base}.csv"
 
     if [ ! -f "$input_trace" ]; then
         echo "  ✗ Input not found: $input_trace"
@@ -68,6 +68,7 @@ for test_base in "${REPLAY_TESTS[@]}"; do
     fi
 
     # Step 2: Replay the job trace
+    replay_job_output="/tmp/replay_rep_${test_base}_jobs.csv"
     replay_resource_output="/tmp/replay_rep_${test_base}_resources.csv"
 
     ./build/simulator "$sim_job_output" \
@@ -75,6 +76,7 @@ for test_base in "${REPLAY_TESTS[@]}"; do
         --trace_format simple \
         --timestamp_format epoch \
         --duration_mode exact \
+        --outfile "$replay_job_output" \
         --resource_trace "$replay_resource_output" \
         > /dev/null 2>&1
 

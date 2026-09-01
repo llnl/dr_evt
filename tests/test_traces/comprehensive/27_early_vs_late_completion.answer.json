@@ -1,0 +1,31 @@
+{
+  "test_id": "27_early_vs_late_completion",
+  "exact_schedule": [
+    [0, 0, 50],
+    [1, 5, 105],
+    [2, 105, 305],
+    [3, 105, 185]
+  ],
+  "constraints": [
+    {
+      "type": "early_completion",
+      "job": 0,
+      "description": "Job 0 completes early at 50"
+    },
+    {
+      "type": "full_runtime",
+      "job": 1,
+      "description": "Job 1 runs for full time_limit (100 = 100)"
+    },
+    {
+      "type": "backfill",
+      "job": 3,
+      "description": "Job 3 backfills (finishes at 100 < 105 when Job 1 frees resources)"
+    },
+    {
+      "type": "opportunistic_start",
+      "job": 2,
+      "description": "Job 2 starts at 105 (when Job 1 and 3 both finish)"
+    }
+  ]
+}

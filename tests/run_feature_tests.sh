@@ -1,11 +1,11 @@
 #!/bin/bash
-# Run feature tests
+# Feature Tests - Simulation Mode with Reference Comparison
 #
-# These tests verify specific features/modes/policies:
+# Tests specific features/policies:
 # - Conservative vs EASY backfilling
-# - Priority policy comparisons
-# - Replay vs simulation modes
-# - Protobuf configuration equivalence
+# - Different scheduling policies
+#
+# Each test compares simulator output against expected reference files.
 
 set -e
 
@@ -15,81 +15,103 @@ REPO_ROOT="$SCRIPT_DIR/.."
 cd "$REPO_ROOT"
 
 echo "=========================================="
-echo "Feature Tests"
+echo "Feature Tests (Simulation Mode)"
 echo "=========================================="
 echo ""
 
-# Check build exists
 if [ ! -f "./build/simulator" ]; then
     echo "Error: ./build/simulator not found"
-    echo "Please build first: cd build && cmake .. && make"
+    echo "Build first: cd build && cmake .. && make"
     exit 1
 fi
 
 PASS=0
 FAIL=0
 
-echo "=== Trace-based feature tests ==="
-# Run each feature test trace (only CSV files - .trace files are documentation)
-for test_file in tests/test_traces/feature/*.csv; do
-    if [ ! -f "$test_file" ]; then
+TRACE_DIR="tests/test_traces/feature"
+
+for test_file in "$TRACE_DIR"/*.csv; do
+    # Skip expected files
+    if [[ "$test_file" == *.expected* ]]; then
         continue
     fi
 
-    test_name=$(basename "$test_file")
+    test_name=$(basename "$test_file" .csv)
     echo "Testing: $test_name"
 
-    format="simple"
+    EXPECTED="$TRACE_DIR/${test_name}.expected_output.csv"
 
-    if ./build/simulator "$test_file" \
+    if [ ! -f "$EXPECTED" ]; then
+        echo "  ⚠ SKIP - No expected output file"
+        continue
+    fi
+
+    # Optional companion file: extra CLI args for this specific test only
+    # (e.g. --msec_output). Absent for every existing feature test, so
+    # this is purely additive - no effect on tests that don't have one.
+    EXTRA_ARGS=()
+    FLAGS_FILE="$TRACE_DIR/${test_name}.flags"
+    if [ -f "$FLAGS_FILE" ]; then
+        # Word-split intentionally: the .flags file holds space-separated
+        # CLI arguments, not a single opaque string.
+        read -r -a EXTRA_ARGS < "$FLAGS_FILE"
+    fi
+
+    # Run simulator
+    SIM_OUT="/tmp/feature_${test_name}.csv"
+    SIM_RESOURCES="/tmp/feature_${test_name}_resources.csv"
+
+    ./build/simulator "$test_file" \
         --total_nodes 100 \
-        --trace_format "$format" \
+        --trace_format simple \
         --timestamp_format epoch \
         --duration_mode exact \
-        --outfile /tmp/feature_$test_name.csv > /dev/null 2>&1; then
+        --backfill_policy easy \
+        --priority_policy fcfs \
+        "${EXTRA_ARGS[@]}" \
+        --outfile "$SIM_OUT" \
+        --resource_trace "$SIM_RESOURCES" > /dev/null 2>&1 || true
+
+    if [ ! -f "$SIM_OUT" ]; then
+        echo "  ✗ FAIL - Simulator did not produce output"
+        FAIL=$((FAIL + 1))
+        continue
+    fi
+
+    # Convert simulator output to comparable format
+    OUTPUT="/tmp/feature_${test_name}_comparable.csv"
+    awk -F, 'NR==1 {print "job_id,start_time,end_time"; next} {print NR-2","$2","$3}' "$SIM_OUT" > "$OUTPUT"
+
+    # Compare job schedules
+    if diff -w "$EXPECTED" "$OUTPUT" > /dev/null 2>&1; then
+        JOB_MATCH=0
+    else
+        JOB_MATCH=1
+    fi
+
+    # Compare resource traces
+    EXPECTED_RESOURCES="$TRACE_DIR/${test_name}.expected_resources.csv"
+    RESOURCE_MATCH=0
+
+    if [ -f "$EXPECTED_RESOURCES" ]; then
+        awk -F, 'NR==1 {print "time,nodes_used,nodes_free"; next}
+                 NR==2 && $1=="0" && $3=="0" {next}
+                 {print $1","$3","$2}' "$SIM_RESOURCES" > "/tmp/feature_${test_name}_resources_comparable.csv"
+
+        if ! diff -w "$EXPECTED_RESOURCES" "/tmp/feature_${test_name}_resources_comparable.csv" > /dev/null 2>&1; then
+            RESOURCE_MATCH=1
+        fi
+    fi
+
+    # Report results
+    if [ $JOB_MATCH -eq 0 ] && [ $RESOURCE_MATCH -eq 0 ]; then
         echo "  ✓ PASS"
         PASS=$((PASS + 1))
     else
         echo "  ✗ FAIL"
+        [ $JOB_MATCH -ne 0 ] && echo "     Job schedule mismatch"
+        [ $RESOURCE_MATCH -ne 0 ] && echo "     Resource trace mismatch"
         FAIL=$((FAIL + 1))
-    fi
-done
-
-echo ""
-echo "=== Configuration tests ==="
-# Run config tests (may be skipped if Protobuf disabled)
-config_output=$(./tests/run_configs_tests.sh 2>&1)
-config_exit=$?
-
-if [ $config_exit -eq 0 ]; then
-    if echo "$config_output" | grep -q "Skipping config tests"; then
-        echo "  ⊘ Config tests SKIPPED (Protobuf disabled)"
-        # Don't count skipped tests in pass/fail
-    else
-        echo "  ✓ Config tests PASS"
-        PASS=$((PASS + 4))
-    fi
-else
-    echo "  ✗ Config tests FAIL"
-    FAIL=$((FAIL + 4))
-fi
-
-echo ""
-echo "=== C++ feature tests ==="
-# Check if C++ test binaries exist
-for cpp_test in tests/test_streaming_api.cpp tests/test_streaming_vs_batch.cpp tests/test_two_stream_manual.cpp; do
-    test_name=$(basename "$cpp_test" .cpp)
-    if [ -f "./build/$test_name" ]; then
-        echo "Testing: $test_name"
-        if ./build/$test_name > /dev/null 2>&1; then
-            echo "  ✓ PASS"
-            PASS=$((PASS + 1))
-        else
-            echo "  ✗ FAIL"
-            FAIL=$((FAIL + 1))
-        fi
-    else
-        echo "Skipping: $test_name (not built)"
     fi
 done
 

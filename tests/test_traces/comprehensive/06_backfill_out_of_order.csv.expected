@@ -1,0 +1,7 @@
+Later-arriving job backfills before earlier job when time permits
+
+EXPECTED PROPERTIES:
+  - Job 1 (submit=10) blocked by time window
+  - Job 2 (submit=15) allowed by time window
+  - Job 2 starts before job 1 (out of arrival order)
+  - Job 1 waits until t=100

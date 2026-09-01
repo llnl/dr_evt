@@ -1,0 +1,27 @@
+{
+  "test_id": "21_sustained_high_load",
+  "exact_schedule": null,
+  "constraints": [
+    {
+      "type": "job_count",
+      "expected": 50
+    },
+    {
+      "type": "all_complete"
+    },
+    {
+      "type": "no_oversubscription",
+      "max_nodes": 100
+    },
+    {
+      "type": "utilization",
+      "min": 0.8,
+      "description": "Sustained high utilization"
+    },
+    {
+      "type": "makespan",
+      "max": 2000,
+      "description": "Reasonable makespan"
+    }
+  ]
+}

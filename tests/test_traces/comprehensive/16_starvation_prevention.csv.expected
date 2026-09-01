@@ -1,0 +1,7 @@
+Large job must not starve despite continuous small arrivals
+
+EXPECTED PROPERTIES:
+  - Job 0 (80 nodes) is FCFS head
+  - 30 small jobs arrive while job 0 could backfill
+  - Job 0 must start (FCFS guarantee)
+  - Small jobs can backfill around job 0

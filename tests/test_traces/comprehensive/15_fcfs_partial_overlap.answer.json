@@ -1,0 +1,38 @@
+{
+  "test_id": "15_fcfs_partial_overlap",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      10,
+      110
+    ],
+    [
+      2,
+      100,
+      200
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "overlap",
+      "jobs": [
+        0,
+        1
+      ],
+      "description": "Jobs 0,1 run simultaneously"
+    },
+    {
+      "type": "no_overlap",
+      "jobs": [
+        0,
+        2
+      ],
+      "description": "Job 2 waits for job 0"
+    }
+  ]
+}

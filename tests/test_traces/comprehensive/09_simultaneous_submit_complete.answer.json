@@ -1,0 +1,25 @@
+{
+  "test_id": "09_simultaneous_submit_complete",
+  "exact_schedule": [
+    [
+      0,
+      0,
+      100
+    ],
+    [
+      1,
+      100,
+      200
+    ]
+  ],
+  "constraints": [
+    {
+      "type": "no_gap",
+      "between": [
+        0,
+        1
+      ],
+      "description": "No idle gap between job 0 end and job 1 start"
+    }
+  ]
+}

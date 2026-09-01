@@ -1,0 +1,8 @@
+System drains multiple times
+
+EXPECTED PROPERTIES:
+  - Job 0: t=0 to t=50 (idle t=50 to t=200)
+  - Job 1: t=200 to t=250 (idle t=250 to t=400)
+  - Job 2: t=400 to t=450
+  - Three separate idle periods
+  - All jobs complete

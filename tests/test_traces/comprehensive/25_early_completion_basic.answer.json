@@ -1,0 +1,29 @@
+{
+  "test_id": "25_early_completion_basic",
+  "exact_schedule": [
+    [0, 0, 50],
+    [1, 50, 350],
+    [2, 20, 120]
+  ],
+  "constraints": [
+    {
+      "type": "early_completion",
+      "job": 0,
+      "time_limit": 200,
+      "actual_end": 50,
+      "description": "Job 0 completes early (50 < 200)"
+    },
+    {
+      "type": "opportunistic_start",
+      "job": 1,
+      "reservation": 200,
+      "actual_start": 50,
+      "description": "Job 1 starts at 50 (early) instead of reservation 200"
+    },
+    {
+      "type": "backfill",
+      "job": 2,
+      "description": "Job 2 backfills successfully (planned for reservation 200, but job 0 finishes at 50)"
+    }
+  ]
+}
