@@ -17,6 +17,7 @@
 
 namespace dr_evt {
 
+#if defined(DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
 void pbuf_log_collector(google::protobuf::LogLevel level,
                         const char* filename,
                         int line,
@@ -27,6 +28,7 @@ void pbuf_log_collector(google::protobuf::LogLevel level,
         + ' ' + std::to_string(line) + ' ' + message;
     std::cerr << errmsg << std::endl;
 }
+#endif // DR_EVT_HAS_PROTOBUF_LOG_HANDLER
 
 google::protobuf::FieldDescriptor const*
 get_oneof_field_desc(const google::protobuf::Message& msg,

@@ -195,9 +195,73 @@ include(SetupCXX)
 
 # Setup Protobuf (optional - can be disabled with -DDR_EVT_ENABLE_PROTOBUF=OFF)
 option(DR_EVT_ENABLE_PROTOBUF "Enable Protobuf support" OFF)
-if (DR_EVT_ENABLE_PROTOBUF)
+
+# Setup gRPC client/server (optional - requires DR_EVT_ENABLE_PROTOBUF=ON,
+# since the gRPC service definition is itself a .proto file)
+option(DR_EVT_ENABLE_GRPC "Enable gRPC client/server support" OFF)
+
+if (DR_EVT_ENABLE_GRPC)
+  if (NOT DR_EVT_ENABLE_PROTOBUF)
+    message(FATAL_ERROR
+      "DR_EVT_ENABLE_GRPC=ON requires DR_EVT_ENABLE_PROTOBUF=ON, since the "
+      "gRPC service definition is itself built on the Protobuf runtime.")
+  endif()
+  # SetupGRPC.cmake also provides protobuf::libprotobuf/protobuf::protoc
+  # (via find_package(), or - if unavailable - FetchContent building
+  # gRPC's own bundled Protobuf) and sets DR_EVT_HAS_PROTOBUF itself, so
+  # SetupProtobuf.cmake's own, independent Protobuf discovery/build is
+  # skipped entirely here: running both would mean building or linking
+  # two separate, potentially version-mismatched copies of Protobuf in
+  # the same project for no benefit, since gRPC's own copy is already
+  # fully sufficient for dr_evt_params.proto's plain-Protobuf needs too.
+  include(SetupGRPC)
+elseif (DR_EVT_ENABLE_PROTOBUF)
   include(SetupProtobuf)
 endif()
+
+if (DR_EVT_HAS_PROTOBUF)
+  # google::protobuf::SetLogHandler/LogLevel were removed from Protobuf
+  # around its migration to Abseil-based logging (roughly Protobuf
+  # ~22.x, well after the older Protobuf generation bundled by e.g. gRPC
+  # 1.51.1, but present in newer releases such as gRPC 1.73.0's bundled
+  # Protobuf). Rather than guessing at a specific version-number
+  # threshold across Protobuf's own confusing, multiple versioning
+  # schemes, test for the actual feature directly at configure time -
+  # this works correctly regardless of which Protobuf generation ends
+  # up linked, whether via find_package(), FetchContent, and whichever
+  # version tag that resolves to now or in the future.
+  #
+  # cmake/tests/has_protobuf_log_handler.cpp only decltype()s
+  # SetLogHandler rather than calling it, so no LINK_LIBRARIES is needed
+  # here at all - this is a genuine requirement, not just simpler code:
+  # try_compile() runs during this project's own configure step, before
+  # Protobuf has actually been compiled on the FetchContent path (see
+  # SetupGRPC.cmake) - the library file doesn't exist on disk yet at
+  # this point, so actually linking against it here (as an earlier
+  # version of this check did, and also tried to do via
+  # protobuf::libprotobuf as an ALIAS target, which try_compile's own
+  # LINK_LIBRARIES target-export mechanism doesn't reliably resolve
+  # either) cannot work regardless of how the target is referenced.
+  get_target_property(DR_EVT_PBLOGTEST_INCLUDE_DIRS
+                       protobuf::libprotobuf INTERFACE_INCLUDE_DIRECTORIES)
+  if (NOT DR_EVT_PBLOGTEST_INCLUDE_DIRS)
+    set(DR_EVT_PBLOGTEST_INCLUDE_DIRS "")
+  endif()
+
+  try_compile(DR_EVT_HAS_PROTOBUF_LOG_HANDLER "${CMAKE_BINARY_DIR}/temp"
+              "${CMAKE_SOURCE_DIR}/cmake/tests/has_protobuf_log_handler.cpp"
+              CMAKE_FLAGS
+                "-DINCLUDE_DIRECTORIES=${DR_EVT_PBLOGTEST_INCLUDE_DIRS}"
+                "${CMAKE_CXX_FLAGS}")
+  unset(DR_EVT_PBLOGTEST_INCLUDE_DIRS)
+  if (DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
+    message(STATUS "Protobuf has the legacy SetLogHandler API")
+  else ()
+    message(STATUS "Protobuf does not have the legacy SetLogHandler API "
+                    "(removed in newer Protobuf releases) - "
+                    "src/proto/utils.cpp's custom log collector is skipped")
+  endif (DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
+endif (DR_EVT_HAS_PROTOBUF)
 
 # Setup Boost (will use FetchContent if not found)
 include(SetupBoost)
@@ -276,7 +340,21 @@ message(STATUS "DR_EVT_SOURCES: ${DR_EVT_SOURCES}")
 # Create the DR_EVT library
 add_library(dr_evt ${DR_EVT_SOURCES} ${DR_EVT_HEADERS})
 if (DR_EVT_HAS_PROTOBUF)
-  add_dependencies(dr_evt protobuf::libprotobuf)
+  # protobuf::libprotobuf must be linked (not just add_dependencies'd) so
+  # its target_include_directories propagate to dr_evt's own compilation.
+  # add_dependencies() only enforces build order - it builds protobuf
+  # before dr_evt, but never tells dr_evt's own source files where
+  # protobuf's headers actually are. Without this, compiling dr_evt's own
+  # protobuf-using code (e.g. src/proto/utils.cpp) falls back to whatever
+  # protobuf headers happen to be on the compiler's default system
+  # include path, which can silently be a different, unrelated protobuf
+  # installation than the one CMake actually resolved via find_package()/
+  # FetchContent - e.g. a separate, newer Homebrew-installed protobuf on
+  # macOS, even when the correct one was properly pinned and linked.
+  # (protobuf::protoc is different: it's an executable, protoc itself,
+  # never something to link against - add_dependencies is the correct
+  # tool there, just ensuring it's built before anything that invokes it.)
+  target_link_libraries(dr_evt PUBLIC protobuf::libprotobuf)
   add_dependencies(dr_evt protobuf::protoc)
   if (DR_EVT_HAS_OPENMP)
     add_dependencies(dr_evt OpenMP::OpenMP_CXX)
@@ -360,6 +438,59 @@ set_target_properties(trace-bin PROPERTIES OUTPUT_NAME tracer)
 set_target_properties(trace-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 list(APPEND DR_EVT_EXEC_TARGETS trace-bin)
+
+# add executables for the gRPC client/server, if enabled
+if (DR_EVT_HAS_GRPC)
+  add_executable( dr_evt_server-bin src/proto/dr_evt_server.cpp )
+  target_include_directories(dr_evt_server-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_link_libraries(dr_evt_server-bin PRIVATE
+    dr_evt dr_evt_service_proto ${LIB_FILESYSTEM} ${Boost_LIBRARIES})
+  set_target_properties(dr_evt_server-bin PROPERTIES OUTPUT_NAME dr_evt_server)
+  set_target_properties(dr_evt_server-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+  list(APPEND DR_EVT_EXEC_TARGETS dr_evt_server-bin)
+
+  add_executable( dr_evt_client-bin src/proto/dr_evt_client.cpp )
+  target_include_directories(dr_evt_client-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+  # No dependency on dr_evt itself: the client only speaks gRPC to a
+  # separately-running server, it never links against the simulation
+  # library directly.
+  target_link_libraries(dr_evt_client-bin PRIVATE dr_evt_service_proto)
+  set_target_properties(dr_evt_client-bin PROPERTIES OUTPUT_NAME dr_evt_client)
+  set_target_properties(dr_evt_client-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+  list(APPEND DR_EVT_EXEC_TARGETS dr_evt_client-bin)
+
+  # MPI-aware multi-client/multi-server test harness (optional: only
+  # built if MPI is actually available - unlike gRPC/Protobuf, this
+  # project has no existing MPI dependency to build on, so this is the
+  # first find_package(MPI) call in this project).
+  find_package(MPI)
+  if (MPI_FOUND)
+    add_executable( test_grpc_multi_client_server-bin
+      tests/test_grpc_multi_client_server.cpp )
+    target_include_directories(test_grpc_multi_client_server-bin PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_link_libraries(test_grpc_multi_client_server-bin PRIVATE
+      dr_evt_service_proto MPI::MPI_CXX)
+    set_target_properties(test_grpc_multi_client_server-bin PROPERTIES
+      OUTPUT_NAME test_grpc_multi_client_server)
+    set_target_properties(test_grpc_multi_client_server-bin PROPERTIES
+      CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    list(APPEND DR_EVT_EXEC_TARGETS test_grpc_multi_client_server-bin)
+  else()
+    message(STATUS "MPI not found - skipping test_grpc_multi_client_server "
+                    "(gRPC client/server themselves are unaffected)")
+  endif (MPI_FOUND)
+endif (DR_EVT_HAS_GRPC)
 
 
 # Build tests

@@ -45,6 +45,8 @@ jobs:
             openmpi-bin \
             libprotobuf-dev \
             protobuf-compiler \
+            libgrpc++-dev \
+            protobuf-compiler-grpc \
             ${{ matrix.cc }} \
             ${{ matrix.cxx }}
 
@@ -98,6 +100,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=$PWD/install \
             -DDR_EVT_BUILD_PYTHON=ON \
             -DDR_EVT_ENABLE_PROTOBUF=ON \
+            -DDR_EVT_ENABLE_GRPC=ON \
             -DPython3_EXECUTABLE=$PYTHON_EXE
 
       - name: Build
@@ -107,6 +110,16 @@ jobs:
           make -j$(nproc)
           # Build test binaries
           make test_streaming_api-bin test_batch_vs_streaming-bin
+          # gRPC client/server + MPI multi-client/server test harness
+          # (already covered by `make -j$(nproc)` above since none of
+          # these are EXCLUDE_FROM_ALL, but listed explicitly here too
+          # for the same clarity reason as the line above). The MPI
+          # harness target only exists if find_package(MPI) succeeded at
+          # configure time (see CMakeLists.txt) - `|| true` tolerates it
+          # being absent rather than failing this otherwise-redundant
+          # clarity line with "no rule to make target".
+          make dr_evt_server-bin dr_evt_client-bin
+          make test_grpc_multi_client_server-bin || true
 
       - name: Check build artifacts
         run: |
@@ -163,6 +176,13 @@ jobs:
           echo "========================================"
           ./tests/run_streaming_tests.sh
 
+      - name: Run gRPC Client/Server Tests
+        run: |
+          echo "========================================"
+          echo "Running gRPC Client/Server Tests (2 tests)"
+          echo "========================================"
+          ./tests/run_grpc_tests.sh
+
       - name: Run Scale Tests (Optional)
         continue-on-error: true
         run: |
@@ -187,6 +207,7 @@ jobs:
           echo "  Config: 4 tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON, now enabled)"
           echo "  Python API: 9 tests (requires -DDR_EVT_BUILD_PYTHON=ON)"
           echo "  Streaming API: 4 tests (requires building test_streaming_api)"
+          echo "  gRPC Client/Server: 2 tests (requires -DDR_EVT_ENABLE_GRPC=ON; MPI-based multi-client test skipped if MPI unavailable)"
           echo "  Scale: 6 tests, optional (all working - see tests/run_scale_tests.sh)"
           echo ""
           echo "These counts reflect what this workflow attempts to run, not"

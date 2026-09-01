@@ -32,11 +32,13 @@ namespace dr_evt {
 /** \addtogroup dr_evt_proto
  *  @{ */
 
+#if defined(DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
 void pbuf_log_collector(
        google::protobuf::LogLevel level,
        const char* filename,
        int line,
        const std::string& message);
+#endif // DR_EVT_HAS_PROTOBUF_LOG_HANDLER
 
 template<typename T>
 bool read_prototext(const std::string& file_name, const bool is_binary,
@@ -45,7 +47,14 @@ bool read_prototext(const std::string& file_name, const bool is_binary,
   GOOGLE_PROTOBUF_VERIFY_VERSION;
   std::ifstream input(file_name, std::ios::in | std::ios::binary);
 
+#if defined(DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
   google::protobuf::SetLogHandler(pbuf_log_collector);
+#endif // DR_EVT_HAS_PROTOBUF_LOG_HANDLER
+  // Without SetLogHandler (removed in newer Protobuf, in favor of
+  // Abseil-based logging - see DR_EVT_HAS_PROTOBUF_LOG_HANDLER's own
+  // feature-detection check in the root CMakeLists.txt), Protobuf's own
+  // internal parse diagnostics still reach stderr via its current
+  // default logging path - just without this custom message format.
 
   if (!input) {
     std::cerr << file_name << ": File not found!" << std::endl;

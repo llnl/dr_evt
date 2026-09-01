@@ -35,6 +35,7 @@ Complete guide for running simulations:
 
 - **[Streaming API](STREAMING_API.md)** - Online/incremental simulation API
 - **[Python API](PYTHON_API.md)** - Python bindings reference
+- **[gRPC Client/Server](CLIENT_SERVER_GUIDE.md)** - Network-exposed streaming API, including the MPI-based multi-client/multi-server test harness
 
 ### Reference
 
