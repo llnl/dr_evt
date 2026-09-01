@@ -17,7 +17,12 @@
 
 namespace dr_evt {
 
-#if defined(DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
+#if !defined(DR_EVT_HAS_ABSL_LOG_SINK) && defined(DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
+// Matches utils.hpp's own #if/#elif chain: the modern, Abseil-based
+// ProtoLogSink (preferred when available) is fully defined inline in
+// the header, so there's nothing to define here in that case - this
+// definition only exists as a fallback for a Protobuf old enough to
+// have SetLogHandler but built without Abseil's newer logging.
 void pbuf_log_collector(google::protobuf::LogLevel level,
                         const char* filename,
                         int line,
@@ -28,7 +33,7 @@ void pbuf_log_collector(google::protobuf::LogLevel level,
         + ' ' + std::to_string(line) + ' ' + message;
     std::cerr << errmsg << std::endl;
 }
-#endif // DR_EVT_HAS_PROTOBUF_LOG_HANDLER
+#endif // !DR_EVT_HAS_ABSL_LOG_SINK && DR_EVT_HAS_PROTOBUF_LOG_HANDLER
 
 google::protobuf::FieldDescriptor const*
 get_oneof_field_desc(const google::protobuf::Message& msg,
