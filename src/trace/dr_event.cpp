@@ -1,11 +1,8 @@
 /******************************************************************************
+ *         Copyright 2023 Lawrence Livermore National Security, LLC           *
+ *         See the top-level LICENSE file for details.                        *
  *                                                                            *
- *    Copyright 2023   Lawrence Livermore National Security, LLC and other    *
- *    Whole Cell Simulator Project Developers. See the top-level COPYRIGHT    *
- *    file for details.                                                       *
- *                                                                            *
- *    SPDX-License-Identifier: MIT                                            *
- *                                                                            *
+ *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
 #include "trace/dr_event.hpp"
