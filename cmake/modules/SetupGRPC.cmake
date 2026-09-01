@@ -9,6 +9,9 @@ find_package(Threads REQUIRED)
 
 option(protobuf_MODULE_COMPATIBLE TRUE)
 
+# To avoid grpc installation exists in the system
+option(AVOID_ENV_GRPC FALSE)
+
 # gRPC first, then Protobuf - and only search Protobuf independently if
 # gRPC was actually found. find_package() is idempotent, so whichever
 # Protobuf is found first gets "locked in" for the rest of this configure.
@@ -16,10 +19,18 @@ option(protobuf_MODULE_COMPATIBLE TRUE)
 # was actually built against; skipping the Protobuf search entirely when
 # gRPC isn't found avoids handing FetchContent's own, bundled gRPC build
 # a separate, possibly mismatched Protobuf found beforehand.
-find_package(gRPC CONFIG QUIET)
+
+if (AVOID_ENV_GRPC)
+  set(SEARCH_GRPC_IN_SYSTEM_PATH NO_DEFAULT_PATH)
+else()
+  set(SEARCH_GRPC_IN_SYSTEM_PATH "")
+endif()
+
+find_package(gRPC CONFIG QUIET ${SEARCH_GRPC_IN_SYSTEM_PATH})
 
 if (gRPC_FOUND)
-  find_package(Protobuf CONFIG QUIET)
+  message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
+  find_package(Protobuf CONFIG QUIET HINTS ${gRPC_DIR} ${SEARCH_GRPC_IN_SYSTEM_PATH})
 
   if (NOT Protobuf_FOUND)
     # Debian/Ubuntu's protobuf-compiler-grpc ships a CMake config, but the
@@ -27,14 +38,12 @@ if (gRPC_FOUND)
     # bundled FindProtobuf.cmake (MODULE mode), which finds the library/
     # headers/protoc directly and creates the same protobuf::libprotobuf /
     # protobuf::protoc targets CONFIG mode would have.
-    find_package(Protobuf MODULE QUIET)
+    find_package(Protobuf MODULE QUIET ${SEARCH_GRPC_IN_SYSTEM_PATH})
   endif (NOT Protobuf_FOUND)
-endif (gRPC_FOUND)
+endif()
 
 if (NOT Protobuf_FOUND OR NOT gRPC_FOUND)
   set(DR_EVT_GRPC_FETCHCONTENT ON)
-else()
-  message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
 endif()
 
 if (DR_EVT_GRPC_FETCHCONTENT)
@@ -120,7 +129,7 @@ if (DR_EVT_GRPC_FETCHCONTENT)
   FetchContent_Declare(
     grpc
     GIT_REPOSITORY https://github.com/grpc/grpc.git
-    GIT_TAG        v1.51.1
+    GIT_TAG        v1.83.1
     PATCH_COMMAND  ${DR_EVT_GRPC_PATCH_COMMAND})
   FetchContent_MakeAvailable(grpc)
   unset(DR_EVT_GRPC_PATCH_COMMAND)
