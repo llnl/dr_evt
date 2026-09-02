@@ -261,47 +261,6 @@ if (DR_EVT_HAS_PROTOBUF)
                     "(removed in newer Protobuf releases) - "
                     "src/proto/utils.cpp's custom log collector is skipped")
   endif (DR_EVT_HAS_PROTOBUF_LOG_HANDLER)
-
-  # Protobuf's own internal logging moved to Abseil's absl::LogSink
-  # mechanism as part of the same migration that removed SetLogHandler
-  # (see above) - but the full absl::LogSink API only exists in
-  # sufficiently recent Abseil releases (confirmed: gRPC 1.51.1-era
-  # Abseil, ~2022, has none of absl/log/*.h at all - only older,
-  # internal-only logging headers). Only even attempt this check if
-  # Abseil's own log-sink-registry target exists at all - it won't on
-  # the standalone-Protobuf-without-gRPC path (SetupProtobuf.cmake
-  # doesn't bring in Abseil), or with an older gRPC/Abseil pin.
-  if (TARGET absl::log_sink_registry)
-    get_target_property(DR_EVT_ABSLLOGTEST_INCLUDE_DIRS
-                         absl::log_sink_registry INTERFACE_INCLUDE_DIRECTORIES)
-    if (NOT DR_EVT_ABSLLOGTEST_INCLUDE_DIRS)
-      set(DR_EVT_ABSLLOGTEST_INCLUDE_DIRS "")
-    endif()
-
-    # Same decltype()-only, no-LINK_LIBRARIES reasoning as
-    # has_protobuf_log_handler.cpp above - Abseil hasn't actually been
-    # compiled yet at this point on the FetchContent path either (it's
-    # built as part of gRPC's own source tree, alongside Protobuf).
-    try_compile(DR_EVT_HAS_ABSL_LOG_SINK "${CMAKE_BINARY_DIR}/temp"
-                "${CMAKE_SOURCE_DIR}/cmake/tests/has_absl_log_sink.cpp"
-                CMAKE_FLAGS
-                  "-DINCLUDE_DIRECTORIES=${DR_EVT_ABSLLOGTEST_INCLUDE_DIRS}"
-                  "${CMAKE_CXX_FLAGS}")
-    unset(DR_EVT_ABSLLOGTEST_INCLUDE_DIRS)
-  else()
-    set(DR_EVT_HAS_ABSL_LOG_SINK FALSE)
-  endif()
-  if (DR_EVT_HAS_ABSL_LOG_SINK)
-    message(STATUS "Abseil has the full log_sink API - "
-                    "src/proto/utils.cpp uses it in preference to the "
-                    "legacy Protobuf SetLogHandler API, when both are "
-                    "available")
-  else()
-    message(STATUS "Abseil's full log_sink API is not available "
-                    "(too old an Abseil, or built without gRPC) - "
-                    "falling back to the legacy Protobuf SetLogHandler "
-                    "API instead, if that is itself available (see above)")
-  endif (DR_EVT_HAS_ABSL_LOG_SINK)
 endif (DR_EVT_HAS_PROTOBUF)
 
 # Setup Boost (will use FetchContent if not found)
@@ -397,11 +356,6 @@ if (DR_EVT_HAS_PROTOBUF)
   # tool there, just ensuring it's built before anything that invokes it.)
   target_link_libraries(dr_evt PUBLIC protobuf::libprotobuf)
   add_dependencies(dr_evt protobuf::protoc)
-  # DR_EVT_HAS_ABSL_LOG_SINK was already computed above (before this
-  # target existed) - only the actual link needed to wait until now.
-  if (DR_EVT_HAS_ABSL_LOG_SINK)
-    target_link_libraries(dr_evt PUBLIC absl::log_sink absl::log_sink_registry)
-  endif (DR_EVT_HAS_ABSL_LOG_SINK)
   if (DR_EVT_HAS_OPENMP)
     add_dependencies(dr_evt OpenMP::OpenMP_CXX)
     if (DR_EVT_HAS_NUMA)
