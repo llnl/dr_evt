@@ -20,7 +20,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:r:f:T:z:d:D:S:V:vc:R:M"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:d:D:S:V:vc:R:M"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -33,6 +33,8 @@ static const struct option longopts[] = {
     {"priority_policy",       required_argument,  0, 'p'},
     {"queue_impl",            required_argument,  0, 'q'},
     {"block_size",            required_argument,  0, 'Q'},
+    {"circular_capacity",     required_argument,  0, 'A'},
+    {"circular_overflow",     required_argument,  0, 'G'},
     {"runtime_mode",          required_argument,  0, 'r'},
     {"trace_format",          required_argument,  0, 'f'},
     {"timestamp_format",      required_argument,  0, 'T'},
@@ -55,9 +57,11 @@ Sim_Params::Sim_Params()
     m_is_time_set(false),
     m_backfill_policy(BackfillPolicy::EASY),
     m_priority_policy(PriorityPolicy::FCFS),
+    m_runtime_mode(RuntimeEstimateMode::USE_LIMIT),
     m_queue_impl(QueueImplementation::DEQUE),
     m_block_size(128),
-    m_runtime_mode(RuntimeEstimateMode::USE_LIMIT),
+    m_circular_capacity(0),  // 0 = size of job trace (never overflows)
+    m_circular_overflow(CircularOverflowPolicy::GROW),
     m_total_nodes(dr_evt::total_nodes),
     m_trace_format("lassen"),  // Default to Lassen format for backward compatibility
     m_timestamp_format("iso"),  // Default to ISO/human-readable timestamps
@@ -142,9 +146,11 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         m_queue_impl = QueueImplementation::MULTIMAP;
                     } else if (impl == "block") {
                         m_queue_impl = QueueImplementation::BLOCK;
+                    } else if (impl == "circular") {
+                        m_queue_impl = QueueImplementation::CIRCULAR;
                     } else {
                         std::cerr << "Unknown queue implementation: " << impl << std::endl;
-                        std::cerr << "Valid options: 'deque' (default), 'multimap', 'block' (FCFS only)" << std::endl;
+                        std::cerr << "Valid options: 'deque' (default), 'multimap', 'block', 'circular' (FCFS only)" << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
@@ -155,6 +161,25 @@ void Sim_Params::getopt(int& argc, char** &argv)
                     // Validate power of 2
                     if (m_block_size == 0 || (m_block_size & (m_block_size - 1)) != 0) {
                         std::cerr << "Error: block_size must be a power of 2 (e.g., 4, 8, 16, 32, 64, 128, 256)" << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'A': /* --circular_capacity */
+                {
+                    m_circular_capacity = std::stoull(optarg);
+                }
+                break;
+            case 'G': /* --circular_overflow */
+                {
+                    std::string policy(optarg);
+                    if (policy == "abort") {
+                        m_circular_overflow = CircularOverflowPolicy::ABORT;
+                    } else if (policy == "grow") {
+                        m_circular_overflow = CircularOverflowPolicy::GROW;
+                    } else {
+                        std::cerr << "Unknown circular_overflow policy: " << policy << std::endl;
+                        std::cerr << "Valid options: 'abort', 'grow' (default)" << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
@@ -316,11 +341,12 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        sjf: Shortest-Job-First\n"
         "        ljf: Longest-Job-First\n"
         "\n"
-        "    -q, --queue_impl {deque|multimap|block}\n"
+        "    -q, --queue_impl {deque|multimap|block|circular}\n"
         "        Wait queue implementation for FCFS scheduler (default: deque).\n"
         "        deque: std::deque-based (simple, well-tested)\n"
         "        multimap: std::multimap-based (for differential testing)\n"
         "        block: Block-based with multi-index (optimized for large queues)\n"
+        "        circular: boost::circular_buffer-based\n"
         "        Note: Only applies to FCFS scheduler. SJF/LJF always use multimap.\n"
         "\n"
         "    -Q, --block_size SIZE\n"
@@ -328,6 +354,18 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Must be power of 2: 32, 64, 128, or 256\n"
         "        Only used when --queue_impl=block\n"
         "        Larger blocks reduce overhead but increase memory per block\n"
+        "\n"
+        "    -A, --circular_capacity SIZE\n"
+        "        Initial capacity of the wait queue (default: 0, meaning the\n"
+        "        size of the job trace - large enough it can never overflow).\n"
+        "        Only used when --queue_impl=circular\n"
+        "\n"
+        "    -G, --circular_overflow {abort|grow}\n"
+        "        What to do if an insert would exceed circular_capacity\n"
+        "        (default: grow). abort: end the simulation with an error.\n"
+        "        grow: reallocate to a larger capacity, copying existing\n"
+        "        entries over.\n"
+        "        Only used when --queue_impl=circular\n"
         "\n"
         "    -r, --runtime_mode {limit|actual}\n"
         "        Runtime estimate mode (default: limit).\n"

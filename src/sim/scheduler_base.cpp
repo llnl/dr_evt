@@ -9,6 +9,7 @@
 #include "sim/scheduler_fcfs.hpp"
 #include "sim/scheduler_fcfs_alt.hpp"
 #include "sim/scheduler_block_fcfs.hpp"
+#include "sim/scheduler_circular_fcfs.hpp"
 #include "sim/scheduler_sjf.hpp"
 #include "sim/scheduler_ljf.hpp"
 #include <algorithm>
@@ -61,6 +62,17 @@ sim_time_t SchedulerBase::calculate_fcfs_reservation(
     return current_time;
 }
 
+namespace {
+const char* queue_impl_name(QueueImplementation impl) {
+    switch (impl) {
+        case QueueImplementation::BLOCK:    return "block";
+        case QueueImplementation::CIRCULAR: return "circular";
+        case QueueImplementation::MULTIMAP: return "multimap";
+        default:                            return "multimap";
+    }
+}
+} // anonymous namespace
+
 std::unique_ptr<SchedulerBase> create_scheduler(
     num_nodes_t total_nodes,
     const std::vector<Job_Record>& job_data,
@@ -68,7 +80,9 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     PriorityPolicy priority_policy,
     RuntimeEstimateMode runtime_mode,
     QueueImplementation queue_impl,
-    size_t block_size)
+    size_t block_size,
+    size_t circular_capacity,
+    CircularOverflowPolicy circular_overflow)
 {
     switch (priority_policy) {
         case PriorityPolicy::FCFS:
@@ -124,6 +138,10 @@ std::unique_ptr<SchedulerBase> create_scheduler(
             } else if (queue_impl == QueueImplementation::MULTIMAP) {
                 return std::make_unique<FCFSAltScheduler>(
                     total_nodes, job_data, backfill_policy, runtime_mode);
+            } else if (queue_impl == QueueImplementation::CIRCULAR) {
+                return std::make_unique<CircularBufferFCFSScheduler>(
+                    total_nodes, job_data, backfill_policy, runtime_mode,
+                    circular_capacity, circular_overflow);
             } else {
                 return std::make_unique<FCFSScheduler>(
                     total_nodes, job_data, backfill_policy, runtime_mode);
@@ -131,8 +149,10 @@ std::unique_ptr<SchedulerBase> create_scheduler(
 
         case PriorityPolicy::FCFS_ALT:
             // FCFS_ALT always uses multimap
-            if (queue_impl == QueueImplementation::BLOCK) {
-                std::cerr << "Warning: Block queue not supported for FCFS_ALT, using multimap\n";
+            if (queue_impl == QueueImplementation::BLOCK ||
+                queue_impl == QueueImplementation::CIRCULAR) {
+                std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
+                         << "' not supported for FCFS_ALT, using multimap\n";
             }
             return std::make_unique<FCFSAltScheduler>(
                 total_nodes, job_data, backfill_policy, runtime_mode);
@@ -141,7 +161,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
             // SJF only uses multimap (already efficient)
             if (queue_impl != QueueImplementation::DEQUE) {
                 std::cerr << "Warning: queue_impl '"
-                         << (queue_impl == QueueImplementation::BLOCK ? "block" : "multimap")
+                         << queue_impl_name(queue_impl)
                          << "' not supported for SJF, using default multimap\n";
             }
             return std::make_unique<SJFScheduler>(
@@ -151,7 +171,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
             // LJF only uses multimap (already efficient)
             if (queue_impl != QueueImplementation::DEQUE) {
                 std::cerr << "Warning: queue_impl '"
-                         << (queue_impl == QueueImplementation::BLOCK ? "block" : "multimap")
+                         << queue_impl_name(queue_impl)
                          << "' not supported for LJF, using default multimap\n";
             }
             return std::make_unique<LJFScheduler>(

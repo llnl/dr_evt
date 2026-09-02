@@ -135,7 +135,9 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     PriorityPolicy priority_policy,
     RuntimeEstimateMode runtime_mode,
     QueueImplementation queue_impl = QueueImplementation::DEQUE,
-    size_t block_size = 128);
+    size_t block_size = 128,
+    size_t circular_capacity = 0,
+    CircularOverflowPolicy circular_overflow = CircularOverflowPolicy::GROW);
 
 } // namespace dr_evt
 

@@ -159,11 +159,29 @@ run_correctness_tests() {
             --resource_trace "/tmp/fcfs_block_${test_name}_resources.csv" \
             > /dev/null 2>&1
 
-        # Compare job schedules (all three must match)
+        # Run with circular queue (priority_policy=fcfs, queue_impl=circular)
+        if [ "$VERBOSE" = true ]; then
+            echo "  Running fcfs (circular queue): $test_name"
+        fi
+        ./build/simulator "$test_file" \
+            --priority_policy fcfs \
+            --queue_impl circular \
+            --total_nodes 100 \
+            --trace_format simple \
+            --timestamp_format epoch \
+            --duration_mode "$duration_mode" \
+            --backfill_policy easy \
+            --outfile "/tmp/fcfs_circular_${test_name}.csv" \
+            --resource_trace "/tmp/fcfs_circular_${test_name}_resources.csv" \
+            > /dev/null 2>&1
+
+        # Compare job schedules (all four must match)
         SCHEDULE_MATCH_ALT=0
         SCHEDULE_MATCH_BLOCK=0
+        SCHEDULE_MATCH_CIRCULAR=0
         RESOURCE_MATCH_ALT=0
         RESOURCE_MATCH_BLOCK=0
+        RESOURCE_MATCH_CIRCULAR=0
 
         if ! diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_alt_${test_name}.csv" > /dev/null 2>&1; then
             SCHEDULE_MATCH_ALT=1
@@ -182,10 +200,18 @@ run_correctness_tests() {
             RESOURCE_MATCH_BLOCK=1
         fi
 
+        if ! diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_circular_${test_name}.csv" > /dev/null 2>&1; then
+            SCHEDULE_MATCH_CIRCULAR=1
+        fi
+
+        if ! diff -q "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_circular_${test_name}_resources.csv" > /dev/null 2>&1; then
+            RESOURCE_MATCH_CIRCULAR=1
+        fi
+
         # All must match
-        if [ $SCHEDULE_MATCH_ALT -eq 0 ] && [ $SCHEDULE_MATCH_BLOCK -eq 0 ] && \
-           [ $RESOURCE_MATCH_ALT -eq 0 ] && [ $RESOURCE_MATCH_BLOCK -eq 0 ]; then
-            echo "✓ $test_name (deque == multimap == block)"
+        if [ $SCHEDULE_MATCH_ALT -eq 0 ] && [ $SCHEDULE_MATCH_BLOCK -eq 0 ] && [ $SCHEDULE_MATCH_CIRCULAR -eq 0 ] && \
+           [ $RESOURCE_MATCH_ALT -eq 0 ] && [ $RESOURCE_MATCH_BLOCK -eq 0 ] && [ $RESOURCE_MATCH_CIRCULAR -eq 0 ]; then
+            echo "✓ $test_name (deque == multimap == block == circular)"
             PASS=$((PASS + 1))
         else
             echo "✗ $test_name - MISMATCH"
