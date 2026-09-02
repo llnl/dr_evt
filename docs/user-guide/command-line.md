@@ -1,348 +1,491 @@
 # Command-Line Options
 
-Complete reference for all DR_EVT command-line options.
+Complete reference for all DR_EVT command-line options for the `simulator` binary.
 
 ## Basic Usage
 
 ```bash
-./simulator INPUT_FILE [OPTIONS]
+./build/simulator INPUT_FILE [OPTIONS]
 ```
 
-## Required Arguments
+`INPUT_FILE` (the input job trace, in CSV format) can also be given via
+`-i, --infile FILENAME` instead of as the first positional argument.
 
-### Input File
+## Input/Output Options
+
+### `-i, --infile FILENAME`
+Input job trace file. Can also be specified as the first positional argument.
+
+**Format:** CSV with columns `job_submit_time`, `num_nodes`, `time_limit`, etc.
+
+**Example:**
 ```bash
-./simulator trace.csv
+./build/simulator --infile traces/jobs.csv
 ```
-Path to input trace file in CSV format.
 
-## Simulation Options
+### `-o, --outfile FILENAME`
+Output file for simulated job trace.
 
-### Total Nodes
+**Format:** CSV with columns `job_submit_time`, `begin_time`, `end_time`, `num_nodes`, `exit_status`, `queue`, `time_limit`
+
+**Default:** Derived from input filename (e.g., `jobs.csv` -> `jobs_sim.csv`)
+
+**Example:**
 ```bash
---total_nodes N
+./build/simulator traces/jobs.csv --outfile output/result.csv
 ```
-Total number of compute nodes in the system.
 
-**Example:** `--total_nodes 100`
+### `-R, --resource_trace FILENAME`
+Write resource usage trace to file.
 
-### Backfill Policy
+**Format:** CSV with columns `time`, `free_nodes`, `allocated_nodes`
+
+**Purpose:** Track cluster resource utilization over time for visualization and analysis.
+
+**Example:**
 ```bash
---backfill_policy {easy|conservative|none}
+./build/simulator traces/jobs.csv \
+    --outfile results/jobs.csv \
+    --resource_trace results/resources.csv
 ```
-- `easy` - EASY backfilling (default, verified correct)
-- `conservative` - Conservative backfilling
+
+**Default:** If not specified, resource trace is written to `<outfile>_resources.csv`
+
+**Output example:**
+```csv
+time,free_nodes,allocated_nodes
+0,100,0
+0,20,80
+10,5,95
+40,20,80
+100,100,0
+```
+
+## System Configuration
+
+### `-n, --total_nodes COUNT`
+Total number of nodes in the simulated cluster.
+
+**Default:** 795
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --total_nodes 100
+```
+
+## Scheduling Policies
+
+### `-b, --backfill_policy POLICY`
+Backfilling algorithm to use.
+
+**Options:**
+- `easy` - EASY backfilling (default): backfill jobs that complete before FCFS head reservation
+- `conservative` - Conservative backfilling: backfill only if won't delay any waiting job
 - `none` - Pure FCFS (no backfilling)
 
-**Example:** `--backfill_policy easy`
+**Default:** `easy`
 
-### Priority Policy
+**Example:**
 ```bash
---priority_policy {fcfs|sjf|ljf}
+./build/simulator traces/jobs.csv --backfill_policy conservative
 ```
+
+### `-p, --priority_policy POLICY`
+Job priority/ordering policy.
+
+**Options:**
 - `fcfs` - First Come First Served (default)
-- `sjf` - Shortest Job First
-- `ljf` - Longest Job First
+- `sjf` - Shortest Job First (by runtime estimate)
+- `ljf` - Longest Job First (by runtime estimate)
 
-**Example:** `--priority_policy fcfs`
+**Default:** `fcfs`
 
-### Runtime Estimation Mode
+**Example:**
 ```bash
---runtime_mode {use_limit|use_actual}
+./build/simulator traces/jobs.csv --priority_policy sjf
 ```
-- `use_limit` - Use time_limit field (default)
-- `use_actual` - Use actual runtime from trace
 
-**Example:** `--runtime_mode use_limit`
+### `-q, --queue_impl IMPLEMENTATION`
+Wait queue implementation (FCFS scheduler only).
+
+**Options:**
+- `deque` - std::deque-based (default)
+  - Simple, well-tested sequential container
+  - Linear backfill search O(n)
+  - Recommended for <1000 queued jobs
+- `multimap` - std::multimap-based (FCFS_ALT)
+  - Tree-based container for differential testing
+  - Produces identical schedules to `deque`
+  - Useful for verifying FCFS correctness
+- `block` - BlockWaitQueue-based
+  - Block-based container with metadata pre-filtering
+  - Tunable block size (default: 128 jobs per block)
+  - **Performance:** `deque` is 30% faster even at the optimal block
+    size (16); smaller/larger sizes are worse still, up to 97% slower
+    at block size 256 (see [`dev/design-decisions/BLOCK_QUEUE.md`](../dev/design-decisions/BLOCK_QUEUE.md)) - each
+    block's multi-index red-black trees dominate the overhead. Kept
+    for differential testing and as a reference implementation; not
+    recommended over `deque` or `circular` for typical HPC workloads.
+- `circular` - boost::circular_buffer-based
+  - Same O(1) push_back/pop_front as `deque`, but backed by one
+    contiguous array instead of `deque`'s chunked storage, so indexed
+    access (used throughout the backfill scan) is a direct offset
+    rather than a chunk-lookup-then-offset
+  - **Performance:** measured 14-28% *faster* than `deque` on a 10,000
+    job / 2,000 node benchmark (see [`dev/design-decisions/CIRCULAR_QUEUE.md`](../dev/design-decisions/CIRCULAR_QUEUE.md))
+  - Has a fixed capacity, unlike `deque` - see `--circular_capacity`
+    and `--circular_overflow` below
+
+**Default:** `deque`
+
+**Note:** This option only affects FCFS scheduler. SJF/LJF always use std::multimap
+(already efficient for priority-based scheduling). If `block`, `multimap`, or `circular`
+is specified with SJF/LJF, a warning is printed and the default multimap is used.
+
+**Examples:**
+```bash
+# Standard FCFS with deque (default)
+./build/simulator traces/jobs.csv --priority_policy fcfs
+
+# FCFS with circular queue (typically the fastest option)
+./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl circular
+
+# FCFS with block queue (reference implementation, not recommended for performance)
+./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl block
+
+# Differential testing: compare deque vs multimap (should produce identical output)
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl deque --outfile output_deque.csv
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl multimap --outfile output_multimap.csv
+diff output_deque.csv output_multimap.csv  # Should be identical
+```
+
+### `-A, --circular_capacity SIZE`
+Initial capacity of the circular queue. Only used when `--queue_impl circular`.
+
+**Default:** `0`, meaning the size of the job trace - large enough that the
+queue can never overflow, since at most one entry is inserted per job in the
+trace over the scheduler's lifetime.
+
+A smaller, explicit value trades that guarantee for a smaller initial
+allocation; see `--circular_overflow` for what happens if it's exceeded.
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular --circular_capacity 1000
+```
+
+### `-G, --circular_overflow {abort|grow}`
+What to do if an insert would exceed `--circular_capacity`. Only used when
+`--queue_impl circular`.
+
+**Options:**
+- `abort` - end the simulation with a clean error (`std::runtime_error`,
+  reported to stderr / to the gRPC client, exit code 1)
+- `grow` (default) - reallocate to double the current capacity via
+  `boost::circular_buffer::set_capacity()`, which preserves every existing
+  entry; the simulation continues normally
+
+**Default:** `grow`
+
+**Example:**
+```bash
+# Fail fast if the queue ever needs more than the pre-sized capacity
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular \
+    --circular_capacity 500 --circular_overflow abort
+```
+
+### `-r, --runtime_mode MODE`
+How to estimate job runtimes for scheduling decisions.
+
+**Options:**
+- `limit` - Use job's time_limit field (default)
+- `actual` - Use actual runtime (omniscient scheduler, for analysis)
+
+**Default:** `limit`
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --runtime_mode actual
+```
 
 ## Trace Format Options
 
-### Trace Format
+### `-f, --trace_format FORMAT`
+Input trace format.
+
+**Options:**
+- `simple` - Simple CSV format (minimal columns)
+- `lassen` - Lassen HPC format (many metadata columns)
+
+**Default:** `lassen`
+
+**Example:**
 ```bash
---trace_format {simple|lassen}
+./build/simulator traces/simple.csv --trace_format simple
 ```
-- `simple` - Minimal CSV format (7 columns)
-- `lassen` - LLNL Lassen format (33 columns, default)
 
-**Example:** `--trace_format simple`
+### `-T, --timestamp_format FORMAT`
+Timestamp format in output.
 
-### Timestamp Format
+**Options:**
+- `epoch` - Unix epoch seconds (e.g., `1693234567.0`)
+- `iso` - ISO 8601 format (e.g., `2026-08-29T14:35:00-07:00`)
+
+**Default:** `iso`
+
+**Example:**
 ```bash
---timestamp_format {epoch|iso}
+./build/simulator traces/jobs.csv --timestamp_format epoch
 ```
-- `epoch` - Unix epoch seconds (0, 100, 1234567890)
-- `iso` - ISO 8601 timestamps (2024-01-15T10:30:00)
 
-**Example:** `--timestamp_format epoch`
+### `-z, --timezone TIMEZONE`
+Timezone for ISO timestamp output.
 
-### Timezone
+**Format:** IANA timezone database name (e.g., `"America/Los_Angeles"`, `"UTC"`, `"America/New_York"`)
+
+**Default:** `America/Los_Angeles`
+
+**Example:**
 ```bash
---timezone TIMEZONE
+./build/simulator traces/jobs.csv \
+    --timestamp_format iso \
+    --timezone "America/New_York"
 ```
-Timezone for ISO timestamps (ignored for epoch format).
 
-**Examples:**
-- `--timezone UTC`
-- `--timezone America/Los_Angeles` (default)
-- `--timezone Europe/London`
+## Simulation Mode Options
 
-## Duration Mode
+### `-d, --duration_mode MODE`
+How to determine job execution durations in simulation mode.
 
-### Duration Mode
-```bash
---duration_mode {exact|from_column|distribution}
-```
-**Simulation mode only:**
-- `exact` - Jobs run exactly for their time_limit
-- `from_column` - Use actual_duration column from trace
+**Options:**
+- `exact` - Jobs run exactly their time_limit (default)
+- `column` - Use `duration` column from input trace
 - `distribution` - Sample from statistical distribution
 
-**Example:** `--duration_mode exact`
+**Default:** `exact`
 
-### Duration Distribution
+**Example:**
 ```bash
---duration_distribution {normal|lognormal|uniform}
+./build/simulator traces/jobs.csv --duration_mode distribution
 ```
-Used with `--duration_mode distribution`.
 
-**Example:** `--duration_distribution normal --duration_scale 0.9 --duration_stddev 0.1`
+### `-D, --duration_distribution TYPE`
+Statistical distribution for duration sampling (when `--duration_mode distribution`).
 
-## Output Options
+**Options:**
+- `normal` - Normal (Gaussian) distribution (default)
+- `lognormal` - Log-normal distribution
+- `uniform` - Uniform distribution
 
-### Output File
+**Default:** `normal`
+
+**Example:**
 ```bash
---outfile FILE
+./build/simulator traces/jobs.csv \
+    --duration_mode distribution \
+    --duration_distribution lognormal
 ```
-Write simulated trace to FILE.
 
-**Example:** `--outfile results.csv`
+### `-S, --duration_scale FACTOR`
+Scale factor for job durations.
 
-### Verbose Mode
+**Range:** > 0.0
+
+**Default:** 1.0 (100% of time_limit)
+
+**Example:** Jobs run 80% of their time_limit on average:
 ```bash
---verbose
+./build/simulator traces/jobs.csv \
+    --duration_mode distribution \
+    --duration_scale 0.8
 ```
-Enable verbose output (shows detailed simulation progress).
 
-**Example:** `./simulator trace.csv --verbose`
+### `-V, --duration_stddev FACTOR`
+Standard deviation for duration distribution.
 
-## Advanced Options
+**Range:** >= 0.0
 
-### Random Seed
+**Default:** 0.0 (no variation)
+
+**Example:** 10% standard deviation:
 ```bash
---seed N
+./build/simulator traces/jobs.csv \
+    --duration_mode distribution \
+    --duration_scale 0.9 \
+    --duration_stddev 0.1
 ```
-Random seed for duration sampling (default: 0).
 
-**Example:** `--seed 42`
+## Limit Options
 
-### Maximum Jobs
+### `-j, --max_jobs COUNT`
+Maximum number of jobs to simulate.
+
+**Default:** Unlimited (process all jobs in trace)
+
+**Example:**
 ```bash
---max_jobs N
+./build/simulator traces/jobs.csv --max_jobs 100
 ```
-Process only first N jobs from trace.
 
-**Example:** `--max_jobs 100`
+### `-t, --max_time TIME`
+Maximum simulation time (in trace time units).
 
-### Maximum Time
+**Default:** Unlimited (run until all jobs complete)
+
+**Example:**
 ```bash
---max_time T
+./build/simulator traces/jobs.csv --max_time 3600.0
 ```
-Stop simulation at time T.
 
-**Example:** `--max_time 3600`
+### `-s, --seed VALUE`
+Random number generator seed for reproducibility.
 
-## Complete Examples
+**Default:** System clock
 
-### Basic Simulation
+**Example:**
 ```bash
-./simulator trace.csv \
-  --total_nodes 100 \
-  --trace_format simple \
-  --timestamp_format epoch \
-  --duration_mode exact \
-  --backfill_policy easy \
-  --outfile results.csv
+./build/simulator traces/jobs.csv --seed 42
 ```
 
-### With Real HPC Trace
-```bash
-./simulator lassen_trace.csv \
-  --total_nodes 795 \
-  --trace_format lassen \
-  --timestamp_format iso \
-  --timezone America/Los_Angeles \
-  --runtime_mode use_actual \
-  --outfile simulation_results.csv \
-  --verbose
-```
+## Configuration File Option
 
-### Different Scheduling Policies
-```bash
-# EASY backfilling with SJF
-./simulator trace.csv \
-  --total_nodes 100 \
-  --backfill_policy easy \
-  --priority_policy sjf
+### `-c, --config CONFIGFILE`
+Load parameters from a Protobuf `.textproto` configuration file.
 
-# Conservative backfilling
-./simulator trace.csv \
-  --total_nodes 100 \
-  --backfill_policy conservative
-
-# Pure FCFS (no backfilling)
-./simulator trace.csv \
-  --total_nodes 100 \
-  --backfill_policy none
-```
-
-### Statistical Duration Sampling
-```bash
-./simulator trace.csv \
-  --total_nodes 100 \
-  --duration_mode distribution \
-  --duration_distribution normal \
-  --duration_scale 0.9 \
-  --duration_stddev 0.1 \
-  --seed 42
-```
-
-## See Also
-
-- [User Guide Overview](overview.md) - Complete user guide with trace formats and simulation modes
-- [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Scheduling algorithm details
-- [Quick Start](../getting-started/quickstart.md) - Quick reference
-- [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
-
-## Configuration Files (Protocol Buffer)
-
-Instead of long command lines, use a `.textproto` configuration file:
-
-### Basic Config File
-
-`config.textproto`:
-```protobuf
-simulation_params {
-  infile: "trace.csv"
-  outfile: "results.csv"
-  total_nodes: 1000
-  backfill_policy: "easy"
-  priority_policy: "fcfs"
-}
-```
-
-Run with:
-```bash
-./simulator --config config.textproto
-```
-
-### Config + Command-Line Override
-
-Command-line arguments override config file values:
-
-```bash
-# Config says total_nodes: 1000, command-line overrides to 2000
-./simulator --config config.textproto --total_nodes 2000
-```
+**Requires:** Simulator built with `-DDR_EVT_ENABLE_PROTOBUF=ON`
 
 **Precedence (highest to lowest):**
 1. Command-line arguments (highest priority)
 2. Config file (`--config`)
 3. Built-in defaults (lowest priority)
 
-### All Options in Config File
-
-```protobuf
-simulation_params {
-  # === Input/Output ===
-  infile: "workload.csv"
-  outfile: "schedule.csv"
-  
-  # === System ===
-  total_nodes: 2000
-  seed: 42
-  
-  # === Scheduling ===
-  backfill_policy: "easy"        # easy | conservative | none
-  priority_policy: "fcfs"        # fcfs | sjf | ljf
-  runtime_mode: "limit"          # limit | actual
-  
-  # === Trace Format ===
-  trace_format: "simple"         # simple | lassen
-  timestamp_format: "epoch"      # epoch | iso
-  timezone: "America/Los_Angeles"
-  
-  # === Duration Simulation ===
-  duration_mode: "distribution"  # exact | column | distribution
-  duration_distribution: "normal" # normal | uniform | exponential
-  duration_scale: 0.8            # Scale factor (0.0 - 1.0)
-  duration_stddev: 0.15          # Standard deviation
-  
-  # === Limits ===
-  max_jobs: 100000
-  time_limit: 86400              # Stop after 24 hours sim time
-  
-  # === Output ===
-  verbose: false
-}
+**Example:**
+```bash
+./build/simulator traces/jobs.csv \
+    --config config.textproto \
+    --total_nodes 200  # Overrides config file value
 ```
 
-### Common Configuration Patterns
+For the full `.textproto` schema, worked examples (including how to set
+`queue_impl`/`circular_capacity`/`circular_overflow` this way), and common
+configuration patterns, see
+[Protobuf Configuration](protobuf-config.md).
 
-**Replay Mode (Reproduce Historical Behavior):**
-```protobuf
-simulation_params {
-  infile: "production_trace.csv"
-  total_nodes: 2048
-  
-  runtime_mode: "actual"         # Use actual runtimes from trace
-  duration_mode: "column"
-  
-  backfill_policy: "easy"
-  trace_format: "lassen"
-  timestamp_format: "iso"
-  timezone: "America/Los_Angeles"
-}
+## Debug Options
+
+### `-v, --verbose`
+Enable verbose output for debugging.
+
+**Output includes:**
+- Simulation progress
+- Scheduling decisions
+- Resource usage
+- Job state transitions
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --verbose
 ```
 
-**What-If Analysis (Test Different Policy):**
-```protobuf
-simulation_params {
-  infile: "production_trace.csv"
-  total_nodes: 2048
-  
-  runtime_mode: "limit"          # Use scheduler estimates
-  duration_mode: "distribution"  # Realistic variation
-  duration_distribution: "normal"
-  duration_scale: 0.85           # Jobs run ~85% of time_limit
-  duration_stddev: 0.1           # ±10% variation
-  
-  backfill_policy: "conservative" # Try different policy!
-}
+### `-h, --help`
+Display help message with all options.
+
+```bash
+./build/simulator --help
 ```
 
-**Capacity Planning (Test With More Load):**
-```protobuf
-simulation_params {
-  infile: "synthetic_high_load.csv"
-  total_nodes: 1500              # Test with fewer nodes
-  
-  runtime_mode: "limit"
-  duration_mode: "exact"
-  
-  time_limit: 604800             # Simulate 7 days
-  verbose: true
-}
+## Common Usage Patterns
+
+### Basic Simulation
+```bash
+./build/simulator input.csv \
+    --total_nodes 100 \
+    --trace_format simple \
+    --timestamp_format epoch \
+    --duration_mode exact \
+    --outfile output.csv
 ```
 
-### Validation
-
-Protobuf validates configuration:
-- Type checking (integers, strings, booleans)
-- Unknown field detection
-- Invalid enum values
-
-Example error:
-```
-Error: Unknown field "totalnodes" (did you mean "total_nodes"?)
+### Simulation with Resource Tracking
+```bash
+./build/simulator input.csv \
+    --total_nodes 100 \
+    --outfile jobs.csv \
+    --resource_trace resources.csv
 ```
 
+### With Real HPC Trace
+```bash
+./build/simulator lassen_trace.csv \
+    --total_nodes 795 \
+    --trace_format lassen \
+    --timestamp_format iso \
+    --timezone America/Los_Angeles \
+    --runtime_mode actual \
+    --outfile simulation_results.csv \
+    --verbose
+```
+
+### Replay Mode (Reproduce Historical Behavior)
+```bash
+# runtime_mode=actual + duration_mode=column together reproduce exactly
+# what happened on the real system: actual runtimes drive both the
+# scheduler's decisions and how long each job actually takes.
+./build/simulator production_trace.csv \
+    --total_nodes 2048 \
+    --trace_format lassen \
+    --timestamp_format iso \
+    --timezone America/Los_Angeles \
+    --runtime_mode actual \
+    --duration_mode column \
+    --backfill_policy easy \
+    --priority_policy fcfs \
+    --outfile replay_results.csv
+```
+
+### Different Scheduling Policies
+```bash
+# EASY backfilling with SJF
+./build/simulator input.csv \
+    --backfill_policy easy \
+    --priority_policy sjf \
+    --outfile results.csv
+
+# Conservative backfilling
+./build/simulator input.csv \
+    --backfill_policy conservative \
+    --outfile results.csv
+
+# Pure FCFS (no backfilling)
+./build/simulator input.csv \
+    --backfill_policy none \
+    --outfile results.csv
+```
+
+### Distribution-Based Duration Simulation
+```bash
+./build/simulator input.csv \
+    --duration_mode distribution \
+    --duration_distribution lognormal \
+    --duration_scale 0.85 \
+    --duration_stddev 0.15 \
+    --seed 42 \
+    --outfile simulated.csv
+```
+
+### Using Config File
+```bash
+./build/simulator input.csv --config my_config.textproto
+```
+
+## See Also
+
+- [User Guide Overview](overview.md) - Complete user guide with trace formats and simulation modes
+- [Protobuf Configuration](protobuf-config.md) - Full `.textproto` schema and worked examples
+- [Streaming API](../STREAMING_API.md) - Programmatic C++ API for online simulation
+- [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Scheduling algorithm details
+- [Quick Start](../getting-started/quickstart.md) - Quick reference
+- [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
+- [Test Suite](../../tests/README.md) - Example usage in test scripts
+- [Block Queue Implementation](../dev/design-decisions/BLOCK_QUEUE.md) - Performance analysis of `--queue_impl block`
+- [Circular Queue Implementation](../dev/design-decisions/CIRCULAR_QUEUE.md) - Performance analysis of `--queue_impl circular`

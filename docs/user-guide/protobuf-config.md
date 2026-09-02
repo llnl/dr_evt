@@ -356,6 +356,6 @@ Error parsing config file: Unknown field "totalnodes" (did you mean "total_nodes
 
 ## See Also
 
-- [CLI Options](../CLI_OPTIONS.md) - Command-line alternatives to protobuf config
+- [CLI Options](command-line.md) - Command-line alternatives to protobuf config
 - [User Guide Overview](overview.md) - Trace formats and simulation modes
 - [Quick Start](../getting-started/quickstart.md) - Basic usage examples

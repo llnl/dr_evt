@@ -78,7 +78,7 @@ print(f"Running: {stats.jobs_running}, Waiting: {stats.jobs_waiting}")
 
 ## Configuration Parameters
 
-All CLI options are available through `SimParams`. See [CLI_OPTIONS.md](CLI_OPTIONS.md) for detailed descriptions.
+All CLI options are available through `SimParams`. See [command-line.md](user-guide/command-line.md) for detailed descriptions.
 
 ### Input/Output
 
@@ -641,7 +641,7 @@ Some parameters are not yet exposed in Python bindings:
 
 Full API documentation: [python/README.md](../python/README.md)
 
-CLI options reference: [CLI_OPTIONS.md](CLI_OPTIONS.md)
+CLI options reference: [command-line.md](user-guide/command-line.md)
 
 ## Comparison: Python vs C++ API
 
@@ -672,7 +672,7 @@ To add new Python bindings:
 
 ## See Also
 
-- [CLI Options](CLI_OPTIONS.md) - Complete CLI reference
+- [CLI Options](user-guide/command-line.md) - Complete CLI reference
 - [C++ Streaming API](STREAMING_API.md) - C++ API documentation
 - [Python Examples](../python/example_streaming.py) - Working code examples
 - [Python API Details](../python/README.md) - Detailed Python reference

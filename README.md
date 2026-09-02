@@ -49,7 +49,7 @@ For quick access without leaving GitHub:
 - **[Streaming API](docs/STREAMING_API.md)** - Online simulation API
 - **[Client/Server (gRPC)](docs/CLIENT_SERVER_GUIDE.md)** - Remote simulation over network
 - **[Python API](docs/PYTHON_API.md)** - Python bindings and reference implementation
-- **[CLI Options](docs/CLI_OPTIONS.md)** - Command-line reference
+- **[CLI Options](docs/user-guide/command-line.md)** - Command-line reference
 - **[Testing Guide](docs/TESTING_GUIDE.md)** - Test philosophy, organization, and test suite details
 - **[Test Suite](tests/README.md)** - All tests and validation
 - **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity 

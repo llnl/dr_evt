@@ -32,7 +32,7 @@ make dr_evt_server-bin dr_evt_client-bin
 gRPC service definition (`dr_evt_service.proto`) is itself built on the
 Protobuf runtime. When gRPC is enabled, it also becomes the sole provider
 of Protobuf support for the rest of the project (including the existing
-`--config` file feature, see `docs/CLI_OPTIONS.md`) - `SetupProtobuf.cmake`
+`--config` file feature, see `docs/user-guide/command-line.md`) - `SetupProtobuf.cmake`
 is skipped entirely in that case, since gRPC's own Protobuf is already
 fully sufficient, and running both independently would mean building or
 linking two separate copies of Protobuf for no benefit.
