@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="196" height="128" viewBox="0 0 196 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- DR_EVT Logo - INVERTED: Light clock on white background -->
+
+  <defs>
+    <radialGradient id="clockGradientInv" cx="35%" cy="35%" r="70%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#e8f0f5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d0dce5;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="glassHighlightInv" cx="30%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    </radialGradient>
+    <linearGradient id="handGradientInv" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0088cc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#006699;stop-opacity:1" />
+    </linearGradient>
+    <filter id="cyberGlowInv">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="dropShadowInv">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.15"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- White background -->
+  <rect width="196" height="128" fill="#f5f7fa"/>
+
+  <!-- Direction lines -->
+  <line x1="0" y1="10" x2="132" y2="10" stroke="#0088cc" stroke-width="1" opacity="0.3"/>
+  <line x1="0" y1="22" x2="130" y2="22" stroke="#0099cc" stroke-width="1" opacity="0.25"/>
+  <line x1="0" y1="34" x2="128" y2="34" stroke="#0088cc" stroke-width="1" opacity="0.3"/>
+  <line x1="0" y1="46" x2="116" y2="46" stroke="#0099cc" stroke-width="1" opacity="0.25"/>
+  <line x1="0" y1="58" x2="114" y2="58" stroke="#0088cc" stroke-width="1" opacity="0.25"/>
+  <line x1="0" y1="70" x2="114" y2="70" stroke="#0099cc" stroke-width="1" opacity="0.25"/>
+  <line x1="0" y1="82" x2="116" y2="82" stroke="#0088cc" stroke-width="1" opacity="0.3"/>
+  <line x1="0" y1="94" x2="128" y2="94" stroke="#0099cc" stroke-width="1" opacity="0.25"/>
+  <line x1="0" y1="106" x2="130" y2="106" stroke="#0088cc" stroke-width="1" opacity="0.25"/>
+  <line x1="0" y1="118" x2="132" y2="118" stroke="#0099cc" stroke-width="1" opacity="0.25"/>
+
+  <!-- Arrows -->
+  <polygon points="128,8 132,10 128,12" fill="#0088cc" opacity="0.4"/>
+  <polygon points="126,20 130,22 126,24" fill="#0099cc" opacity="0.35"/>
+  <polygon points="124,32 128,34 124,36" fill="#0088cc" opacity="0.4"/>
+  <polygon points="112,44 116,46 112,48" fill="#0099cc" opacity="0.35"/>
+  <polygon points="110,56 114,58 110,60" fill="#0088cc" opacity="0.35"/>
+  <polygon points="110,68 114,70 110,72" fill="#0099cc" opacity="0.35"/>
+  <polygon points="112,80 116,82 112,84" fill="#0088cc" opacity="0.4"/>
+  <polygon points="124,92 128,94 124,96" fill="#0099cc" opacity="0.35"/>
+  <polygon points="126,104 130,106 126,108" fill="#0088cc" opacity="0.35"/>
+  <polygon points="128,116 132,118 128,120" fill="#0099cc" opacity="0.35"/>
+
+  <!-- Event Streams - TOP -->
+  <rect x="0" y="8" width="4" height="4" fill="#0088cc" opacity="0.9"/>
+  <rect x="16" y="8" width="4" height="4" fill="#0088cc" opacity="0.8"/>
+  <rect x="32" y="8" width="4" height="4" fill="#0088cc" opacity="0.7"/>
+  <rect x="48" y="8" width="4" height="4" fill="#0088cc" opacity="0.6"/>
+  <rect x="64" y="8" width="4" height="4" fill="#0088cc" opacity="0.5"/>
+  <rect x="80" y="8" width="4" height="4" fill="#0088cc" opacity="0.4"/>
+  <rect x="96" y="8" width="4" height="4" fill="#0088cc" opacity="0.3"/>
+  <rect x="112" y="8" width="4" height="4" fill="#0088cc" opacity="0.25"/>
+  <rect x="124" y="8" width="4" height="4" fill="#0088cc" opacity="0.2"/>
+
+  <rect x="8" y="20" width="4" height="4" fill="#0099cc" opacity="0.8"/>
+  <rect x="24" y="20" width="4" height="4" fill="#0099cc" opacity="0.7"/>
+  <rect x="40" y="20" width="4" height="4" fill="#0099cc" opacity="0.6"/>
+  <rect x="56" y="20" width="4" height="4" fill="#0099cc" opacity="0.5"/>
+  <rect x="72" y="20" width="4" height="4" fill="#0099cc" opacity="0.4"/>
+  <rect x="88" y="20" width="4" height="4" fill="#0099cc" opacity="0.3"/>
+  <rect x="104" y="20" width="4" height="4" fill="#0099cc" opacity="0.25"/>
+  <rect x="120" y="20" width="4" height="4" fill="#0099cc" opacity="0.2"/>
+
+  <rect x="4" y="32" width="4" height="4" fill="#0088cc" opacity="1.0"/>
+  <rect x="16" y="32" width="4" height="4" fill="#0088cc" opacity="0.9"/>
+  <rect x="28" y="32" width="4" height="4" fill="#0088cc" opacity="0.8"/>
+  <rect x="40" y="32" width="4" height="4" fill="#0088cc" opacity="0.7"/>
+  <rect x="52" y="32" width="4" height="4" fill="#0088cc" opacity="0.6"/>
+  <rect x="64" y="32" width="4" height="4" fill="#0088cc" opacity="0.5"/>
+  <rect x="76" y="32" width="4" height="4" fill="#0088cc" opacity="0.4"/>
+  <rect x="88" y="32" width="4" height="4" fill="#0088cc" opacity="0.3"/>
+  <rect x="100" y="32" width="4" height="4" fill="#0088cc" opacity="0.25"/>
+  <rect x="112" y="32" width="4" height="4" fill="#0088cc" opacity="0.2"/>
+
+  <!-- MIDDLE -->
+  <rect x="12" y="44" width="4" height="4" fill="#0099cc" opacity="0.7"/>
+  <rect x="36" y="44" width="4" height="4" fill="#0099cc" opacity="0.6"/>
+  <rect x="60" y="44" width="4" height="4" fill="#0099cc" opacity="0.5"/>
+  <rect x="84" y="44" width="4" height="4" fill="#0099cc" opacity="0.4"/>
+  <rect x="104" y="44" width="4" height="4" fill="#0099cc" opacity="0.3"/>
+
+  <rect x="20" y="56" width="4" height="4" fill="#0088cc" opacity="0.7"/>
+  <rect x="44" y="56" width="4" height="4" fill="#0088cc" opacity="0.6"/>
+  <rect x="68" y="56" width="4" height="4" fill="#0088cc" opacity="0.5"/>
+  <rect x="92" y="56" width="4" height="4" fill="#0088cc" opacity="0.4"/>
+
+  <rect x="8" y="68" width="4" height="4" fill="#0099cc" opacity="0.7"/>
+  <rect x="28" y="68" width="4" height="4" fill="#0099cc" opacity="0.6"/>
+  <rect x="48" y="68" width="4" height="4" fill="#0099cc" opacity="0.5"/>
+  <rect x="68" y="68" width="4" height="4" fill="#0099cc" opacity="0.4"/>
+  <rect x="88" y="68" width="4" height="4" fill="#0099cc" opacity="0.3"/>
+
+  <rect x="0" y="80" width="4" height="4" fill="#0088cc" opacity="0.9"/>
+  <rect x="16" y="80" width="4" height="4" fill="#0088cc" opacity="0.7"/>
+  <rect x="32" y="80" width="4" height="4" fill="#0088cc" opacity="0.6"/>
+  <rect x="48" y="80" width="4" height="4" fill="#0088cc" opacity="0.5"/>
+  <rect x="64" y="80" width="4" height="4" fill="#0088cc" opacity="0.4"/>
+  <rect x="80" y="80" width="4" height="4" fill="#0088cc" opacity="0.35"/>
+  <rect x="96" y="80" width="4" height="4" fill="#0088cc" opacity="0.3"/>
+
+  <!-- BOTTOM -->
+  <rect x="4" y="92" width="4" height="4" fill="#0099cc" opacity="0.9"/>
+  <rect x="16" y="92" width="4" height="4" fill="#0099cc" opacity="0.8"/>
+  <rect x="28" y="92" width="4" height="4" fill="#0099cc" opacity="0.7"/>
+  <rect x="40" y="92" width="4" height="4" fill="#0099cc" opacity="0.6"/>
+  <rect x="52" y="92" width="4" height="4" fill="#0099cc" opacity="0.5"/>
+  <rect x="64" y="92" width="4" height="4" fill="#0099cc" opacity="0.4"/>
+  <rect x="76" y="92" width="4" height="4" fill="#0099cc" opacity="0.35"/>
+  <rect x="88" y="92" width="4" height="4" fill="#0099cc" opacity="0.3"/>
+  <rect x="100" y="92" width="4" height="4" fill="#0099cc" opacity="0.25"/>
+  <rect x="112" y="92" width="4" height="4" fill="#0099cc" opacity="0.2"/>
+
+  <rect x="12" y="104" width="4" height="4" fill="#0088cc" opacity="0.7"/>
+  <rect x="32" y="104" width="4" height="4" fill="#0088cc" opacity="0.6"/>
+  <rect x="52" y="104" width="4" height="4" fill="#0088cc" opacity="0.5"/>
+  <rect x="72" y="104" width="4" height="4" fill="#0088cc" opacity="0.4"/>
+  <rect x="92" y="104" width="4" height="4" fill="#0088cc" opacity="0.3"/>
+  <rect x="112" y="104" width="4" height="4" fill="#0088cc" opacity="0.25"/>
+
+  <rect x="8" y="116" width="4" height="4" fill="#0099cc" opacity="0.6"/>
+  <rect x="28" y="116" width="4" height="4" fill="#0099cc" opacity="0.5"/>
+  <rect x="48" y="116" width="4" height="4" fill="#0099cc" opacity="0.4"/>
+  <rect x="68" y="116" width="4" height="4" fill="#0099cc" opacity="0.35"/>
+  <rect x="88" y="116" width="4" height="4" fill="#0099cc" opacity="0.3"/>
+  <rect x="108" y="116" width="4" height="4" fill="#0099cc" opacity="0.25"/>
+  <rect x="124" y="116" width="4" height="4" fill="#0099cc" opacity="0.2"/>
+
+  <!-- Clock centered at x=128, y=64 -->
+  <g transform="translate(128, 0)" filter="url(#dropShadowInv)">
+    <!-- Clock face - smooth circular -->
+    <ellipse cx="0" cy="64" rx="56" ry="56" fill="url(#clockGradientInv)" opacity="0.98"/>
+
+    <!-- Glass highlight overlay -->
+    <ellipse cx="-12" cy="48" rx="32" ry="28" fill="url(#glassHighlightInv)"/>
+
+    <!-- Subtle rim highlight -->
+    <ellipse cx="-8" cy="50" rx="28" ry="24" fill="#ffffff" opacity="0.4"/>
+
+    <!-- Hour markers - squares at 12, 3, 6, 9 (radius ~50px from center) -->
+    <rect x="-3" y="11" width="6" height="6" fill="#0088cc" filter="url(#cyberGlowInv)"/>
+    <rect x="47" y="61" width="6" height="6" fill="#0088cc" filter="url(#cyberGlowInv)"/>
+    <rect x="-3" y="111" width="6" height="6" fill="#0088cc" filter="url(#cyberGlowInv)"/>
+    <rect x="-53" y="61" width="6" height="6" fill="#0088cc" filter="url(#cyberGlowInv)"/>
+
+    <!-- Subtle dots at radius ~50px -->
+    <rect x="24" y="20" width="3" height="3" fill="#0088cc" opacity="0.5"/>   <!-- 1 o'clock -->
+    <rect x="42" y="38" width="3" height="3" fill="#0088cc" opacity="0.5"/>   <!-- 2 o'clock -->
+    <rect x="24" y="106" width="3" height="3" fill="#0088cc" opacity="0.5"/>  <!-- 4 o'clock -->
+    <rect x="42" y="88" width="3" height="3" fill="#0088cc" opacity="0.5"/>   <!-- 5 o'clock -->
+    <rect x="-44" y="88" width="3" height="3" fill="#0088cc" opacity="0.5"/>  <!-- 7 o'clock -->
+    <rect x="-26" y="106" width="3" height="3" fill="#0088cc" opacity="0.5"/> <!-- 8 o'clock -->
+    <rect x="-26" y="20" width="3" height="3" fill="#0088cc" opacity="0.5"/>  <!-- 10 o'clock -->
+    <rect x="-44" y="38" width="3" height="3" fill="#0088cc" opacity="0.5"/>  <!-- 11 o'clock -->
+
+    <!-- Hour hand - very pixelated with 6x6 blocks -->
+    <rect x="-3" y="58" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="-9" y="52" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="-15" y="46" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="-21" y="40" width="6" height="6" fill="url(#handGradientInv)"/>
+
+    <!-- Minute hand - very pixelated with 6x6 blocks -->
+    <rect x="3" y="58" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="9" y="52" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="15" y="46" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="21" y="40" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="27" y="34" width="6" height="6" fill="url(#handGradientInv)"/>
+    <rect x="33" y="28" width="6" height="6" fill="url(#handGradientInv)"/>
+
+    <!-- Center pivot -->
+    <ellipse cx="0" cy="64" rx="7" ry="7" fill="#556677"/>
+    <ellipse cx="0" cy="64" rx="5" ry="5" fill="#0088cc" opacity="0.9"/>
+    <ellipse cx="-1" cy="63" rx="2" ry="2" fill="#66aacc"/>
+  </g>
+</svg>

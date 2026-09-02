@@ -65,11 +65,14 @@ master_doc = 'index'
 # HTML output options
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
-html_logo = None
-html_favicon = None
+html_logo = '_static/dr_evt_logo.svg'
+html_favicon = '_static/favicon.ico'
 
 # Theme options
 html_theme_options = {
+    'logo_only': False,
+    'display_version': True,
+    'style_nav_header_background': '#2c3e50',
     'navigation_depth': 4,
     'collapse_navigation': False,
     'sticky_navigation': True,

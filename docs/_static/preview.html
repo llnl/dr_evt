@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DR_EVT Logo Preview</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .preview-section {
+            margin: 40px 0;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .preview-section h2 {
+            margin-top: 0;
+            color: #34495e;
+        }
+        .dark-bg {
+            background: #1a1a1a;
+        }
+        .dark-bg h2 {
+            color: #ecf0f1;
+        }
+        .logo-container {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .logo-item {
+            text-align: center;
+        }
+        .logo-item p {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        .dark-bg .logo-item p {
+            color: #95a5a6;
+        }
+        img {
+            display: block;
+        }
+        .color-info {
+            display: inline-block;
+            padding: 4px 12px;
+            margin: 4px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .dark-bg .color-info {
+            background: #34495e;
+            color: #ecf0f1;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 DR_EVT Logo - HPC/Supercomputer Theme</h1>
+
+    <div class="preview-section">
+        <h2>Light Background Preview</h2>
+        <div class="logo-container">
+            <div class="logo-item">
+                <img src="dr_evt_logo.svg" alt="DR_EVT Logo" width="128" height="128">
+                <p>Main Logo (128x128)</p>
+            </div>
+            <div class="logo-item">
+                <img src="dr_evt_logo.svg" alt="DR_EVT Logo" width="64" height="64">
+                <p>Medium (64x64)</p>
+            </div>
+            <div class="logo-item">
+                <img src="favicon.ico" alt="Favicon" width="32" height="32">
+                <p>Favicon (32x32)</p>
+            </div>
+        </div>
+
+        <h3>Color Palette</h3>
+        <div>
+            <span class="color-info">#2c3e50 Dark Slate</span>
+            <span class="color-info">#00d4ff Electric Cyan</span>
+            <span class="color-info">#34495e Metal Gray</span>
+        </div>
+    </div>
+
+    <div class="preview-section dark-bg">
+        <h2>Dark Background Preview</h2>
+        <div class="logo-container">
+            <div class="logo-item">
+                <img src="dr_evt_logo_dark.svg" alt="DR_EVT Logo Dark" width="128" height="128">
+                <p>Dark Theme (128x128)</p>
+            </div>
+            <div class="logo-item">
+                <img src="dr_evt_logo_dark.svg" alt="DR_EVT Logo Dark" width="64" height="64">
+                <p>Medium (64x64)</p>
+            </div>
+            <div class="logo-item">
+                <img src="favicon.ico" alt="Favicon" width="32" height="32">
+                <p>Favicon (32x32)</p>
+            </div>
+        </div>
+
+        <h3>Dark Theme Colors</h3>
+        <div>
+            <span class="color-info">#1a252f Charcoal</span>
+            <span class="color-info">#00ffff Bright Cyan</span>
+            <span class="color-info">#7f8c8d Light Gray</span>
+        </div>
+    </div>
+
+    <div class="preview-section">
+        <h2>✅ Fixed Issues</h2>
+        <ul>
+            <li><strong>Hour hand position:</strong> Now correctly positioned just slightly past 10 (not halfway to 11)</li>
+            <li><strong>Color scheme:</strong> Changed to HPC/Supercomputer theme with dark slate face and electric cyan accents</li>
+            <li><strong>Hand ratio:</strong> Hour hand is ~50% length of minute hand (proper proportion)</li>
+        </ul>
+
+        <h3>Design Features</h3>
+        <ul>
+            <li>Dark slate → charcoal gradient background</li>
+            <li>Electric cyan hands with gradient (#00d4ff → #0099cc)</li>
+            <li>Cyan glow effects on hour markers</li>
+            <li>Professional HPC/tech aesthetic</li>
+            <li>Pixelated style = discrete event simulation</li>
+        </ul>
+    </div>
+
+    <div class="preview-section">
+        <h2>📝 Implementation</h2>
+        <p>The logo has been integrated into Sphinx documentation:</p>
+        <ul>
+            <li><code>docs/conf.py</code> updated with logo paths</li>
+            <li>Logo will appear in top-left of documentation when built</li>
+            <li>Favicon configured for browser tabs</li>
+        </ul>
+
+        <h3>To rebuild documentation:</h3>
+        <pre style="background: #2c3e50; color: #00d4ff; padding: 15px; border-radius: 4px;">cd docs
+make clean
+make html
+open _build/html/index.html</pre>
+    </div>
+</body>
+</html>
