@@ -126,6 +126,10 @@ int main(int argc, char** argv)
         init->set_runtime_mode("limit");
         init->set_duration_mode("exact");
         init->set_infile(trace_file);
+        // Demonstrates the queue_impl field added to InitRequest -
+        // produces identical results to the default (deque), since
+        // deque and circular are verified byte-for-byte equivalent.
+        init->set_queue_impl("circular");
         client.call(init_req);
         std::cout << "Session initialized." << std::endl;
 

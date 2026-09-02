@@ -57,6 +57,25 @@ message InitRequest {
     string duration_mode = 8;      // "column", "exact", or "distribution"
     bool msec_output = 9;
     string infile = 10;            // trace file path (server-side path)
+
+    // Queue implementation (FCFS scheduler only). Empty string keeps
+    // Sim_Params' own default (deque).
+    string queue_impl = 11;        // "deque", "multimap", "block", or "circular"
+
+    // Block size for block queue implementation (must be power of 2).
+    // Ignored unless queue_impl is "block". 0 keeps Sim_Params' own
+    // default (128).
+    uint32 block_size = 12;
+
+    // Initial capacity for circular queue implementation. Ignored
+    // unless queue_impl is "circular". 0 keeps Sim_Params' own default
+    // (size of the job trace, large enough it can never overflow).
+    uint64 circular_capacity = 13;
+
+    // What to do if a circular queue insert would exceed
+    // circular_capacity. Ignored unless queue_impl is "circular".
+    // Empty string keeps Sim_Params' own default (grow).
+    string circular_overflow = 14; // "abort" or "grow"
 }
 
 message InitializeTraceRequest {

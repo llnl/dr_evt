@@ -190,6 +190,53 @@ static void set_sim_options(
         sp.m_duration_stddev = 0.0;
     }
 
+    // Queue implementation (default: DEQUE)
+    if (!cfg.queue_impl().empty()) {
+        std::string impl = cfg.queue_impl();
+        if (impl == "deque") {
+            sp.m_queue_impl = QueueImplementation::DEQUE;
+        } else if (impl == "multimap") {
+            sp.m_queue_impl = QueueImplementation::MULTIMAP;
+        } else if (impl == "block") {
+            sp.m_queue_impl = QueueImplementation::BLOCK;
+        } else if (impl == "circular") {
+            sp.m_queue_impl = QueueImplementation::CIRCULAR;
+        } else {
+            std::cerr << "Warning: Unknown queue_impl in protobuf: " << impl
+                     << " (using default: deque)" << std::endl;
+            sp.m_queue_impl = QueueImplementation::DEQUE;
+        }
+    } else {
+        sp.m_queue_impl = QueueImplementation::DEQUE;
+    }
+
+    // Block size for block queue implementation (0 means use default from Sim_Params constructor)
+    if (cfg.block_size() > 0) {
+        sp.m_block_size = cfg.block_size();
+    }
+
+    // Initial capacity for circular queue implementation (0 means use
+    // default from Sim_Params constructor - size of the job trace)
+    if (cfg.circular_capacity() > 0) {
+        sp.m_circular_capacity = cfg.circular_capacity();
+    }
+
+    // Circular queue overflow policy (default: GROW)
+    if (!cfg.circular_overflow().empty()) {
+        std::string policy = cfg.circular_overflow();
+        if (policy == "abort") {
+            sp.m_circular_overflow = CircularOverflowPolicy::ABORT;
+        } else if (policy == "grow") {
+            sp.m_circular_overflow = CircularOverflowPolicy::GROW;
+        } else {
+            std::cerr << "Warning: Unknown circular_overflow in protobuf: " << policy
+                     << " (using default: grow)" << std::endl;
+            sp.m_circular_overflow = CircularOverflowPolicy::GROW;
+        }
+    } else {
+        sp.m_circular_overflow = CircularOverflowPolicy::GROW;
+    }
+
     // Handle defaults
     if (!sp.m_is_time_set) {
         sp.m_max_time = dr_evt::max_sim_time;

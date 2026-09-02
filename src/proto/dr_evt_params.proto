@@ -46,10 +46,17 @@ message DR_EVT_Params {
         double duration_stddev = 18;    // Standard deviation factor (default: 0.0)
 
         // Queue implementation (FCFS scheduler only)
-        string queue_impl = 19;         // "deque", "multimap", or "block" (default: "deque")
+        string queue_impl = 19;         // "deque", "multimap", "block", or "circular" (default: "deque")
 
         // Block size for block queue implementation (must be power of 2)
         uint32 block_size = 20;         // 32, 64, 128, or 256 (default: 128)
+
+        // Initial capacity for circular queue implementation. 0 means
+        // the size of the job trace (large enough it can never overflow).
+        uint64 circular_capacity = 21;  // (default: 0)
+
+        // What to do if a circular queue insert would exceed circular_capacity
+        string circular_overflow = 22;  // "abort" or "grow" (default: "grow")
     }
 
     message Tracing_Params {

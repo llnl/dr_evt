@@ -81,6 +81,27 @@ public:
                         else if (r.duration_mode() == "exact") sp.m_duration_mode = dr_evt::DurationMode::EXACT;
                         else if (r.duration_mode() == "distribution") sp.m_duration_mode = dr_evt::DurationMode::DISTRIBUTION;
 
+                        // Empty/zero request fields keep Sim_Params' own
+                        // constructor defaults (deque, block_size=128,
+                        // circular_capacity=0, overflow=grow) - see the
+                        // field comments in dr_evt_service.proto.
+                        if (r.queue_impl() == "deque") sp.m_queue_impl = dr_evt::QueueImplementation::DEQUE;
+                        else if (r.queue_impl() == "multimap") sp.m_queue_impl = dr_evt::QueueImplementation::MULTIMAP;
+                        else if (r.queue_impl() == "block") sp.m_queue_impl = dr_evt::QueueImplementation::BLOCK;
+                        else if (r.queue_impl() == "circular") sp.m_queue_impl = dr_evt::QueueImplementation::CIRCULAR;
+                        else if (!r.queue_impl().empty()) {
+                            throw std::runtime_error("Unknown queue_impl: " + r.queue_impl());
+                        }
+
+                        if (r.block_size() != 0) sp.m_block_size = r.block_size();
+                        if (r.circular_capacity() != 0) sp.m_circular_capacity = r.circular_capacity();
+
+                        if (r.circular_overflow() == "abort") sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::ABORT;
+                        else if (r.circular_overflow() == "grow") sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::GROW;
+                        else if (!r.circular_overflow().empty()) {
+                            throw std::runtime_error("Unknown circular_overflow: " + r.circular_overflow());
+                        }
+
                         sim = std::make_unique<dr_evt::Simulation>(sp);
                         resp.mutable_init()->set_ok(true);
                         break;
