@@ -296,7 +296,6 @@ if (DR_EVT_HAS_PROTOBUF)
                     "src/proto/utils.cpp uses it in preference to the "
                     "legacy Protobuf SetLogHandler API, when both are "
                     "available")
-    target_link_libraries(dr_evt PUBLIC absl::log_sink absl::log_sink_registry)
   else()
     message(STATUS "Abseil's full log_sink API is not available "
                     "(too old an Abseil, or built without gRPC) - "
@@ -398,6 +397,11 @@ if (DR_EVT_HAS_PROTOBUF)
   # tool there, just ensuring it's built before anything that invokes it.)
   target_link_libraries(dr_evt PUBLIC protobuf::libprotobuf)
   add_dependencies(dr_evt protobuf::protoc)
+  # DR_EVT_HAS_ABSL_LOG_SINK was already computed above (before this
+  # target existed) - only the actual link needed to wait until now.
+  if (DR_EVT_HAS_ABSL_LOG_SINK)
+    target_link_libraries(dr_evt PUBLIC absl::log_sink absl::log_sink_registry)
+  endif (DR_EVT_HAS_ABSL_LOG_SINK)
   if (DR_EVT_HAS_OPENMP)
     add_dependencies(dr_evt OpenMP::OpenMP_CXX)
     if (DR_EVT_HAS_NUMA)
