@@ -2,41 +2,6 @@
 
 This document describes all command-line options for the `simulator` binary.
 
-## Configuration Methods
-
-DR_EVT supports two ways to configure simulations:
-
-### 1. Command-Line Arguments (documented below)
-```bash
-./simulator trace.csv --total_nodes 1000 --backfill_policy easy
-```
-
-### 2. Protocol Buffer Config Files (recommended for complex setups)
-```bash
-./simulator --config sim_config.textproto
-```
-
-**When to use config files:**
-- ✅ Complex simulations with 10+ parameters
-- ✅ Reproducible configurations (version in git)
-- ✅ Sharing setups with team
-- ✅ Avoiding command-line mistakes
-
-**Configuration precedence:**
-1. Command-line arguments (highest priority)
-2. Config file (`--config`)
-3. Built-in defaults (lowest priority)
-
-**Example override:**
-```bash
-# Config file says total_nodes=1000, CLI overrides to 2000
-./simulator --config config.textproto --total_nodes 2000
-```
-
-**See:** [Command-Line Reference](user-guide/command-line.md#configuration-files-protocol-buffer) for protobuf config examples and all available parameters.
-
----
-
 ## Quick Reference
 
 ```bash
@@ -148,31 +113,81 @@ Wait queue implementation (FCFS scheduler only).
   - Tree-based container for differential testing
   - Produces identical schedules to `deque`
   - Useful for verifying FCFS correctness
-- `block` - BlockWaitQueue-based (optimized)
+- `block` - BlockWaitQueue-based
   - Block-based container with metadata pre-filtering
-  - Faster backfill search O(blocks) via block-level metadata
   - Tunable block size (default: 128 jobs per block)
-  - Recommended for >1000 queued jobs or backfill-heavy workloads
-  - **Performance:** 2-10x speedup on large-scale FCFS workloads
+  - **Performance:** `deque` is 30% faster even at the optimal block
+    size (16); smaller/larger sizes are worse still, up to 97% slower
+    at block size 256 (see `docs/dev/design-decisions/BLOCK_QUEUE.md`) - each block's
+    multi-index red-black trees dominate the overhead. Kept for
+    differential testing and as a reference implementation; not
+    recommended over `deque` or `circular` for typical HPC workloads.
+- `circular` - boost::circular_buffer-based
+  - Same O(1) push_back/pop_front as `deque`, but backed by one
+    contiguous array instead of `deque`'s chunked storage, so indexed
+    access (used throughout the backfill scan) is a direct offset
+    rather than a chunk-lookup-then-offset
+  - **Performance:** measured 14-28% *faster* than `deque` on a 10,000
+    job / 2,000 node benchmark (see `docs/dev/design-decisions/CIRCULAR_QUEUE.md`)
+  - Has a fixed capacity, unlike `deque` - see `--circular_capacity`
+    and `--circular_overflow` below
 
 **Default:** `deque`
 
 **Note:** This option only affects FCFS scheduler. SJF/LJF always use std::multimap
-(already efficient for priority-based scheduling). If `block` or `multimap` is specified
-with SJF/LJF, a warning is printed and the default multimap is used.
+(already efficient for priority-based scheduling). If `block`, `multimap`, or `circular`
+is specified with SJF/LJF, a warning is printed and the default multimap is used.
 
 **Examples:**
 ```bash
 # Standard FCFS with deque (default)
 ./build/simulator traces/jobs.csv --priority_policy fcfs
 
-# FCFS with block queue optimization (large-scale workloads)
+# FCFS with circular queue (typically the fastest option)
+./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl circular
+
+# FCFS with block queue (reference implementation, not recommended for performance)
 ./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl block
 
 # Differential testing: compare deque vs multimap (should produce identical output)
 ./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl deque --outfile output_deque.csv
 ./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl multimap --outfile output_multimap.csv
 diff output_deque.csv output_multimap.csv  # Should be identical
+```
+
+### `-A, --circular_capacity SIZE`
+Initial capacity of the circular queue. Only used when `--queue_impl circular`.
+
+**Default:** `0`, meaning the size of the job trace - large enough that the
+queue can never overflow, since at most one entry is inserted per job in the
+trace over the scheduler's lifetime.
+
+A smaller, explicit value trades that guarantee for a smaller initial
+allocation; see `--circular_overflow` for what happens if it's exceeded.
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular --circular_capacity 1000
+```
+
+### `-G, --circular_overflow {abort|grow}`
+What to do if an insert would exceed `--circular_capacity`. Only used when
+`--queue_impl circular`.
+
+**Options:**
+- `abort` - end the simulation with a clean error (`std::runtime_error`,
+  reported to stderr / to the gRPC client, exit code 1)
+- `grow` (default) - reallocate to double the current capacity via
+  `boost::circular_buffer::set_capacity()`, which preserves every existing
+  entry; the simulation continues normally
+
+**Default:** `grow`
+
+**Example:**
+```bash
+# Fail fast if the queue ever needs more than the pre-sized capacity
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular \
+    --circular_capacity 500 --circular_overflow abort
 ```
 
 ### `-r, --runtime_mode MODE`
@@ -426,4 +441,5 @@ Display help message with all options.
 
 - [Streaming API](STREAMING_API.md) - Programmatic C++ API for online simulation
 - [Test Suite](../tests/README.md) - Example usage in test scripts
-- [Performance Analysis](SCHEDULER_PERFORMANCE_ANALYSIS.md) - Performance characteristics
+- [Block Queue Implementation](dev/design-decisions/BLOCK_QUEUE.md) - Performance analysis of `--queue_impl block`
+- [Circular Queue Implementation](dev/design-decisions/CIRCULAR_QUEUE.md) - Performance analysis of `--queue_impl circular`

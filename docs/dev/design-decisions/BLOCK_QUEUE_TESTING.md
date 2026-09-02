@@ -24,10 +24,11 @@ The block queue implementation has been thoroughly tested for correctness and pe
 
 **`tests/test_fcfs_comprehensive.sh`**
 - Differential correctness testing
-- Compares 3 FCFS implementations:
+- Compares 4 FCFS implementations:
   - fcfs (deque-based, default)
   - fcfs_alt (multimap-based, for verification)
   - fcfs --queue_impl block (block queue, default size 128)
+  - fcfs --queue_impl circular (circular buffer queue - see `CIRCULAR_QUEUE.md`)
 - Tests 34 comprehensive test traces
 - Verifies byte-for-byte identical output across all implementations
 - Also includes Python reference performance comparison
@@ -47,12 +48,13 @@ The block queue implementation has been thoroughly tested for correctness and pe
 ### 3. Block Size Performance Comparison
 
 **`tests/benchmark_block_sizes.sh`**
-- Comprehensive performance testing across ALL block sizes (16, 32, 64, 128, 256)
+- Comprehensive performance testing across ALL block sizes (4, 8, 16, 32, 64, 128, 256)
+  plus the circular buffer queue (see `CIRCULAR_QUEUE.md`)
 - Tests on realistic large-scale workloads (10,000 jobs)
 - Verifies correctness (all must match deque output)
 - Measures performance (execution time, queue statistics)
-- Identifies optimal block size
-- Reports U-shaped performance curve
+- Identifies the best-performing implementation overall, not just the best block size
+- Reports U-shaped performance curve for block sizes
 
 **To run:**
 ```bash
@@ -66,10 +68,11 @@ The block queue implementation has been thoroughly tested for correctness and pe
 **Example output:**
 ```
 ==========================================
-Block Queue Performance Comparison
+Wait Queue Performance Comparison
 ==========================================
 Trace: tests/test_traces/scale/huge_10000jobs.csv
 Block sizes: 4 8 16 32 64 128 256
+Also testing: circular (boost::circular_buffer)
 
 Parameters:
   Jobs in trace: 10001
@@ -80,7 +83,7 @@ Parameters:
 1. BASELINE: Deque (default FCFS)
 ==========================================
 Running... done
-  Time: 1.397s
+  Time: 0.679s
   Avg queue: 3806.66
   Peak queue: 7703
 
@@ -88,48 +91,57 @@ Running... done
 2. BLOCK QUEUE: All Block Sizes
 ==========================================
 --- Block Size: 4 ---
-  Running... done (2.325s)
-  Checking correctness... ✓ PASS
+  Running... done (0.611s)
+  Checking correctness... ✓ PASS (identical to deque)
 
---- Block Size: 8 ---
-  Running... done (1.905s)
-  Checking correctness... ✓ PASS
-
---- Block Size: 16 ---
-  Running... done (1.823s)
-  Checking correctness... ✓ PASS
-
-[... etc ...]
+[... remaining block sizes ...]
 
 ==========================================
-3. SUMMARY: Performance & Correctness
+3. CIRCULAR QUEUE: boost::circular_buffer
+==========================================
+Running... done (0.490s)
+  Avg queue: 3806.66
+  Peak queue: 7703
+  Checking correctness... ✓ PASS (identical to deque)
+
+==========================================
+4. SUMMARY: Performance & Correctness
 ==========================================
 
-Impl         | Time (s)   | vs Deque   | Slowdown   | Peak Queue | Correctness 
+Impl         | Time (s)   | vs Deque   | Slowdown   | Peak Queue | Correctness
 -------------|------------|------------|------------|------------|-------------
-Deque        | 1.397      | 1.00x      | baseline   | 7703       | baseline    
-Block-4      | 2.325      | 1.66x      | +66%       | 7703       | ✓ PASS      
-Block-8      | 1.905      | 1.36x      | +36%       | 7703       | ✓ PASS      
-Block-16*    | 1.823      | 1.30x      | +30%       | 7703       | ✓ PASS      
-Block-32     | 2.043      | 1.46x      | +46%       | 7703       | ✓ PASS      
-Block-64     | 2.165      | 1.55x      | +55%       | 7703       | ✓ PASS      
-Block-128    | 2.521      | 1.80x      | +80%       | 7703       | ✓ PASS      
-Block-256    | 2.752      | 1.96x      | +97%       | 7703       | ✓ PASS      
+Deque        | .679       | 1.00x      | baseline   | 7703       | baseline
+Circular     | .490       | .72x       | -28%       | 7703       | PASS
+Block-4*     | .611       | .89x       | -10%       | 7703       | PASS
+Block-8*     | .530       | .78x       | -22%       | 7703       | PASS
+Block-16*    | .528       | .77x       | -22%       | 7703       | PASS
+Block-32     | .559       | .82x       | -18%       | 7703       | PASS
+Block-64     | .631       | .92x       | -7%        | 7703       | PASS
+Block-128    | .709       | 1.04x      | +4%        | 7703       | PASS
+Block-256    | .749       | 1.10x      | +10%       | 7703       | PASS
 
 ==========================================
-4. CONCLUSIONS
+5. CONCLUSIONS
 ==========================================
 
-✓ All block sizes produce identical output (correctness verified)
+✓ All block sizes and circular queue produce identical output (correctness verified)
 
 Best block size: Block-16
-  Time: 1.823s
-  vs Deque: 1.30x slower
+  Time: .528s
+  vs Deque: .77x slower
 
-Deque is 30% faster than best block size
+Best overall: Circular
+  Time: .490s
+  28% faster than deque
 
-RECOMMENDATION: Use deque (default) for typical HPC workloads
+RECOMMENDATION: Use --queue_impl circular for this workload
 ```
+
+Note: exact per-run numbers vary by hardware and run-to-run noise (this
+script times a single run per implementation) - which implementation wins
+"best overall" can vary between runs on the same machine, though circular
+has been faster than both deque and every block size in every run observed
+so far. See `CIRCULAR_QUEUE.md` for a 3-trial-averaged comparison.
 
 ## Test Traces
 
@@ -302,12 +314,13 @@ cd build && ctest
 
 ## Continuous Integration
 
-All tests run automatically on:
-- Every commit to main branch
-- All pull requests
-- Nightly builds
+`.github/workflows/tests.yml` runs on every push to `main`/`develop` and every
+pull request against them (gcc-11 and clang-14, in parallel).
 
-CI tests all configurations:
-- gcc-11, clang-14
-- deque, multimap, block queue (size 128)
-- All 170+ test traces
+Its "Run Queue Implementation Differential Tests" step runs
+`tests/test_fcfs_comprehensive.sh --correctness`, which exercises deque,
+multimap, block queue (size 128), and circular queue against the 34
+comprehensive test traces - the same script and traces described above.
+Other CI steps (the 34-trace comprehensive test against known-correct
+expected output, unit/feature/replay/config tests, etc.) always use the
+default deque queue.

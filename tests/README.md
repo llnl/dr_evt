@@ -336,7 +336,10 @@ run_replay_tests.sh        # replay methodology (hardcodes 3 comprehensive/ test
 run_configs_tests.sh       # protobuf config tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON)
 run_python_tests.sh        # python API tests (requires -DDR_EVT_BUILD_PYTHON=ON; not verified in this pass)
 run_streaming_tests.sh     # C++ streaming API test binary (requires building test_streaming_api target; not verified in this pass)
+run_grpc_tests.sh          # gRPC client/server tests (requires -DDR_EVT_ENABLE_GRPC=ON)
 test_all_dr_evt.sh         # comprehensive/ tests (see below)
+test_fcfs_comprehensive.sh # queue implementation differential testing (see below)
+benchmark_block_sizes.sh   # queue implementation performance comparison (see below)
 ```
 
 `test_all_dr_evt.sh` runs the simulator against every `comprehensive/`
@@ -356,6 +359,19 @@ mostly works.
 There is no equivalent runner for `scale/` - that has been done manually
 during development. `compare_with_analytical.sh`, referenced elsewhere in
 older docs, does not exist in this checkout.
+
+`test_fcfs_comprehensive.sh --correctness` checks something different from
+`test_all_dr_evt.sh`: not whether the C++ simulator matches the Python
+reference, but whether all four FCFS wait-queue implementations
+(`--queue_impl deque/multimap/block/circular`) produce byte-for-byte
+identical output to each other, across the same 34 comprehensive traces.
+Runs in CI. See `docs/dev/design-decisions/BLOCK_QUEUE.md` and `docs/dev/design-decisions/CIRCULAR_QUEUE.md` for what
+each non-default implementation is, and `docs/TESTING_GUIDE.md` for how
+this differs from the Python-reference comparison above.
+
+`benchmark_block_sizes.sh` measures performance (not correctness) across
+every block size and the circular queue, against a 10,000-job trace by
+default.
 
 ### Verification Scripts
 
@@ -509,6 +525,7 @@ cd ..
 - **Replay test methodology**: `REPLAY_TESTS.md`
 - **Algorithm**: `docs/EASY_BACKFILLING_ALGORITHM.md`
 - **User guide**: `docs/user-guide/`
+- **Queue implementation differential testing**: `docs/dev/design-decisions/BLOCK_QUEUE.md`, `docs/dev/design-decisions/CIRCULAR_QUEUE.md`
 
 (`docs/verification/`, `docs/development/algorithm.md`, and
 `CORRECTNESS_TEST_METHODOLOGY.md`, referenced by an earlier version of
