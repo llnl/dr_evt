@@ -79,9 +79,12 @@ run_correctness_tests() {
     echo "Part 1: Differential Correctness Testing"
     echo "=========================================="
     echo ""
-    echo "Purpose: Verify scheduler correctness by comparing two"
+    echo "Purpose: Verify scheduler correctness by comparing three"
     echo "independent FCFS implementations that should produce"
-    echo "identical results."
+    echo "identical results:"
+    echo "  - fcfs (deque-based, default)"
+    echo "  - fcfs_alt (multimap-based, differential testing)"
+    echo "  - fcfs with --queue_impl block (block-based, optimized)"
     echo ""
 
     PASS=0
@@ -140,37 +143,75 @@ run_correctness_tests() {
             --resource_trace "/tmp/fcfs_alt_${test_name}_resources.csv" \
             > /dev/null 2>&1
 
-        # Compare job schedules
-        if diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_alt_${test_name}.csv" > /dev/null 2>&1; then
-            SCHEDULE_MATCH=0
-        else
-            SCHEDULE_MATCH=1
+        # Run with block queue (priority_policy=fcfs, queue_impl=block)
+        if [ "$VERBOSE" = true ]; then
+            echo "  Running fcfs (block queue): $test_name"
+        fi
+        ./build/simulator "$test_file" \
+            --priority_policy fcfs \
+            --queue_impl block \
+            --total_nodes 100 \
+            --trace_format simple \
+            --timestamp_format epoch \
+            --duration_mode "$duration_mode" \
+            --backfill_policy easy \
+            --outfile "/tmp/fcfs_block_${test_name}.csv" \
+            --resource_trace "/tmp/fcfs_block_${test_name}_resources.csv" \
+            > /dev/null 2>&1
+
+        # Compare job schedules (all three must match)
+        SCHEDULE_MATCH_ALT=0
+        SCHEDULE_MATCH_BLOCK=0
+        RESOURCE_MATCH_ALT=0
+        RESOURCE_MATCH_BLOCK=0
+
+        if ! diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_alt_${test_name}.csv" > /dev/null 2>&1; then
+            SCHEDULE_MATCH_ALT=1
         fi
 
-        # Compare resource traces
-        if diff -q "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_alt_${test_name}_resources.csv" > /dev/null 2>&1; then
-            RESOURCE_MATCH=0
-        else
-            RESOURCE_MATCH=1
+        if ! diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_block_${test_name}.csv" > /dev/null 2>&1; then
+            SCHEDULE_MATCH_BLOCK=1
         fi
 
-        # Both must match
-        if [ $SCHEDULE_MATCH -eq 0 ] && [ $RESOURCE_MATCH -eq 0 ]; then
-            echo "✓ $test_name"
+        # Compare resource traces (all three must match)
+        if ! diff -q "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_alt_${test_name}_resources.csv" > /dev/null 2>&1; then
+            RESOURCE_MATCH_ALT=1
+        fi
+
+        if ! diff -q "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_block_${test_name}_resources.csv" > /dev/null 2>&1; then
+            RESOURCE_MATCH_BLOCK=1
+        fi
+
+        # All must match
+        if [ $SCHEDULE_MATCH_ALT -eq 0 ] && [ $SCHEDULE_MATCH_BLOCK -eq 0 ] && \
+           [ $RESOURCE_MATCH_ALT -eq 0 ] && [ $RESOURCE_MATCH_BLOCK -eq 0 ]; then
+            echo "✓ $test_name (deque == multimap == block)"
             ((PASS++))
         else
             echo "✗ $test_name - MISMATCH"
-            if [ $SCHEDULE_MATCH -ne 0 ]; then
-                echo "  Job schedules differ:"
+            if [ $SCHEDULE_MATCH_ALT -ne 0 ]; then
+                echo "  Job schedules differ (deque vs multimap):"
                 echo "  fcfs:     /tmp/fcfs_${test_name}.csv"
                 echo "  fcfs_alt: /tmp/fcfs_alt_${test_name}.csv"
                 [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_alt_${test_name}.csv" | head -10
             fi
-            if [ $RESOURCE_MATCH -ne 0 ]; then
-                echo "  Resource traces differ:"
+            if [ $SCHEDULE_MATCH_BLOCK -ne 0 ]; then
+                echo "  Job schedules differ (deque vs block):"
+                echo "  fcfs:       /tmp/fcfs_${test_name}.csv"
+                echo "  fcfs_block: /tmp/fcfs_block_${test_name}.csv"
+                [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_block_${test_name}.csv" | head -10
+            fi
+            if [ $RESOURCE_MATCH_ALT -ne 0 ]; then
+                echo "  Resource traces differ (deque vs multimap):"
                 echo "  fcfs:     /tmp/fcfs_${test_name}_resources.csv"
                 echo "  fcfs_alt: /tmp/fcfs_alt_${test_name}_resources.csv"
                 [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_alt_${test_name}_resources.csv" | head -10
+            fi
+            if [ $RESOURCE_MATCH_BLOCK -ne 0 ]; then
+                echo "  Resource traces differ (deque vs block):"
+                echo "  fcfs:       /tmp/fcfs_${test_name}_resources.csv"
+                echo "  fcfs_block: /tmp/fcfs_block_${test_name}_resources.csv"
+                [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_block_${test_name}_resources.csv" | head -10
             fi
             ((FAIL++))
         fi
@@ -188,7 +229,11 @@ run_correctness_tests() {
     if [ $FAIL -eq 0 ]; then
         echo "✅ ALL CORRECTNESS TESTS PASSED"
         echo ""
-        echo "Both FCFS implementations produce identical results!"
+        echo "All three FCFS implementations produce identical results!"
+        echo "  - fcfs (deque)"
+        echo "  - fcfs_alt (multimap)"
+        echo "  - fcfs --queue_impl block (BlockWaitQueue)"
+        echo ""
         echo "This provides strong evidence of correctness."
         return 0
     else

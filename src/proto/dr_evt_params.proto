@@ -44,6 +44,12 @@ message DR_EVT_Params {
         string duration_distribution = 16; // "normal", "lognormal", or "uniform" (default: "normal")
         double duration_scale = 17;     // Scale factor (default: 1.0)
         double duration_stddev = 18;    // Standard deviation factor (default: 0.0)
+
+        // Queue implementation (FCFS scheduler only)
+        string queue_impl = 19;         // "deque", "multimap", or "block" (default: "deque")
+
+        // Block size for block queue implementation (must be power of 2)
+        uint32 block_size = 20;         // 32, 64, 128, or 256 (default: 128)
     }
 
     message Tracing_Params {

@@ -14,6 +14,7 @@
 #include "common.hpp"
 #include "trace/job_record.hpp"
 #include "sim/scheduler_policies.hpp"
+#include "params/sim_params.hpp"
 
 namespace dr_evt {
 
@@ -132,7 +133,9 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     const std::vector<Job_Record>& job_data,
     BackfillPolicy backfill_policy,
     PriorityPolicy priority_policy,
-    RuntimeEstimateMode runtime_mode);
+    RuntimeEstimateMode runtime_mode,
+    QueueImplementation queue_impl = QueueImplementation::DEQUE,
+    size_t block_size = 128);
 
 } // namespace dr_evt
 
