@@ -2,6 +2,41 @@
 
 This document describes all command-line options for the `simulator` binary.
 
+## Configuration Methods
+
+DR_EVT supports two ways to configure simulations:
+
+### 1. Command-Line Arguments (documented below)
+```bash
+./simulator trace.csv --total_nodes 1000 --backfill_policy easy
+```
+
+### 2. Protocol Buffer Config Files (recommended for complex setups)
+```bash
+./simulator --config sim_config.textproto
+```
+
+**When to use config files:**
+- ✅ Complex simulations with 10+ parameters
+- ✅ Reproducible configurations (version in git)
+- ✅ Sharing setups with team
+- ✅ Avoiding command-line mistakes
+
+**Configuration precedence:**
+1. Command-line arguments (highest priority)
+2. Config file (`--config`)
+3. Built-in defaults (lowest priority)
+
+**Example override:**
+```bash
+# Config file says total_nodes=1000, CLI overrides to 2000
+./simulator --config config.textproto --total_nodes 2000
+```
+
+**See:** [Command-Line Reference](user-guide/command-line.md#configuration-files-protocol-buffer) for protobuf config examples and all available parameters.
+
+---
+
 ## Quick Reference
 
 ```bash

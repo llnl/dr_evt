@@ -43,7 +43,7 @@ Makespan: 2010 sec
 ### Simple Format (Recommended for Testing)
 
 7-column CSV format:
-```csv
+```text
 job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 0,0,100,10,0,pbatch,100
 50,100,150,10,0,pbatch,50
@@ -87,7 +87,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 ### Epoch (Unix Time)
 
 Integer seconds since 1970-01-01:
-```csv
+```text
 0,0,100,10,0,pbatch,100      # Time 0, 100 seconds
 50,100,150,10,0,pbatch,50    # Time 50, 100, 150
 ```
@@ -103,7 +103,7 @@ Integer seconds since 1970-01-01:
 ### ISO (Human-Readable)
 
 ISO 8601 format with timezone:
-```csv
+```text
 2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,pbatch,100
 ```
 
@@ -548,10 +548,10 @@ grep "Average wait time" results/*.txt | \
 
 ## References
 
-- [TESTING.md](../TESTING.md) - Running test suite
-- [TRACE_FORMAT.md](../TRACE_FORMAT.md) - Detailed trace format specification
-- [TEST_SUMMARY.md](../TEST_SUMMARY.md) - Test results and validation
-- [API Documentation](api/html/index.html) - Doxygen-generated API docs
+- [Testing Guide](../TESTING_GUIDE.md) - Running test suite and test philosophy
+- [CLI Options](../CLI_OPTIONS.md) - Complete command-line reference
+- [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Algorithm specification
+- [Streaming API](../STREAMING_API.md) - Online simulation API
 
 ## Support
 

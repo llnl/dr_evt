@@ -152,19 +152,154 @@ params.duration_mode = dr_evt.DurationMode.EXACT
 params.verbose = True  # Default: False
 ```
 
-### Not Yet Exposed in Python Bindings
+## Missing Parameters in Python Bindings
 
-Some parameters are only accessible via C++ API currently:
-- `timezone` - Timezone for ISO timestamp parsing
-- `runtime_mode` - Runtime estimate mode (limit vs actual)
-- `duration_distribution` - Distribution type
-- `duration_scale` - Duration scale factor
-- `duration_stddev` - Duration standard deviation
-- `max_jobs` - Limit number of jobs to process
-- `max_time` - Upper limit on simulation time
-- `seed` - Random seed
+The following parameters from the protobuf schema (`dr_evt_params.proto`) are **not yet exposed** in the Python API (`dr_evt_bindings.cpp`):
 
-To use these, pass them via command-line when calling the simulator binary.
+### Currently Exposed (9 parameters)
+✅ `infile` - Input trace file  
+✅ `total_nodes` - Total compute nodes  
+✅ `trace_format` - Trace format (simple/lassen)  
+✅ `timestamp_format` - Timestamp format (epoch/iso)  
+✅ `duration_mode` - Duration mode (exact/column/distribution)  
+✅ `backfill_policy` - Backfilling policy (easy/conservative/none)  
+✅ `priority_policy` - Priority policy (fcfs/sjf/ljf)  
+✅ `verbose` - Verbose output flag  
+
+### Missing from Python Bindings (10 parameters)
+
+**Critical for Full Functionality:**
+
+| Parameter | Type | Default | Purpose | Impact |
+|-----------|------|---------|---------|--------|
+| `seed` | uint32 | Random | RNG seed for reproducibility | **High** - Can't reproduce simulations |
+| `max_jobs` | uint32 | Unlimited | Limit jobs processed | **Medium** - Can't test subsets |
+| `max_time` | double | Unlimited | Stop at simulation time | **Medium** - Can't limit runtime |
+| `runtime_mode` | string | "limit" | Use time_limit vs actual_runtime | **High** - Can't do replay mode |
+| `timezone` | string | "America/Los_Angeles" | Timezone for ISO timestamps | **Medium** - Can't parse non-LA times correctly |
+
+**Duration Simulation (only if duration_mode=DISTRIBUTION):**
+
+| Parameter | Type | Default | Purpose | Impact |
+|-----------|------|---------|---------|--------|
+| `duration_distribution` | string | "normal" | Distribution type | **Low** - Can't customize distribution |
+| `duration_scale` | double | 1.0 | Scale factor | **Low** - Can't model realistic runtimes |
+| `duration_stddev` | double | 0.0 | Standard deviation | **Low** - Can't add variation |
+
+**Output Control:**
+
+| Parameter | Type | Default | Purpose | Impact |
+|-----------|------|---------|---------|--------|
+| `outfile` | string | stdout | Output trace file | **High** - Can't set output file from Python |
+| `resource_trace` | string | None | Resource usage trace | **Low** - Can't capture resource timeline |
+
+### Workarounds
+
+**Option 1: Use Protobuf Config File**
+```python
+import dr_evt
+import subprocess
+
+# Create protobuf config with missing parameters
+config = """
+simulation_params {
+  infile: "jobs.csv"
+  outfile: "results.csv"
+  total_nodes: 1000
+  seed: 42
+  max_jobs: 5000
+  max_time: 86400.0
+  runtime_mode: "actual"
+  timezone: "UTC"
+  duration_distribution: "normal"
+  duration_scale: 0.8
+  duration_stddev: 0.1
+  backfill_policy: "easy"
+  verbose: false
+}
+"""
+
+# Write config file
+with open("sim_config.textproto", "w") as f:
+    f.write(config)
+
+# Call C++ binary with config
+subprocess.run(["./simulator", "--config", "sim_config.textproto"])
+```
+
+**Option 2: Call C++ Binary from Python**
+```python
+import subprocess
+import pandas as pd
+
+result = subprocess.run([
+    "./simulator",
+    "jobs.csv",
+    "--total_nodes", "1000",
+    "--seed", "42",
+    "--max_jobs", "5000",
+    "--runtime_mode", "actual",
+    "--timezone", "UTC",
+    "--duration_distribution", "normal",
+    "--duration_scale", "0.8",
+    "--outfile", "results.csv"
+], capture_output=True, text=True)
+
+# Parse results
+df = pd.read_csv("results.csv")
+```
+
+**Option 3: Extend Python Bindings**
+
+To expose missing parameters, edit `python/dr_evt_bindings.cpp`:
+
+```cpp
+py::class_<Sim_Params>(m, "SimParams")
+    .def(py::init<>())
+    // Existing bindings...
+    .def_readwrite("infile", &Sim_Params::m_infile)
+    .def_readwrite("total_nodes", &Sim_Params::m_total_nodes)
+    // ... existing 9 parameters ...
+    
+    // ADD MISSING PARAMETERS:
+    .def_readwrite("seed", &Sim_Params::m_seed)
+    .def_readwrite("max_jobs", &Sim_Params::m_max_jobs)
+    .def_readwrite("max_time", &Sim_Params::m_max_time)
+    .def_readwrite("outfile", &Sim_Params::m_outfile)
+    .def_readwrite("resource_trace", &Sim_Params::m_resource_trace)
+    .def_readwrite("runtime_mode", &Sim_Params::m_runtime_mode)
+    .def_readwrite("timezone", &Sim_Params::m_timezone)
+    .def_readwrite("duration_distribution", &Sim_Params::m_duration_distribution)
+    .def_readwrite("duration_scale", &Sim_Params::m_duration_scale)
+    .def_readwrite("duration_stddev", &Sim_Params::m_duration_stddev);
+```
+
+Then rebuild:
+```bash
+cd build
+cmake .. -DDR_EVT_BUILD_PYTHON=ON
+make
+cd ../python
+pip install --force-reinstall .
+```
+
+### Impact on Use Cases
+
+| Use Case | Missing Parameters Needed | Workaround |
+|----------|--------------------------|------------|
+| **Reproducible simulations** | `seed` | Use config file or CLI |
+| **Replay mode** | `runtime_mode=actual` | Use config file or CLI |
+| **Output to file** | `outfile` | Use CLI or call `write_simulated_trace()` |
+| **Test on subset** | `max_jobs`, `max_time` | Preprocess trace file |
+| **Non-LA timezones** | `timezone` | Convert timestamps to LA time or use epoch |
+| **Realistic duration variation** | `duration_distribution`, `duration_scale`, `duration_stddev` | Use `duration_mode=EXACT` or config file |
+
+### Recommendation
+
+For complete control, either:
+1. **Add missing bindings** (10 lines of code in `dr_evt_bindings.cpp`)
+2. **Use protobuf config files** (already fully supported)
+3. **Call C++ binary via subprocess** (simplest for one-off scripts)
 
 ## Enumerations
 

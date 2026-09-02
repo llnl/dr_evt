@@ -204,9 +204,10 @@ make -j4
 
 ## Documentation
 
-- **[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)**: Technical implementation details
-- **[BUILD_SETUP.md](BUILD_SETUP.md)**: Detailed build instructions
-- **README.md**: Original DR_EVT documentation
+- **[Installation Guide](installation.md)**: Detailed build instructions
+- **[Tutorial](tutorial.md)**: Step-by-step first simulation
+- **[User Guide](../user-guide/overview.md)**: Complete usage manual
+- **[Testing Guide](../TESTING_GUIDE.md)**: Test suite and validation
 
 ## Citation
 
@@ -227,9 +228,10 @@ MIT License - See LICENSE file for details
 ## Support
 
 For issues or questions:
-1. Check [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for technical details
-2. Review [BUILD_SETUP.md](BUILD_SETUP.md) for build problems
-3. Open an issue on GitHub
+1. Check [Installation Guide](installation.md) for build problems
+2. Review [Testing Guide](../TESTING_GUIDE.md) for test suite details
+3. Read [User Guide](../user-guide/overview.md) for usage questions
+4. Open an issue on GitHub
 
 ## What's Next?
 

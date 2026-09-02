@@ -5,10 +5,14 @@ import sys
 
 # Project information
 project = 'DR_EVT'
-copyright = '2024, Lawrence Livermore National Laboratory'
+copyright = '2024-2026, Lawrence Livermore National Laboratory'
 author = 'LLNL'
 version = '1.0'
 release = '1.0.0'
+
+# Short description for metadata
+html_title = 'DR_EVT Documentation'
+html_short_title = 'DR_EVT'
 
 # General configuration
 extensions = [
@@ -17,6 +21,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'myst_parser',  # For Markdown support
+    'sphinxcontrib.mermaid',  # For Mermaid diagrams
 ]
 
 # Markdown configuration
@@ -25,6 +30,17 @@ myst_enable_extensions = [
     "deflist",
     "html_image",
 ]
+
+# Mermaid configuration
+mermaid_version = "10.6.1"  # Use specific stable version
+mermaid_init_js = """
+mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: { useMaxWidth: true },
+    gantt: { useMaxWidth: true }
+});
+"""
 
 # Add any paths that contain templates here
 templates_path = ['_templates']

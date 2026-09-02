@@ -57,7 +57,7 @@ cat results.csv
 ```
 
 Expected output:
-```csv
+```text
 job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 0,0,100,80,0,pbatch,100
 10,10,40,15,0,pbatch,30
@@ -134,9 +134,9 @@ Result: Job 1 would wait until Job 0 completes, even though resources are availa
 ## Next Steps
 
 - [Command-Line Options](../user-guide/command-line.md) - All available options
-- [Scheduling Policies](../user-guide/scheduling-policies.md) - Different algorithms
-- [Trace Formats](../user-guide/trace-formats.md) - Working with real HPC traces
-- [Verification](../verification/summary.md) - How we verify correctness
+- [User Guide](../user-guide/overview.md) - Complete guide with trace formats and scheduling policies
+- [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Algorithm specification
+- [Testing Guide](../TESTING_GUIDE.md) - How we verify correctness
 
 ## Exercises
 
