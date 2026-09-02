@@ -20,7 +20,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:r:f:T:z:d:D:S:V:vc:R:M"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:r:f:T:z:d:D:S:V:vc:R:M"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -31,6 +31,8 @@ static const struct option longopts[] = {
     {"max_time",              required_argument,  0, 't'},
     {"backfill_policy",       required_argument,  0, 'b'},
     {"priority_policy",       required_argument,  0, 'p'},
+    {"queue_impl",            required_argument,  0, 'q'},
+    {"block_size",            required_argument,  0, 'Q'},
     {"runtime_mode",          required_argument,  0, 'r'},
     {"trace_format",          required_argument,  0, 'f'},
     {"timestamp_format",      required_argument,  0, 'T'},
@@ -53,6 +55,8 @@ Sim_Params::Sim_Params()
     m_is_time_set(false),
     m_backfill_policy(BackfillPolicy::EASY),
     m_priority_policy(PriorityPolicy::FCFS),
+    m_queue_impl(QueueImplementation::DEQUE),
+    m_block_size(128),
     m_runtime_mode(RuntimeEstimateMode::USE_LIMIT),
     m_total_nodes(dr_evt::total_nodes),
     m_trace_format("lassen"),  // Default to Lassen format for backward compatibility
@@ -125,6 +129,32 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         m_priority_policy = PriorityPolicy::LJF;
                     } else {
                         std::cerr << "Unknown priority policy: " << policy << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'q': /* --queue_impl */
+                {
+                    std::string impl(optarg);
+                    if (impl == "deque") {
+                        m_queue_impl = QueueImplementation::DEQUE;
+                    } else if (impl == "multimap") {
+                        m_queue_impl = QueueImplementation::MULTIMAP;
+                    } else if (impl == "block") {
+                        m_queue_impl = QueueImplementation::BLOCK;
+                    } else {
+                        std::cerr << "Unknown queue implementation: " << impl << std::endl;
+                        std::cerr << "Valid options: 'deque' (default), 'multimap', 'block' (FCFS only)" << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'Q': /* --block_size */
+                {
+                    m_block_size = std::stoull(optarg);
+                    // Validate power of 2
+                    if (m_block_size == 0 || (m_block_size & (m_block_size - 1)) != 0) {
+                        std::cerr << "Error: block_size must be a power of 2 (e.g., 4, 8, 16, 32, 64, 128, 256)" << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
@@ -285,6 +315,19 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        fcfs_alt: Alternative FCFS implementation (for testing)\n"
         "        sjf: Shortest-Job-First\n"
         "        ljf: Longest-Job-First\n"
+        "\n"
+        "    -q, --queue_impl {deque|multimap|block}\n"
+        "        Wait queue implementation for FCFS scheduler (default: deque).\n"
+        "        deque: std::deque-based (simple, well-tested)\n"
+        "        multimap: std::multimap-based (for differential testing)\n"
+        "        block: Block-based with multi-index (optimized for large queues)\n"
+        "        Note: Only applies to FCFS scheduler. SJF/LJF always use multimap.\n"
+        "\n"
+        "    -Q, --block_size SIZE\n"
+        "        Block size for block queue implementation (default: 128).\n"
+        "        Must be power of 2: 32, 64, 128, or 256\n"
+        "        Only used when --queue_impl=block\n"
+        "        Larger blocks reduce overhead but increase memory per block\n"
         "\n"
         "    -r, --runtime_mode {limit|actual}\n"
         "        Runtime estimate mode (default: limit).\n"

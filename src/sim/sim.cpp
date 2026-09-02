@@ -14,10 +14,7 @@
 #include <queue>
 #include <sstream>
 #include <iomanip>
-
-#ifdef USE_BLOCK_QUEUE
 #include "sim/block_wait_queue.hpp"
-#endif
 
 namespace dr_evt {
 
@@ -48,12 +45,17 @@ Simulation::Simulation(const Sim_Params& params)
         m_trace.data(),
         params.m_backfill_policy,
         params.m_priority_policy,
-        params.m_runtime_mode)),
+        params.m_runtime_mode,
+        params.m_queue_impl,
+        params.m_block_size)),
     m_current_time(0.0),
     m_jobs_completed(0),
     m_jobs_submitted(0),
     m_rng(params.m_seed),
-    m_replay_ctx(m_trace.create_context())
+    m_replay_ctx(m_trace.create_context()),
+    m_queue_length_sum(0),
+    m_queue_length_samples(0),
+    m_queue_length_peak(0)
 {
 }
 
@@ -150,6 +152,13 @@ void Simulation::print_stats(std::ostream& os) const
         os << "Average wait time: " << (total_wait / m_jobs_completed) << " sec" << std::endl;
         os << "Average turnaround time: " << (total_turnaround / m_jobs_completed) << " sec" << std::endl;
         os << "Makespan: " << format_sim_time(makespan, m_params.m_msec_output) << " sec" << std::endl;
+    }
+
+    // Queue length statistics
+    if (m_queue_length_samples > 0) {
+        double avg_queue_length = static_cast<double>(m_queue_length_sum) / m_queue_length_samples;
+        os << "Average queue length: " << avg_queue_length << " jobs" << std::endl;
+        os << "Peak queue length: " << m_queue_length_peak << " jobs" << std::endl;
     }
 }
 
@@ -394,6 +403,11 @@ void Simulation::advance_to(sim_time_t target_time)
     size_t active_count = m_scheduler->active_job_count();
     sim_time_t next_arrival = m_scheduler->get_next_arrival_time();
 
+    // Sample queue length for statistics
+    m_queue_length_sum += active_count;
+    m_queue_length_samples++;
+    m_queue_length_peak = std::max(m_queue_length_peak, active_count);
+
     // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending (jobs running), OR (3) future job arrivals
     while (active_count > 0 || !m_replay_ctx.m_evtq.empty() || next_arrival < std::numeric_limits<sim_time_t>::max()) {
         // next_arrival already computed above
@@ -529,6 +543,11 @@ void Simulation::advance_to(sim_time_t target_time)
         // Update loop state variables at end of iteration
         active_count = m_scheduler->active_job_count();
         next_arrival = m_scheduler->get_next_arrival_time();
+
+        // Sample queue length for statistics
+        m_queue_length_sum += active_count;
+        m_queue_length_samples++;
+        m_queue_length_peak = std::max(m_queue_length_peak, active_count);
     }
 
     // Loop exited - log final state for debugging

@@ -449,35 +449,22 @@ set_target_properties(test_batch_vs_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_batch_vs_streaming-bin)
 
-# Block-based wait queue test (conditional - only if USE_BLOCK_QUEUE is ON)
-if(USE_BLOCK_QUEUE)
-  add_executable( test_block_queue-bin tests/test_block_queue_simple.cpp )
+# Block-based wait queue test (always enabled)
+add_executable( test_block_queue-bin tests/test_block_queue_simple.cpp )
 
-  target_include_directories(test_block_queue-bin PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(test_block_queue-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-  target_link_libraries(test_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-  set_target_properties(test_block_queue-bin PROPERTIES OUTPUT_NAME test_block_queue)
-  set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
-                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+target_link_libraries(test_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_block_queue-bin PROPERTIES OUTPUT_NAME test_block_queue)
+set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
 
-  # Benchmark program
-  add_executable( bench_block_queue-bin tests/bench_block_queue.cpp )
-
-  target_include_directories(bench_block_queue-bin PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-
-  target_link_libraries(bench_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-  set_target_properties(bench_block_queue-bin PROPERTIES OUTPUT_NAME bench_block_queue)
-
-  message(STATUS "Block queue test and benchmark enabled")
-endif()
+message(STATUS "Block queue test enabled")
 
 # MPI streaming test (requires MPI)
 if(MPI_CXX_FOUND)
