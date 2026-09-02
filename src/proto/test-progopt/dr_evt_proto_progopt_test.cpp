@@ -28,17 +28,6 @@
 
 namespace dr_evt {
 
-void pbuf_log_collector(google::protobuf::LogLevel level,
-                        const char* filename,
-                        int line,
-                        const std::string& message)
-{
-    std::string errmsg
-        = std::to_string(static_cast<int>(level)) + ' ' + std::string{filename}
-        + ' ' + std::to_string(line) + ' ' + message;
-    std::cerr << errmsg << std::endl;
-}
-
 template<typename T>
 bool read_prototext(const std::string& file_name,
                     const bool is_binary,
@@ -46,8 +35,6 @@ bool read_prototext(const std::string& file_name,
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     std::ifstream input(file_name, std::ios::in | std::ios::binary);
-
-    google::protobuf::SetLogHandler(pbuf_log_collector);
 
     if (!input) {
         std::cerr << file_name << ": File not found!" << std::endl;

@@ -1,5 +1,4 @@
-// Purely a compile-time check, same reasoning as
-// has_protobuf_log_handler.cpp: decltype only needs the declarations to
+// Purely a compile-time check: decltype only needs the declarations to
 // determine types, never an actual call/link against a not-yet-built
 // Abseil (on the FetchContent path, Abseil is built as part of gRPC's
 // own source tree, alongside Protobuf - it doesn't exist on disk yet at
