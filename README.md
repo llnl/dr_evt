@@ -6,24 +6,24 @@ scheduling and resource management using a set of heterogenous clusters.
 
 ## Features
 
-- **Verified Scheduler Implementation**: EASY backfilling algorithm verified against analytical ground truth (34 comprehensive tests)
-- **Analytical Testing Framework**: Mathematical formulas generate test inputs, hand-calculated expected outputs provide ground truth
-- **Python Reference Implementation**: Verified EASY backfilling scheduler (34/34 tests passing)
-- **Streaming API**: Online simulation with dynamic job submission (`insert_job`, `run_until_inclusive`, `run_until_exclusive`)
+- **Verified Scheduler Implementation**: EASY backfilling algorithm cross-checked against an independent Python reference implementation (34 comprehensive tests) - a regression check confirming the two implementations agree, not independent mathematical proof; see [Testing Guide](docs/TESTING_GUIDE.md)
+- **Python Reference Implementation**: A from-scratch, independently written EASY backfilling scheduler used to generate expected test outputs (34/34 tests passing against it)
+- **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
 - **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
 - **Replay and Simulation Modes**: Replay historical traces or simulate with runtime distributions
 - **Early Completion Support**: Jobs can finish before time_limit (actual_runtime < time_limit)
-- **Diff-based Validation**: Compare simulator output with analytical traces using `diff`
+- **Diff-based Validation**: Compare simulator output with expected traces using `diff`
 - **Real HPC Trace Support**: Load and process job traces from production HPC systems
 - **CI/CD Integration**: Automated testing with GitHub Actions
 
 ## Documentation
 
 - **[EASY Backfilling Algorithm](docs/EASY_BACKFILLING_ALGORITHM.md)** - Complete algorithm specification
-- **[Analytical Testing](tests/ANALYTICAL_TESTING.md)** - Testing framework and methodology
+- **[Testing Guide](docs/TESTING_GUIDE.md)** - How the test suite is structured, what it does and doesn't verify
 - **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity
 - **[Complete Documentation](docs/)** - User guides, API reference, verification
 - **[Streaming API Guide](docs/STREAMING_API.md)** - Online simulation API
+- **[gRPC Client/Server Guide](docs/CLIENT_SERVER_GUIDE.md)** - Network-exposed streaming API, MPI multi-client/server harness
 - **[Test Suite](tests/README.md)** - All tests and validation
 - **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
 

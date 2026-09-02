@@ -1,0 +1,170 @@
+/******************************************************************************
+ *                                                                            *
+ *    Copyright 2023   Lawrence Livermore National Security, LLC and other    *
+ *    Whole Cell Simulator Project Developers. See the top-level COPYRIGHT    *
+ *    file for details.                                                       *
+ *                                                                            *
+ *    SPDX-License-Identifier: MIT                                            *
+ *                                                                            *
+ ******************************************************************************/
+
+syntax = "proto3";
+
+package dr_evt_grpc;
+
+// Single bidirectional-streaming RPC exposing DR_EVT's existing streaming
+// API (submit_job, advance_to, run_until_exclusive, and the monitoring
+// queries) over the network. One call to Session() corresponds to one
+// server-side Simulation instance for the lifetime of the stream.
+service SimulationService {
+    rpc Session(stream ClientMessage) returns (stream ServerMessage);
+}
+
+// ---- Client -> Server ----
+
+message ClientMessage {
+    // Echoed back on the matching ServerMessage so the client can correlate
+    // out-of-order or interleaved responses. Not interpreted by the server.
+    uint64 request_id = 1;
+
+    oneof request {
+        InitRequest init = 2;
+        InitializeTraceRequest initialize_trace = 3;
+        SubmitJobRequest submit_job = 4;
+        AdvanceToRequest advance_to = 5;
+        RunUntilExclusiveRequest run_until_exclusive = 6;
+        GetCurrentTimeRequest get_current_time = 7;
+        GetNodesInUseRequest get_nodes_in_use = 8;
+        GetAvailableNodesRequest get_available_nodes = 9;
+        GetActiveJobCountRequest get_active_job_count = 10;
+        GetFCFSHeadShadowTimeRequest get_fcfs_head_shadow_time = 11;
+        GetStatisticsRequest get_statistics = 12;
+        GetTraceSizeRequest get_trace_size = 13;
+    }
+}
+
+// First message on a new stream: constructs the server-side Simulation
+// from a flat Sim_Params-equivalent config (same fields as the existing
+// protobuf --config schema). Must be sent before any other request.
+message InitRequest {
+    uint32 total_nodes = 1;
+    string trace_format = 2;       // "simple" or "lassen"
+    string timestamp_format = 3;   // "epoch" or "iso"
+    string timezone = 4;
+    string backfill_policy = 5;    // "easy", "conservative", or "none"
+    string priority_policy = 6;    // "fcfs", "fcfs_alt", "sjf", or "ljf"
+    string runtime_mode = 7;       // "limit" or "actual"
+    string duration_mode = 8;      // "column", "exact", or "distribution"
+    bool msec_output = 9;
+    string infile = 10;            // trace file path (server-side path)
+}
+
+message InitializeTraceRequest {
+    uint64 max_jobs = 1;           // 0 = no limit
+}
+
+message SubmitJobRequest {
+    uint32 job_idx = 1;
+    double submit_time = 2;
+}
+
+message AdvanceToRequest {
+    double target_time = 1;
+}
+
+message RunUntilExclusiveRequest {
+    double target_time = 1;
+}
+
+message GetCurrentTimeRequest {}
+message GetNodesInUseRequest {}
+message GetAvailableNodesRequest {}
+message GetActiveJobCountRequest {}
+message GetFCFSHeadShadowTimeRequest {}
+message GetStatisticsRequest {}
+message GetTraceSizeRequest {}
+
+// ---- Server -> Client ----
+
+message ServerMessage {
+    // Echoes the ClientMessage.request_id this responds to. 0 for
+    // unsolicited server-initiated messages, if any are added later.
+    uint64 request_id = 1;
+
+    oneof response {
+        ErrorResponse error = 2;
+        InitResponse init = 3;
+        InitializeTraceResponse initialize_trace = 4;
+        SubmitJobResponse submit_job = 5;
+        AdvanceToResponse advance_to = 6;
+        RunUntilExclusiveResponse run_until_exclusive = 7;
+        GetCurrentTimeResponse get_current_time = 8;
+        GetNodesInUseResponse get_nodes_in_use = 9;
+        GetAvailableNodesResponse get_available_nodes = 10;
+        GetActiveJobCountResponse get_active_job_count = 11;
+        GetFCFSHeadShadowTimeResponse get_fcfs_head_shadow_time = 12;
+        GetStatisticsResponse get_statistics = 13;
+        GetTraceSizeResponse get_trace_size = 14;
+    }
+}
+
+// Returned instead of the expected response type when a request fails
+// (e.g. Init not sent first, trace load failure, exception from the
+// underlying Simulation call). request_id still identifies which
+// request failed.
+message ErrorResponse {
+    string message = 1;
+}
+
+message InitResponse {
+    bool ok = 1;
+}
+
+message InitializeTraceResponse {
+    uint64 num_jobs_loaded = 1;
+}
+
+message SubmitJobResponse {}
+
+message AdvanceToResponse {}
+
+message RunUntilExclusiveResponse {}
+
+message GetCurrentTimeResponse {
+    double current_time = 1;
+}
+
+message GetNodesInUseResponse {
+    uint32 nodes_in_use = 1;
+}
+
+message GetAvailableNodesResponse {
+    uint32 available_nodes = 1;
+}
+
+message GetActiveJobCountResponse {
+    uint64 active_job_count = 1;
+}
+
+message GetFCFSHeadShadowTimeResponse {
+    double shadow_time = 1;
+}
+
+message GetStatisticsResponse {
+    uint64 jobs_submitted = 1;
+    uint64 jobs_completed = 2;
+    uint64 jobs_running = 3;
+    uint64 jobs_waiting = 4;
+    double current_time = 5;
+    uint32 total_nodes = 6;
+    uint32 nodes_in_use = 7;
+    uint32 nodes_available = 8;
+    double utilization = 9;
+    double avg_wait_time = 10;
+    double avg_turnaround_time = 11;
+    double makespan = 12;
+}
+
+message GetTraceSizeResponse {
+    uint64 trace_size = 1;
+}
