@@ -12,7 +12,9 @@ scheduling and resource management using a set of heterogenous clusters.
 ## Features
 
 ### Core Simulation
-- **Verified Scheduler Implementation**: EASY backfilling algorithm verified against analytical ground truth (34 comprehensive tests)
+- **Verified Scheduler Implementation**: EASY backfilling algorithm cross-checked against an independent Python reference implementation (34 comprehensive tests); see [Testing Guide](docs/TESTING_GUIDE.md)
+- **Python Reference Implementation**: A from-scratch, independently written EASY backfilling scheduler used to generate expected test outputs (34/34 tests passing against it)
+- **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
 - **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
 - **Block Queue Wait Queue**: Optional block-based queue with metadata filtering (7 block sizes: 4-256)
 - **Replay and Simulation Modes**: Replay historical traces or simulate with runtime distributions
@@ -44,11 +46,17 @@ scheduling and resource management using a set of heterogenous clusters.
 For quick access without leaving GitHub:
 - **[Complete Documentation Index](docs/)** - All guides, references, and specifications
 - **[EASY Backfilling Algorithm](docs/EASY_BACKFILLING_ALGORITHM.md)** - Algorithm specification and verification
-- **[Streaming API](docs/STREAMING_API.md)** - Dynamic job submission API
+- **[Streaming API](docs/STREAMING_API.md)** - Online simulation API
 - **[Client/Server (gRPC)](docs/CLIENT_SERVER_GUIDE.md)** - Remote simulation over network
 - **[Python API](docs/PYTHON_API.md)** - Python bindings and reference implementation
 - **[CLI Options](docs/CLI_OPTIONS.md)** - Command-line reference
 - **[Testing Guide](docs/TESTING_GUIDE.md)** - Test philosophy, organization, and test suite details
+- **[Test Suite](tests/README.md)** - All tests and validation
+- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity 
+- **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
+ 
+**Note:** Local builds are optional for contributors. The official documentation is automatically built and published to ReadTheDocs on every commit to `main`.
+
 
 ### Building Documentation Locally
 
@@ -77,7 +85,6 @@ make serve
 make linkcheck
 ```
 
-**Note:** Local builds are optional for contributors. The official documentation is automatically built and published to ReadTheDocs on every commit to `main`.
 
 ## Current Requirements:
  + **Platforms targeted**: Linux-based systems

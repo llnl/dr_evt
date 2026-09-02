@@ -11,12 +11,12 @@
 #include <iostream>
 #include <cassert>
 
-void run_tests(bool immediate_erase, size_t block_size) {
-    std::cout << "\n=== BlockWaitQueue Tests (block_size=" << block_size
-              << ", immediate_erase=" << (immediate_erase ? "true" : "false")
+template<size_t BlockSize>
+void run_tests_impl() {
+    std::cout << "\n=== BlockWaitQueue Tests (block_size=" << BlockSize
               << ") ===" << std::endl;
 
-    dr_evt::BlockWaitQueue queue(block_size, immediate_erase);
+    dr_evt::BlockWaitQueue<BlockSize> queue;
     assert(queue.empty());
     assert(queue.size() == 0);
     std::cout << "✓ Empty queue initialized" << std::endl;
@@ -30,41 +30,60 @@ void run_tests(bool immediate_erase, size_t block_size) {
     assert(queue.active_count() == 3);
     std::cout << "✓ Inserted 3 jobs" << std::endl;
 
-    // Test 2: Find backfill candidate
+    // Test 2: Find and remove backfill candidate (NEW combined API)
     // available_nodes=30, current_time=0, reservation_time=200
     // Job 1: nodes=10 (fits), runtime=100 (fits in window)
     // Job 2: nodes=20 (fits), runtime=50 (fits in window, shorter)
     // Job 3: nodes=15 (fits), runtime=150 (fits in window)
-    auto candidate = queue.find_backfill_candidate(30, 0.0, 200.0);
+    auto candidate = queue.find_and_remove_backfill_candidate(30, 0.0, 200.0);
     assert(candidate.has_value());
-    std::cout << "✓ Found backfill candidate: job " << *candidate << std::endl;
+    std::cout << "✓ Found and removed backfill candidate: job " << *candidate << std::endl;
+    // Note: candidate was automatically removed
+    assert(queue.active_count() == 2);  // One job removed
+    std::cout << "✓ Combined find-and-remove worked, active count: " << queue.active_count() << std::endl;
 
     // Test 3: Find with tight resource constraint
     // Only 12 nodes available - only job 1 (10 nodes) should fit
-    candidate = queue.find_backfill_candidate(12, 0.0, 200.0);
+    // We need fresh queue for this test
+    dr_evt::BlockWaitQueue<BlockSize> queue2;
+    queue2.insert_job(1, 0.0, 100.0, 10);
+    queue2.insert_job(2, 5.0, 50.0, 20);
+    queue2.insert_job(3, 10.0, 150.0, 15);
+
+    candidate = queue2.find_and_remove_backfill_candidate(12, 0.0, 200.0);
     assert(candidate.has_value());
     assert(*candidate == 1);
     std::cout << "✓ Resource constraint filtering works: job " << *candidate << std::endl;
 
     // Test 4: Find with tight time constraint
     // Window only 60 time units - only job 2 (runtime=50) should fit
-    candidate = queue.find_backfill_candidate(30, 0.0, 60.0);
+    // NOTE: current_time must be >= submit_time for job to be eligible
+    dr_evt::BlockWaitQueue<BlockSize> queue3;
+    queue3.insert_job(1, 0.0, 100.0, 10);
+    queue3.insert_job(2, 0.0, 50.0, 20);  // Changed submit_time to 0.0 (was 5.0)
+    queue3.insert_job(3, 0.0, 150.0, 15);  // Changed submit_time to 0.0 (was 10.0)
+
+    candidate = queue3.find_and_remove_backfill_candidate(30, 0.0, 60.0);
     assert(candidate.has_value());
     assert(*candidate == 2);
     std::cout << "✓ Time constraint filtering works: job " << *candidate << std::endl;
 
-    // Test 5: Mark job removed
-    queue.mark_removed(2);
-    assert(queue.active_count() == 2);
-    std::cout << "✓ Job 2 marked removed, active count: " << queue.active_count() << std::endl;
+    // Test 5: Manual remove (still supported)
+    dr_evt::BlockWaitQueue<BlockSize> queue4;
+    queue4.insert_job(1, 0.0, 100.0, 10);
+    queue4.insert_job(2, 5.0, 50.0, 20);
+    queue4.remove(2);
+    assert(queue4.active_count() == 1);
+    std::cout << "✓ Manual remove works, active count: " << queue4.active_count() << std::endl;
 
     // Test 6: Search after removal - job 2 should not be found
-    candidate = queue.find_backfill_candidate(30, 0.0, 60.0);
-    // Now job 2 is removed, window=60 is too short for job 1 (100) and job 3 (150)
+    candidate = queue4.find_and_remove_backfill_candidate(30, 0.0, 60.0);
+    // Now job 2 is removed, window=60 is too short for job 1 (100)
     assert(!candidate.has_value());
     std::cout << "✓ Removed job not returned in search" << std::endl;
 
     // Test 7: Iterate over active jobs
+    // Use queue (which removed one job via find_and_remove)
     std::cout << "Active jobs: ";
     size_t count = 0;
     queue.for_each_active([&count](dr_evt::job_no_t job_id) {
@@ -72,7 +91,7 @@ void run_tests(bool immediate_erase, size_t block_size) {
         count++;
     });
     std::cout << std::endl;
-    assert(count == 2);  // Jobs 1 and 3 still active
+    assert(count == 2);  // 2 jobs still active (one was removed by find_and_remove)
     std::cout << "✓ Iteration over active jobs works" << std::endl;
 
     // Test 8: Stats
@@ -83,33 +102,56 @@ void run_tests(bool immediate_erase, size_t block_size) {
     std::cout << "Stats - jobs scanned: " << stats.jobs_scanned << std::endl;
     std::cout << "✓ Statistics tracking works" << std::endl;
 
-    // Test 9: Multiple blocks (insert block_size+1 jobs to trigger 2 blocks)
-    dr_evt::BlockWaitQueue large_queue(block_size);
-    for (size_t i = 0; i < block_size + 1; i++) {
+    // Test 9: Multiple blocks (insert BlockSize+1 jobs to trigger 2 blocks)
+    dr_evt::BlockWaitQueue<BlockSize> large_queue;
+    for (size_t i = 0; i < BlockSize + 1; i++) {
         large_queue.insert_job(i, i * 1.0, 100.0 + i, 10);
     }
-    assert(large_queue.size() == block_size + 1);
-    std::cout << "✓ Multiple blocks created for " << (block_size + 1) << " jobs" << std::endl;
+    assert(large_queue.size() == BlockSize + 1);
+    std::cout << "✓ Multiple blocks created for " << (BlockSize + 1) << " jobs" << std::endl;
 
-    // Search should work across blocks
-    candidate = large_queue.find_backfill_candidate(20, 0.0, 200.0);
+    // Search should work across blocks (using new combined API)
+    candidate = large_queue.find_and_remove_backfill_candidate(20, 0.0, 200.0);
     assert(candidate.has_value());
     std::cout << "✓ Search across multiple blocks works: job " << *candidate << std::endl;
+    // Verify it was removed
+    assert(large_queue.active_count() == BlockSize);
+    std::cout << "✓ Cross-block find-and-remove works, active count: " << large_queue.active_count() << std::endl;
 
-    std::cout << "✓ All tests passed for block_size=" << block_size
-              << ", immediate_erase=" << (immediate_erase ? "true" : "false") << std::endl;
+    std::cout << "✓ All tests passed for block_size=" << BlockSize << std::endl;
+}
+
+// Factory function: runtime block_size -> template instantiation
+void run_tests(size_t block_size) {
+    switch (block_size) {
+        case 16:  run_tests_impl<16>(); break;
+        case 32:  run_tests_impl<32>(); break;
+        case 64:  run_tests_impl<64>(); break;
+        case 128: run_tests_impl<128>(); break;
+        case 256: run_tests_impl<256>(); break;
+        default:
+            std::cerr << "Unsupported block size: " << block_size << std::endl;
+            std::exit(1);
+    }
 }
 
 int main() {
-    // Test different block sizes and deletion modes
-    std::cout << "Testing with block size 32:" << std::endl;
-    run_tests(false, 32);  // Lazy deletion, block_size=32
-    run_tests(true, 32);   // Immediate deletion, block_size=32
+    // Test all supported block sizes: 16, 32, 64, 128, 256
+    std::cout << "Testing with block size 16:" << std::endl;
+    run_tests(16);
+
+    std::cout << "\nTesting with block size 32:" << std::endl;
+    run_tests(32);
+
+    std::cout << "\nTesting with block size 64:" << std::endl;
+    run_tests(64);
 
     std::cout << "\nTesting with block size 128:" << std::endl;
-    run_tests(false, 128);  // Lazy deletion, block_size=128
-    run_tests(true, 128);   // Immediate deletion, block_size=128
+    run_tests(128);
 
-    std::cout << "\n=== All tests passed! ===" << std::endl;
+    std::cout << "\nTesting with block size 256:" << std::endl;
+    run_tests(256);
+
+    std::cout << "\n=== All tests passed for all block sizes! ===" << std::endl;
     return 0;
 }

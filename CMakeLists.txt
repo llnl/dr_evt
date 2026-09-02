@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.24)
 
 project(DR_EVT CXX)
 
@@ -195,9 +195,64 @@ include(SetupCXX)
 
 # Setup Protobuf (optional - can be disabled with -DDR_EVT_ENABLE_PROTOBUF=OFF)
 option(DR_EVT_ENABLE_PROTOBUF "Enable Protobuf support" OFF)
-if (DR_EVT_ENABLE_PROTOBUF)
+
+# Setup gRPC client/server (optional - requires DR_EVT_ENABLE_PROTOBUF=ON,
+# since the gRPC service definition is itself a .proto file)
+option(DR_EVT_ENABLE_GRPC "Enable gRPC client/server support" OFF)
+
+if (DR_EVT_ENABLE_GRPC)
+  if (NOT DR_EVT_ENABLE_PROTOBUF)
+    message(FATAL_ERROR
+      "DR_EVT_ENABLE_GRPC=ON requires DR_EVT_ENABLE_PROTOBUF=ON, since the "
+      "gRPC service definition is itself built on the Protobuf runtime.")
+  endif()
+  # SetupGRPC.cmake also provides protobuf::libprotobuf/protobuf::protoc
+  # and sets DR_EVT_HAS_PROTOBUF itself, so SetupProtobuf.cmake's own
+  # discovery/build is skipped here to avoid two separate Protobuf copies.
+  include(SetupGRPC)
+elseif (DR_EVT_ENABLE_PROTOBUF)
   include(SetupProtobuf)
 endif()
+
+if (DR_EVT_HAS_PROTOBUF)
+  # Protobuf's own internal logging is redirected via Abseil's
+  # absl::LogSink when available - only recent enough Abseil releases
+  # have the full API, so only attempt this if the target exists at
+  # all (won't on the standalone-Protobuf-without-gRPC path, or with
+  # an older gRPC/Abseil pin). Without it, Protobuf's own default
+  # logging still reaches stderr, just unformatted.
+  #
+  # decltype()-only, no LINK_LIBRARIES: Abseil hasn't actually been
+  # compiled yet at this configure step on the FetchContent path, so
+  # linking against it here cannot work.
+  if (TARGET absl::log_sink_registry)
+    get_target_property(DR_EVT_ABSLLOGTEST_INCLUDE_DIRS
+                         absl::log_sink_registry INTERFACE_INCLUDE_DIRECTORIES)
+    if (NOT DR_EVT_ABSLLOGTEST_INCLUDE_DIRS)
+      set(DR_EVT_ABSLLOGTEST_INCLUDE_DIRS "")
+    endif()
+
+    try_compile(DR_EVT_HAS_ABSL_LOG_SINK "${CMAKE_BINARY_DIR}/temp"
+                "${CMAKE_SOURCE_DIR}/cmake/tests/has_absl_log_sink.cpp"
+                CMAKE_FLAGS
+                  "-DINCLUDE_DIRECTORIES=${DR_EVT_ABSLLOGTEST_INCLUDE_DIRS}"
+                  "${CMAKE_CXX_FLAGS}")
+    unset(DR_EVT_ABSLLOGTEST_INCLUDE_DIRS)
+  else()
+    set(DR_EVT_HAS_ABSL_LOG_SINK FALSE)
+  endif()
+  if (DR_EVT_HAS_ABSL_LOG_SINK)
+    message(STATUS "Abseil has the full log_sink API - "
+                    "src/proto/utils.cpp uses it to format Protobuf's "
+                    "own internal parse diagnostics")
+  else()
+    message(STATUS "Abseil's full log_sink API is not available "
+                    "(too old an Abseil, or built without gRPC) - "
+                    "src/proto/utils.cpp's custom log formatting is "
+                    "skipped; Protobuf's own default logging still "
+                    "reaches stderr")
+  endif (DR_EVT_HAS_ABSL_LOG_SINK)
+endif (DR_EVT_HAS_PROTOBUF)
 
 # Setup Boost (will use FetchContent if not found)
 include(SetupBoost)
@@ -276,8 +331,17 @@ message(STATUS "DR_EVT_SOURCES: ${DR_EVT_SOURCES}")
 # Create the DR_EVT library
 add_library(dr_evt ${DR_EVT_SOURCES} ${DR_EVT_HEADERS})
 if (DR_EVT_HAS_PROTOBUF)
-  add_dependencies(dr_evt protobuf::libprotobuf)
+  # protobuf::libprotobuf must be linked, not just add_dependencies'd,
+  # so its include directories propagate to dr_evt's own compilation -
+  # otherwise dr_evt's protobuf-using code can silently pick up a
+  # different, unrelated protobuf install from the compiler's default
+  # system include path. protobuf::protoc is just an executable, so
+  # add_dependencies is correct there.
+  target_link_libraries(dr_evt PUBLIC protobuf::libprotobuf)
   add_dependencies(dr_evt protobuf::protoc)
+  if (DR_EVT_HAS_ABSL_LOG_SINK)
+    target_link_libraries(dr_evt PUBLIC absl::log_sink absl::log_sink_registry)
+  endif (DR_EVT_HAS_ABSL_LOG_SINK)
   if (DR_EVT_HAS_OPENMP)
     add_dependencies(dr_evt OpenMP::OpenMP_CXX)
     if (DR_EVT_HAS_NUMA)
@@ -360,6 +424,59 @@ set_target_properties(trace-bin PROPERTIES OUTPUT_NAME tracer)
 set_target_properties(trace-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 list(APPEND DR_EVT_EXEC_TARGETS trace-bin)
+
+# add executables for the gRPC client/server, if enabled
+if (DR_EVT_HAS_GRPC)
+  add_executable( dr_evt_server-bin src/proto/dr_evt_server.cpp )
+  target_include_directories(dr_evt_server-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_link_libraries(dr_evt_server-bin PRIVATE
+    dr_evt dr_evt_service_proto ${LIB_FILESYSTEM} ${Boost_LIBRARIES})
+  set_target_properties(dr_evt_server-bin PROPERTIES OUTPUT_NAME dr_evt_server)
+  set_target_properties(dr_evt_server-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+  list(APPEND DR_EVT_EXEC_TARGETS dr_evt_server-bin)
+
+  add_executable( dr_evt_client-bin src/proto/dr_evt_client.cpp )
+  target_include_directories(dr_evt_client-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+  # No dependency on dr_evt itself: the client only speaks gRPC to a
+  # separately-running server, it never links against the simulation
+  # library directly.
+  target_link_libraries(dr_evt_client-bin PRIVATE dr_evt_service_proto)
+  set_target_properties(dr_evt_client-bin PROPERTIES OUTPUT_NAME dr_evt_client)
+  set_target_properties(dr_evt_client-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+  list(APPEND DR_EVT_EXEC_TARGETS dr_evt_client-bin)
+
+  # MPI-aware multi-client/multi-server test harness (optional: only
+  # built if MPI is actually available - unlike gRPC/Protobuf, this
+  # project has no existing MPI dependency to build on, so this is the
+  # first find_package(MPI) call in this project).
+  find_package(MPI)
+  if (MPI_FOUND)
+    add_executable( test_grpc_multi_client_server-bin
+      tests/test_grpc_multi_client_server.cpp )
+    target_include_directories(test_grpc_multi_client_server-bin PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_link_libraries(test_grpc_multi_client_server-bin PRIVATE
+      dr_evt_service_proto MPI::MPI_CXX)
+    set_target_properties(test_grpc_multi_client_server-bin PROPERTIES
+      OUTPUT_NAME test_grpc_multi_client_server)
+    set_target_properties(test_grpc_multi_client_server-bin PROPERTIES
+      CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    list(APPEND DR_EVT_EXEC_TARGETS test_grpc_multi_client_server-bin)
+  else()
+    message(STATUS "MPI not found - skipping test_grpc_multi_client_server "
+                    "(gRPC client/server themselves are unaffected)")
+  endif (MPI_FOUND)
+endif (DR_EVT_HAS_GRPC)
 
 
 # Build tests
@@ -449,35 +566,22 @@ set_target_properties(test_batch_vs_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_batch_vs_streaming-bin)
 
-# Block-based wait queue test (conditional - only if USE_BLOCK_QUEUE is ON)
-if(USE_BLOCK_QUEUE)
-  add_executable( test_block_queue-bin tests/test_block_queue_simple.cpp )
+# Block-based wait queue test (always enabled)
+add_executable( test_block_queue-bin tests/test_block_queue_simple.cpp )
 
-  target_include_directories(test_block_queue-bin PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(test_block_queue-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-  target_link_libraries(test_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-  set_target_properties(test_block_queue-bin PROPERTIES OUTPUT_NAME test_block_queue)
-  set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
-                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+target_link_libraries(test_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_block_queue-bin PROPERTIES OUTPUT_NAME test_block_queue)
+set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
 
-  # Benchmark program
-  add_executable( bench_block_queue-bin tests/bench_block_queue.cpp )
-
-  target_include_directories(bench_block_queue-bin PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-
-  target_link_libraries(bench_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-  set_target_properties(bench_block_queue-bin PROPERTIES OUTPUT_NAME bench_block_queue)
-
-  message(STATUS "Block queue test and benchmark enabled")
-endif()
+message(STATUS "Block queue test enabled")
 
 # MPI streaming test (requires MPI)
 if(MPI_CXX_FOUND)

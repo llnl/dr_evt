@@ -31,9 +31,7 @@
 namespace dr_evt {
 
 // Forward declarations
-#ifdef USE_BLOCK_QUEUE
-class BlockWaitQueue;
-#endif
+template<size_t BlockSize> class BlockWaitQueue;
 class SchedulerBase;
 
 /** \addtogroup dr_evt_sim
@@ -77,6 +75,11 @@ class Simulation {
 
     /// Resource state history: (time, free_nodes, allocated_nodes) for verification
     mutable std::vector<std::tuple<sim_time_t, num_nodes_t, num_nodes_t>> m_resource_history;
+
+    /// Queue length statistics for performance analysis
+    mutable size_t m_queue_length_sum;
+    mutable size_t m_queue_length_samples;
+    mutable size_t m_queue_length_peak;
 
   public:
     /**

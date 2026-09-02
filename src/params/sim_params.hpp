@@ -22,6 +22,15 @@ namespace dr_evt {
 /** \addtogroup dr_evt_params
  *  @{ */
 
+/**
+ * Queue implementation selection for FCFS scheduler
+ */
+enum class QueueImplementation {
+    DEQUE,      // std::deque based (FCFS default)
+    MULTIMAP,   // std::multimap based (FCFS alt, for differential testing)
+    BLOCK       // BlockWaitQueue based (optimized for large queues, FCFS only)
+};
+
 class Sim_Params {
  public:
     Sim_Params();
@@ -46,6 +55,8 @@ class Sim_Params {
     BackfillPolicy m_backfill_policy;
     PriorityPolicy m_priority_policy;
     RuntimeEstimateMode m_runtime_mode;
+    QueueImplementation m_queue_impl;
+    size_t m_block_size;  // Block size for block queue (must be power of 2)
     num_nodes_t m_total_nodes;
     std::string m_trace_format;  // "simple" or "lassen"
     std::string m_timestamp_format;  // "epoch" or "iso"

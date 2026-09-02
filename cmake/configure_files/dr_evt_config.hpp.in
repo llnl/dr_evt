@@ -29,6 +29,8 @@
 #cmakedefine DR_EVT_HAS_NUMA 1
 #cmakedefine DR_EVT_HAS_STD_FILESYSTEM 1
 #cmakedefine DR_EVT_HAS_PROTOBUF 1
+#cmakedefine DR_EVT_HAS_PROTOBUF_LOG_HANDLER 1
+#cmakedefine DR_EVT_HAS_ABSL_LOG_SINK 1
 
 
 #ifdef DR_EVT_HAS_OPENMP

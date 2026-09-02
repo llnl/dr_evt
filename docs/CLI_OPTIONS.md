@@ -136,6 +136,45 @@ Job priority/ordering policy.
 ./build/simulator traces/jobs.csv --priority_policy sjf
 ```
 
+### `-q, --queue_impl IMPLEMENTATION`
+Wait queue implementation (FCFS scheduler only).
+
+**Options:**
+- `deque` - std::deque-based (default)
+  - Simple, well-tested sequential container
+  - Linear backfill search O(n)
+  - Recommended for <1000 queued jobs
+- `multimap` - std::multimap-based (FCFS_ALT)
+  - Tree-based container for differential testing
+  - Produces identical schedules to `deque`
+  - Useful for verifying FCFS correctness
+- `block` - BlockWaitQueue-based (optimized)
+  - Block-based container with metadata pre-filtering
+  - Faster backfill search O(blocks) via block-level metadata
+  - Tunable block size (default: 128 jobs per block)
+  - Recommended for >1000 queued jobs or backfill-heavy workloads
+  - **Performance:** 2-10x speedup on large-scale FCFS workloads
+
+**Default:** `deque`
+
+**Note:** This option only affects FCFS scheduler. SJF/LJF always use std::multimap
+(already efficient for priority-based scheduling). If `block` or `multimap` is specified
+with SJF/LJF, a warning is printed and the default multimap is used.
+
+**Examples:**
+```bash
+# Standard FCFS with deque (default)
+./build/simulator traces/jobs.csv --priority_policy fcfs
+
+# FCFS with block queue optimization (large-scale workloads)
+./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl block
+
+# Differential testing: compare deque vs multimap (should produce identical output)
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl deque --outfile output_deque.csv
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl multimap --outfile output_multimap.csv
+diff output_deque.csv output_multimap.csv  # Should be identical
+```
+
 ### `-r, --runtime_mode MODE`
 How to estimate job runtimes for scheduling decisions.
 

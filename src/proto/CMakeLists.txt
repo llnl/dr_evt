@@ -74,6 +74,54 @@ if (DR_EVT_HAS_PROTOBUF)
 endif (DR_EVT_HAS_PROTOBUF)
 
 
+# gRPC service (client/server): separate from the dr_evt_proto library
+# above, since dr_evt_params.proto (a plain config message) and
+# dr_evt_service.proto (an actual gRPC service definition) have
+# different codegen needs - the service needs grpc_cpp_plugin's
+# .grpc.pb.cc/.h in addition to protoc's own .pb.cc/.h.
+if (DR_EVT_HAS_GRPC)
+    set_full_path(GRPC_PROTO_INPUTS
+        dr_evt_service.proto
+    )
+
+    set(SERVICE_PROTO_SRCS "${CMAKE_CURRENT_BINARY_DIR}/dr_evt_service.pb.cc")
+    set(SERVICE_PROTO_HDRS "${CMAKE_CURRENT_BINARY_DIR}/dr_evt_service.pb.h")
+    set(SERVICE_GRPC_SRCS "${CMAKE_CURRENT_BINARY_DIR}/dr_evt_service.grpc.pb.cc")
+    set(SERVICE_GRPC_HDRS "${CMAKE_CURRENT_BINARY_DIR}/dr_evt_service.grpc.pb.h")
+
+    add_custom_command(
+        OUTPUT ${SERVICE_PROTO_SRCS} ${SERVICE_PROTO_HDRS}
+               ${SERVICE_GRPC_SRCS} ${SERVICE_GRPC_HDRS}
+        COMMAND protobuf::protoc
+        ARGS --cpp_out=${CMAKE_CURRENT_BINARY_DIR}
+             --grpc_out=${CMAKE_CURRENT_BINARY_DIR}
+             --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
+             --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+             ${GRPC_PROTO_INPUTS}
+        DEPENDS ${GRPC_PROTO_INPUTS} protobuf::protoc gRPC::grpc_cpp_plugin
+        COMMENT "Running protoc + grpc_cpp_plugin on dr_evt_service.proto."
+        VERBATIM)
+
+    add_custom_target(dr_evt_service_proto_genSrc
+        DEPENDS ${SERVICE_PROTO_SRCS} ${SERVICE_PROTO_HDRS}
+                ${SERVICE_GRPC_SRCS} ${SERVICE_GRPC_HDRS})
+
+    add_library(dr_evt_service_proto
+        ${SERVICE_PROTO_SRCS} ${SERVICE_PROTO_HDRS}
+        ${SERVICE_GRPC_SRCS} ${SERVICE_GRPC_HDRS})
+    target_link_libraries(dr_evt_service_proto PUBLIC
+        protobuf::libprotobuf gRPC::grpc++)
+    target_include_directories(dr_evt_service_proto SYSTEM PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+
+    add_dependencies(dr_evt_service_proto dr_evt_service_proto_genSrc)
+
+    # Not installed (unlike dr_evt_proto above): the gRPC service is only
+    # consumed by the dr_evt_server/dr_evt_client executables built in
+    # the root CMakeLists.txt, not by any installed library's public API.
+endif (DR_EVT_HAS_GRPC)
+
+
 # Propagate the files up the tree (only if protobuf is enabled)
 if (DR_EVT_HAS_PROTOBUF)
     set(DR_EVT_HEADERS "${DR_EVT_HEADERS}" "${THIS_DIR_HEADERS}" PARENT_SCOPE)
