@@ -133,6 +133,13 @@ jobs:
           echo "========================================"
           ./tests/test_all_dr_evt.sh
 
+      - name: Run Queue Implementation Differential Tests
+        run: |
+          echo "========================================"
+          echo "Comparing deque/multimap/block/circular queue implementations"
+          echo "========================================"
+          ./tests/test_fcfs_comprehensive.sh --correctness
+
       - name: Run Unit Tests
         run: |
           echo "========================================"
@@ -201,6 +208,7 @@ jobs:
           echo ""
           echo "Test Results:"
           echo "  Comprehensive: 34 tests (verified 34/34 in a manual session pass)"
+          echo "  Queue Impl Differential: 34 tests x 4 queue impls (deque/multimap/block/circular)"
           echo "  Unit: 7 tests (5/7 - 2 known-broken, incomplete fixture data)"
           echo "  Feature: 3 tests"
           echo "  Replay: 3 tests (methodology also verified against more)"

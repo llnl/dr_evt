@@ -79,12 +79,13 @@ run_correctness_tests() {
     echo "Part 1: Differential Correctness Testing"
     echo "=========================================="
     echo ""
-    echo "Purpose: Verify scheduler correctness by comparing three"
+    echo "Purpose: Verify scheduler correctness by comparing four"
     echo "independent FCFS implementations that should produce"
     echo "identical results:"
     echo "  - fcfs (deque-based, default)"
     echo "  - fcfs_alt (multimap-based, differential testing)"
     echo "  - fcfs with --queue_impl block (block-based, optimized)"
+    echo "  - fcfs with --queue_impl circular (boost::circular_buffer-based)"
     echo ""
 
     PASS=0
@@ -159,11 +160,29 @@ run_correctness_tests() {
             --resource_trace "/tmp/fcfs_block_${test_name}_resources.csv" \
             > /dev/null 2>&1
 
-        # Compare job schedules (all three must match)
+        # Run with circular queue (priority_policy=fcfs, queue_impl=circular)
+        if [ "$VERBOSE" = true ]; then
+            echo "  Running fcfs (circular queue): $test_name"
+        fi
+        ./build/simulator "$test_file" \
+            --priority_policy fcfs \
+            --queue_impl circular \
+            --total_nodes 100 \
+            --trace_format simple \
+            --timestamp_format epoch \
+            --duration_mode "$duration_mode" \
+            --backfill_policy easy \
+            --outfile "/tmp/fcfs_circular_${test_name}.csv" \
+            --resource_trace "/tmp/fcfs_circular_${test_name}_resources.csv" \
+            > /dev/null 2>&1
+
+        # Compare job schedules (all four must match)
         SCHEDULE_MATCH_ALT=0
         SCHEDULE_MATCH_BLOCK=0
+        SCHEDULE_MATCH_CIRCULAR=0
         RESOURCE_MATCH_ALT=0
         RESOURCE_MATCH_BLOCK=0
+        RESOURCE_MATCH_CIRCULAR=0
 
         if ! diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_alt_${test_name}.csv" > /dev/null 2>&1; then
             SCHEDULE_MATCH_ALT=1
@@ -173,7 +192,11 @@ run_correctness_tests() {
             SCHEDULE_MATCH_BLOCK=1
         fi
 
-        # Compare resource traces (all three must match)
+        if ! diff -q "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_circular_${test_name}.csv" > /dev/null 2>&1; then
+            SCHEDULE_MATCH_CIRCULAR=1
+        fi
+
+        # Compare resource traces (all four must match)
         if ! diff -q "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_alt_${test_name}_resources.csv" > /dev/null 2>&1; then
             RESOURCE_MATCH_ALT=1
         fi
@@ -182,10 +205,14 @@ run_correctness_tests() {
             RESOURCE_MATCH_BLOCK=1
         fi
 
+        if ! diff -q "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_circular_${test_name}_resources.csv" > /dev/null 2>&1; then
+            RESOURCE_MATCH_CIRCULAR=1
+        fi
+
         # All must match
-        if [ $SCHEDULE_MATCH_ALT -eq 0 ] && [ $SCHEDULE_MATCH_BLOCK -eq 0 ] && \
-           [ $RESOURCE_MATCH_ALT -eq 0 ] && [ $RESOURCE_MATCH_BLOCK -eq 0 ]; then
-            echo "✓ $test_name (deque == multimap == block)"
+        if [ $SCHEDULE_MATCH_ALT -eq 0 ] && [ $SCHEDULE_MATCH_BLOCK -eq 0 ] && [ $SCHEDULE_MATCH_CIRCULAR -eq 0 ] && \
+           [ $RESOURCE_MATCH_ALT -eq 0 ] && [ $RESOURCE_MATCH_BLOCK -eq 0 ] && [ $RESOURCE_MATCH_CIRCULAR -eq 0 ]; then
+            echo "✓ $test_name (deque == multimap == block == circular)"
             PASS=$((PASS + 1))
         else
             echo "✗ $test_name - MISMATCH"
@@ -201,6 +228,12 @@ run_correctness_tests() {
                 echo "  fcfs_block: /tmp/fcfs_block_${test_name}.csv"
                 [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_block_${test_name}.csv" | head -10
             fi
+            if [ $SCHEDULE_MATCH_CIRCULAR -ne 0 ]; then
+                echo "  Job schedules differ (deque vs circular):"
+                echo "  fcfs:          /tmp/fcfs_${test_name}.csv"
+                echo "  fcfs_circular: /tmp/fcfs_circular_${test_name}.csv"
+                [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}.csv" "/tmp/fcfs_circular_${test_name}.csv" | head -10
+            fi
             if [ $RESOURCE_MATCH_ALT -ne 0 ]; then
                 echo "  Resource traces differ (deque vs multimap):"
                 echo "  fcfs:     /tmp/fcfs_${test_name}_resources.csv"
@@ -212,6 +245,12 @@ run_correctness_tests() {
                 echo "  fcfs:       /tmp/fcfs_${test_name}_resources.csv"
                 echo "  fcfs_block: /tmp/fcfs_block_${test_name}_resources.csv"
                 [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_block_${test_name}_resources.csv" | head -10
+            fi
+            if [ $RESOURCE_MATCH_CIRCULAR -ne 0 ]; then
+                echo "  Resource traces differ (deque vs circular):"
+                echo "  fcfs:          /tmp/fcfs_${test_name}_resources.csv"
+                echo "  fcfs_circular: /tmp/fcfs_circular_${test_name}_resources.csv"
+                [ "$VERBOSE" = true ] && diff "/tmp/fcfs_${test_name}_resources.csv" "/tmp/fcfs_circular_${test_name}_resources.csv" | head -10
             fi
             FAIL=$((FAIL + 1))
         fi
@@ -229,10 +268,11 @@ run_correctness_tests() {
     if [ $FAIL -eq 0 ]; then
         echo "✅ ALL CORRECTNESS TESTS PASSED"
         echo ""
-        echo "All three FCFS implementations produce identical results!"
+        echo "All four FCFS implementations produce identical results!"
         echo "  - fcfs (deque)"
         echo "  - fcfs_alt (multimap)"
         echo "  - fcfs --queue_impl block (BlockWaitQueue)"
+        echo "  - fcfs --queue_impl circular (boost::circular_buffer)"
         echo ""
         echo "This provides strong evidence of correctness."
         return 0
