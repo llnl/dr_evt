@@ -58,7 +58,7 @@ Sim_Params::Sim_Params()
     m_backfill_policy(BackfillPolicy::EASY),
     m_priority_policy(PriorityPolicy::FCFS),
     m_runtime_mode(RuntimeEstimateMode::USE_LIMIT),
-    m_queue_impl(QueueImplementation::DEQUE),
+    m_queue_impl(QueueImplementation::CIRCULAR),
     m_block_size(128),
     m_circular_capacity(0),  // 0 = size of job trace (never overflows)
     m_circular_overflow(CircularOverflowPolicy::GROW),
@@ -108,7 +108,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'b': /* --backfill_policy */
                 {
                     std::string policy(optarg);
-                    if (policy == "easy") {
+                    if (policy.empty()) {
+                        m_backfill_policy = BackfillPolicy::EASY;
+                    } else if (policy == "easy") {
                         m_backfill_policy = BackfillPolicy::EASY;
                     } else if (policy == "conservative") {
                         m_backfill_policy = BackfillPolicy::CONSERVATIVE;
@@ -123,7 +125,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'p': /* --priority_policy */
                 {
                     std::string policy(optarg);
-                    if (policy == "fcfs") {
+                    if (policy.empty()) {
+                        m_priority_policy = PriorityPolicy::FCFS;
+                    } else if (policy == "fcfs") {
                         m_priority_policy = PriorityPolicy::FCFS;
                     } else if (policy == "fcfs_alt") {
                         m_priority_policy = PriorityPolicy::FCFS_ALT;
@@ -140,17 +144,19 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'q': /* --queue_impl */
                 {
                     std::string impl(optarg);
-                    if (impl == "deque") {
+                    if (impl.empty()) {
+                        m_queue_impl = QueueImplementation::CIRCULAR;
+                    } else if (impl == "circular") {
+                        m_queue_impl = QueueImplementation::CIRCULAR;
+                    } else if (impl == "deque") {
                         m_queue_impl = QueueImplementation::DEQUE;
                     } else if (impl == "multimap") {
                         m_queue_impl = QueueImplementation::MULTIMAP;
                     } else if (impl == "block") {
                         m_queue_impl = QueueImplementation::BLOCK;
-                    } else if (impl == "circular") {
-                        m_queue_impl = QueueImplementation::CIRCULAR;
                     } else {
                         std::cerr << "Unknown queue implementation: " << impl << std::endl;
-                        std::cerr << "Valid options: 'deque' (default), 'multimap', 'block', 'circular' (FCFS only)" << std::endl;
+                        std::cerr << "Valid options: 'circular' (default), 'deque', 'multimap', 'block' (FCFS only)" << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
@@ -173,7 +179,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'G': /* --circular_overflow */
                 {
                     std::string policy(optarg);
-                    if (policy == "abort") {
+                    if (policy.empty()) {
+                        m_circular_overflow = CircularOverflowPolicy::GROW;
+                    } else if (policy == "abort") {
                         m_circular_overflow = CircularOverflowPolicy::ABORT;
                     } else if (policy == "grow") {
                         m_circular_overflow = CircularOverflowPolicy::GROW;
@@ -187,7 +195,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'r': /* --runtime_mode */
                 {
                     std::string mode(optarg);
-                    if (mode == "limit") {
+                    if (mode.empty()) {
+                        m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
+                    } else if (mode == "limit") {
                         m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
                     } else if (mode == "actual") {
                         m_runtime_mode = RuntimeEstimateMode::USE_ACTUAL;
@@ -200,7 +210,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'f': /* --trace_format */
                 {
                     std::string format(optarg);
-                    if (format == "simple" || format == "lassen") {
+                    if (format.empty()) {
+                        m_trace_format = "lassen";
+                    } else if (format == "simple" || format == "lassen") {
                         m_trace_format = format;
                     } else {
                         std::cerr << "Unknown trace format: " << format << std::endl;
@@ -211,7 +223,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'T': /* --timestamp_format */
                 {
                     std::string format(optarg);
-                    if (format == "epoch" || format == "iso") {
+                    if (format.empty()) {
+                        m_timestamp_format = "iso";
+                    } else if (format == "epoch" || format == "iso") {
                         m_timestamp_format = format;
                     } else {
                         std::cerr << "Unknown timestamp format: " << format << std::endl;
@@ -225,7 +239,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'd': /* --duration_mode */
                 {
                     std::string mode(optarg);
-                    if (mode == "column") {
+                    if (mode.empty()) {
+                        m_duration_mode = DurationMode::EXACT;
+                    } else if (mode == "column") {
                         m_duration_mode = DurationMode::FROM_COLUMN;
                     } else if (mode == "exact") {
                         m_duration_mode = DurationMode::EXACT;
@@ -240,7 +256,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'D': /* --duration_distribution */
                 {
                     std::string dist(optarg);
-                    if (dist == "normal") {
+                    if (dist.empty()) {
+                        m_duration_distribution = DistributionType::NORMAL;
+                    } else if (dist == "normal") {
                         m_duration_distribution = DistributionType::NORMAL;
                     } else if (dist == "lognormal") {
                         m_duration_distribution = DistributionType::LOGNORMAL;
@@ -268,7 +286,12 @@ void Sim_Params::getopt(int& argc, char** &argv)
                 {
 #if defined(DR_EVT_HAS_PROTOBUF)
                     std::string config_file(optarg);
-                    read_proto_params(config_file, *this, m_verbose);
+                    try {
+                        read_proto_params(config_file, *this, m_verbose);
+                    } catch (const std::exception& e) {
+                        std::cerr << "Error reading --config file: " << e.what() << std::endl;
+                        exit(1);
+                    }
 #else
                     std::cerr << "Error: --config option requires Protobuf support" << std::endl;
                     std::cerr << "Rebuild with -DDR_EVT_ENABLE_PROTOBUF=ON" << std::endl;
@@ -341,12 +364,12 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        sjf: Shortest-Job-First\n"
         "        ljf: Longest-Job-First\n"
         "\n"
-        "    -q, --queue_impl {deque|multimap|block|circular}\n"
-        "        Wait queue implementation for FCFS scheduler (default: deque).\n"
+        "    -q, --queue_impl {circular|deque|multimap|block}\n"
+        "        Wait queue implementation for FCFS scheduler (default: circular).\n"
+        "        circular: boost::circular_buffer-based (fastest measured; default)\n"
         "        deque: std::deque-based (simple, well-tested)\n"
         "        multimap: std::multimap-based (for differential testing)\n"
         "        block: Block-based with multi-index (optimized for large queues)\n"
-        "        circular: boost::circular_buffer-based\n"
         "        Note: Only applies to FCFS scheduler. SJF/LJF always use multimap.\n"
         "\n"
         "    -Q, --block_size SIZE\n"

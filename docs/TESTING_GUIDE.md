@@ -29,6 +29,7 @@ correct.
 - [Replay Tests](#replay-tests) - Resource usage verification
 - [Streaming API Tests](#streaming-api-tests) - Online job submission
 - [Configuration Tests](#configuration-tests) - Protobuf validation
+- [Queue Implementation Testing](#queue-implementation-testing) - Wait-queue data structure consistency
 - [Test Summary](#test-summary)
 - [Test File Formats](#test-file-formats)
 - [Adding New Tests](#adding-new-tests)
@@ -60,6 +61,9 @@ cd build
 # Run streaming API tests
 ./tests/test_streaming_api
 ./tests/test_batch_vs_streaming
+
+# Run queue implementation differential tests (circular/deque/multimap/block)
+../tests/test_fcfs_comprehensive.sh --correctness
 ```
 
 ---
@@ -314,6 +318,44 @@ make
 
 ---
 
+## Queue Implementation Testing
+
+**Location:** `tests/test_traces/comprehensive/` (same 34 traces as the Comprehensive Tests above)
+**Purpose:** Verify all four FCFS wait-queue *data structure* implementations
+(`--queue_impl circular/deque/multimap/block`) produce byte-for-byte identical
+output to each other
+
+This checks something different from the Python-reference comparison the
+rest of this guide describes: not whether the C++ simulator's scheduling
+*decisions* are correct, but whether swapping the underlying queue data
+structure changes the result. It won't catch a bug shared by all four
+implementations, but it will catch a bug introduced in one specific
+implementation while the others stay correct - something the
+Python-reference comparison above wouldn't specifically localize.
+
+`circular` is the default (`--queue_impl` unset uses it); `deque`,
+`multimap`, and `block` all still need to be requested explicitly.
+
+**How to run:**
+```bash
+cd build
+../tests/test_fcfs_comprehensive.sh --correctness
+```
+
+**Performance comparison** (not correctness - separate script):
+```bash
+../tests/benchmark_block_sizes.sh
+```
+
+Runs in CI (`.github/workflows/tests.yml`, "Run Queue Implementation
+Differential Tests"). See
+[`dev/design-decisions/CIRCULAR_QUEUE.md`](dev/design-decisions/CIRCULAR_QUEUE.md)
+for the default implementation and
+[`dev/design-decisions/BLOCK_QUEUE.md`](dev/design-decisions/BLOCK_QUEUE.md)
+for the block-based one.
+
+---
+
 ## Test Summary
 
 | Category | Total | Passing | Broken | Purpose |
@@ -325,7 +367,8 @@ make
 | **Replay** | 3+ | 3+ | 0 | Resource verification |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 4 | 4 | 0 | Protobuf validation |
-| **TOTAL** | 61+ | 61+ | 0 | Complete test suite |
+| **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
+| **TOTAL** | 95+ | 95+ | 0 | Complete test suite |
 
 **All tests passing as of Aug 31, 2026** (commits e6da09c and 68ff506)
 
@@ -494,6 +537,7 @@ it out.
 - **Python Reference**: [scripts/python_reference_scheduler.py](../scripts/python_reference_scheduler.py)
 - **Test overview**: [tests/README.md](../tests/README.md)
 - **Test trace details**: [tests/test_traces/README.md](../tests/test_traces/README.md)
+- **Queue implementation differential testing**: [dev/design-decisions/CIRCULAR_QUEUE.md](dev/design-decisions/CIRCULAR_QUEUE.md) (default), [dev/design-decisions/BLOCK_QUEUE.md](dev/design-decisions/BLOCK_QUEUE.md)
 
 ---
 

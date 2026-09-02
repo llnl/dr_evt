@@ -58,9 +58,7 @@ static void set_sim_options(
         } else if (policy == "none") {
             sp.m_backfill_policy = BackfillPolicy::NONE;
         } else {
-            std::cerr << "Warning: Unknown backfill_policy in protobuf: " << policy
-                     << " (using default: easy)" << std::endl;
-            sp.m_backfill_policy = BackfillPolicy::EASY;
+            throw std::runtime_error("Unknown backfill_policy in protobuf: " + policy);
         }
     } else {
         sp.m_backfill_policy = BackfillPolicy::EASY;
@@ -76,9 +74,7 @@ static void set_sim_options(
         } else if (policy == "ljf") {
             sp.m_priority_policy = PriorityPolicy::LJF;
         } else {
-            std::cerr << "Warning: Unknown priority_policy in protobuf: " << policy
-                     << " (using default: fcfs)" << std::endl;
-            sp.m_priority_policy = PriorityPolicy::FCFS;
+            throw std::runtime_error("Unknown priority_policy in protobuf: " + policy);
         }
     } else {
         sp.m_priority_policy = PriorityPolicy::FCFS;
@@ -92,9 +88,7 @@ static void set_sim_options(
         } else if (mode == "actual") {
             sp.m_runtime_mode = RuntimeEstimateMode::USE_ACTUAL;
         } else {
-            std::cerr << "Warning: Unknown runtime_mode in protobuf: " << mode
-                     << " (using default: limit)" << std::endl;
-            sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
+            throw std::runtime_error("Unknown runtime_mode in protobuf: " + mode);
         }
     } else {
         sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
@@ -106,9 +100,7 @@ static void set_sim_options(
         if (format == "simple" || format == "lassen") {
             sp.m_trace_format = format;
         } else {
-            std::cerr << "Warning: Unknown trace_format in protobuf: " << format
-                     << " (using default: lassen)" << std::endl;
-            sp.m_trace_format = "lassen";
+            throw std::runtime_error("Unknown trace_format in protobuf: " + format);
         }
     } else {
         sp.m_trace_format = "lassen";
@@ -120,9 +112,7 @@ static void set_sim_options(
         if (format == "epoch" || format == "iso") {
             sp.m_timestamp_format = format;
         } else {
-            std::cerr << "Warning: Unknown timestamp_format in protobuf: " << format
-                     << " (using default: iso)" << std::endl;
-            sp.m_timestamp_format = "iso";
+            throw std::runtime_error("Unknown timestamp_format in protobuf: " + format);
         }
     } else {
         sp.m_timestamp_format = "iso";
@@ -146,9 +136,7 @@ static void set_sim_options(
         } else if (mode == "distribution") {
             sp.m_duration_mode = DurationMode::DISTRIBUTION;
         } else {
-            std::cerr << "Warning: Unknown duration_mode in protobuf: " << mode
-                     << " (using default: exact)" << std::endl;
-            sp.m_duration_mode = DurationMode::EXACT;
+            throw std::runtime_error("Unknown duration_mode in protobuf: " + mode);
         }
     } else {
         sp.m_duration_mode = DurationMode::EXACT;
@@ -164,9 +152,7 @@ static void set_sim_options(
         } else if (dist == "uniform") {
             sp.m_duration_distribution = DistributionType::UNIFORM;
         } else {
-            std::cerr << "Warning: Unknown duration_distribution in protobuf: " << dist
-                     << " (using default: normal)" << std::endl;
-            sp.m_duration_distribution = DistributionType::NORMAL;
+            throw std::runtime_error("Unknown duration_distribution in protobuf: " + dist);
         }
     } else {
         sp.m_duration_distribution = DistributionType::NORMAL;
@@ -190,24 +176,22 @@ static void set_sim_options(
         sp.m_duration_stddev = 0.0;
     }
 
-    // Queue implementation (default: DEQUE)
+    // Queue implementation (default: CIRCULAR)
     if (!cfg.queue_impl().empty()) {
         std::string impl = cfg.queue_impl();
-        if (impl == "deque") {
+        if (impl == "circular") {
+            sp.m_queue_impl = QueueImplementation::CIRCULAR;
+        } else if (impl == "deque") {
             sp.m_queue_impl = QueueImplementation::DEQUE;
         } else if (impl == "multimap") {
             sp.m_queue_impl = QueueImplementation::MULTIMAP;
         } else if (impl == "block") {
             sp.m_queue_impl = QueueImplementation::BLOCK;
-        } else if (impl == "circular") {
-            sp.m_queue_impl = QueueImplementation::CIRCULAR;
         } else {
-            std::cerr << "Warning: Unknown queue_impl in protobuf: " << impl
-                     << " (using default: deque)" << std::endl;
-            sp.m_queue_impl = QueueImplementation::DEQUE;
+            throw std::runtime_error("Unknown queue_impl in protobuf: " + impl);
         }
     } else {
-        sp.m_queue_impl = QueueImplementation::DEQUE;
+        sp.m_queue_impl = QueueImplementation::CIRCULAR;
     }
 
     // Block size for block queue implementation (0 means use default from Sim_Params constructor)
@@ -229,9 +213,7 @@ static void set_sim_options(
         } else if (policy == "grow") {
             sp.m_circular_overflow = CircularOverflowPolicy::GROW;
         } else {
-            std::cerr << "Warning: Unknown circular_overflow in protobuf: " << policy
-                     << " (using default: grow)" << std::endl;
-            sp.m_circular_overflow = CircularOverflowPolicy::GROW;
+            throw std::runtime_error("Unknown circular_overflow in protobuf: " + policy);
         }
     } else {
         sp.m_circular_overflow = CircularOverflowPolicy::GROW;

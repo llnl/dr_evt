@@ -82,10 +82,10 @@ run_correctness_tests() {
     echo "Purpose: Verify scheduler correctness by comparing four"
     echo "independent FCFS implementations that should produce"
     echo "identical results:"
-    echo "  - fcfs (deque-based, default)"
+    echo "  - fcfs with --queue_impl circular (boost::circular_buffer-based, default)"
+    echo "  - fcfs with --queue_impl deque (deque-based)"
     echo "  - fcfs_alt (multimap-based, differential testing)"
     echo "  - fcfs with --queue_impl block (block-based, optimized)"
-    echo "  - fcfs with --queue_impl circular (boost::circular_buffer-based)"
     echo ""
 
     PASS=0
@@ -120,6 +120,7 @@ run_correctness_tests() {
         fi
         ./build/simulator "$test_file" \
             --priority_policy fcfs \
+            --queue_impl deque \
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
@@ -212,7 +213,7 @@ run_correctness_tests() {
         # All must match
         if [ $SCHEDULE_MATCH_ALT -eq 0 ] && [ $SCHEDULE_MATCH_BLOCK -eq 0 ] && [ $SCHEDULE_MATCH_CIRCULAR -eq 0 ] && \
            [ $RESOURCE_MATCH_ALT -eq 0 ] && [ $RESOURCE_MATCH_BLOCK -eq 0 ] && [ $RESOURCE_MATCH_CIRCULAR -eq 0 ]; then
-            echo "✓ $test_name (deque == multimap == block == circular)"
+            echo "✓ $test_name (circular == deque == multimap == block)"
             PASS=$((PASS + 1))
         else
             echo "✗ $test_name - MISMATCH"
@@ -269,10 +270,10 @@ run_correctness_tests() {
         echo "✅ ALL CORRECTNESS TESTS PASSED"
         echo ""
         echo "All four FCFS implementations produce identical results!"
-        echo "  - fcfs (deque)"
+        echo "  - fcfs --queue_impl circular (boost::circular_buffer, default)"
+        echo "  - fcfs --queue_impl deque (deque)"
         echo "  - fcfs_alt (multimap)"
         echo "  - fcfs --queue_impl block (BlockWaitQueue)"
-        echo "  - fcfs --queue_impl circular (boost::circular_buffer)"
         echo ""
         echo "This provides strong evidence of correctness."
         return 0

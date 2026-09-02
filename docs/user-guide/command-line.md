@@ -109,13 +109,22 @@ Job priority/ordering policy.
 Wait queue implementation (FCFS scheduler only).
 
 **Options:**
-- `deque` - std::deque-based (default)
+- `circular` - boost::circular_buffer-based (default)
+  - Same O(1) push_back/pop_front as `deque`, but backed by one
+    contiguous array instead of `deque`'s chunked storage, so indexed
+    access (used throughout the backfill scan) is a direct offset
+    rather than a chunk-lookup-then-offset
+  - **Performance:** measured 14-28% *faster* than `deque` on a 10,000
+    job / 2,000 node benchmark (see [`dev/design-decisions/CIRCULAR_QUEUE.md`](../dev/design-decisions/CIRCULAR_QUEUE.md))
+  - Has a fixed capacity, unlike `deque` - see `--circular_capacity`
+    and `--circular_overflow` below
+- `deque` - std::deque-based
   - Simple, well-tested sequential container
   - Linear backfill search O(n)
-  - Recommended for <1000 queued jobs
+  - Kept as a well-tested fallback and for differential testing
 - `multimap` - std::multimap-based (FCFS_ALT)
   - Tree-based container for differential testing
-  - Produces identical schedules to `deque`
+  - Produces identical schedules to `deque`/`circular`
   - Useful for verifying FCFS correctness
 - `block` - BlockWaitQueue-based
   - Block-based container with metadata pre-filtering
@@ -126,29 +135,20 @@ Wait queue implementation (FCFS scheduler only).
     block's multi-index red-black trees dominate the overhead. Kept
     for differential testing and as a reference implementation; not
     recommended over `deque` or `circular` for typical HPC workloads.
-- `circular` - boost::circular_buffer-based
-  - Same O(1) push_back/pop_front as `deque`, but backed by one
-    contiguous array instead of `deque`'s chunked storage, so indexed
-    access (used throughout the backfill scan) is a direct offset
-    rather than a chunk-lookup-then-offset
-  - **Performance:** measured 14-28% *faster* than `deque` on a 10,000
-    job / 2,000 node benchmark (see [`dev/design-decisions/CIRCULAR_QUEUE.md`](../dev/design-decisions/CIRCULAR_QUEUE.md))
-  - Has a fixed capacity, unlike `deque` - see `--circular_capacity`
-    and `--circular_overflow` below
 
-**Default:** `deque`
+**Default:** `circular`
 
 **Note:** This option only affects FCFS scheduler. SJF/LJF always use std::multimap
-(already efficient for priority-based scheduling). If `block`, `multimap`, or `circular`
+(already efficient for priority-based scheduling). If `deque`, `block`, or `multimap`
 is specified with SJF/LJF, a warning is printed and the default multimap is used.
 
 **Examples:**
 ```bash
-# Standard FCFS with deque (default)
+# Standard FCFS with circular queue (default, typically the fastest option)
 ./build/simulator traces/jobs.csv --priority_policy fcfs
 
-# FCFS with circular queue (typically the fastest option)
-./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl circular
+# FCFS with deque explicitly (simple, well-tested fallback)
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl deque
 
 # FCFS with block queue (reference implementation, not recommended for performance)
 ./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl block

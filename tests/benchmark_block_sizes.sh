@@ -89,6 +89,7 @@ START_TIME=$(date +%s%N)
 
 ./build/simulator "$TRACE_FILE" \
     --priority_policy fcfs \
+    --queue_impl deque \
     --total_nodes $TOTAL_NODES \
     --max_jobs $MAX_JOBS \
     --trace_format $TRACE_FORMAT \
@@ -415,7 +416,7 @@ if [[ "$BEST_OVERALL_NAME" == "Deque" ]]; then
     DEQUE_ADVANTAGE=$(printf "%.0f" $(echo "scale=4; ($BEST_BLOCK_TIME / $BASELINE_TIME - 1) * 100" | bc))
     echo "  Deque is ${DEQUE_ADVANTAGE}% faster than the best block size"
     echo ""
-    echo "RECOMMENDATION: Use deque (default) for typical HPC workloads"
+    echo "RECOMMENDATION: Use --queue_impl deque"
 else
     ADVANTAGE=$(printf "%.0f" $(echo "scale=4; (1 - $BEST_OVERALL_TIME / $BASELINE_TIME) * 100" | bc))
     echo "  ${ADVANTAGE}% faster than deque"
@@ -424,7 +425,7 @@ else
         WINNING_BLOCK_SIZE="${BEST_OVERALL_NAME#Block-}"
         echo "RECOMMENDATION: Use --queue_impl block --block_size $WINNING_BLOCK_SIZE for this workload"
     else
-        echo "RECOMMENDATION: Use --queue_impl circular for this workload"
+        echo "RECOMMENDATION: circular is the configured default (no flag needed) - confirmed best for this workload"
     fi
 fi
 echo ""

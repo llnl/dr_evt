@@ -256,6 +256,9 @@ Scheduler uses user-provided time limits.
 -b, --backfill_policy POLICY   # Backfill: easy|conservative (default: easy)
 -p, --priority_policy POLICY   # Priority: fcfs|sjf|ljf (default: fcfs)
 -r, --runtime_mode MODE        # Runtime: actual|limit (default: actual)
+-q, --queue_impl IMPL          # FCFS wait queue: circular|deque|multimap|block (default: circular)
+-A, --circular_capacity SIZE   # Initial capacity for queue_impl=circular (default: 0 = size of trace)
+-G, --circular_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
 ```
 
 ### Other Options

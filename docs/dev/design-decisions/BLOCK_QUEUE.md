@@ -240,7 +240,9 @@ for (auto& block_info : m_blocks) {
 ## Recommendations
 
 ### Production
-✅ **Use deque (default)** - 30% faster, simpler code
+✅ **Use circular (default)** - measured faster than both deque and every
+block size (see [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md)); `deque` remains
+available as a simple, well-tested fallback
 
 ### Research/Testing
 ✅ **Use Block-16** - best block size if testing block queue

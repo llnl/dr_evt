@@ -2,14 +2,14 @@
 
 ## Quick Summary
 
-Circular queue is structurally identical to the default deque-based FCFS
-scheduler - same job entry layout, same lazy-mark-and-compact removal, same
-`pop_front()` head consumption, same indexed backfill scan - but backed by
-`boost::circular_buffer` instead of `std::deque`. **Measured 14% faster than
-deque on average (10K jobs, 2K nodes).** Use it as a drop-in, faster
-replacement for deque.
+Circular queue is now DR_EVT's default FCFS wait-queue implementation.
+It's structurally identical to the deque-based FCFSScheduler it replaced
+as default - same job entry layout, same lazy-mark-and-compact removal,
+same `pop_front()` head consumption, same indexed backfill scan - but
+backed by `boost::circular_buffer` instead of `std::deque`. **Measured
+14% faster than deque on average (10K jobs, 2K nodes).**
 
-**Command:** `./simulator trace.csv --queue_impl circular`
+**Command:** `./simulator trace.csv` (default) or explicitly `./simulator trace.csv --queue_impl circular`
 
 ## Performance Results (10K jobs, 2K nodes, average of 3 trials)
 
@@ -137,20 +137,19 @@ Both protobuf-based configuration paths support `queue_impl`,
 - The `.prototext` config file format read via `--config`
   (`src/proto/dr_evt_params.proto`)
 
-An empty `queue_impl`/`circular_overflow` string or a `0` `circular_capacity`
-keeps `Sim_Params`' own defaults (deque; grow; sized to the job trace) in
-both paths.
+An empty `queue_impl` string, empty `circular_overflow` string, or a `0`
+`circular_capacity` keeps `Sim_Params`' own defaults (circular; grow;
+sized to the job trace) in both paths.
 
 ## Recommendations
 
 ### Production
-✅ **Use circular** for FCFS workloads where the backfill scan's indexed
-access is a meaningful share of runtime - measured faster than both deque
-and block queue.
+✅ **circular is the default** - no action needed for most FCFS workloads;
+measured faster than both deque and block queue.
 
-✅ **Use deque (default)** if you'd rather not depend on Boost, or want the
-simplest, most battle-tested option; the performance difference measured
-here is real but not dramatic.
+✅ **Use `--queue_impl deque`** if you'd rather not depend on Boost, or want
+the simplest, most battle-tested option; the performance difference
+measured here is real but not dramatic.
 
 ### Research/Testing
 ✅ Use the default capacity (0) unless you specifically want to test the

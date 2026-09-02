@@ -68,6 +68,7 @@ const char* queue_impl_name(QueueImplementation impl) {
         case QueueImplementation::BLOCK:    return "block";
         case QueueImplementation::CIRCULAR: return "circular";
         case QueueImplementation::MULTIMAP: return "multimap";
+        case QueueImplementation::DEQUE:    return "deque";
         default:                            return "multimap";
     }
 }
@@ -86,7 +87,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
 {
     switch (priority_policy) {
         case PriorityPolicy::FCFS:
-            // FCFS has 3 queue options
+            // FCFS has 4 queue options
             if (queue_impl == QueueImplementation::BLOCK) {
                 // Validate block_size is power of 2
                 if (block_size == 0 || (block_size & (block_size - 1)) != 0) {
@@ -138,19 +139,20 @@ std::unique_ptr<SchedulerBase> create_scheduler(
             } else if (queue_impl == QueueImplementation::MULTIMAP) {
                 return std::make_unique<FCFSAltScheduler>(
                     total_nodes, job_data, backfill_policy, runtime_mode);
-            } else if (queue_impl == QueueImplementation::CIRCULAR) {
+            } else if (queue_impl == QueueImplementation::DEQUE) {
+                return std::make_unique<FCFSScheduler>(
+                    total_nodes, job_data, backfill_policy, runtime_mode);
+            } else {
+                // circular (default)
                 return std::make_unique<CircularBufferFCFSScheduler>(
                     total_nodes, job_data, backfill_policy, runtime_mode,
                     circular_capacity, circular_overflow);
-            } else {
-                return std::make_unique<FCFSScheduler>(
-                    total_nodes, job_data, backfill_policy, runtime_mode);
             }
 
         case PriorityPolicy::FCFS_ALT:
             // FCFS_ALT always uses multimap
             if (queue_impl == QueueImplementation::BLOCK ||
-                queue_impl == QueueImplementation::CIRCULAR) {
+                queue_impl == QueueImplementation::DEQUE) {
                 std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                          << "' not supported for FCFS_ALT, using multimap\n";
             }
@@ -159,7 +161,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
 
         case PriorityPolicy::SJF:
             // SJF only uses multimap (already efficient)
-            if (queue_impl != QueueImplementation::DEQUE) {
+            if (queue_impl != QueueImplementation::CIRCULAR) {
                 std::cerr << "Warning: queue_impl '"
                          << queue_impl_name(queue_impl)
                          << "' not supported for SJF, using default multimap\n";
@@ -169,7 +171,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
 
         case PriorityPolicy::LJF:
             // LJF only uses multimap (already efficient)
-            if (queue_impl != QueueImplementation::DEQUE) {
+            if (queue_impl != QueueImplementation::CIRCULAR) {
                 std::cerr << "Warning: queue_impl '"
                          << queue_impl_name(queue_impl)
                          << "' not supported for LJF, using default multimap\n";

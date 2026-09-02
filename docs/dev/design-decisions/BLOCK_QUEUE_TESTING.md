@@ -25,7 +25,7 @@ The block queue implementation has been thoroughly tested for correctness and pe
 **`tests/test_fcfs_comprehensive.sh`**
 - Differential correctness testing
 - Compares 4 FCFS implementations:
-  - fcfs (deque-based, default)
+  - fcfs (deque-based, explicit `--queue_impl deque`)
   - fcfs_alt (multimap-based, for verification)
   - fcfs --queue_impl block (block queue, default size 128)
   - fcfs --queue_impl circular (circular buffer queue - see `CIRCULAR_QUEUE.md`)
@@ -280,13 +280,15 @@ The fundamental issue: **Multi-index trees are overkill for blocks of 16-256 job
 
 ## Recommendation
 
-**Use deque (default)** for typical HPC workloads.
+**Use circular (default)** for typical HPC workloads - see
+[`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md). `deque` remains available as a
+simple, well-tested fallback.
 
 The block queue implementation:
 - ✅ Correct (all tests pass)
 - ✅ Well-designed (clean API, good architecture)
 - ✅ Educational (demonstrates multi-index trade-offs)
-- ❌ Slower than deque at ALL block sizes (88-178% overhead)
+- ❌ Slower than deque (and circular) at ALL block sizes (88-178% overhead)
 
 Block queue would only help with:
 1. Much larger block sizes (>500 jobs) - not typical
@@ -323,4 +325,4 @@ multimap, block queue (size 128), and circular queue against the 34
 comprehensive test traces - the same script and traces described above.
 Other CI steps (the 34-trace comprehensive test against known-correct
 expected output, unit/feature/replay/config tests, etc.) always use the
-default deque queue.
+default circular queue.

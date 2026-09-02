@@ -26,10 +26,10 @@ namespace dr_evt {
  * Queue implementation selection for FCFS scheduler
  */
 enum class QueueImplementation {
-    DEQUE,      // std::deque based (FCFS default)
+    CIRCULAR,   // boost::circular_buffer based (FCFS default)
+    DEQUE,      // std::deque based (FCFS)
     MULTIMAP,   // std::multimap based (FCFS alt, for differential testing)
-    BLOCK,      // BlockWaitQueue based (optimized for large queues, FCFS only)
-    CIRCULAR    // boost::circular_buffer based (FCFS only)
+    BLOCK       // BlockWaitQueue based (optimized for large queues, FCFS only)
 };
 
 /**

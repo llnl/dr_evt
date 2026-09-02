@@ -363,11 +363,12 @@ older docs, does not exist in this checkout.
 `test_fcfs_comprehensive.sh --correctness` checks something different from
 `test_all_dr_evt.sh`: not whether the C++ simulator matches the Python
 reference, but whether all four FCFS wait-queue implementations
-(`--queue_impl deque/multimap/block/circular`) produce byte-for-byte
+(`--queue_impl circular/deque/multimap/block`) produce byte-for-byte
 identical output to each other, across the same 34 comprehensive traces.
-Runs in CI. See `docs/dev/design-decisions/BLOCK_QUEUE.md` and `docs/dev/design-decisions/CIRCULAR_QUEUE.md` for what
-each non-default implementation is, and `docs/TESTING_GUIDE.md` for how
-this differs from the Python-reference comparison above.
+Runs in CI. See `docs/dev/design-decisions/CIRCULAR_QUEUE.md` for the
+default implementation and `docs/dev/design-decisions/BLOCK_QUEUE.md`
+for the block-based one, and `docs/TESTING_GUIDE.md` for how this
+differs from the Python-reference comparison above.
 
 `benchmark_block_sizes.sh` measures performance (not correctness) across
 every block size and the circular queue, against a 10,000-job trace by

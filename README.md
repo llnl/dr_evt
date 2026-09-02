@@ -32,7 +32,7 @@ scheduling and resource management using a set of heterogenous clusters.
   - All 34 comprehensive tests pass with byte-for-byte identical output
   - Regression detection: Any scheduling behavior change flagged immediately
 - **Analytical Testing**: Mathematical formulas generate test inputs, hand-calculated expected outputs
-- **Differential Testing**: Compare multiple scheduler implementations (deque, multimap, block queue)
+- **Differential Testing**: Compare multiple scheduler implementations (circular queue, deque, multimap, block queue)
 - **CI/CD Integration**: Automated testing on every commit via GitHub Actions
 
 ## Documentation
