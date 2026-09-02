@@ -1,19 +1,29 @@
-# Read the Docs configuration file
+# Read the Docs configuration file for DR_EVT
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html
 
 version: 2
 
-# Build documentation with Sphinx
+# Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: docs/conf.py
+  fail_on_warning: false
 
-# Python configuration
+# Set the version of Python and required tools
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+  jobs:
+    post_install:
+      # Install any additional system dependencies if needed
+      - echo "Build started"
+
+# Python requirements
 python:
-  version: "3.9"
   install:
     - requirements: docs/requirements.txt
 
-# Build formats
+# Formats to build (HTML and PDF)
 formats:
   - pdf
-  - htmlzip
   - epub

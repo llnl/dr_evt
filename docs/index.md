@@ -1,5 +1,8 @@
 # DR_EVT: HPC Job Scheduler Simulator
 
+[![Documentation Status](https://readthedocs.org/projects/dr-evt/badge/?version=latest)](https://dr-evt.readthedocs.io/en/latest/?badge=latest)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/LLNL/dr_evt/blob/main/LICENSE)
+
 **Discrete Event-Driven Simulator for High-Performance Computing Job Schedulers**
 
 DR_EVT simulates HPC job scheduling policies, including an EASY backfilling
@@ -7,6 +10,55 @@ implementation whose behavior is checked against a from-scratch Python
 reference implementation (see Verification note below - this is a
 consistency check between two implementations, not independently derived
 ground truth).
+
+```{toctree}
+:maxdepth: 2
+:caption: Getting Started
+
+getting-started/quickstart
+getting-started/installation
+getting-started/tutorial
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: User Guide
+
+user-guide/overview
+user-guide/command-line
+user-guide/grpc-setup
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Algorithm & Testing
+
+EASY_BACKFILLING_ALGORITHM
+TESTING_GUIDE
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: APIs
+
+STREAMING_API
+PYTHON_API
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Reference
+
+CLI_OPTIONS
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Development
+
+dev/README
+DOCUMENTATION_ORGANIZATION
+```
 
 ## Documentation
 
@@ -28,8 +80,8 @@ Complete guide for running simulations:
 
 ### Algorithm and Testing
 
-- **[EASY Backfilling Algorithm](EASY_BACKFILLING_ALGORITHM.md)** - How the scheduling algorithm works
-- **[Testing Guide](TESTING_GUIDE.md)** - How the test suite is structured, what it does and doesn't verify, and known limitations
+- **[EASY Backfilling Algorithm](EASY_BACKFILLING_ALGORITHM.md)** - How the scheduling algorithm works with diagrams
+- **[Testing Guide](TESTING_GUIDE.md)** - Complete test catalog, how to run tests, test patterns, and verification methodology
 
 ### APIs
 
@@ -38,14 +90,13 @@ Complete guide for running simulations:
 
 ### Reference
 
-- **[Terminology](reference/terminology.md)** - Terms and definitions
+- **[CLI Options](CLI_OPTIONS.md)** - Complete command-line reference with configuration examples
 
 ### Development
 
-For contributors:
+For contributors and maintainers:
 
-- **[Developer Notes](dev/README.md)** - Session notes and design decision index
-- **[Design Decisions](dev/design-decisions/)** - Specific architectural decisions (Conan removal, renaming history, trace format choices)
+- **[Developer Notes](dev/README.md)** - Design decision index and development resources
 
 ## Quick Links
 

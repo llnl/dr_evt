@@ -72,36 +72,11 @@ docs/
 ├── api/                              # API documentation
 │   └── index.md                     # C++ API reference (NEW)
 │
-└── dev/                              # Development session notes (retained)
-    ├── session-notes/               # Historical session notes
+└── dev/                              # Development notes
     └── design-decisions/            # Design documents
 ```
 
-## What Changed
-
-### Created
-- **ReadTheDocs structure** - Proper categorization
-- **Sphinx configuration** - `conf.py`, `Makefile`, `requirements.txt`
-- **Getting Started** - New user-focused documentation
-  - Quick start guide
-  - Installation instructions
-  - Step-by-step tutorial
-- **Comprehensive indexes** - Navigation for each section
-- **Command-line reference** - Complete option documentation
-
-### Reorganized
-- **User Guide** - Consolidated user-facing documentation
-- **Verification** - All test and verification docs in one place
-- **Development** - Developer-focused documentation separated
-- **Reference** - Technical reference material
-
-### Retained
-- **dev/** - Development session notes (historical)
-- **Original files** - Moved but preserved all content
-
-## Building Documentation
-
-### Install Dependencies
+### Install Dependencies for Sphinx documents
 
 ```bash
 cd docs

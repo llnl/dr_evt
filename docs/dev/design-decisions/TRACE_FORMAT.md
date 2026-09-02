@@ -76,7 +76,7 @@ Examples:
 ## Simple Format CSV Structure
 
 ### With Epoch Timestamps
-```csv
+```text
 job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 0,0,100,10,0,batch,100
 50,100,150,10,0,batch,50
@@ -84,7 +84,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 ```
 
 ### With ISO Timestamps
-```csv
+```text
 job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,batch,100
 2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,0,batch,50
@@ -109,7 +109,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 - `begin_time` and `end_time` from trace are used to calculate job duration
 - For simulation, the scheduler **computes** actual start time
 - Jobs run for the historical duration: `duration = end_time - begin_time`
-- See [TEST_STATUS.md](TEST_STATUS.md) for replay vs simulation distinction
+- See [Simulation vs Replay Modes](SIMULATION_VS_REPLAY_MODES.md) for replay vs simulation distinction
 
 ### Lassen Format
 33-column format specific to LLNL HPC traces. Columns used:
@@ -181,6 +181,6 @@ Expected output should show:
 
 ## See Also
 
-- [QUICKSTART.md](../../QUICKSTART.md) - User guide
-- [TEST_STATUS.md](TEST_STATUS.md) - Testing status and blockers
-- [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) - Technical implementation details
+- [User Guide](../../user-guide/overview.md) - Complete usage guide with trace formats
+- [Testing Guide](../../TESTING_GUIDE.md) - Test suite and validation
+- [Quick Start](../../getting-started/quickstart.md) - Getting started guide

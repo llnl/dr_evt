@@ -1,93 +1,89 @@
 # Discrete Resource Event Modeling and Multi-cluster Scheduling Simulator
 
+[![Documentation Status](https://readthedocs.org/projects/dr-evt/badge/?version=latest)](https://dr-evt.readthedocs.io/en/latest/?badge=latest)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/LLNL/dr_evt/blob/main/LICENSE)
+
 Discrete resource event modeling and multi-cluster scheduling simulator
 (DR_EVT) aims to provide a computational environment for simulating job
 scheduling and resource management using a set of heterogenous clusters.
 
+**[📚 Read the Full Documentation on ReadTheDocs →](https://dr-evt.readthedocs.io/)**
+
 ## Features
 
+### Core Simulation
 - **Verified Scheduler Implementation**: EASY backfilling algorithm verified against analytical ground truth (34 comprehensive tests)
-- **Analytical Testing Framework**: Mathematical formulas generate test inputs, hand-calculated expected outputs provide ground truth
-- **Python Reference Implementation**: Verified EASY backfilling scheduler (34/34 tests passing)
-- **Streaming API**: Online simulation with dynamic job submission (`insert_job`, `run_until_inclusive`, `run_until_exclusive`)
 - **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
+- **Block Queue Wait Queue**: Optional block-based queue with metadata filtering (7 block sizes: 4-256)
 - **Replay and Simulation Modes**: Replay historical traces or simulate with runtime distributions
 - **Early Completion Support**: Jobs can finish before time_limit (actual_runtime < time_limit)
-- **Diff-based Validation**: Compare simulator output with analytical traces using `diff`
-- **Real HPC Trace Support**: Load and process job traces from production HPC systems
-- **CI/CD Integration**: Automated testing with GitHub Actions
+
+### APIs & Integration
+- **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
+- **gRPC Client/Server**: Remote simulation control over network (optional)
+- **Python Bindings**: Python API for in-process simulation control
+- **Protocol Buffer Configuration**: Structured configuration files for complex simulations
+
+### Testing & Validation
+- **Dual Validation**: C++ simulator verified against independent Python reference implementation
+  - Python reference: Pure Python EASY backfilling (scripts/python_reference_scheduler.py)
+  - All 34 comprehensive tests pass with byte-for-byte identical output
+  - Regression detection: Any scheduling behavior change flagged immediately
+- **Analytical Testing**: Mathematical formulas generate test inputs, hand-calculated expected outputs
+- **Differential Testing**: Compare multiple scheduler implementations (deque, multimap, block queue)
+- **CI/CD Integration**: Automated testing on every commit via GitHub Actions
 
 ## Documentation
 
-- **[EASY Backfilling Algorithm](docs/EASY_BACKFILLING_ALGORITHM.md)** - Complete algorithm specification
-- **[Analytical Testing](tests/ANALYTICAL_TESTING.md)** - Testing framework and methodology
-- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity
-- **[Complete Documentation](docs/)** - User guides, API reference, verification
-- **[Streaming API Guide](docs/STREAMING_API.md)** - Online simulation API
-- **[Test Suite](tests/README.md)** - All tests and validation
-- **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
+**Primary Documentation**: [**ReadTheDocs** (https://dr-evt.readthedocs.io/)](https://dr-evt.readthedocs.io/)
+- Searchable, versioned documentation with PDF/EPUB downloads
+- Automatic builds from `main` branch
+- Mobile-friendly with navigation
+
+### Quick Reference (GitHub)
+For quick access without leaving GitHub:
+- **[Complete Documentation Index](docs/)** - All guides, references, and specifications
+- **[EASY Backfilling Algorithm](docs/EASY_BACKFILLING_ALGORITHM.md)** - Algorithm specification and verification
+- **[Streaming API](docs/STREAMING_API.md)** - Dynamic job submission API
+- **[Client/Server (gRPC)](docs/CLIENT_SERVER_GUIDE.md)** - Remote simulation over network
+- **[Python API](docs/PYTHON_API.md)** - Python bindings and reference implementation
+- **[CLI Options](docs/CLI_OPTIONS.md)** - Command-line reference
+- **[Testing Guide](docs/TESTING_GUIDE.md)** - Test philosophy, organization, and test suite details
+
+### Building Documentation Locally
+
+Build the same Sphinx documentation that powers ReadTheDocs:
+
+```bash
+cd docs
+
+# Install dependencies (one-time setup)
+make install
+# or manually: pip install -r requirements.txt
+
+# Build HTML documentation
+make html
+# Output: docs/_build/html/index.html
+
+# Build PDF documentation (requires LaTeX)
+make pdf
+# Output: docs/_build/latex/DR_EVT.pdf
+
+# Serve with live-reload (for development)
+make serve
+# Opens browser at http://localhost:8000
+
+# Check for broken links
+make linkcheck
+```
+
+**Note:** Local builds are optional for contributors. The official documentation is automatically built and published to ReadTheDocs on every commit to `main`.
 
 ## Current Requirements:
  + **Platforms targeted**: Linux-based systems
  + **c++ compiler that supports c++17**
-   e.g., clang++ 5.0 or later, g++ 7.1 or later, and icpc 19.0.1 or later
-
  + **GNU Boost library**
-   The particular boost libraries used are `multi_index`, `filesystem`, `regex` and
-   `system`.
-   To build with other pre-existing installation of boost, set the environment
-   variable `BOOST_ROOT` or pass `-DBOOST_ROOT=<path-to-boost>`
-   to cmake. An example path to boost on LC is
-   `/usr/tce/packages/boost/boost-1.69.0-mvapich2-2.3-gcc-8.1.0`.
-   To run the executable, add `${BOOST_ROOT}/lib` to the `LD_LIBRARY_PATH` as
-   needed
-
- + **Guide specific to using clang on Livermore Computing (LC) platforms**
-   Currently, to use clang on Livermore Computing (LC) platforms with
-   the libraries compiled with gcc, make sure the c++ standard library
-   is compatible. On LC, clang by default is paired with c++ standard
-   library from gcc/4.9.3. To avoid incompatibility issue,
-
-   0) Use the user libraries compiled with the system default compiler.
-      On many of LC platforms, it is currently gcc/4.9.3. On others,
-      it depends on how clang is configure there.
-   1) Make clang use the c++ standard library from the same version of gcc
-      as that used for building user libraries to link.
-      e.g., clang++ --gcc-toolchain=/usr/tce/packages/gcc/gcc-8.1.0/ ...
-   2) Use clang's c++ standard library. Recompile user libraries in the
-      same way as needed.
-      i.e., clang++ --stdlib=libc++ ...
-
-   Choose either `USE_GCC_LIBCXX` for option 1 or `USE_CLANG_LIBCXX` for
-   option 2 if needed. Usually, option 1 works best. Option 0 does not work
-   well especially with Catch2 due to the incomplete support for C++17.
-   If neither is chosen, the build relies on the system default, which is,
-   on LC, with `USE_GCC_LIBCXX` on and `GCC_TOOLCHAIN_VER` set to "4.9.3".
-   If both are on, `USE_GCC_LIBCXX` is turned off. When `USE_GCC_LIBCXX`
-   is on, `GCC_TOOLCHAIN_VER` can be set accordingly (e.g., "8.1.0").
-   To make sure to use the correct compiler, invoke the cmake command as
-   `CC=clang CXX=clang++ cmake ...`.
-
- + **Guide specific to using the intel compiler on Livermore Computing (LC) platforms**
-
-   For gcc Interoperability, use `-DGCC_PATH=<path-to-gcc>`. Otherwise,
-   icc picks up the gcc in default path, which may not support c++17.
-   Finally, invoke the cmake command as `CC=icc CXX=icpc cmake ...`.
-
- + **cmake 3.12 or later**
-
-   This requirement mostly comes from the compatibility between the cmake
-   module `find_package()`, and the version of boost used. An older version
-   might still work with some warnings.
-
- + [**Cereal**](https://uscilab.github.io/cereal)
-
-   We rely on Cereal serialization library to enable state packing and
-   unpacking of which needs arises under various circumstances including
-   messaging, rollback, migration, and checkpointing. Cereal is a c++
-   header-only library. No pre-installation is required as it is
-   automatically downloaded and made available.
-
+ + **cmake 3.24 or later**
  + [**Protocol Buffers**](https://developers.google.com/protocol-buffers)
 
    We use the google protocol buffers library for parsing the configuration file
@@ -106,37 +102,281 @@ scheduling and resource management using a set of heterogenous clusters.
    and `-DPROTOBUF_DIR=<installation-for-target>` respectively.
 
 
-## Getting started:
- ```
- git clone https://github.com/llnl/dr_evt.git
- mkdir build; cd build
- # The first invocation of cmake will setup to build protocol buffer
- cmake -DBOOST_ROOT:PATH=<PathToYourBoostDev> \
-       -DCMAKE_INSTALL_PREFIX:PATH=<YourInstallPath> \
-       ../dr_evt
- make -j 4
- # The second invocation of cmake will setup to build the DR_EVT project
- cmake -DBOOST_ROOT:PATH=<PathToYourBoostDev> \
-       -DCMAKE_INSTALL_PREFIX:PATH=<YourInstallPath> \
-       ../dr_evt
- make -j 4
- make install
- ```
+## Quick Start
 
-## Taking advanage of OpenMP:
- + Build DR_EVT with the cmake option `-DDR_EVT_WITH_OPENMP:BOOL=ON`.
- Then, for accelerating execution performance, use the OpenMP environment
- variables to control the parallelism and the processor affinity, such as
- `OMP_NUM_THREADS`, `OMP_PROC_BIND`, and `OMP_PLACES`.
+### Build from Source
 
+```bash
+# Clone repository
+git clone https://github.com/llnl/dr_evt.git
+cd dr_evt
 
-## Unit testing:
- + [**Catch2**](https://github.com/catchorg/Catch2)
- We rely on Catch2 for unit testing. To enable testing for development, set the
- environment variable `DR_EVT_WITH_UNIT_TESTING` or invoke cmake with the
- option `-DDR_EVT_WITH_UNIT_TESTING=ON`. No pre-installation of Catch2 is
- required as it is automatically downloaded and made available.
- To use a pre-installed copy, use the variable `CATCH2_ROOT`.
+# Create build directory
+mkdir build && cd build
+
+# Configure (first run builds Protocol Buffers)
+cmake -DBOOST_ROOT=/path/to/boost \
+      -DCMAKE_INSTALL_PREFIX=/install/path \
+      ..
+
+# Build Protocol Buffers dependency
+make -j4
+
+# Configure DR_EVT (second run builds the simulator)
+cmake -DBOOST_ROOT=/path/to/boost \
+      -DCMAKE_INSTALL_PREFIX=/install/path \
+      ..
+
+# Build and install
+make -j4
+make install
+```
+
+### Run Your First Simulation
+
+**Quick test:**
+```bash
+# Run a simple test
+./simulator ../tests/test_traces/unit/simple.csv
+
+# Run with EASY backfilling (default)
+./simulator trace.csv --priority_policy fcfs --backfill_policy easy
+
+# Run with custom parameters
+./simulator trace.csv \
+    --priority_policy fcfs \
+    --backfill_policy easy \
+    --total_nodes 100 \
+    --outfile results.csv
+```
+
+**Using Protocol Buffer configuration files:**
+
+Create a configuration file `sim_config.textproto`:
+```protobuf
+simulation_params {
+  infile: "trace.csv"
+  outfile: "results.csv"
+  resource_trace: "resources.csv"
+
+  # System configuration
+  total_nodes: 1000
+  seed: 42
+
+  # Scheduling policies
+  backfill_policy: "easy"     # "easy", "conservative", or "none"
+  priority_policy: "fcfs"     # "fcfs", "sjf", or "ljf"
+  runtime_mode: "limit"       # "limit" or "actual"
+
+  # Trace format
+  trace_format: "simple"      # "simple" or "lassen"
+  timestamp_format: "epoch"   # "epoch" or "iso"
+
+  # Simulation limits
+  max_jobs: 10000
+
+  # Duration simulation (optional)
+  duration_mode: "exact"      # "column", "exact", or "distribution"
+  duration_scale: 1.0
+
+  # Output options
+  verbose: false
+}
+```
+
+Run with configuration file:
+```bash
+# Use protobuf config (overrides command-line defaults)
+./simulator --config sim_config.textproto trace.csv
+
+# Command-line options override config file values
+./simulator --config sim_config.textproto \
+    --total_nodes 2000 \
+    --verbose \
+    trace.csv
+```
+
+**Configuration precedence:**
+1. Command-line options (highest priority)
+2. Protocol Buffer config file (`--config`)
+3. Built-in defaults (lowest priority)
+
+### Simulation vs Replay Modes
+
+DR_EVT supports two modes for processing job traces:
+
+#### Replay Mode (`--runtime_mode actual`)
+
+**Purpose:** Reproduce what actually happened on a real HPC system
+
+**Input:** Historical trace with actual job durations
+- Reads `actual_runtime` from trace file
+- Or uses recorded start/end times
+
+**Output:** Schedule matching the original execution
+- Jobs run for their actual recorded duration
+- Simulates the exact behavior that occurred
+
+**Use cases:**
+- Validate scheduler correctness against historical data
+- Understand past system behavior
+- Compare how different schedulers would have performed on real workloads
+- Verify trace processing correctness
+
+**Example:**
+```bash
+# Replay with actual runtimes from trace
+./simulator trace.csv \
+    --runtime_mode actual \
+    --duration_mode column
+```
+
+#### Simulation Mode (`--runtime_mode limit`, default)
+
+**Purpose:** Predict what WOULD happen under different conditions
+
+**Input:** Trace with user-requested time limits
+- Uses `time_limit` column (what users requested)
+- Actual runtime not required
+
+**Output:** Predicted schedule based on scheduler decisions
+- Jobs run for simulated durations (controlled by `--duration_mode`)
+
+**Duration modes:**
+- `exact` (default): Jobs run exactly `time_limit` (perfect estimates)
+- `distribution`: Sample from statistical distribution (realistic variation)
+- `column`: Read `actual_duration` column (if available)
+
+**Use cases:**
+- What-if analysis: "What if we changed the backfill policy?"
+- Test scheduler modifications before deployment
+- Capacity planning: "Can we handle 20% more jobs?"
+- Explore different runtime estimation strategies
+
+**Examples:**
+```bash
+# Simulate with perfect estimates (jobs run exactly time_limit)
+./simulator trace.csv \
+    --runtime_mode limit \
+    --duration_mode exact
+
+# Simulate with realistic variation (80% of time_limit ± 10%)
+./simulator trace.csv \
+    --runtime_mode limit \
+    --duration_mode distribution \
+    --duration_distribution normal \
+    --duration_scale 0.8 \
+    --duration_stddev 0.1
+
+# Simulate but read actual durations from trace column
+./simulator trace.csv \
+    --runtime_mode limit \
+    --duration_mode column
+```
+
+**Key difference:**
+- **Replay (`actual`)**: Uses actual job durations → reproduces history
+- **Simulation (`limit`)**: Uses scheduler's runtime estimates → predicts future
+
+**When to use which:**
+| Scenario | Mode | Why |
+|----------|------|-----|
+| Validate against historical data | Replay | Need to match what actually happened |
+| Test scheduler changes | Simulation | Explore hypothetical scenarios |
+| Capacity planning | Simulation | Predict future with different loads |
+| Understand past incidents | Replay | Reproduce exact historical behavior |
+| Compare schedulers | Either | Replay = fair comparison, Simulation = realistic estimates |
+
+### Verify Installation
+
+```bash
+# Run comprehensive test suite
+./tests/test_all_dr_evt.sh
+
+# Run quick unit tests
+./tests/run_unit_tests.sh
+```
+
+### Build Options
+
+**Enable OpenMP for parallel execution:**
+```bash
+cmake -DDR_EVT_WITH_OPENMP=ON \
+      -DBOOST_ROOT=/path/to/boost \
+      ..
+```
+
+Then control parallelism with environment variables:
+```bash
+export OMP_NUM_THREADS=4
+export OMP_PROC_BIND=close
+./simulator trace.csv
+```
+
+**Enable gRPC client/server (optional):**
+```bash
+cmake -DDR_EVT_ENABLE_PROTOBUF=ON \
+      -DDR_EVT_ENABLE_GRPC=ON \
+      -DBOOST_ROOT=/path/to/boost \
+      ..
+make -j4
+make dr_evt_server-bin dr_evt_client-bin
+```
+
+**Cross-compilation:**
+```bash
+cmake -DProtobuf_PROTOC_EXECUTABLE=/host/bin/protoc \
+      -DPROTOBUF_DIR=/target/protobuf \
+      -DBOOST_ROOT=/path/to/boost \
+      ..
+```
+
+### gRPC Client/Server Mode (Optional)
+
+DR_EVT can run as a network service, enabling remote simulation control from any gRPC-capable language.
+
+**Start the server:**
+```bash
+./dr_evt_server --port 50051
+```
+
+**Run a client:**
+```bash
+# Basic usage
+./dr_evt_client --server localhost:50051 \
+    --trace trace.csv \
+    --total_nodes 1000
+
+# With custom parameters
+./dr_evt_client --server localhost:50051 \
+    --trace trace.csv \
+    --total_nodes 1000 \
+    --backfill_policy easy \
+    --priority_policy fcfs \
+    --outfile results.csv
+```
+
+**Use cases:**
+- **Remote simulation**: Run simulator on HPC cluster, control from laptop
+- **Multi-language integration**: Use Python/Java/Go clients with C++ simulator
+- **Distributed testing**: Multiple clients testing different scenarios
+- **Web dashboards**: Real-time simulation monitoring over HTTP/gRPC
+
+**Architecture:**
+```
+┌─────────────┐                  ┌──────────────┐
+│   Client    │  gRPC Stream     │    Server    │
+│ (Any Lang)  │ ←──────────────→ │  (C++ Core)  │
+└─────────────┘                  └──────────────┘
+     │                                   │
+     │ submit_job()                      │ Simulation
+     │ advance_to()                      │ Instance
+     │ get_statistics()                  │
+     └───────────────────────────────────┘
+```
+
+See [Client/Server Guide](docs/CLIENT_SERVER_GUIDE.md) for details.
+
 
 ## Authors:
   Many thanks go to DR_EVT's [contributors](https://github.com/llnl/dr_evt/graphs/contributors).

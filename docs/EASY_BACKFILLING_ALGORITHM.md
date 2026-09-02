@@ -6,6 +6,30 @@ FCFS (First-Come-First-Served) with EASY (Extensible Argonne Scheduling sYstem) 
 
 Jobs are scheduled in arrival order (FCFS), but smaller jobs can "backfill" - start early while larger jobs wait - as long as they don't delay the first waiting job.
 
+## Visual Overview
+
+```{mermaid}
+graph TD
+    A[Job Arrives] --> B{Wait Queue Empty?}
+    B -->|Yes| C[Start Immediately]
+    B -->|No| D[Add to Wait Queue]
+    D --> E[Scheduling Event]
+    E --> F{FCFS Head<br/>Can Start?}
+    F -->|Yes| G[Start FCFS Head]
+    F -->|No| H[Calculate Reservation<br/>for FCFS Head]
+    H --> I[Try Backfilling]
+    I --> J{Found Backfill<br/>Candidate?}
+    J -->|Yes| K[Start Backfill Job]
+    J -->|No| L[Wait for Resources]
+    G --> F
+    K --> J
+    L --> M[Next Event]
+    M --> E
+    C --> N[Job Runs]
+    N --> O[Job Completes]
+    O --> E
+```
+
 ---
 
 ## Data Structures
@@ -95,6 +119,30 @@ FOR EACH (end_time, nodes) IN events:
 // FCFS head is GUARANTEED to start no later than reservation_time
 ```
 
+### Reservation Timeline Example
+
+```{mermaid}
+gantt
+    title Reservation Calculation (FCFS Head needs 50 nodes, 30 available)
+    dateFormat X
+    axisFormat %s
+    
+    section Running Jobs
+    Job A 20 nodes :done, j1, 0, 100
+    Job B 25 nodes :done, j2, 0, 150
+    Job C 15 nodes :done, j3, 0, 80
+    
+    section Wait Queue
+    FCFS Head 50 nodes :crit, fcfs, 150, 200
+    
+    section Resource Timeline
+    Free 30 nodes :active, r1, 0, 80
+    Job C ends 45 nodes :active, r2, 80, 100
+    Job A ends 65 nodes :milestone, r3, 100, 100
+```
+
+**Reservation Decision:** Job A completes at t=100, freeing 20 nodes (30+20=50). FCFS head can start at t=100.
+
 **Key Points**:
 - Use **time_limit** (not actual_runtime) for pessimistic planning
 - May need **multiple jobs** to finish to free enough resources
@@ -126,6 +174,43 @@ FOR EACH job IN wait_queue[1:]:  // Skip FCFS head (index 0)
 // After backfilling, GOTO Step 1
 // (free_nodes changed, FCFS head might fit now)
 ```
+
+### Backfilling Example
+
+```{mermaid}
+gantt
+    title EASY Backfilling Example (100 total nodes)
+    dateFormat X
+    axisFormat %s
+    
+    section Running
+    Job A 60 nodes :done, ja, 0, 200
+    Backfill Job D 20 nodes :active, jd, 50, 150
+    Backfill Job E 15 nodes :active, je, 50, 120
+    
+    section Wait Queue
+    FCFS Head Job B 50 nodes :crit, jb, 200, 300
+    Job C 30 nodes :jc, 300, 400
+    Job D BACKFILLED :done, jd2, 0, 0
+    Job E BACKFILLED :done, je2, 0, 0
+    
+    section Timeline
+    t0 40 nodes free :milestone, t0, 0, 0
+    t50 Job B blocked :crit, t1, 50, 50
+    Reservation at t200 :milestone, res, 200, 200
+    Backfill window :active, bw, 50, 200
+```
+
+**Scenario:**
+- t=0: Job A (60 nodes) running, 40 nodes free
+- t=50: Job B arrives (needs 50 nodes) → BLOCKED (only 40 free)
+  - Reservation: Job A ends at t=200 → 100 nodes available
+  - Backfill window: [50, 200)
+- Jobs D and E can backfill:
+  - Job D: 20 nodes, time_limit=100 → ends at 150 < 200 ✓
+  - Job E: 15 nodes, time_limit=70 → ends at 120 < 200 ✓
+  - Job C: 30 nodes → Won't fit (40-20-15=5 < 30) ✗
+- t=200: Job A ends, Job B starts immediately
 
 **Key Points**:
 - Check uses **time_limit** for estimated completion (pessimistic)

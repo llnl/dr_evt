@@ -35,8 +35,10 @@
 build/
 venv/
 
-# Development session notes (local only)
+# Development session notes (local only - but keep design-decisions/)
 docs/dev/
+!docs/dev/design-decisions/
+!docs/dev/README.md
 
 # User-specific CMake presets
 CMakeUserPresets.json
@@ -52,6 +54,16 @@ test_streaming*.csv
 
 # macOS system files
 .DS_Store
+docs/.DS_Store
 
 # Session state notes (local only)
 SESSION_STATE.md
+VERIFICATION_COMPLETE.md
+
+# Documentation session summaries (temporary)
+*SUMMARY.md
+*_SUMMARY.md
+
+# Documentation build artifacts
+docs/_build/
+venv_docs/
