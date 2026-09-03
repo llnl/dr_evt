@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- DR_EVT Favicon - HPC Theme 32x32 (No Border) -->
+
+  <defs>
+    <linearGradient id="faceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2c3e50"/>
+      <stop offset="100%" style="stop-color:#1a252f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Face (no border) -->
+  <rect x="6" y="4" width="20" height="24" rx="1" fill="url(#faceGrad)"/>
+  <rect x="4" y="6" width="24" height="20" fill="url(#faceGrad)"/>
+
+  <!-- Markers (cyan) -->
+  <rect x="14" y="7" width="4" height="1" fill="#00d4ff"/>
+  <rect x="23" y="14" width="1" height="4" fill="#00d4ff"/>
+  <rect x="14" y="23" width="4" height="1" fill="#00d4ff"/>
+  <rect x="8" y="14" width="1" height="4" fill="#00d4ff"/>
+
+  <!-- Hour hand (10:10 position - shorter, slightly past 10) -->
+  <rect x="13" y="12" width="2" height="2" fill="#00d4ff"/>
+  <rect x="14" y="14" width="2" height="2" fill="#00d4ff"/>
+
+  <!-- Minute hand (pointing to 2) -->
+  <rect x="16" y="15" width="2" height="2" fill="#00d4ff"/>
+  <rect x="18" y="15" width="2" height="2" fill="#00d4ff"/>
+  <rect x="20" y="16" width="2" height="2" fill="#00d4ff"/>
+
+  <!-- Center -->
+  <rect x="14" y="14" width="4" height="4" fill="#00d4ff" opacity="0.8"/>
+</svg>
