@@ -1,10 +1,11 @@
 #!/bin/bash
-# Block Queue Performance Testing: Compare all block sizes
+# Wait Queue Performance Testing: Compare block sizes and circular queue
 #
-# Tests block queue implementations with sizes: 16, 32, 64, 128, 256
+# Tests block queue implementations with sizes: 4, 8, 16, 32, 64, 128, 256,
+# and the circular_buffer-based queue (--queue_impl circular)
 # - Verifies correctness (all must match deque output)
 # - Measures performance (time and queue statistics)
-# - Identifies optimal block size
+# - Identifies the best-performing implementation
 
 set -e
 
@@ -15,16 +16,16 @@ cd "$REPO_ROOT"
 
 # Configuration
 BLOCK_SIZES=(4 8 16 32 64 128 256)
-TRACE_FILE="${1:-test_traces/scale/large_10000jobs.csv}"
+TRACE_FILE="${1:-tests/test_traces/scale/huge_10000jobs.csv}"
 VERBOSE=false
 
 print_usage() {
     echo "Usage: $0 [TRACE_FILE]"
     echo ""
-    echo "Block queue performance testing across all block sizes"
+    echo "Wait queue performance testing: all block sizes plus circular queue"
     echo ""
     echo "ARGUMENTS:"
-    echo "  TRACE_FILE    Path to test trace (default: test_traces/scale/large_10000jobs.csv)"
+    echo "  TRACE_FILE    Path to test trace (default: tests/test_traces/scale/huge_10000jobs.csv)"
     echo ""
     echo "EXAMPLES:"
     echo "  $0                                           # Use default 10K job trace"
@@ -49,10 +50,11 @@ if [[ ! -f "build/simulator" ]]; then
 fi
 
 echo "=========================================="
-echo "Block Queue Performance Comparison"
+echo "Wait Queue Performance Comparison"
 echo "=========================================="
 echo "Trace: $TRACE_FILE"
 echo "Block sizes: ${BLOCK_SIZES[@]}"
+echo "Also testing: circular (boost::circular_buffer)"
 echo ""
 
 # Detect trace parameters
@@ -87,6 +89,7 @@ START_TIME=$(date +%s%N)
 
 ./build/simulator "$TRACE_FILE" \
     --priority_policy fcfs \
+    --queue_impl deque \
     --total_nodes $TOTAL_NODES \
     --max_jobs $MAX_JOBS \
     --trace_format $TRACE_FORMAT \
@@ -235,9 +238,56 @@ for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
     echo ""
 done
 
+# Run circular queue
+echo "=========================================="
+echo "3. CIRCULAR QUEUE: boost::circular_buffer"
+echo "=========================================="
+
+CIRCULAR_OUT="/tmp/circular_output.csv"
+CIRCULAR_RESOURCES="/tmp/circular_resources.csv"
+
+echo -n "Running... "
+START_TIME=$(date +%s%N)
+
+./build/simulator "$TRACE_FILE" \
+    --priority_policy fcfs \
+    --queue_impl circular \
+    --total_nodes $TOTAL_NODES \
+    --max_jobs $MAX_JOBS \
+    --trace_format $TRACE_FORMAT \
+    --timestamp_format $TIMESTAMP_FORMAT \
+    --duration_mode $DURATION_MODE \
+    --backfill_policy $BACKFILL_POLICY \
+    --outfile "$CIRCULAR_OUT" \
+    --resource_trace "$CIRCULAR_RESOURCES" \
+    > /tmp/circular_log.txt 2>&1
+
+END_TIME=$(date +%s%N)
+CIRCULAR_TIME=$(echo "scale=3; ($END_TIME - $START_TIME) / 1000000000" | bc)
+
+CIRCULAR_AVG_QUEUE=$(grep "Average queue length:" /tmp/circular_log.txt | awk '{print $4}' || echo "N/A")
+CIRCULAR_PEAK_QUEUE=$(grep "Peak queue length:" /tmp/circular_log.txt | awk '{print $4}' || echo "N/A")
+
+echo "done (${CIRCULAR_TIME}s)"
+echo "  Avg queue: $CIRCULAR_AVG_QUEUE"
+echo "  Peak queue: $CIRCULAR_PEAK_QUEUE"
+
+echo -n "  Checking correctness... "
+if diff -q "$BASELINE_OUT" "$CIRCULAR_OUT" > /dev/null 2>&1; then
+    echo "✓ PASS (identical to deque)"
+    CORRECTNESS_CIRCULAR="PASS"
+else
+    echo "✗ FAIL (differs from deque)"
+    CORRECTNESS_CIRCULAR="FAIL"
+    echo "    Baseline: $BASELINE_OUT"
+    echo "    Circular: $CIRCULAR_OUT"
+fi
+
+echo ""
+
 # Summary table
 echo "=========================================="
-echo "3. SUMMARY: Performance & Correctness"
+echo "4. SUMMARY: Performance & Correctness"
 echo "=========================================="
 echo ""
 
@@ -245,11 +295,32 @@ printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
     "Impl" "Time (s)" "vs Deque" "Slowdown" "Peak Queue" "Correctness"
 echo "-------------|------------|------------|------------|------------|-------------"
 
+# Track the overall best (fastest) implementation across deque, every
+# block size, and circular - not just the best among block sizes, since
+# either deque or circular can legitimately be the fastest overall.
+BEST_OVERALL_NAME="Deque"
+BEST_OVERALL_TIME=$BASELINE_TIME
+
 # Baseline
 printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
     "Deque" "$BASELINE_TIME" "1.00x" "baseline" "$BASELINE_PEAK_QUEUE" "baseline"
 
-# Find best block size
+# Circular queue
+CIRCULAR_VS_DEQUE=$(echo "scale=2; $CIRCULAR_TIME / $BASELINE_TIME" | bc)
+CIRCULAR_SLOWDOWN=$(printf "%.0f" $(echo "scale=4; (($CIRCULAR_TIME / $BASELINE_TIME) - 1.0) * 100.0" | bc))
+if [[ "$CIRCULAR_SLOWDOWN" =~ ^- ]]; then
+    CIRCULAR_SLOWDOWN_STR="${CIRCULAR_SLOWDOWN}%"
+else
+    CIRCULAR_SLOWDOWN_STR="+${CIRCULAR_SLOWDOWN}%"
+fi
+if (( $(echo "$CIRCULAR_TIME < $BEST_OVERALL_TIME" | bc -l) )); then
+    BEST_OVERALL_TIME=$CIRCULAR_TIME
+    BEST_OVERALL_NAME="Circular"
+fi
+printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
+    "Circular" "$CIRCULAR_TIME" "${CIRCULAR_VS_DEQUE}x" "$CIRCULAR_SLOWDOWN_STR" "$CIRCULAR_PEAK_QUEUE" "$CORRECTNESS_CIRCULAR"
+
+# Find best block size, and fold that into the overall-best tracking
 BEST_BLOCK_SIZE=""
 BEST_BLOCK_TIME=999999.0
 
@@ -277,12 +348,18 @@ for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
         SLOWDOWN_STR="+${SLOWDOWN}%"
     fi
 
-    # Mark best
+    # Mark best among block sizes specifically (for the "optimal block
+    # size" note below), and separately fold into the overall-best
+    # tracking across every implementation tested.
     MARKER=""
     if (( $(echo "$TIME < $BEST_BLOCK_TIME" | bc -l) )); then
         BEST_BLOCK_TIME=$TIME
         BEST_BLOCK_SIZE=$BLOCK_SIZE
         MARKER="*"
+    fi
+    if (( $(echo "$TIME < $BEST_OVERALL_TIME" | bc -l) )); then
+        BEST_OVERALL_TIME=$TIME
+        BEST_OVERALL_NAME="Block-${BLOCK_SIZE}"
     fi
 
     printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
@@ -291,11 +368,11 @@ done
 
 echo ""
 echo "=========================================="
-echo "4. CONCLUSIONS"
+echo "5. CONCLUSIONS"
 echo "=========================================="
 echo ""
 
-# Check if all passed
+# Check if all passed (block sizes and circular)
 ALL_PASSED=true
 for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
     case $BLOCK_SIZE in
@@ -313,11 +390,14 @@ for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
         break
     fi
 done
+if [[ "$CORRECTNESS_CIRCULAR" != "PASS" ]]; then
+    ALL_PASSED=false
+fi
 
 if $ALL_PASSED; then
-    echo "✓ All block sizes produce identical output (correctness verified)"
+    echo "✓ All block sizes and circular queue produce identical output (correctness verified)"
 else
-    echo "✗ Some block sizes produced different output (INVESTIGATION NEEDED)"
+    echo "✗ Some implementation produced different output (INVESTIGATION NEEDED)"
 fi
 
 echo ""
@@ -326,16 +406,32 @@ echo "  Time: ${BEST_BLOCK_TIME}s"
 echo "  vs Deque: $(echo "scale=2; $BEST_BLOCK_TIME / $BASELINE_TIME" | bc)x slower"
 echo ""
 
-# Calculate deque advantage
-DEQUE_ADVANTAGE=$(echo "scale=0; ($BEST_BLOCK_TIME / $BASELINE_TIME - 1) * 100" | bc)
-echo "Deque is ${DEQUE_ADVANTAGE}% faster than best block size"
-echo ""
-
-echo "RECOMMENDATION: Use deque (default) for typical HPC workloads"
+# BEST_OVERALL_NAME/BEST_OVERALL_TIME were tracked across deque, every
+# block size, and circular above - not just among block sizes - so this
+# reflects whichever implementation actually won, rather than assuming
+# deque always does.
+echo "Best overall: $BEST_OVERALL_NAME"
+echo "  Time: ${BEST_OVERALL_TIME}s"
+if [[ "$BEST_OVERALL_NAME" == "Deque" ]]; then
+    DEQUE_ADVANTAGE=$(printf "%.0f" $(echo "scale=4; ($BEST_BLOCK_TIME / $BASELINE_TIME - 1) * 100" | bc))
+    echo "  Deque is ${DEQUE_ADVANTAGE}% faster than the best block size"
+    echo ""
+    echo "RECOMMENDATION: Use --queue_impl deque"
+else
+    ADVANTAGE=$(printf "%.0f" $(echo "scale=4; (1 - $BEST_OVERALL_TIME / $BASELINE_TIME) * 100" | bc))
+    echo "  ${ADVANTAGE}% faster than deque"
+    echo ""
+    if [[ "$BEST_OVERALL_NAME" == Block-* ]]; then
+        WINNING_BLOCK_SIZE="${BEST_OVERALL_NAME#Block-}"
+        echo "RECOMMENDATION: Use --queue_impl block --block_size $WINNING_BLOCK_SIZE for this workload"
+    else
+        echo "RECOMMENDATION: circular is the configured default (no flag needed) - confirmed best for this workload"
+    fi
+fi
 echo ""
 
 # Cleanup option
 echo "Temporary files in /tmp/:"
-echo "  baseline_*, block*_*.{csv,txt}"
+echo "  baseline_*, block*_*.{csv,txt}, circular_*.{csv,txt}"
 echo ""
-echo "To clean up: rm /tmp/baseline_* /tmp/block*"
+echo "To clean up: rm /tmp/baseline_* /tmp/block* /tmp/circular_*"

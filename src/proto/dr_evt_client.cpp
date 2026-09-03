@@ -126,6 +126,11 @@ int main(int argc, char** argv)
         init->set_runtime_mode("limit");
         init->set_duration_mode("exact");
         init->set_infile(trace_file);
+        // Demonstrates the queue_impl field added to InitRequest.
+        // circular is already Sim_Params' own default, so this call is
+        // redundant with leaving the field unset - kept explicit here
+        // as a working usage example.
+        init->set_queue_impl("circular");
         client.call(init_req);
         std::cout << "Session initialized." << std::endl;
 

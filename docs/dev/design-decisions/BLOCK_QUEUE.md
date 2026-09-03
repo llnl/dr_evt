@@ -6,6 +6,10 @@ Block queue groups jobs into fixed-size blocks with multi-index containers for f
 
 **Command:** `./simulator trace.csv --queue_impl block --block_size 16`
 
+**See also:** [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md) - a `boost::circular_buffer`-based
+queue implementation directly motivated by this analysis, measured faster than both deque and
+block queue.
+
 ## Performance Results (10K jobs, 2K nodes)
 
 | Block Size | Time (s) | vs Deque | Blocks | Notes |
@@ -104,7 +108,7 @@ Deque advantages:
 
 ### Comprehensive Testing
 ```bash
-# Correctness test (deque vs multimap vs block)
+# Correctness test (deque vs multimap vs block vs circular - see CIRCULAR_QUEUE.md)
 ./tests/test_fcfs_comprehensive.sh
 
 # All 7 block sizes with custom trace
@@ -236,7 +240,9 @@ for (auto& block_info : m_blocks) {
 ## Recommendations
 
 ### Production
-✅ **Use deque (default)** - 30% faster, simpler code
+✅ **Use circular (default)** - measured faster than both deque and every
+block size (see [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md)); `deque` remains
+available as a simple, well-tested fallback
 
 ### Research/Testing
 ✅ **Use Block-16** - best block size if testing block queue
@@ -262,7 +268,7 @@ for (auto& block_info : m_blocks) {
 - `tests/test_traces/scale/huge_10000jobs.csv` - 10K job test trace
 
 ### Documentation
-- `docs/BLOCK_QUEUE_TESTING.md` - Testing guide
+- `BLOCK_QUEUE_TESTING.md` - Testing guide
 - `docs/BLOCK_QUEUE_U_CURVE_ANALYSIS.md` - Detailed U-curve analysis
 
 ## References

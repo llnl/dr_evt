@@ -65,21 +65,60 @@ public:
                         if (!r.infile().empty()) sp.m_infile = r.infile();
                         sp.m_msec_output = r.msec_output();
 
-                        if (r.backfill_policy() == "easy") sp.m_backfill_policy = dr_evt::BackfillPolicy::EASY;
+                        if (r.backfill_policy().empty()) sp.m_backfill_policy = dr_evt::BackfillPolicy::EASY;
+                        else if (r.backfill_policy() == "easy") sp.m_backfill_policy = dr_evt::BackfillPolicy::EASY;
                         else if (r.backfill_policy() == "conservative") sp.m_backfill_policy = dr_evt::BackfillPolicy::CONSERVATIVE;
                         else if (r.backfill_policy() == "none") sp.m_backfill_policy = dr_evt::BackfillPolicy::NONE;
+                        else {
+                            throw std::runtime_error("Unknown backfill_policy: " + r.backfill_policy());
+                        }
 
-                        if (r.priority_policy() == "fcfs") sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS;
+                        if (r.priority_policy().empty()) sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS;
+                        else if (r.priority_policy() == "fcfs") sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS;
                         else if (r.priority_policy() == "fcfs_alt") sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS_ALT;
                         else if (r.priority_policy() == "sjf") sp.m_priority_policy = dr_evt::PriorityPolicy::SJF;
                         else if (r.priority_policy() == "ljf") sp.m_priority_policy = dr_evt::PriorityPolicy::LJF;
+                        else {
+                            throw std::runtime_error("Unknown priority_policy: " + r.priority_policy());
+                        }
 
-                        if (r.runtime_mode() == "limit") sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_LIMIT;
+                        if (r.runtime_mode().empty()) sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_LIMIT;
+                        else if (r.runtime_mode() == "limit") sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_LIMIT;
                         else if (r.runtime_mode() == "actual") sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_ACTUAL;
+                        else {
+                            throw std::runtime_error("Unknown runtime_mode: " + r.runtime_mode());
+                        }
 
-                        if (r.duration_mode() == "column") sp.m_duration_mode = dr_evt::DurationMode::FROM_COLUMN;
+                        if (r.duration_mode().empty()) sp.m_duration_mode = dr_evt::DurationMode::EXACT;
+                        else if (r.duration_mode() == "column") sp.m_duration_mode = dr_evt::DurationMode::FROM_COLUMN;
                         else if (r.duration_mode() == "exact") sp.m_duration_mode = dr_evt::DurationMode::EXACT;
                         else if (r.duration_mode() == "distribution") sp.m_duration_mode = dr_evt::DurationMode::DISTRIBUTION;
+                        else {
+                            throw std::runtime_error("Unknown duration_mode: " + r.duration_mode());
+                        }
+
+                        // block_size/circular_capacity: 0 means "use Sim_Params'
+                        // own constructor default" - handled by Sim_Params
+                        // itself when constructing CircularBufferFCFSScheduler/
+                        // BlockQueueFCFSScheduler, not by this function.
+                        if (r.queue_impl().empty()) sp.m_queue_impl = dr_evt::QueueImplementation::CIRCULAR;
+                        else if (r.queue_impl() == "circular") sp.m_queue_impl = dr_evt::QueueImplementation::CIRCULAR;
+                        else if (r.queue_impl() == "deque") sp.m_queue_impl = dr_evt::QueueImplementation::DEQUE;
+                        else if (r.queue_impl() == "multimap") sp.m_queue_impl = dr_evt::QueueImplementation::MULTIMAP;
+                        else if (r.queue_impl() == "block") sp.m_queue_impl = dr_evt::QueueImplementation::BLOCK;
+                        else {
+                            throw std::runtime_error("Unknown queue_impl: " + r.queue_impl());
+                        }
+
+                        if (r.block_size() != 0) sp.m_block_size = r.block_size();
+                        if (r.circular_capacity() != 0) sp.m_circular_capacity = r.circular_capacity();
+
+                        if (r.circular_overflow().empty()) sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::GROW;
+                        else if (r.circular_overflow() == "abort") sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::ABORT;
+                        else if (r.circular_overflow() == "grow") sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::GROW;
+                        else {
+                            throw std::runtime_error("Unknown circular_overflow: " + r.circular_overflow());
+                        }
 
                         sim = std::make_unique<dr_evt::Simulation>(sp);
                         resp.mutable_init()->set_ok(true);

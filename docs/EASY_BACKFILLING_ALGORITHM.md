@@ -377,26 +377,6 @@ Job 2: start=20, end=70
 
 ---
 
-## Common Mistakes I Made
-
-### ❌ Mistake 1: "FCFS head must check time window"
-**Wrong**: Job that can fit must check if it outlasts running jobs  
-**Right**: FCFS head starts immediately if resources available
-
-### ❌ Mistake 2: "Use earliest running job end"
-**Wrong**: Backfill window = min(reservation, earliest_running_end)  
-**Right**: Backfill window = reservation (which already accounts for ALL running jobs)
-
-### ❌ Mistake 3: "Only 2-job tests are invalid"
-**Wrong**: Need 3 jobs for backfill test  
-**Right**: 3-job minimum: 1 running, 1 FCFS head (blocked), 1 backfiller
-
-### ❌ Mistake 4: "Use actual_runtime for reservation"
-**Wrong**: Calculate reservation using actual_runtime  
-**Right**: Use time_limit (pessimistic), actual for execution only
-
----
-
 ## Questions to Verify Understanding
 
 ### Q1: Job can fit but would outlast running job. Start it?

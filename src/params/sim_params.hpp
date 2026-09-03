@@ -26,9 +26,19 @@ namespace dr_evt {
  * Queue implementation selection for FCFS scheduler
  */
 enum class QueueImplementation {
-    DEQUE,      // std::deque based (FCFS default)
+    CIRCULAR,   // boost::circular_buffer based (FCFS default)
+    DEQUE,      // std::deque based (FCFS)
     MULTIMAP,   // std::multimap based (FCFS alt, for differential testing)
     BLOCK       // BlockWaitQueue based (optimized for large queues, FCFS only)
+};
+
+/**
+ * What CircularBufferFCFSScheduler does when an insert would exceed its
+ * wait queue's current capacity.
+ */
+enum class CircularOverflowPolicy {
+    ABORT,  // Throw std::runtime_error, ending the simulation
+    GROW    // Reallocate to a larger capacity, copying existing entries over
 };
 
 class Sim_Params {
@@ -57,6 +67,8 @@ class Sim_Params {
     RuntimeEstimateMode m_runtime_mode;
     QueueImplementation m_queue_impl;
     size_t m_block_size;  // Block size for block queue (must be power of 2)
+    size_t m_circular_capacity;  // Initial capacity for circular queue (0 = size of job trace)
+    CircularOverflowPolicy m_circular_overflow;  // What to do if circular queue capacity is exceeded
     num_nodes_t m_total_nodes;
     std::string m_trace_format;  // "simple" or "lassen"
     std::string m_timestamp_format;  // "epoch" or "iso"

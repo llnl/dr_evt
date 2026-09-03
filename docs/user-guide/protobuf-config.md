@@ -19,7 +19,7 @@ Configuration files use Protocol Buffer text format (`.textproto` extension).
 
 `sim_config.textproto`:
 ```protobuf
-simulation_params {
+sim_setup {
   infile: "trace.csv"
   outfile: "results.csv"
   total_nodes: 1000
@@ -39,7 +39,7 @@ Run with:
 
 `advanced_config.textproto`:
 ```protobuf
-simulation_params {
+sim_setup {
   # Input/Output
   infile: "workload.csv"
   outfile: "schedule_output.csv"
@@ -54,23 +54,27 @@ simulation_params {
   priority_policy: "fcfs"         # Options: "fcfs", "sjf", "ljf"
   runtime_mode: "limit"           # Options: "limit", "actual"
   
+  # Queue Implementation (FCFS scheduler only)
+  queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
+  circular_capacity: 0            # 0 = size of job trace; only used when queue_impl="circular"
+  circular_overflow: "grow"       # "abort" | "grow"; only used when queue_impl="circular"
+  
   # Trace Format
   trace_format: "simple"          # Options: "simple", "lassen"
   timestamp_format: "epoch"       # Options: "epoch", "iso"
   
   # Simulation Limits
   max_jobs: 100000
-  time_limit: 86400               # Stop after 86400 seconds (24 hours)
+  max_time: 86400                 # Stop after 86400 seconds (24 hours)
   
   # Duration Simulation
   duration_mode: "distribution"   # Options: "exact", "column", "distribution"
-  duration_distribution: "normal" # Options: "normal", "uniform", "exponential"
+  duration_distribution: "normal" # Options: "normal", "lognormal", "uniform"
   duration_scale: 0.8             # Jobs run for 80% of time_limit on average
   duration_stddev: 0.1            # Standard deviation: 10%
   
   # Output Options
   verbose: false
-  log_level: "info"               # Options: "debug", "info", "warning", "error"
 }
 ```
 
@@ -100,9 +104,13 @@ Run with:
 
 | Field | Type | Default | Options |
 |-------|------|---------|---------|
-| `backfill_policy` | string | `"none"` | `"easy"`, `"conservative"`, `"none"` |
+| `backfill_policy` | string | `"easy"` | `"easy"`, `"conservative"`, `"none"` |
 | `priority_policy` | string | `"fcfs"` | `"fcfs"`, `"sjf"`, `"ljf"` |
 | `runtime_mode` | string | `"limit"` | `"limit"`, `"actual"` |
+| `queue_impl` | string | `"circular"` | `"circular"`, `"deque"`, `"multimap"`, `"block"` |
+| `block_size` | uint32 | `128` | Power of 2; only used when `queue_impl="block"` |
+| `circular_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
+| `circular_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
 
 **backfill_policy:**
 - `"easy"` - EASY backfilling (only first queued job gets reservation)
@@ -117,6 +125,14 @@ Run with:
 **runtime_mode:**
 - `"limit"` - Use `time_limit` column for scheduling decisions (simulation mode)
 - `"actual"` - Use `actual_runtime` column (replay mode)
+
+**queue_impl** (FCFS scheduler only - SJF/LJF always use multimap):
+- `"circular"` - boost::circular_buffer-based (default; measured 14-28% faster
+  than `deque` - see [`../dev/design-decisions/CIRCULAR_QUEUE.md`](../dev/design-decisions/CIRCULAR_QUEUE.md))
+- `"deque"` - std::deque-based (simple, well-tested fallback)
+- `"multimap"` - std::multimap-based (for differential testing)
+- `"block"` - block-based with multi-index (reference implementation, not
+  recommended for performance - see [`../dev/design-decisions/BLOCK_QUEUE.md`](../dev/design-decisions/BLOCK_QUEUE.md))
 
 ### Trace Format
 
@@ -139,7 +155,7 @@ Run with:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `max_jobs` | int32 | Unlimited | Stop after processing N jobs |
-| `time_limit` | double | Unlimited | Stop after N seconds simulation time |
+| `max_time` | double | Unlimited | Stop after N seconds simulation time |
 
 ### Duration Simulation
 
@@ -159,12 +175,12 @@ Control how long jobs run in simulation mode:
 
 **duration_distribution:**
 - `"normal"` - Normal distribution: mean=`time_limit × duration_scale`, stddev=`duration_stddev`
+- `"lognormal"` - Log-normal distribution with median=`time_limit × duration_scale`
 - `"uniform"` - Uniform distribution: [0, `time_limit × duration_scale`]
-- `"exponential"` - Exponential distribution: lambda=`1/(time_limit × duration_scale)`
 
 **Example: Realistic Runtime Variation**
 ```protobuf
-simulation_params {
+sim_setup {
   runtime_mode: "limit"
   duration_mode: "distribution"
   duration_distribution: "normal"
@@ -178,7 +194,6 @@ simulation_params {
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `verbose` | bool | `false` | Print detailed scheduling events |
-| `log_level` | string | `"info"` | Logging verbosity |
 
 ## Command-Line Override
 
@@ -204,7 +219,7 @@ Replay exactly what happened on a real system:
 
 `replay.textproto`:
 ```protobuf
-simulation_params {
+sim_setup {
   infile: "production_trace.csv"
   outfile: "replay_results.csv"
   
@@ -229,7 +244,7 @@ Simulate how system would behave with different policy:
 
 `what_if.textproto`:
 ```protobuf
-simulation_params {
+sim_setup {
   infile: "production_trace.csv"
   outfile: "what_if_results.csv"
   
@@ -257,7 +272,7 @@ Test if system can handle increased load:
 
 `capacity_test.textproto`:
 ```protobuf
-simulation_params {
+sim_setup {
   infile: "synthetic_high_load.csv"
   outfile: "capacity_results.csv"
   
@@ -271,7 +286,7 @@ simulation_params {
   priority_policy: "fcfs"
   
   # Stop after 7 days simulation time
-  time_limit: 604800
+  max_time: 604800
   
   verbose: true
 }
@@ -279,19 +294,48 @@ simulation_params {
 
 ### Performance Testing
 
-Benchmark different block queue sizes:
+Benchmark different queue implementations:
 
-`block_queue_test.textproto`:
+`circular_queue_test.textproto` (default, typically fastest):
 ```protobuf
-simulation_params {
+sim_setup {
+  infile: "large_scale_10k_jobs.csv"
+  outfile: "circular_queue_results.csv"
+  
+  total_nodes: 1000
+  
+  backfill_policy: "easy"
+  priority_policy: "fcfs"
+  
+  # queue_impl defaults to "circular" - explicit here for clarity.
+  # circular_capacity/circular_overflow are optional; omitting them
+  # defaults to a capacity sized to the job trace, which can never
+  # overflow.
+  queue_impl: "circular"
+  
+  runtime_mode: "limit"
+  duration_mode: "exact"
+  
+  trace_format: "simple"
+  timestamp_format: "epoch"
+}
+```
+
+`block_queue_test.textproto` (reference implementation, not recommended
+for performance):
+```protobuf
+sim_setup {
   infile: "large_scale_10k_jobs.csv"
   outfile: "block_queue_results.csv"
   
   total_nodes: 1000
   
-  # Use block queue (command-line: --queue_impl block --block_size 128)
   backfill_policy: "easy"
   priority_policy: "fcfs"
+  
+  # Use block queue with a 128-job block size
+  queue_impl: "block"
+  block_size: 128
   
   runtime_mode: "limit"
   duration_mode: "exact"
@@ -307,40 +351,48 @@ The full schema is defined in `src/proto/dr_evt_params.proto`:
 
 ```protobuf
 message Simulation_Params {
-  // Input/Output
-  string infile = 1;
-  string outfile = 2;
-  string resource_trace = 3;
-  
-  // System configuration
-  int32 total_nodes = 4;
-  int32 seed = 5;
-  
-  // Scheduling policies
-  string backfill_policy = 6;
-  string priority_policy = 7;
-  string runtime_mode = 8;
-  
-  // Trace format
-  string trace_format = 9;
-  string timestamp_format = 10;
-  string timezone = 11;
-  
+  // Random seed (default: system clock-dependent if unset)
+  uint32 seed = 1;
+
   // Simulation limits
-  int32 max_jobs = 12;
-  double time_limit = 13;
-  
+  uint32 max_jobs = 2;
+  double max_time = 3;
+
+  // Input/Output
+  string infile = 4;
+  string outfile = 5;
+  string resource_trace = 6;
+
+  // Enable verbose output for debugging/testing (default: false)
+  bool verbose = 7;
+
+  // Scheduling parameters
+  int32 total_nodes = 8;          // default: 795
+  string backfill_policy = 9;     // "easy", "conservative", or "none" (default: "easy")
+  string priority_policy = 10;    // "fcfs", "sjf", or "ljf" (default: "fcfs")
+  string runtime_mode = 11;       // "limit" or "actual" (default: "limit")
+
+  // Trace format
+  string trace_format = 12;       // "simple" or "lassen" (default: "lassen")
+  string timestamp_format = 13;   // "epoch" or "iso" (default: "iso")
+  string timezone = 14;           // e.g. "UTC", "America/Los_Angeles"
+
   // Duration simulation
-  string duration_mode = 14;
-  string duration_distribution = 15;
-  double duration_scale = 16;
-  double duration_stddev = 17;
-  
-  // Output options
-  bool verbose = 18;
-  string log_level = 19;
+  string duration_mode = 15;          // "column", "exact", or "distribution" (default: "exact")
+  string duration_distribution = 16;  // "normal", "lognormal", or "uniform" (default: "normal")
+  double duration_scale = 17;         // default: 1.0
+  double duration_stddev = 18;        // default: 0.0
+
+  // Queue implementation (FCFS scheduler only)
+  string queue_impl = 19;         // "circular", "deque", "multimap", or "block" (default: "circular")
+  uint32 block_size = 20;         // power of 2 (default: 128); only used when queue_impl="block"
+  uint64 circular_capacity = 21;  // 0 = size of job trace (default: 0); only used when queue_impl="circular"
+  string circular_overflow = 22;  // "abort" or "grow" (default: "grow"); only used when queue_impl="circular"
 }
 ```
+
+This mirrors `src/proto/dr_evt_params.proto`'s actual `Simulation_Params` message -
+check that file directly if this drifts out of sync again.
 
 ## Validation
 
@@ -356,6 +408,6 @@ Error parsing config file: Unknown field "totalnodes" (did you mean "total_nodes
 
 ## See Also
 
-- [CLI Options](../CLI_OPTIONS.md) - Command-line alternatives to protobuf config
+- [CLI Options](command-line.md) - Command-line alternatives to protobuf config
 - [User Guide Overview](overview.md) - Trace formats and simulation modes
 - [Quick Start](../getting-started/quickstart.md) - Basic usage examples
