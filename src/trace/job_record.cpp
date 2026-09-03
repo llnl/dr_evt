@@ -19,7 +19,7 @@ Job_Record::Job_Record(const Job_Record& o)
     m_t_end(o.m_t_end),
     m_t_submit(o.m_t_submit),
     m_t_limit(o.m_t_limit),
-    m_actual_duration(o.m_actual_duration),
+    m_actual_run_time(o.m_actual_run_time),
     m_num_nodes(o.m_num_nodes),
     m_q(o.m_q),
     m_is_simulated(o.m_is_simulated),
@@ -37,7 +37,7 @@ Job_Record::Job_Record(Job_Record&& o) noexcept
     m_t_end(std::move(o.m_t_end)),
     m_t_submit(std::move(o.m_t_submit)),
     m_t_limit(std::move(o.m_t_limit)),
-    m_actual_duration(std::move(o.m_actual_duration)),
+    m_actual_run_time(std::move(o.m_actual_run_time)),
     m_num_nodes(std::move(o.m_num_nodes)),
     m_q(std::move(o.m_q)),
     m_is_simulated(std::move(o.m_is_simulated)),
@@ -57,7 +57,7 @@ Job_Record& Job_Record::operator=(const Job_Record& o)
         m_t_end = o.m_t_end;
         m_t_submit = o.m_t_submit;
         m_t_limit = o.m_t_limit;
-        m_actual_duration = o.m_actual_duration;
+        m_actual_run_time = o.m_actual_run_time;
         m_num_nodes = o.m_num_nodes;
         m_q = o.m_q;
         m_is_simulated = o.m_is_simulated;
@@ -79,7 +79,7 @@ Job_Record& Job_Record::operator=(Job_Record&& o) noexcept
         m_t_end = std::move(o.m_t_end);
         m_t_submit = std::move(o.m_t_submit);
         m_t_limit = std::move(o.m_t_limit);
-        m_actual_duration = std::move(o.m_actual_duration);
+        m_actual_run_time = std::move(o.m_actual_run_time);
         m_num_nodes = std::move(o.m_num_nodes);
         m_q = std::move(o.m_q);
         m_is_simulated = std::move(o.m_is_simulated);
@@ -132,9 +132,9 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
 
     // Check mode based on number of fields:
     // Replay mode (6): num_nodes, begin_time, end_time, submit_time, queue, time_limit
-    // Simulation mode (4 or 5): num_nodes, submit_time, queue, time_limit[, actual_duration]
+    // Simulation mode (4 or 5): num_nodes, submit_time, queue, time_limit[, actual_run_time]
     bool is_replay_mode = (num_inputs == 6);
-    bool has_actual_duration = (num_inputs == 5 || num_inputs == 7);
+    bool has_actual_run_time = (num_inputs == 5 || num_inputs == 7);
 
     if (is_replay_mode) {
         // Replay mode: has begin_time and end_time
@@ -161,8 +161,8 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         set_by(m_q, *it++);
         set_by(m_t_limit, *it++);
 
-        // Compute actual_duration from recorded times
-        m_actual_duration = static_cast<tdiff_t>(m_t_end - m_t_begin);
+        // Compute actual_run_time from recorded times
+        m_actual_run_time = static_cast<tdiff_t>(m_t_end - m_t_begin);
         m_is_simulated = false;
     } else {
         // Simulation mode: no begin_time or end_time in input.
@@ -184,11 +184,11 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         set_by(m_q, *it++);
         set_by(m_t_limit, *it++);
 
-        // If actual_duration provided, read it; otherwise will be set by determine_job_durations()
-        if (has_actual_duration) {
-            set_by(m_actual_duration, *it++);
+        // If actual_run_time provided, read it; otherwise will be set by determine_job_run_time()
+        if (has_actual_run_time) {
+            set_by(m_actual_run_time, *it++);
         } else {
-            m_actual_duration = 0.0;
+            m_actual_run_time = 0.0;
         }
         // m_is_simulated stays false here (set above) until the scheduler
         // actually dispatches this job via set_begin_time(). This line
@@ -230,7 +230,7 @@ std::string Job_Record::to_string() const
         to_string(m_t_submit) + '\t' +
         to_string(m_t_limit) + '\t' +
         to_string(get_wait_time()) + '\t' +
-        to_string(get_exec_time()) + '\t' +
+        to_string(get_actual_run_time()) + '\t' +
         to_string(m_busy_nodes) + '\t' +
         to_string(m_q)
       #if MARK_DAT_PERIOD

@@ -92,10 +92,16 @@ run_correctness_tests() {
     FAIL=0
     TRACE_DIR="tests/test_traces/comprehensive"
 
-    # Auto-detect duration_mode based on file contents
-    detect_duration_mode() {
+    # Auto-detect run_time_mode based on file contents. --duration_mode
+    # is never passed anywhere in this script, so it stays at its own
+    # default, "limit", throughout. That matters because
+    # duration_mode="actual" would make the scheduler ignore
+    # run_time_mode entirely and just use the trace's own real run
+    # time - "limit" is what makes whichever run_time_mode gets
+    # detected below actually get used.
+    detect_run_time_mode() {
         local test_file="$1"
-        if head -1 "$test_file" | grep -q "actual_duration"; then
+        if head -1 "$test_file" | grep -q "actual_run_time"; then
             echo "column"
         else
             echo "exact"
@@ -111,8 +117,8 @@ run_correctness_tests() {
 
         test_name=$(basename "$test_file" .csv)
 
-        # Detect duration mode
-        duration_mode=$(detect_duration_mode "$test_file")
+        # Detect run_time_mode
+        run_time_mode=$(detect_run_time_mode "$test_file")
 
         # Run with scheduler_fcfs (priority_policy=fcfs)
         if [ "$VERBOSE" = true ]; then
@@ -124,7 +130,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_${test_name}_resources.csv" \
@@ -139,7 +145,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_alt_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_alt_${test_name}_resources.csv" \
@@ -155,7 +161,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_block_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_block_${test_name}_resources.csv" \
@@ -171,7 +177,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_circular_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_circular_${test_name}_resources.csv" \
@@ -350,12 +356,18 @@ run_performance_tests() {
         # 2. C++ fcfs (deque-based)
         echo -n "  C++ fcfs (deque):  "
         FCFS_START=$(date +%s.%N)
+        # --duration_mode isn't passed, so it stays at its default,
+        # "limit". That matters because duration_mode="actual" would
+        # make the scheduler ignore --run_time_mode entirely and just
+        # use the trace's own real run time - "limit" is what makes
+        # --run_time_mode exact below (and the circular-queue run
+        # further down) actually get used.
         ./build/simulator "$test_file" \
             --priority_policy fcfs \
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode exact \
+            --run_time_mode exact \
             --backfill_policy easy \
             --outfile /tmp/fcfs_out.csv \
             > /dev/null 2>&1
@@ -379,7 +391,7 @@ run_performance_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode exact \
+            --run_time_mode exact \
             --backfill_policy easy \
             --outfile /tmp/fcfs_alt_out.csv \
             > /dev/null 2>&1

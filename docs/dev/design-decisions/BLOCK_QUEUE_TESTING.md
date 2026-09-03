@@ -194,16 +194,16 @@ for i in range(num_jobs):
     else:
         nodes = random.randint(129, 500)
     
-    # Runtime distribution (50% short, 35% medium, 15% long)
+    # time_limit distribution (50% short, 35% medium, 15% long)
     r2 = random.random()
     if r2 < 0.5:
-        runtime = random.randint(60, 1800)  # 1-30 min
+        time_limit = random.randint(60, 1800)  # 1-30 min
     elif r2 < 0.85:
-        runtime = random.randint(1800, 14400)  # 30 min - 4 hours
+        time_limit = random.randint(1800, 14400)  # 30 min - 4 hours
     else:
-        runtime = random.randint(14400, 86400)  # 4-24 hours
+        time_limit = random.randint(14400, 86400)  # 4-24 hours
     
-    jobs.append([int(current_time), nodes, 0, 'pbatch', runtime])
+    jobs.append([int(current_time), nodes, 0, 'pbatch', time_limit])
 
 with open('tests/test_traces/scale/huge_${num_jobs}jobs.csv', 'w', newline='') as f:
     writer = csv.writer(f)
@@ -272,7 +272,7 @@ Slowdown
 ### Bottleneck Analysis
 
 Block queue overhead breakdown:
-- **70%**: Red-black tree maintenance (runtime + nodes trees)
+- **70%**: Red-black tree maintenance (run time + nodes trees)
 - **20%**: Memory allocation and cache misses
 - **10%**: Block iteration overhead
 

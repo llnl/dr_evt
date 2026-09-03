@@ -72,15 +72,21 @@ Configuration parameters for simulation.
 - `total_nodes` (int): Total number of nodes in system
 - `trace_format` (str): Trace format ("simple" or "lassen")
 - `timestamp_format` (str): Timestamp format ("epoch" or "iso")
-- `duration_mode` (DurationMode): How to determine job durations
+- `duration_mode` (DurationEstimateMode): Scheduler's own planning estimate
+  (limit/actual); when USE_ACTUAL, run_time_mode below is ignored entirely
+- `run_time_mode` (RunTimeMode): How the job's actual run time is determined
 - `backfill_policy` (BackfillPolicy): Backfilling policy (NONE, EASY, CONSERVATIVE)
 - `priority_policy` (PriorityPolicy): Job priority policy (FCFS, SJF, LJF)
 - `verbose` (bool): Enable verbose output
 
 **Enums:**
-- `DurationMode.FROM_COLUMN`: Read duration from trace
-- `DurationMode.EXACT`: Use time_limit as duration
-- `DurationMode.DISTRIBUTION`: Sample from distribution
+- `DurationEstimateMode.USE_LIMIT`: Scheduler plans using time_limit (default, realistic)
+- `DurationEstimateMode.USE_ACTUAL`: Scheduler plans using the job's real, observed run time (omniscient/oracle)
+
+- `RunTimeMode.FROM_COLUMN`: Read run time from trace (accepted trace
+  columns: `actual_run_time`, `duration`, `actual_duration`, `run_time`)
+- `RunTimeMode.EXACT`: Use time_limit as the run time
+- `RunTimeMode.DISTRIBUTION`: Sample from distribution
 
 - `BackfillPolicy.NONE`: No backfilling
 - `BackfillPolicy.EASY`: EASY backfilling (verified)

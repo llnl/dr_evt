@@ -22,9 +22,9 @@ void run_tests_impl() {
     std::cout << "✓ Empty queue initialized" << std::endl;
 
     // Test 1: Insert jobs
-    queue.insert_job(1, 0.0, 100.0, 10);   // job_id=1, submit=0, runtime=100, nodes=10
-    queue.insert_job(2, 5.0, 50.0, 20);    // job_id=2, submit=5, runtime=50, nodes=20
-    queue.insert_job(3, 10.0, 150.0, 15);  // job_id=3, submit=10, runtime=150, nodes=15
+    queue.insert_job(1, 0.0, 100.0, 10);   // job_id=1, submit=0, run_time=100, nodes=10
+    queue.insert_job(2, 5.0, 50.0, 20);    // job_id=2, submit=5, run_time=50, nodes=20
+    queue.insert_job(3, 10.0, 150.0, 15);  // job_id=3, submit=10, run_time=150, nodes=15
 
     assert(queue.size() == 3);
     assert(queue.active_count() == 3);
@@ -32,9 +32,9 @@ void run_tests_impl() {
 
     // Test 2: Find and remove backfill candidate (NEW combined API)
     // available_nodes=30, current_time=0, reservation_time=200
-    // Job 1: nodes=10 (fits), runtime=100 (fits in window)
-    // Job 2: nodes=20 (fits), runtime=50 (fits in window, shorter)
-    // Job 3: nodes=15 (fits), runtime=150 (fits in window)
+    // Job 1: nodes=10 (fits), run_time=100 (fits in window)
+    // Job 2: nodes=20 (fits), run_time=50 (fits in window, shorter)
+    // Job 3: nodes=15 (fits), run_time=150 (fits in window)
     auto candidate = queue.find_and_remove_backfill_candidate(30, 0.0, 200.0);
     assert(candidate.has_value());
     std::cout << "✓ Found and removed backfill candidate: job " << *candidate << std::endl;
@@ -56,7 +56,7 @@ void run_tests_impl() {
     std::cout << "✓ Resource constraint filtering works: job " << *candidate << std::endl;
 
     // Test 4: Find with tight time constraint
-    // Window only 60 time units - only job 2 (runtime=50) should fit
+    // Window only 60 time units - only job 2 (run_time=50) should fit
     // NOTE: current_time must be >= submit_time for job to be eligible
     dr_evt::BlockWaitQueue<BlockSize> queue3;
     queue3.insert_job(1, 0.0, 100.0, 10);
@@ -121,7 +121,7 @@ void run_tests_impl() {
     std::cout << "✓ All tests passed for block_size=" << BlockSize << std::endl;
 }
 
-// Factory function: runtime block_size -> template instantiation
+// Factory function: run_time block_size -> template instantiation
 void run_tests(size_t block_size) {
     switch (block_size) {
         case 16:  run_tests_impl<16>(); break;

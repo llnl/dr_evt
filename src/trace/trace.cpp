@@ -184,12 +184,12 @@ void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
 {
     auto& job = m_data[job_idx];
 
-    // Ensure job has actual_duration set
+    // Ensure job has actual_run_time set
     // In streaming mode, this would be determined here
-    // For now, it should already be set by determine_job_durations()
-    if (job.get_actual_duration() <= 0.0) {
+    // For now, it should already be set by determine_job_run_time()
+    if (job.get_actual_run_time() <= 0.0) {
         // Fallback: use time limit if duration not set
-        job.set_actual_duration(job.get_limit_time());
+        job.set_actual_run_time(job.get_limit_time());
     }
 
     // Convert sim_time_t to epoch_t
@@ -198,7 +198,7 @@ void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
     epoch_t start_epoch = {start_sec, start_frac};
 
     // Calculate end time using actual duration
-    tdiff_t duration = job.get_exec_time();
+    tdiff_t duration = job.get_actual_run_time();
     sim_time_t end_time = start_time + duration;
     time_t end_sec = static_cast<time_t>(end_time);
     float end_frac = end_time - end_sec;

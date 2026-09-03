@@ -44,18 +44,19 @@ enum class PriorityPolicy {
     /** Alternative FCFS implementation (for differential testing) */
     FCFS_ALT,
 
-    /** Shortest-Job-First: Order by estimated runtime (ascending) */
+    /** Shortest-Job-First: Order by estimated run_time (ascending) */
     SJF,
 
-    /** Longest-Job-First: Order by estimated runtime (descending) */
+    /** Longest-Job-First: Order by estimated run_time (descending) */
     LJF
 };
 
 /**
- * Runtime estimate mode for scheduling decisions
- * Determines what runtime value is used for making scheduling decisions
+ * Scheduler's own job-length estimate, used for reservation/backfill
+ * planning decisions. Distinct from RunTimeMode below, which controls
+ * how the job's actual, observed execution length is determined.
  */
-enum class RuntimeEstimateMode {
+enum class DurationEstimateMode {
     /**
      * Use user-provided time limit (realistic mode).
      * Scheduler makes decisions based on requested walltime limit.
@@ -64,29 +65,34 @@ enum class RuntimeEstimateMode {
     USE_LIMIT,
 
     /**
-     * Use actual runtime (oracle mode, for comparison studies).
-     * Scheduler knows exact runtimes in advance.
+     * Use the job's actual, observed run_time (oracle mode, for
+     * comparison studies). Scheduler knows exact run_times in advance.
      * Unrealistic but useful for comparison with optimal schedules.
+     * When this mode is active, RunTimeMode below is ignored entirely -
+     * the trace's own real run_time is used directly.
      */
     USE_ACTUAL
 };
 
 /**
- * @brief How to determine actual job duration in simulation mode
+ * @brief How the job's actual, observed run_time is determined in
+ * simulation mode
  *
- * In simulation mode, the scheduler computes start times but actual job
- * duration must be determined. This enum controls the method.
+ * In simulation mode, the scheduler computes start times but the job's
+ * actual run_time must be determined. This enum controls the method.
+ * Only consulted when DurationEstimateMode::USE_LIMIT is active - ignored
+ * entirely under USE_ACTUAL, which uses the trace's own real run_time.
  */
-enum class DurationMode {
-    FROM_COLUMN,    ///< Read actual_duration from trace column
-    EXACT,          ///< Use time_limit as actual duration (perfect estimation)
+enum class RunTimeMode {
+    FROM_COLUMN,    ///< Read actual_run_time from trace column
+    EXACT,          ///< Use time_limit as the run_time (perfect estimation)
     DISTRIBUTION    ///< Sample from statistical distribution
 };
 
 /**
- * @brief Statistical distribution for sampling job durations
+ * @brief Statistical distribution for sampling job run_times
  *
- * Used when DurationMode::DISTRIBUTION is selected.
+ * Used when RunTimeMode::DISTRIBUTION is selected.
  */
 enum class DistributionType {
     NORMAL,      ///< Normal distribution N(limit*scale, limit*stddev)

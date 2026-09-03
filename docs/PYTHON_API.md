@@ -53,7 +53,7 @@ params.infile = "jobs.csv"
 params.total_nodes = 100
 params.trace_format = "simple"
 params.timestamp_format = "epoch"
-params.duration_mode = dr_evt.DurationMode.EXACT
+params.run_time_mode = dr_evt.RunTimeMode.EXACT
 params.backfill_policy = dr_evt.BackfillPolicy.EASY
 params.priority_policy = dr_evt.PriorityPolicy.FCFS
 
@@ -124,25 +124,26 @@ params.backfill_policy = dr_evt.BackfillPolicy.EASY
 params.priority_policy = dr_evt.PriorityPolicy.FCFS
 # Options: FCFS, SJF (Shortest Job First), LJF (Longest Job First)
 
-# Runtime estimation (for reservation calculation)
-# params.runtime_mode = RuntimeEstimateMode.LIMIT  # Not exposed in bindings yet
-# Options: LIMIT (use time_limit), ACTUAL (oracle mode)
+# Scheduler's own job-length estimate for reservation/backfill planning
+# params.duration_mode = dr_evt.DurationEstimateMode.USE_LIMIT  # Not exposed in bindings yet
+# Options: USE_LIMIT (use time_limit), USE_ACTUAL (omniscient/oracle mode)
 ```
 
-### Duration Mode (Simulation)
+### Run Time Mode (Simulation)
 
 ```python
-# How to determine actual job duration
-params.duration_mode = dr_evt.DurationMode.EXACT
+# How the job's actual, observed execution length is determined
+params.run_time_mode = dr_evt.RunTimeMode.EXACT
 # Options:
-# - FROM_COLUMN: Read from actual_duration column
+# - FROM_COLUMN: Read from actual_run_time column (also accepted:
+#   duration, actual_duration, run_time)
 # - EXACT: Jobs run exactly their time_limit
 # - DISTRIBUTION: Sample from statistical distribution
 
-# Distribution parameters (when duration_mode=DISTRIBUTION)
-# params.duration_distribution = DistributionType.NORMAL  # Not exposed yet
-# params.duration_scale = 0.8  # 80% of time_limit on average
-# params.duration_stddev = 0.1  # 10% standard deviation
+# Distribution parameters (when run_time_mode=DISTRIBUTION)
+# params.run_time_distribution = DistributionType.NORMAL  # Not exposed yet
+# params.run_time_scale = 0.8  # 80% of time_limit on average
+# params.run_time_stddev = 0.1  # 10% standard deviation
 ```
 
 ### Output Control
@@ -161,12 +162,13 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 ✅ `total_nodes` - Total compute nodes  
 ✅ `trace_format` - Trace format (simple/lassen)  
 ✅ `timestamp_format` - Timestamp format (epoch/iso)  
-✅ `duration_mode` - Duration mode (exact/column/distribution)  
+✅ `duration_mode` - Scheduler's own planning estimate (limit/actual); determines whether run_time_mode below is consulted at all  
+✅ `run_time_mode` - How the job's actual run time is determined (exact/column/distribution)  
 ✅ `backfill_policy` - Backfilling policy (easy/conservative/none)  
 ✅ `priority_policy` - Priority policy (fcfs/sjf/ljf)  
 ✅ `verbose` - Verbose output flag  
 
-### Missing from Python Bindings (10 parameters)
+### Missing from Python Bindings (14 parameters)
 
 **Critical for Full Functionality:**
 
@@ -175,16 +177,24 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 | `seed` | uint32 | Random | RNG seed for reproducibility | **High** - Can't reproduce simulations |
 | `max_jobs` | uint32 | Unlimited | Limit jobs processed | **Medium** - Can't test subsets |
 | `max_time` | double | Unlimited | Stop at simulation time | **Medium** - Can't limit runtime |
-| `runtime_mode` | string | "limit" | Use time_limit vs actual_runtime | **High** - Can't do replay mode |
 | `timezone` | string | "America/Los_Angeles" | Timezone for ISO timestamps | **Medium** - Can't parse non-LA times correctly |
 
-**Duration Simulation (only if duration_mode=DISTRIBUTION):**
+**Run Time Simulation (only if run_time_mode=DISTRIBUTION):**
 
 | Parameter | Type | Default | Purpose | Impact |
 |-----------|------|---------|---------|--------|
-| `duration_distribution` | string | "normal" | Distribution type | **Low** - Can't customize distribution |
-| `duration_scale` | double | 1.0 | Scale factor | **Low** - Can't model realistic runtimes |
-| `duration_stddev` | double | 0.0 | Standard deviation | **Low** - Can't add variation |
+| `run_time_distribution` | string | "normal" | Distribution type | **Low** - Can't customize distribution |
+| `run_time_scale` | double | 1.0 | Scale factor | **Low** - Can't model realistic run times |
+| `run_time_stddev` | double | 0.0 | Standard deviation | **Low** - Can't add variation |
+
+**Queue Implementation (FCFS scheduler only):**
+
+| Parameter | Type | Default | Purpose | Impact |
+|-----------|------|---------|---------|--------|
+| `queue_impl` | string | "circular" | Wait-queue data structure (circular/deque/multimap/block) | **Medium** - Can't select faster/alternate implementations |
+| `block_size` | uint32 | 128 | Block size when queue_impl="block" | **Low** - Can't tune block queue |
+| `circular_capacity` | uint64 | 0 (sized to trace) | Initial capacity when queue_impl="circular" | **Low** - Can't bound memory use |
+| `circular_overflow` | string | "grow" | abort/grow when circular_capacity exceeded | **Low** - Can't test overflow behavior |
 
 **Output Control:**
 
@@ -192,6 +202,17 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 |-----------|------|---------|---------|--------|
 | `outfile` | string | stdout | Output trace file | **High** - Can't set output file from Python |
 | `resource_trace` | string | None | Resource usage trace | **Low** - Can't capture resource timeline |
+| `msec_output` | bool | False | Millisecond-precision timestamps | **Low** - Can't get sub-second output resolution |
+
+### Also Missing: Simulation Methods (not parameters)
+
+Beyond `Sim_Params` fields, three `Simulation` class methods aren't bound either:
+
+| Method | Purpose | Impact |
+|--------|---------|--------|
+| `get_resource_history()` | Return in-memory (time, nodes_in_use, nodes_available) history directly | **Medium** - Must write to CSV via `write_resource_trace()` (also unbound) and re-read, rather than getting data directly in Python |
+| `write_resource_trace(filename)` | Write resource history to a file, independent of `Sim_Params.resource_trace` | **Low** - No way to trigger this from Python at all |
+| `get_trace()` | Access the full `Trace` object (individual job records) | **Medium** - Only `get_trace_size()` (a job count) is exposed; `Trace`/`Job_Record` themselves aren't bound as Python classes, so there's no way to inspect individual submitted jobs from Python |
 
 ### Workarounds
 
@@ -202,19 +223,21 @@ import subprocess
 
 # Create protobuf config with missing parameters
 config = """
-simulation_params {
+sim_setup {
   infile: "jobs.csv"
   outfile: "results.csv"
   total_nodes: 1000
   seed: 42
   max_jobs: 5000
   max_time: 86400.0
-  runtime_mode: "actual"
+  duration_mode: "actual"
   timezone: "UTC"
-  duration_distribution: "normal"
-  duration_scale: 0.8
-  duration_stddev: 0.1
+  run_time_distribution: "normal"
+  run_time_scale: 0.8
+  run_time_stddev: 0.1
   backfill_policy: "easy"
+  queue_impl: "circular"
+  circular_capacity: 10000
   verbose: false
 }
 """
@@ -238,10 +261,10 @@ result = subprocess.run([
     "--total_nodes", "1000",
     "--seed", "42",
     "--max_jobs", "5000",
-    "--runtime_mode", "actual",
+    "--duration_mode", "actual",
     "--timezone", "UTC",
-    "--duration_distribution", "normal",
-    "--duration_scale", "0.8",
+    "--run_time_distribution", "normal",
+    "--run_time_scale", "0.8",
     "--outfile", "results.csv"
 ], capture_output=True, text=True)
 
@@ -267,11 +290,10 @@ py::class_<Sim_Params>(m, "SimParams")
     .def_readwrite("max_time", &Sim_Params::m_max_time)
     .def_readwrite("outfile", &Sim_Params::m_outfile)
     .def_readwrite("resource_trace", &Sim_Params::m_resource_trace)
-    .def_readwrite("runtime_mode", &Sim_Params::m_runtime_mode)
     .def_readwrite("timezone", &Sim_Params::m_timezone)
-    .def_readwrite("duration_distribution", &Sim_Params::m_duration_distribution)
-    .def_readwrite("duration_scale", &Sim_Params::m_duration_scale)
-    .def_readwrite("duration_stddev", &Sim_Params::m_duration_stddev);
+    .def_readwrite("run_time_distribution", &Sim_Params::m_run_time_distribution)
+    .def_readwrite("run_time_scale", &Sim_Params::m_run_time_scale)
+    .def_readwrite("run_time_stddev", &Sim_Params::m_run_time_stddev);
 ```
 
 Then rebuild:
@@ -288,11 +310,11 @@ pip install --force-reinstall .
 | Use Case | Missing Parameters Needed | Workaround |
 |----------|--------------------------|------------|
 | **Reproducible simulations** | `seed` | Use config file or CLI |
-| **Replay mode** | `runtime_mode=actual` | Use config file or CLI |
+| **Replay mode** | `duration_mode=actual` | Now directly settable: `params.duration_mode = dr_evt.DurationEstimateMode.USE_ACTUAL` |
 | **Output to file** | `outfile` | Use CLI or call `write_simulated_trace()` |
 | **Test on subset** | `max_jobs`, `max_time` | Preprocess trace file |
 | **Non-LA timezones** | `timezone` | Convert timestamps to LA time or use epoch |
-| **Realistic duration variation** | `duration_distribution`, `duration_scale`, `duration_stddev` | Use `duration_mode=EXACT` or config file |
+| **Realistic run time variation** | `run_time_distribution`, `run_time_scale`, `run_time_stddev` | Use `run_time_mode=EXACT` or config file |
 
 ### Recommendation
 
@@ -319,12 +341,12 @@ dr_evt.PriorityPolicy.SJF   # Shortest Job First
 dr_evt.PriorityPolicy.LJF   # Longest Job First
 ```
 
-### DurationMode
+### RunTimeMode
 
 ```python
-dr_evt.DurationMode.FROM_COLUMN   # Read actual_duration from trace
-dr_evt.DurationMode.EXACT         # Jobs run exactly time_limit
-dr_evt.DurationMode.DISTRIBUTION  # Sample from distribution
+dr_evt.RunTimeMode.FROM_COLUMN   # Read actual_run_time from trace
+dr_evt.RunTimeMode.EXACT         # Jobs run exactly time_limit
+dr_evt.RunTimeMode.DISTRIBUTION  # Sample from distribution
 ```
 
 ## Streaming API
@@ -574,20 +596,21 @@ cmake .. -DDR_EVT_BUILD_PYTHON=ON
 make
 
 # Run Python tests
-cd ../python
-python test_api.py
+cd ..
+./tests/run_python_tests.sh
 ```
 
 Expected output:
 ```
-✓ dr_evt module imported successfully
-Testing DR_EVT Python API
-✓ SimParams configuration
-✓ Trace loading
-✓ Streaming API
-✓ Monitoring API
-✓ Statistics
-ALL TESTS PASSED!
+1. Module Import
+  ✓ Version: 1.0.0
+2. Enumerations
+  ✓ BackfillPolicy
+  ✓ PriorityPolicy
+  ✓ RunTimeMode
+...
+Test Results: 14/14 passed
+✅ ALL PYTHON API TESTS PASSED!
 ```
 
 ## Examples
@@ -595,7 +618,9 @@ ALL TESTS PASSED!
 Complete working examples in `python/`:
 
 - **example_streaming.py**: Online simulation with real-time monitoring
-- **test_api.py**: Comprehensive API usage examples
+
+The full Python API test suite lives at `tests/test_python_api.py` (run via
+`tests/run_python_tests.sh` above, and in CI).
 
 ## Troubleshooting
 
@@ -667,7 +692,8 @@ To add new Python bindings:
    ```cpp
    .def_readwrite("new_param", &Sim_Params::m_new_param)
    ```
-4. Add test in `python/test_api.py`
+4. Add test in `tests/test_python_api.py` (the actual Python API test
+   suite, run via `tests/run_python_tests.sh` and CI)
 5. Document here and in `python/README.md`
 
 ## See Also

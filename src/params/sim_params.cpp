@@ -35,14 +35,14 @@ static const struct option longopts[] = {
     {"block_size",            required_argument,  0, 'Q'},
     {"circular_capacity",     required_argument,  0, 'A'},
     {"circular_overflow",     required_argument,  0, 'G'},
-    {"runtime_mode",          required_argument,  0, 'r'},
+    {"duration_mode",          required_argument,  0, 'r'},
     {"trace_format",          required_argument,  0, 'f'},
     {"timestamp_format",      required_argument,  0, 'T'},
     {"timezone",              required_argument,  0, 'z'},
-    {"duration_mode",         required_argument,  0, 'd'},
-    {"duration_distribution", required_argument,  0, 'D'},
-    {"duration_scale",        required_argument,  0, 'S'},
-    {"duration_stddev",       required_argument,  0, 'V'},
+    {"run_time_mode",         required_argument,  0, 'd'},
+    {"run_time_distribution", required_argument,  0, 'D'},
+    {"run_time_scale",        required_argument,  0, 'S'},
+    {"run_time_stddev",       required_argument,  0, 'V'},
     {"verbose",               no_argument,        0, 'v'},
     {"msec_output",           no_argument,        0, 'M'},
     {"config",                required_argument,  0, 'c'},
@@ -57,7 +57,7 @@ Sim_Params::Sim_Params()
     m_is_time_set(false),
     m_backfill_policy(BackfillPolicy::EASY),
     m_priority_policy(PriorityPolicy::FCFS),
-    m_runtime_mode(RuntimeEstimateMode::USE_LIMIT),
+    m_duration_mode(DurationEstimateMode::USE_LIMIT),
     m_queue_impl(QueueImplementation::CIRCULAR),
     m_block_size(128),
     m_circular_capacity(0),  // 0 = size of job trace (never overflows)
@@ -66,10 +66,10 @@ Sim_Params::Sim_Params()
     m_trace_format("lassen"),  // Default to Lassen format for backward compatibility
     m_timestamp_format("iso"),  // Default to ISO/human-readable timestamps
     m_timezone("America/Los_Angeles"),  // Default timezone
-    m_duration_mode(DurationMode::EXACT),  // Default: jobs run exactly time_limit
-    m_duration_distribution(DistributionType::NORMAL),
-    m_duration_scale(1.0),  // Default: 100% of time_limit
-    m_duration_stddev(0.0),  // Default: no variation
+    m_run_time_mode(RunTimeMode::EXACT),  // Default: jobs run exactly time_limit
+    m_run_time_distribution(DistributionType::NORMAL),
+    m_run_time_scale(1.0),  // Default: 100% of time_limit
+    m_run_time_stddev(0.0),  // Default: no variation
     m_verbose(false),  // Default: production mode (quiet)
     m_msec_output(false)  // Default: integer-second output
 {}
@@ -192,17 +192,17 @@ void Sim_Params::getopt(int& argc, char** &argv)
                     }
                 }
                 break;
-            case 'r': /* --runtime_mode */
+            case 'r': /* --duration_mode */
                 {
                     std::string mode(optarg);
                     if (mode.empty()) {
-                        m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
+                        m_duration_mode = DurationEstimateMode::USE_LIMIT;
                     } else if (mode == "limit") {
-                        m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
+                        m_duration_mode = DurationEstimateMode::USE_LIMIT;
                     } else if (mode == "actual") {
-                        m_runtime_mode = RuntimeEstimateMode::USE_ACTUAL;
+                        m_duration_mode = DurationEstimateMode::USE_ACTUAL;
                     } else {
-                        std::cerr << "Unknown runtime mode: " << mode << std::endl;
+                        std::cerr << "Unknown run time mode: " << mode << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
@@ -236,45 +236,45 @@ void Sim_Params::getopt(int& argc, char** &argv)
             case 'z': /* --timezone */
                 m_timezone = optarg;
                 break;
-            case 'd': /* --duration_mode */
+            case 'd': /* --run_time_mode */
                 {
                     std::string mode(optarg);
                     if (mode.empty()) {
-                        m_duration_mode = DurationMode::EXACT;
+                        m_run_time_mode = RunTimeMode::EXACT;
                     } else if (mode == "column") {
-                        m_duration_mode = DurationMode::FROM_COLUMN;
+                        m_run_time_mode = RunTimeMode::FROM_COLUMN;
                     } else if (mode == "exact") {
-                        m_duration_mode = DurationMode::EXACT;
+                        m_run_time_mode = RunTimeMode::EXACT;
                     } else if (mode == "distribution") {
-                        m_duration_mode = DurationMode::DISTRIBUTION;
+                        m_run_time_mode = RunTimeMode::DISTRIBUTION;
                     } else {
                         std::cerr << "Unknown duration mode: " << mode << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
                 break;
-            case 'D': /* --duration_distribution */
+            case 'D': /* --run_time_distribution */
                 {
                     std::string dist(optarg);
                     if (dist.empty()) {
-                        m_duration_distribution = DistributionType::NORMAL;
+                        m_run_time_distribution = DistributionType::NORMAL;
                     } else if (dist == "normal") {
-                        m_duration_distribution = DistributionType::NORMAL;
+                        m_run_time_distribution = DistributionType::NORMAL;
                     } else if (dist == "lognormal") {
-                        m_duration_distribution = DistributionType::LOGNORMAL;
+                        m_run_time_distribution = DistributionType::LOGNORMAL;
                     } else if (dist == "uniform") {
-                        m_duration_distribution = DistributionType::UNIFORM;
+                        m_run_time_distribution = DistributionType::UNIFORM;
                     } else {
                         std::cerr << "Unknown distribution type: " << dist << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
                 break;
-            case 'S': /* --duration_scale */
-                m_duration_scale = std::stod(optarg);
+            case 'S': /* --run_time_scale */
+                m_run_time_scale = std::stod(optarg);
                 break;
-            case 'V': /* --duration_stddev */
-                m_duration_stddev = std::stod(optarg);
+            case 'V': /* --run_time_stddev */
+                m_run_time_stddev = std::stod(optarg);
                 break;
             case 'v': /* --verbose */
                 m_verbose = true;
@@ -390,10 +390,11 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        entries over.\n"
         "        Only used when --queue_impl=circular\n"
         "\n"
-        "    -r, --runtime_mode {limit|actual}\n"
-        "        Runtime estimate mode (default: limit).\n"
+        "    -r, --duration_mode {limit|actual}\n"
+        "        Scheduler's job length estimate for reservation/backfill\n"
+        "        planning (default: limit).\n"
         "        limit: Use user-provided time limit (realistic)\n"
-        "        actual: Use actual runtime (oracle mode)\n"
+        "        actual: Use the job's actual, observed run time (oracle mode)\n"
         "\n"
         "    -f, --trace_format {simple|lassen}\n"
         "        Trace file format (default: lassen).\n"
@@ -410,24 +411,25 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Examples: UTC, America/New_York, America/Los_Angeles\n"
         "        Only used when timestamp_format=iso\n"
         "\n"
-        "    -d, --duration_mode {column|exact|distribution}\n"
-        "        How to determine actual job duration in simulation mode (default: exact).\n"
-        "        column: Read from actual_duration column in trace\n"
+        "    -d, --run_time_mode {column|exact|distribution}\n"
+        "        How to determine the job's actual run time in simulation mode (default: exact).\n"
+        "        column: Read from actual_run_time column in trace\n"
+        "          (also accepted: duration, actual_duration, run_time)\n"
         "        exact: Jobs run exactly time_limit (perfect estimation)\n"
         "        distribution: Sample from statistical distribution\n"
         "\n"
-        "    -D, --duration_distribution {normal|lognormal|uniform}\n"
-        "        Distribution type when duration_mode=distribution (default: normal).\n"
+        "    -D, --run_time_distribution {normal|lognormal|uniform}\n"
+        "        Distribution type when run_time_mode=distribution (default: normal).\n"
         "        normal: Normal distribution N(limit*scale, limit*stddev)\n"
         "        lognormal: Lognormal with median=limit*scale\n"
         "        uniform: Uniform in [limit*scale, limit*(scale+stddev)]\n"
         "\n"
-        "    -S, --duration_scale FACTOR\n"
-        "        Scale factor for duration sampling (default: 1.0).\n"
+        "    -S, --run_time_scale FACTOR\n"
+        "        Scale factor for run time sampling (default: 1.0).\n"
         "        Example: 0.8 means jobs run 80% of their time_limit on average\n"
         "\n"
-        "    -V, --duration_stddev FACTOR\n"
-        "        Standard deviation factor for duration sampling (default: 0.0).\n"
+        "    -V, --run_time_stddev FACTOR\n"
+        "        Standard deviation factor for run time sampling (default: 0.0).\n"
         "        For normal: std dev = limit * stddev\n"
         "        For lognormal: shape parameter\n"
         "        For uniform: upper bound offset\n"
@@ -487,28 +489,28 @@ void Sim_Params::print() const
     else msg += "LJF";
     msg += "\n";
 
-    msg += " - runtime_mode: ";
-    msg += (m_runtime_mode == RuntimeEstimateMode::USE_LIMIT) ? "USE_LIMIT" : "USE_ACTUAL";
+    msg += " - duration_mode: ";
+    msg += (m_duration_mode == DurationEstimateMode::USE_LIMIT) ? "USE_LIMIT" : "USE_ACTUAL";
     msg += "\n";
 
     msg += " - trace_format: " + m_trace_format + "\n";
     msg += " - timestamp_format: " + m_timestamp_format + "\n";
     msg += " - timezone: " + m_timezone + "\n";
 
-    msg += " - duration_mode: ";
-    if (m_duration_mode == DurationMode::FROM_COLUMN) msg += "FROM_COLUMN";
-    else if (m_duration_mode == DurationMode::EXACT) msg += "EXACT";
+    msg += " - run_time_mode: ";
+    if (m_run_time_mode == RunTimeMode::FROM_COLUMN) msg += "FROM_COLUMN";
+    else if (m_run_time_mode == RunTimeMode::EXACT) msg += "EXACT";
     else msg += "DISTRIBUTION";
     msg += "\n";
 
-    msg += " - duration_distribution: ";
-    if (m_duration_distribution == DistributionType::NORMAL) msg += "NORMAL";
-    else if (m_duration_distribution == DistributionType::LOGNORMAL) msg += "LOGNORMAL";
+    msg += " - run_time_distribution: ";
+    if (m_run_time_distribution == DistributionType::NORMAL) msg += "NORMAL";
+    else if (m_run_time_distribution == DistributionType::LOGNORMAL) msg += "LOGNORMAL";
     else msg += "UNIFORM";
     msg += "\n";
 
-    msg += " - duration_scale: " + to_string(m_duration_scale) + "\n";
-    msg += " - duration_stddev: " + to_string(m_duration_stddev) + "\n";
+    msg += " - run_time_scale: " + to_string(m_run_time_scale) + "\n";
+    msg += " - run_time_stddev: " + to_string(m_run_time_stddev) + "\n";
 
     std::cout << msg << std::endl;
 }

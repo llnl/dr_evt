@@ -17,7 +17,7 @@ namespace dr_evt {
 /**
  * Shortest Job First (SJF) scheduler with iterator tracking
  *
- * Uses std::multimap ordered by runtime for priority,
+ * Uses std::multimap ordered by run_time for priority,
  * plus tracking of eligibility boundary to avoid rescanning.
  */
 class SJFScheduler : public SchedulerBase {
@@ -25,11 +25,11 @@ public:
     SJFScheduler(num_nodes_t total_nodes,
                  const std::vector<Job_Record>& job_data,
                  BackfillPolicy backfill_policy,
-                 RuntimeEstimateMode runtime_mode);
+                 DurationEstimateMode duration_mode);
 
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,
-                    tdiff_t runtime,
+                    tdiff_t run_time,
                     num_nodes_t nodes) override;
 
     std::vector<job_no_t> schedule(
@@ -73,7 +73,7 @@ private:
     struct JobEntry {
         job_no_t job_id;
         sim_time_t submit_time;
-        tdiff_t runtime;
+        tdiff_t run_time;
         num_nodes_t nodes;
         // No removed flag: schedule() erases scheduled entries from
         // m_wait_queue immediately via the iterator it already holds
@@ -87,7 +87,7 @@ private:
         // notes for the specific reasoning at each site).
     };
 
-    // Ordered by runtime (shortest first), then by job_id for stability
+    // Ordered by run_time (shortest first), then by job_id for stability
     std::multimap<tdiff_t, JobEntry> m_wait_queue;
 
     // Track eligible jobs (submit_time <= current_time)

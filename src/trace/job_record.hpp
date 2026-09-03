@@ -40,7 +40,7 @@ class Job_Record {
     epoch_t m_t_end; ///< The end time of job execution
     epoch_t m_t_submit; ///< The time when the job was submitted
     timeout_t m_t_limit; ///< The time limit of the job (user estimate)
-    tdiff_t m_actual_duration; ///< Actual execution time (ground truth)
+    tdiff_t m_actual_run_time; ///< Actual execution time (ground truth)
     num_nodes_t m_num_nodes; ///< The amount of resources this job uses
     job_queue_t m_q; ///< The queue to which the job was submitted
     bool m_is_simulated; ///< True if times were computed by scheduler (simulation mode)
@@ -77,10 +77,9 @@ class Job_Record {
     epoch_t get_begin_time() const { return m_t_begin; }
     epoch_t get_end_time() const { return m_t_end; }
     epoch_t get_submit_time() const { return m_t_submit; }
-    tdiff_t get_exec_time() const { return m_actual_duration; }
     tdiff_t get_wait_time() const { return (m_t_begin - m_t_submit); }
     timeout_t get_limit_time() const { return m_t_limit; }
-    tdiff_t get_actual_duration() const { return m_actual_duration; }
+    tdiff_t get_actual_run_time() const { return m_actual_run_time; }
     num_nodes_t get_num_nodes() const { return m_num_nodes; }
     num_nodes_t get_busy_nodes() const { return m_busy_nodes; }
     bool is_simulated() const { return m_is_simulated; }
@@ -111,11 +110,11 @@ class Job_Record {
 
     // Setters for simulation mode
     void set_begin_time(const epoch_t& t) { m_t_begin = t; m_is_simulated = true; }
-    void set_actual_duration(tdiff_t d) { m_actual_duration = d; }
+    void set_actual_run_time(tdiff_t d) { m_actual_run_time = d; }
     void compute_end_time() {
         m_t_end = m_t_begin;
-        time_t seconds = static_cast<time_t>(m_actual_duration);
-        float fraction = m_actual_duration - seconds;
+        time_t seconds = static_cast<time_t>(m_actual_run_time);
+        float fraction = m_actual_run_time - seconds;
         m_t_end.first += seconds;
         m_t_end.second += fraction;
         if (m_t_end.second >= 1.0) {

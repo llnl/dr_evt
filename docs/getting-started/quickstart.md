@@ -9,7 +9,7 @@ This branch (`feature/backfilling-scheduler`) adds a **SLURM-style backfilling s
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
 - **Priority Policies**: FCFS (First-Come-First-Served), SJF (Shortest-Job-First), LJF (Longest-Job-First)
-- **Runtime Modes**: Realistic (use time limits) or Oracle (perfect knowledge)
+- **Run Time Modes**: Realistic (use time limits) or Oracle (perfect knowledge)
 
 ## Build Instructions
 
@@ -52,20 +52,55 @@ All dependencies are automatically downloaded via CMake FetchContent:
   --total_nodes 795 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --runtime_mode limit
+  --duration_mode limit
 ```
 
 ### All Options
 
+This is a quick summary; see [Command-Line Reference](../user-guide/command-line.md)
+for the full description of every option.
+
 ```
---total_nodes <N>           Number of nodes in system (default: 795)
---backfill_policy <policy>  Backfilling algorithm: easy|conservative
---priority_policy <policy>  Job ordering: fcfs|sjf|ljf
---runtime_mode <mode>       Runtime estimates: limit|actual
---max_jobs <N>              Maximum number of jobs to simulate
---max_time <T>              Maximum simulation time
---outfile <file>            Output file for results
---seed <N>                  Random number seed
+Input/Output:
+  -i, --infile <file>          Input trace file
+  -o, --outfile <file>         Output file for results
+  -R, --resource_trace <file>  Write resource usage trace to file
+
+Simulation setup:
+  -n, --total_nodes <N>        Number of nodes in system (default: 795)
+  -j, --max_jobs <N>           Maximum number of jobs to simulate
+  -t, --max_time <T>           Maximum simulation time
+  -s, --seed <N>                Random number seed
+
+Scheduling policy:
+  -b, --backfill_policy <policy>   easy|conservative|none (default: easy)
+  -p, --priority_policy <policy>   fcfs|fcfs_alt|sjf|ljf (default: fcfs)
+  -q, --queue_impl <impl>          circular|deque|multimap|block (default: circular)
+  -Q, --block_size <size>          Block size when queue_impl=block (default: 128)
+  -A, --circular_capacity <size>   Initial wait queue capacity when queue_impl=circular
+  -G, --circular_overflow <mode>   abort|grow when queue_impl=circular (default: grow)
+
+Trace format:
+  -f, --trace_format <fmt>     simple|lassen (default: lassen)
+  -T, --timestamp_format <fmt> epoch|iso (default: iso)
+  -z, --timezone <tz>          Timezone for iso timestamps (default: America/Los_Angeles)
+
+Duration/run time modeling:
+  -r, --duration_mode <mode>          limit|actual (default: limit) - scheduler's
+                                       planning estimate
+  -d, --run_time_mode <mode>          column|exact|distribution (default: exact) -
+                                       how the job's actual run time is determined
+  -D, --run_time_distribution <type>  normal|lognormal|uniform (default: normal)
+  -S, --run_time_scale <factor>       Scale factor for run time sampling (default: 1.0)
+  -V, --run_time_stddev <factor>      Std deviation factor for run time sampling
+
+Config file (requires protobuf support):
+  -c, --config <file>          Read simulation parameters from a config file
+
+Other:
+  -v, --verbose                 Enable verbose output
+  -M, --msec_output             Millisecond-precision timestamps in output
+  -h, --help                    Display usage information
 ```
 
 ### Examples
@@ -78,10 +113,10 @@ All dependencies are automatically downloaded via CMake FetchContent:
   --outfile results_conservative_sjf.txt
 ```
 
-**Oracle mode (perfect runtime knowledge):**
+**Oracle mode (perfect run time knowledge):**
 ```bash
 ./simulator trace.txt \
-  --runtime_mode actual \
+  --duration_mode actual \
   --outfile results_oracle.txt
 ```
 
@@ -107,6 +142,8 @@ Input trace files should have tab-separated columns:
 ```
 num_nodes  begin_time  end_time  submit_time  queue  time_limit
 ```
+`time_limit` is also accepted under the column names `timelimit` or
+`walltime`, so an existing trace can be reused without editing its header.
 
 See existing trace files in the project for examples.
 
@@ -141,7 +178,7 @@ See existing trace files in the project for examples.
 - Useful for throughput optimization
 - May starve short jobs
 
-### Runtime Modes
+### Run Time Modes
 
 **USE_LIMIT (Realistic)**
 - Scheduler uses user-provided time limits
@@ -149,7 +186,7 @@ See existing trace files in the project for examples.
 - Mimics real HPC systems
 
 **USE_ACTUAL (Oracle)**
-- Scheduler knows exact runtimes
+- Scheduler knows exact run times
 - Unrealistic but useful for comparison
 - Upper bound on performance
 

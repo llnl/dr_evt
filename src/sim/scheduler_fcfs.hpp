@@ -26,12 +26,12 @@ private:
     struct JobEntry {
         job_no_t job_id;
         sim_time_t submit_time;
-        tdiff_t runtime_estimate;
+        tdiff_t run_time_estimate;
         num_nodes_t nodes_requested;
         bool removed;
 
-        JobEntry(job_no_t id, sim_time_t submit, tdiff_t runtime, num_nodes_t nodes)
-            : job_id(id), submit_time(submit), runtime_estimate(runtime),
+        JobEntry(job_no_t id, sim_time_t submit, tdiff_t run_time, num_nodes_t nodes)
+            : job_id(id), submit_time(submit), run_time_estimate(run_time),
               nodes_requested(nodes), removed(false) {}
     };
 
@@ -44,7 +44,7 @@ public:
     FCFSScheduler(num_nodes_t total_nodes,
                   const std::vector<Job_Record>& job_data,
                   BackfillPolicy bf_policy,
-                  RuntimeEstimateMode rt_mode)
+                  DurationEstimateMode rt_mode)
         : SchedulerBase(total_nodes, job_data, bf_policy, rt_mode)
         , m_eligible_end_idx(0)
         , m_current_tracked_time(0.0)
@@ -52,8 +52,8 @@ public:
     {}
 
     void insert_job(job_no_t job_id, sim_time_t submit_time,
-                   tdiff_t runtime_estimate, num_nodes_t nodes_requested) override {
-        m_wait_queue.emplace_back(job_id, submit_time, runtime_estimate, nodes_requested);
+                   tdiff_t run_time_estimate, num_nodes_t nodes_requested) override {
+        m_wait_queue.emplace_back(job_id, submit_time, run_time_estimate, nodes_requested);
 
         // If this job is already eligible, advance index. Can jump by more
         // than 1 in a single call: if this new job's submit_time is

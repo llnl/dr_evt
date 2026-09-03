@@ -10,18 +10,30 @@ Block queue groups jobs into fixed-size blocks with multi-index containers for f
 queue implementation directly motivated by this analysis, measured faster than both deque and
 block queue.
 
-## Performance Results (10K jobs, 2K nodes)
+## Performance Results (10K jobs, 500 nodes)
 
-| Block Size | Time (s) | vs Deque | Blocks | Notes |
-|------------|----------|----------|--------|-------|
-| **Deque**  | **1.40** | **1.00x** | N/A    | **fastest** |
-| Block-4    | 2.33     | 1.66x    | 1,926  | too many blocks |
-| Block-8    | 1.91     | 1.36x    | 963    | |
-| **Block-16** | **1.82** | **1.30x** | **481** | **optimal** |
-| Block-32   | 2.04     | 1.46x    | 271    | |
-| Block-64   | 2.17     | 1.55x    | 136    | |
-| Block-128  | 2.52     | 1.80x    | 68     | |
-| Block-256  | 2.75     | 1.96x    | 34     | too few blocks |
+500 nodes is the tightest node count that keeps every job in this trace
+schedulable (the trace's largest single job requests exactly 500 nodes),
+reflecting real scheduling contention. An earlier version of this
+benchmark used 2,000 nodes; these numbers supersede it.
+
+| Block Size | Time (s) | vs Deque |
+|------------|----------|----------|
+| **Deque**  | **0.680** | **1.00x (baseline)** |
+| Block-4    | 0.695    | 1.02x (2% slower) |
+| Block-8    | 0.587    | 0.86x (14% faster) |
+| **Block-16** | **0.596** | **0.87x (12% faster)** |
+| Block-32   | 0.619    | 0.91x (9% faster) |
+| Block-64   | 0.659    | 0.96x (3% faster) |
+| Block-128  | 0.676    | 0.99x (1% faster) |
+| Block-256  | 0.713    | 1.04x (5% slower) |
+
+At this node count, several block sizes actually edge out deque - a
+different picture than the 2,000-node version of this benchmark, where
+deque was fastest overall. Run-to-run variance in this measurement is
+real and non-trivial; treat these as directionally representative, not
+precise. See [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md) for how circular
+compares in the same run.
 
 ✅ All block sizes produce byte-for-byte identical output to deque.
 
@@ -51,7 +63,7 @@ Slowdown
 
 Each block maintains:
 1. **Sequential** (linked list) - FCFS order
-2. **Runtime tree** (red-black tree) - sorted by runtime
+2. **Run time tree** (red-black tree) - sorted by run time
 3. **Nodes tree** (red-black tree) - sorted by node count
 
 **Why 3 indices?** Originally 4 (with job_id hash), but hash table was unnecessary—linear scan is faster for small blocks (≤256 jobs).
@@ -71,7 +83,7 @@ void remove(job_no_t job_id);
 
 ### Optimizations
 
-✅ Dynamic metadata filtering (min_runtime, min_nodes)
+✅ Dynamic metadata filtering (min_run_time, min_nodes)
 ✅ Empty block skipping (active_count == 0)
 ✅ Combined find-and-remove API
 ✅ Compile-time block size (bit-shift addressing)
@@ -140,7 +152,7 @@ std::unique_ptr<SchedulerBase> scheduler = create_scheduler(
     job_data,
     BackfillPolicy::EASY,
     PriorityPolicy::FCFS,
-    RuntimeEstimateMode::USE_LIMIT,
+    DurationEstimateMode::USE_LIMIT,
     QueueImplementation::BLOCK,
     16  // block_size
 );
@@ -164,7 +176,7 @@ std::unique_ptr<SchedulerBase> scheduler = create_scheduler(
 
 ### Why Not Deque + Metadata?
 
-Tried: maintaining min_runtime/min_nodes without blocks.
+Tried: maintaining min_run_time/min_nodes without blocks.
 Result: Linear scan still fast (<10K jobs), extra bookkeeping slows it down.
 
 ### Why Not Replace Multi-Index?
@@ -197,7 +209,7 @@ struct BlockInfo {
     size_t active_count;     // non-removed jobs
     
     // O(1) metadata queries from sorted indices
-    tdiff_t get_min_runtime() const;
+    tdiff_t get_min_run_time() const;
     num_nodes_t get_min_nodes() const;
 };
 ```
@@ -210,7 +222,7 @@ for (auto& block_info : m_blocks) {
     if (block_info.active_count == 0) continue;
     
     // Skip if all jobs too long
-    if (current_time + block_info.get_min_runtime() >= reservation_time)
+    if (current_time + block_info.get_min_run_time() >= reservation_time)
         continue;
     
     // Skip if all jobs too large

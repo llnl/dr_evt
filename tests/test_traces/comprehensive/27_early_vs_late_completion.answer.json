@@ -13,7 +13,7 @@
       "description": "Job 0 completes early at 50"
     },
     {
-      "type": "full_runtime",
+      "type": "full_run_time",
       "job": 1,
       "description": "Job 1 runs for full time_limit (100 = 100)"
     },

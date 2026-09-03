@@ -13,20 +13,20 @@ namespace dr_evt {
 FCFSAltScheduler::FCFSAltScheduler(num_nodes_t total_nodes,
                                    const std::vector<Job_Record>& job_data,
                                    BackfillPolicy backfill_policy,
-                                   RuntimeEstimateMode runtime_mode)
-    : SchedulerBase(total_nodes, job_data, backfill_policy, runtime_mode),
+                                   DurationEstimateMode duration_mode)
+    : SchedulerBase(total_nodes, job_data, backfill_policy, duration_mode),
       m_current_tracked_time(0.0)
 {
 }
 
 void FCFSAltScheduler::insert_job(job_no_t job_id,
                                    sim_time_t submit_time,
-                                   tdiff_t runtime,
+                                   tdiff_t run_time,
                                    num_nodes_t nodes)
 {
-    JobEntry entry{job_id, submit_time, runtime, nodes};
+    JobEntry entry{job_id, submit_time, run_time, nodes};
 
-    // KEY DIFFERENCE: Order by submit_time (FCFS) instead of runtime (SJF)
+    // KEY DIFFERENCE: Order by submit_time (FCFS) instead of run_time (SJF)
     m_wait_queue.insert({submit_time, entry});
 
     // If already eligible, add to eligible set
@@ -125,7 +125,7 @@ std::vector<job_no_t> FCFSAltScheduler::schedule(
         // at the reservation time, the FCFS head must wait for that completion event
         // to be processed first, causing a delay. Therefore, backfill jobs must
         // complete BEFORE (not at) the reservation time.
-        bool fits_window = (entry.runtime < backfill_window);
+        bool fits_window = (entry.run_time < backfill_window);
 
         if (m_backfill_policy == BackfillPolicy::EASY) {
             // EASY: must fit both nodes AND window

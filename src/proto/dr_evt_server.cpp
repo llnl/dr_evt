@@ -82,19 +82,19 @@ public:
                             throw std::runtime_error("Unknown priority_policy: " + r.priority_policy());
                         }
 
-                        if (r.runtime_mode().empty()) sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_LIMIT;
-                        else if (r.runtime_mode() == "limit") sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_LIMIT;
-                        else if (r.runtime_mode() == "actual") sp.m_runtime_mode = dr_evt::RuntimeEstimateMode::USE_ACTUAL;
-                        else {
-                            throw std::runtime_error("Unknown runtime_mode: " + r.runtime_mode());
-                        }
-
-                        if (r.duration_mode().empty()) sp.m_duration_mode = dr_evt::DurationMode::EXACT;
-                        else if (r.duration_mode() == "column") sp.m_duration_mode = dr_evt::DurationMode::FROM_COLUMN;
-                        else if (r.duration_mode() == "exact") sp.m_duration_mode = dr_evt::DurationMode::EXACT;
-                        else if (r.duration_mode() == "distribution") sp.m_duration_mode = dr_evt::DurationMode::DISTRIBUTION;
+                        if (r.duration_mode().empty()) sp.m_duration_mode = dr_evt::DurationEstimateMode::USE_LIMIT;
+                        else if (r.duration_mode() == "limit") sp.m_duration_mode = dr_evt::DurationEstimateMode::USE_LIMIT;
+                        else if (r.duration_mode() == "actual") sp.m_duration_mode = dr_evt::DurationEstimateMode::USE_ACTUAL;
                         else {
                             throw std::runtime_error("Unknown duration_mode: " + r.duration_mode());
+                        }
+
+                        if (r.run_time_mode().empty()) sp.m_run_time_mode = dr_evt::RunTimeMode::EXACT;
+                        else if (r.run_time_mode() == "column") sp.m_run_time_mode = dr_evt::RunTimeMode::FROM_COLUMN;
+                        else if (r.run_time_mode() == "exact") sp.m_run_time_mode = dr_evt::RunTimeMode::EXACT;
+                        else if (r.run_time_mode() == "distribution") sp.m_run_time_mode = dr_evt::RunTimeMode::DISTRIBUTION;
+                        else {
+                            throw std::runtime_error("Unknown run_time_mode: " + r.run_time_mode());
                         }
 
                         // block_size/circular_capacity: 0 means "use Sim_Params'

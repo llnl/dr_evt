@@ -103,7 +103,17 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 | 3 | num_nodes | Number of nodes requested | Yes |
 | 4 | exit_status | Job exit code | Optional |
 | 5 | queue | Queue name (e.g., "batch") | Optional |
-| 6 | time_limit | User-provided time limit (seconds) | Optional |
+| 6 | time_limit | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Optional |
+| 7 | actual_run_time | The job's real, historical run time (seconds); used by `--duration_mode actual` and `--run_time_mode column`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Optional |
+
+**Column-name aliases**: `time_limit` and `actual_run_time` are each detected
+under several accepted header names (listed above), so an existing trace
+can be reused as-is without editing its header - slow to do by hand on a
+large file. Only one alias per column is expected to actually be present
+in a given file; if more than one is, the first match in the order listed
+wins. This applies to the "simple" format only; the aliases have no effect
+on the "lassen" format, which is defined by fixed column position rather
+than header name.
 
 **Note**: 
 - `begin_time` and `end_time` from trace are used to calculate job duration
@@ -170,7 +180,7 @@ EOF
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --runtime_mode actual
+  --duration_mode actual
 ```
 
 Expected output should show:

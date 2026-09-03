@@ -64,7 +64,11 @@ class Sim_Params {
     // Scheduling parameters
     BackfillPolicy m_backfill_policy;
     PriorityPolicy m_priority_policy;
-    RuntimeEstimateMode m_runtime_mode;
+    // Scheduler's own job-length estimate for reservation/backfill
+    // planning: limit (pessimistic, use time_limit) or actual (oracle,
+    // use the job's real observed run time). See m_run_time_mode below
+    // for how that real run time is itself determined.
+    DurationEstimateMode m_duration_mode;
     QueueImplementation m_queue_impl;
     size_t m_block_size;  // Block size for block queue (must be power of 2)
     size_t m_circular_capacity;  // Initial capacity for circular queue (0 = size of job trace)
@@ -74,11 +78,15 @@ class Sim_Params {
     std::string m_timestamp_format;  // "epoch" or "iso"
     std::string m_timezone;  // e.g., "UTC", "America/Los_Angeles", "America/New_York"
 
-    // Duration determination (simulation mode)
-    DurationMode m_duration_mode;
-    DistributionType m_duration_distribution;
-    double m_duration_scale;    // Scale factor (e.g., 0.8 = jobs run 80% of estimate)
-    double m_duration_stddev;   // Std deviation factor
+    // Run time determination (simulation mode) - how the job's actual,
+    // observed execution length is determined: exact (= time_limit),
+    // column (read from the trace's own actual_run_time column), or
+    // distribution (sampled). Ignored entirely when m_duration_mode is
+    // actual, since that mode already uses the trace's real run time.
+    RunTimeMode m_run_time_mode;
+    DistributionType m_run_time_distribution;
+    double m_run_time_scale;    // Scale factor (e.g., 0.8 = jobs run 80% of estimate)
+    double m_run_time_stddev;   // Std deviation factor
 
     // Output control
     bool m_verbose;  // Enable verbose/debug output (default: false for production)

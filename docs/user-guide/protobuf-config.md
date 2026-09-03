@@ -26,7 +26,7 @@ sim_setup {
   
   backfill_policy: "easy"
   priority_policy: "fcfs"
-  runtime_mode: "limit"
+  duration_mode: "limit"
 }
 ```
 
@@ -52,7 +52,7 @@ sim_setup {
   # Scheduling Policies
   backfill_policy: "easy"        # Options: "easy", "conservative", "none"
   priority_policy: "fcfs"         # Options: "fcfs", "sjf", "ljf"
-  runtime_mode: "limit"           # Options: "limit", "actual"
+  duration_mode: "limit"           # Options: "limit", "actual"
   
   # Queue Implementation (FCFS scheduler only)
   queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
@@ -68,10 +68,10 @@ sim_setup {
   max_time: 86400                 # Stop after 86400 seconds (24 hours)
   
   # Duration Simulation
-  duration_mode: "distribution"   # Options: "exact", "column", "distribution"
-  duration_distribution: "normal" # Options: "normal", "lognormal", "uniform"
-  duration_scale: 0.8             # Jobs run for 80% of time_limit on average
-  duration_stddev: 0.1            # Standard deviation: 10%
+  run_time_mode: "distribution"   # Options: "exact", "column", "distribution"
+  run_time_distribution: "normal" # Options: "normal", "lognormal", "uniform"
+  run_time_scale: 0.8             # Jobs run for 80% of time_limit on average
+  run_time_stddev: 0.1            # Standard deviation: 10%
   
   # Output Options
   verbose: false
@@ -106,7 +106,7 @@ Run with:
 |-------|------|---------|---------|
 | `backfill_policy` | string | `"easy"` | `"easy"`, `"conservative"`, `"none"` |
 | `priority_policy` | string | `"fcfs"` | `"fcfs"`, `"sjf"`, `"ljf"` |
-| `runtime_mode` | string | `"limit"` | `"limit"`, `"actual"` |
+| `duration_mode` | string | `"limit"` | `"limit"`, `"actual"` |
 | `queue_impl` | string | `"circular"` | `"circular"`, `"deque"`, `"multimap"`, `"block"` |
 | `block_size` | uint32 | `128` | Power of 2; only used when `queue_impl="block"` |
 | `circular_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
@@ -119,12 +119,14 @@ Run with:
 
 **priority_policy:**
 - `"fcfs"` - First-Come-First-Served (arrival order)
-- `"sjf"` - Shortest Job First (by runtime estimate)
-- `"ljf"` - Longest Job First (by runtime estimate)
+- `"sjf"` - Shortest Job First (by run time estimate)
+- `"ljf"` - Longest Job First (by run time estimate)
 
-**runtime_mode:**
-- `"limit"` - Use `time_limit` column for scheduling decisions (simulation mode)
-- `"actual"` - Use `actual_runtime` column (replay mode)
+**duration_mode:**
+- `"limit"` - Scheduler plans using the job's `time_limit` (realistic - what a real scheduler knows)
+- `"actual"` - Scheduler plans using the job's real, observed run time (omniscient/oracle, for
+  comparison studies); when set, `run_time_mode` below is ignored entirely and the job's
+  simulated execution also uses this same real run time directly
 
 **queue_impl** (FCFS scheduler only - SJF/LJF always use multimap):
 - `"circular"` - boost::circular_buffer-based (default; measured 14-28% faster
@@ -157,35 +159,35 @@ Run with:
 | `max_jobs` | int32 | Unlimited | Stop after processing N jobs |
 | `max_time` | double | Unlimited | Stop after N seconds simulation time |
 
-### Duration Simulation
+### Run Time Simulation
 
-Control how long jobs run in simulation mode:
+Control how a job's actual, observed execution length is determined in simulation mode:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `duration_mode` | string | `"exact"` | How to determine job runtime |
-| `duration_distribution` | string | `"normal"` | Statistical distribution for sampling |
-| `duration_scale` | double | `1.0` | Scale factor for durations |
-| `duration_stddev` | double | `0.0` | Standard deviation (for distributions) |
+| `run_time_mode` | string | `"exact"` | How to determine the job's actual run time |
+| `run_time_distribution` | string | `"normal"` | Statistical distribution for sampling |
+| `run_time_scale` | double | `1.0` | Scale factor for run times |
+| `run_time_stddev` | double | `0.0` | Standard deviation (for distributions) |
 
-**duration_mode:**
+**run_time_mode:**
 - `"exact"` - Jobs run for exactly `time_limit` (perfect estimates)
-- `"column"` - Read `actual_duration` from trace file
+- `"column"` - Read `actual_run_time` from trace file
 - `"distribution"` - Sample from statistical distribution
 
-**duration_distribution:**
-- `"normal"` - Normal distribution: mean=`time_limit × duration_scale`, stddev=`duration_stddev`
-- `"lognormal"` - Log-normal distribution with median=`time_limit × duration_scale`
-- `"uniform"` - Uniform distribution: [0, `time_limit × duration_scale`]
+**run_time_distribution:**
+- `"normal"` - Normal distribution: mean=`time_limit × run_time_scale`, stddev=`run_time_stddev`
+- `"lognormal"` - Log-normal distribution with median=`time_limit × run_time_scale`
+- `"uniform"` - Uniform distribution: [0, `time_limit × run_time_scale`]
 
-**Example: Realistic Runtime Variation**
+**Example: Realistic Run Time Variation**
 ```protobuf
 sim_setup {
-  runtime_mode: "limit"
-  duration_mode: "distribution"
-  duration_distribution: "normal"
-  duration_scale: 0.8          # Jobs run for 80% of time_limit on average
-  duration_stddev: 0.1          # ±10% variation
+  duration_mode: "limit"
+  run_time_mode: "distribution"
+  run_time_distribution: "normal"
+  run_time_scale: 0.8          # Jobs run for 80% of time_limit on average
+  run_time_stddev: 0.1          # ±10% variation
 }
 ```
 
@@ -225,9 +227,9 @@ sim_setup {
   
   total_nodes: 2048
   
-  # Replay mode: use actual runtimes from trace
-  runtime_mode: "actual"
-  duration_mode: "column"
+  # Replay mode: use actual run times from trace
+  duration_mode: "actual"
+  run_time_mode: "column"
   
   backfill_policy: "easy"
   priority_policy: "fcfs"
@@ -251,11 +253,11 @@ sim_setup {
   total_nodes: 2048
   
   # Simulation mode with realistic variation
-  runtime_mode: "limit"
-  duration_mode: "distribution"
-  duration_distribution: "normal"
-  duration_scale: 0.85
-  duration_stddev: 0.15
+  duration_mode: "limit"
+  run_time_mode: "distribution"
+  run_time_distribution: "normal"
+  run_time_scale: 0.85
+  run_time_stddev: 0.15
   
   # Try conservative backfilling instead of EASY
   backfill_policy: "conservative"
@@ -279,8 +281,8 @@ sim_setup {
   # Test with fewer nodes
   total_nodes: 1500
   
-  runtime_mode: "limit"
-  duration_mode: "exact"
+  duration_mode: "limit"
+  run_time_mode: "exact"
   
   backfill_policy: "easy"
   priority_policy: "fcfs"
@@ -313,8 +315,8 @@ sim_setup {
   # overflow.
   queue_impl: "circular"
   
-  runtime_mode: "limit"
-  duration_mode: "exact"
+  duration_mode: "limit"
+  run_time_mode: "exact"
   
   trace_format: "simple"
   timestamp_format: "epoch"
@@ -337,8 +339,8 @@ sim_setup {
   queue_impl: "block"
   block_size: 128
   
-  runtime_mode: "limit"
-  duration_mode: "exact"
+  duration_mode: "limit"
+  run_time_mode: "exact"
   
   trace_format: "simple"
   timestamp_format: "epoch"
@@ -370,7 +372,7 @@ message Simulation_Params {
   int32 total_nodes = 8;          // default: 795
   string backfill_policy = 9;     // "easy", "conservative", or "none" (default: "easy")
   string priority_policy = 10;    // "fcfs", "sjf", or "ljf" (default: "fcfs")
-  string runtime_mode = 11;       // "limit" or "actual" (default: "limit")
+  string duration_mode = 11;       // "limit" or "actual" (default: "limit")
 
   // Trace format
   string trace_format = 12;       // "simple" or "lassen" (default: "lassen")
@@ -378,10 +380,10 @@ message Simulation_Params {
   string timezone = 14;           // e.g. "UTC", "America/Los_Angeles"
 
   // Duration simulation
-  string duration_mode = 15;          // "column", "exact", or "distribution" (default: "exact")
-  string duration_distribution = 16;  // "normal", "lognormal", or "uniform" (default: "normal")
-  double duration_scale = 17;         // default: 1.0
-  double duration_stddev = 18;        // default: 0.0
+  string run_time_mode = 15;          // "column", "exact", or "distribution" (default: "exact")
+  string run_time_distribution = 16;  // "normal", "lognormal", or "uniform" (default: "normal")
+  double run_time_scale = 17;         // default: 1.0
+  double run_time_stddev = 18;        // default: 0.0
 
   // Queue implementation (FCFS scheduler only)
   string queue_impl = 19;         // "circular", "deque", "multimap", or "block" (default: "circular")

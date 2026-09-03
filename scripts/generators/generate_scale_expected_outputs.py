@@ -39,7 +39,7 @@ expected files this script replaces.
 
 FIXED (previously a known limitation): xlarge_500jobs.csv and
 huge_2000jobs.csv have been rebuilt with fresh, complete input data
-(500 and 2000 jobs respectively, generated via scripts/generate_large_test.py
+(500 and 2000 jobs respectively, generated via scripts/generators/generate_large_test.py
 with total_nodes=795) and are now included in TESTS below.
 xlarge_500jobs_v2.csv has been removed entirely - it was an unreferenced
 duplicate (nothing in the codebase or test scripts used it, only the
@@ -83,13 +83,13 @@ def load_trace(filename):
     with open(filename, 'r') as f:
         reader = csv.DictReader(f)
         for idx, row in enumerate(reader):
-            actual_runtime = float(row.get('actual_duration', row['time_limit']))
+            actual_run_time = float(row.get('actual_run_time', row['time_limit']))
             jobs.append(Job(
                 idx=idx,
                 submit_time=float(row['job_submit_time']),
                 nodes=int(row['num_nodes']),
                 duration=float(row['time_limit']),
-                actual_runtime=actual_runtime
+                actual_run_time=actual_run_time
             ))
     return jobs
 

@@ -54,11 +54,16 @@ for test_file in "$TRACE_DIR"/*.csv; do
     SIM_OUT="/tmp/unit_${test_name}.csv"
     SIM_RESOURCES="/tmp/unit_${test_name}_resources.csv"
 
+    # --duration_mode isn't passed, so it stays at its default, "limit".
+    # That matters because duration_mode="actual" would make the
+    # scheduler ignore --run_time_mode entirely and just use the
+    # trace's own real run time - "limit" is what makes --run_time_mode
+    # exact below actually get used.
     ./build/simulator "$test_file" \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --duration_mode exact \
+        --run_time_mode exact \
         --backfill_policy easy \
         --priority_policy fcfs \
         --outfile "$SIM_OUT" \

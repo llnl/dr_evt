@@ -53,8 +53,8 @@ message InitRequest {
     string timezone = 4;
     string backfill_policy = 5;    // "easy", "conservative", or "none"
     string priority_policy = 6;    // "fcfs", "fcfs_alt", "sjf", or "ljf"
-    string runtime_mode = 7;       // "limit" or "actual"
-    string duration_mode = 8;      // "column", "exact", or "distribution"
+    string duration_mode = 7;       // "limit" or "actual"
+    string run_time_mode = 8;      // "column", "exact", or "distribution"
     bool msec_output = 9;
     string infile = 10;            // trace file path (server-side path)
 

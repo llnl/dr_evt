@@ -1,4 +1,4 @@
-job_submit_time,num_nodes,exit_status,queue,time_limit,actual_duration
+job_submit_time,num_nodes,exit_status,queue,time_limit,actual_run_time
 0,30,0,pbatch,100,30
 5,40,0,pbatch,200,50
 10,100,0,pbatch,300,300

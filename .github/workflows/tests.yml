@@ -140,6 +140,20 @@ jobs:
           echo "========================================"
           ./tests/test_fcfs_comprehensive.sh --correctness
 
+      - name: Run Column Alias Tests
+        run: |
+          echo "========================================"
+          echo "Testing time_limit/actual_run_time column-name aliases (8 tests)"
+          echo "========================================"
+          ./tests/test_column_aliases.sh
+
+      - name: Run Duration/Run Time Mode Tests
+        run: |
+          echo "========================================"
+          echo "Testing duration_mode/run_time_mode interaction and distribution capping (4 tests)"
+          echo "========================================"
+          ./tests/test_duration_run_time_modes.sh
+
       - name: Run Unit Tests
         run: |
           echo "========================================"
@@ -209,6 +223,8 @@ jobs:
           echo "Test Results:"
           echo "  Comprehensive: 34 tests (verified 34/34 in a manual session pass)"
           echo "  Queue Impl Differential: 34 tests x 4 queue impls (deque/multimap/block/circular)"
+          echo "  Column Aliases: 8 tests (time_limit/actual_run_time accepted column-name variants)"
+          echo "  Duration/Run Time Mode: 4 tests (duration_mode=actual overrides run_time_mode; distribution capping at time_limit)"
           echo "  Unit: 7 tests (5/7 - 2 known-broken, incomplete fixture data)"
           echo "  Feature: 3 tests"
           echo "  Replay: 3 tests (methodology also verified against more)"

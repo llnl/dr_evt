@@ -12,8 +12,8 @@ namespace dr_evt {
 
 template<size_t BlockSize>
 void BlockQueueFCFSScheduler<BlockSize>::insert_job(job_no_t job_id, sim_time_t submit_time,
-                                         tdiff_t runtime_estimate, num_nodes_t nodes_requested) {
-    m_wait_queue.insert_job(job_id, submit_time, runtime_estimate, nodes_requested);
+                                         tdiff_t run_time_estimate, num_nodes_t nodes_requested) {
+    m_wait_queue.insert_job(job_id, submit_time, run_time_estimate, nodes_requested);
     m_job_order.emplace_back(job_id, submit_time);
 
     if (submit_time <= m_current_tracked_time) {

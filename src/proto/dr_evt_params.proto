@@ -32,7 +32,7 @@ message DR_EVT_Params {
         uint32 total_nodes = 8;         // System node count (default: 795)
         string backfill_policy = 9;     // "easy", "conservative" or "none" (default: "easy")
         string priority_policy = 10;    // "fcfs", "sjf", or "ljf" (default: "fcfs")
-        string runtime_mode = 11;       // "limit" or "actual" (default: "limit")
+        string duration_mode = 11;       // "limit" or "actual" (default: "limit")
 
         // Trace format parameters
         string trace_format = 12;       // "simple" or "lassen" (default: "lassen")
@@ -40,10 +40,10 @@ message DR_EVT_Params {
         string timezone = 14;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
 
         // Duration simulation parameters
-        string duration_mode = 15;      // "column", "exact", or "distribution" (default: "exact")
-        string duration_distribution = 16; // "normal", "lognormal", or "uniform" (default: "normal")
-        double duration_scale = 17;     // Scale factor (default: 1.0)
-        double duration_stddev = 18;    // Standard deviation factor (default: 0.0)
+        string run_time_mode = 15;      // "column", "exact", or "distribution" (default: "exact")
+        string run_time_distribution = 16; // "normal", "lognormal", or "uniform" (default: "normal")
+        double run_time_scale = 17;     // Scale factor (default: 1.0)
+        double run_time_stddev = 18;    // Standard deviation factor (default: 0.0)
 
         // Queue implementation (FCFS scheduler only)
         string queue_impl = 19;         // "circular", "deque", "multimap", or "block" (default: "circular")

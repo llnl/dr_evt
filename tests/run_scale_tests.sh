@@ -61,11 +61,16 @@ for test_file in "$TRACE_DIR"/*.csv; do
     # set -e - the check below (SIM_OUT missing) still catches that
     # failure and reports it as this test's own failure, rather than
     # silently skipping every test after it.
+    # --duration_mode isn't passed, so it stays at its default, "limit".
+    # That matters because duration_mode="actual" would make the
+    # scheduler ignore --run_time_mode entirely and just use the
+    # trace's own real run time - "limit" is what makes --run_time_mode
+    # exact below actually get used.
     ./build/simulator "$test_file" \
         --total_nodes 795 \
         --trace_format simple \
         --timestamp_format epoch \
-        --duration_mode exact \
+        --run_time_mode exact \
         --backfill_policy easy \
         --priority_policy fcfs \
         --outfile "$SIM_OUT" \

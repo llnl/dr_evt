@@ -184,7 +184,7 @@ void print_limit_vs_exec_time(const vector<Job_Record>& data)
 
     for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < data.size(); ++i) {
          const auto& job = data[i];
-         data_focus[i] = std::make_pair(job.get_limit_time(), job.get_exec_time());
+         data_focus[i] = std::make_pair(job.get_limit_time(), job.get_actual_run_time());
     }
 
     std::stable_sort(data_focus.begin(), data_focus.end(),

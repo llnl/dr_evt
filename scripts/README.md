@@ -157,7 +157,7 @@ python3 scripts/generate_correctness_traces.py
 
 **Usage:**
 ```bash
-python3 scripts/generate_large_test.py
+python3 scripts/generators/generate_large_test.py
 ```
 
 **Output:**
