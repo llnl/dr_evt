@@ -66,7 +66,7 @@ Test streaming job submission APIs:
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --duration_mode exact \
+    --run_time_mode exact \
     --outfile /tmp/output.csv
 
 # Run C++ test (if built)
@@ -86,7 +86,7 @@ These tests verify that different scheduling policies produce different scheduli
 ### Mode Tests
 
 - **Replay mode**: Read begin_time/end_time from trace file
-- **Simulation mode**: Scheduler computes start times, uses runtime/time_limit
+- **Simulation mode**: Scheduler computes start times, uses run_time/time_limit
 
 ### Configuration File Tests
 

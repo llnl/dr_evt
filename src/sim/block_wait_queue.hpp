@@ -23,7 +23,7 @@ namespace dr_evt {
 /**
  * Block-based wait queue with O(1) operations and efficient backfill search.
  *
- * Groups jobs into blocks and maintains block-level metadata (min runtime,
+ * Groups jobs into blocks and maintains block-level metadata (min run_time,
  * min nodes) for fast pre-filtering before scanning.
  *
  * @tparam BlockSize Maximum jobs per block (must be power of 2)
@@ -48,7 +48,7 @@ public:
      */
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,
-                    tdiff_t runtime_estimate,
+                    tdiff_t run_time_estimate,
                     num_nodes_t nodes_requested);
 
     /**
@@ -61,7 +61,7 @@ public:
      * Find AND REMOVE a backfill candidate job (combined operation - no double search!)
      *
      * Pre-filters blocks by:
-     * 1. Time constraint: block.min_runtime must fit in window
+     * 1. Time constraint: block.min_run_time must fit in window
      * 2. Resource constraint: block.min_nodes must fit available resources
      *
      * Then scans qualifying blocks in FCFS (sequential) order.
@@ -120,12 +120,12 @@ private:
     struct JobEntry {
         job_no_t job_id;
         sim_time_t submit_time;
-        tdiff_t runtime_estimate;
+        tdiff_t run_time_estimate;
         num_nodes_t nodes_requested;
     };
 
     // Boost multi-index container with 3 indexes (removed job_id hash - unnecessary!)
-    struct by_runtime {};
+    struct by_run_time {};
     struct by_nodes {};
 
     using JobBlock = boost::multi_index::multi_index_container<
@@ -134,10 +134,10 @@ private:
             // Index 0: Sequential (FCFS/arrival order)
             boost::multi_index::sequenced<>,
 
-            // Index 1: Ordered by runtime (ascending)
+            // Index 1: Ordered by run_time (ascending)
             boost::multi_index::ordered_non_unique<
-                boost::multi_index::tag<by_runtime>,
-                boost::multi_index::member<JobEntry, tdiff_t, &JobEntry::runtime_estimate>
+                boost::multi_index::tag<by_run_time>,
+                boost::multi_index::member<JobEntry, tdiff_t, &JobEntry::run_time_estimate>
             >,
 
             // Index 2: Ordered by nodes (ascending)
@@ -155,10 +155,10 @@ private:
         BlockInfo() : active_count(0) {}
 
         // Query min values directly from multi_index (O(1) - first element in sorted index)
-        tdiff_t get_min_runtime() const {
+        tdiff_t get_min_run_time() const {
             if (active_count == 0) return std::numeric_limits<tdiff_t>::max();
-            auto& idx = block.template get<by_runtime>();
-            return idx.empty() ? std::numeric_limits<tdiff_t>::max() : idx.begin()->runtime_estimate;
+            auto& idx = block.template get<by_run_time>();
+            return idx.empty() ? std::numeric_limits<tdiff_t>::max() : idx.begin()->run_time_estimate;
         }
 
         num_nodes_t get_min_nodes() const {
@@ -198,7 +198,7 @@ BlockWaitQueue<BlockSize>::BlockWaitQueue()
 template<size_t BlockSize>
 void BlockWaitQueue<BlockSize>::insert_job(job_no_t job_id,
                                             sim_time_t submit_time,
-                                            tdiff_t runtime_estimate,
+                                            tdiff_t run_time_estimate,
                                             num_nodes_t nodes_requested)
 {
     if (m_total_jobs == 0) {
@@ -211,7 +211,7 @@ void BlockWaitQueue<BlockSize>::insert_job(job_no_t job_id,
     }
 
     auto& current = m_blocks[m_current_block_idx];
-    current.block.push_back({job_id, submit_time, runtime_estimate, nodes_requested});
+    current.block.push_back({job_id, submit_time, run_time_estimate, nodes_requested});
     current.active_count++;
 
     m_total_jobs++;
@@ -261,8 +261,8 @@ std::optional<job_no_t> BlockWaitQueue<BlockSize>::find_and_remove_backfill_cand
 
         m_stats.blocks_checked++;
 
-        tdiff_t min_runtime = block_info.get_min_runtime();
-        if (current_time + min_runtime >= reservation_time) {
+        tdiff_t min_run_time = block_info.get_min_run_time();
+        if (current_time + min_run_time >= reservation_time) {
             m_stats.blocks_skipped_time++;
             continue;
         }
@@ -280,7 +280,7 @@ std::optional<job_no_t> BlockWaitQueue<BlockSize>::find_and_remove_backfill_cand
             if (it->submit_time > current_time) continue;
             if (it->nodes_requested > available_nodes) continue;
 
-            if (current_time + it->runtime_estimate < reservation_time) {
+            if (current_time + it->run_time_estimate < reservation_time) {
                 // Found a candidate! Remove it immediately (we have the iterator!)
                 job_no_t found_job = it->job_id;
                 seq.erase(it);  // Erase from all 3 indices (not 4!)

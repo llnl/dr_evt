@@ -7,19 +7,30 @@ It's structurally identical to the deque-based FCFSScheduler it replaced
 as default - same job entry layout, same lazy-mark-and-compact removal,
 same `pop_front()` head consumption, same indexed backfill scan - but
 backed by `boost::circular_buffer` instead of `std::deque`. **Measured
-14% faster than deque on average (10K jobs, 2K nodes).**
+~28% faster than deque on average (10K jobs, 500 nodes).**
 
 **Command:** `./simulator trace.csv` (default) or explicitly `./simulator trace.csv --queue_impl circular`
 
-## Performance Results (10K jobs, 2K nodes, average of 3 trials)
+## Performance Results (10K jobs, 500 nodes, average of 3 trials)
+
+500 nodes is the tightest node count that keeps every job in this trace
+schedulable (the trace's largest single job requests exactly 500 nodes),
+so this reflects real scheduling contention rather than a mostly-idle
+cluster - a materially different (and more realistic) scenario than an
+earlier 2,000-node version of this benchmark.
 
 | Implementation | Time (s) | vs Deque |
 |----------------|----------|----------|
-| Deque          | 0.723    | 1.00x (baseline) |
-| Block-16       | 0.814    | 1.13x (12.6% slower) |
-| **Circular**   | **0.619** | **0.86x (14.4% faster)** |
+| Deque          | 0.812    | 1.00x (baseline) |
+| Block-16       | 0.588    | 0.72x (27.6% faster) |
+| **Circular**   | **0.580** | **0.71x (28.5% faster)** |
 
-Circular is also 23.9% faster than block-16 on the same trace.
+At this tighter node count, circular and block-16 are close (circular
+only ~1% faster than block-16 here) - a smaller margin than the ~24%
+gap measured at 2,000 nodes. Run-to-run variance in this measurement is
+real and non-trivial (observed single trials ranging from -12% to -73%
+relative to deque across repeated runs); treat the specific percentages
+above as directionally representative, not precise.
 
 ✅ Produces byte-for-byte identical output to deque, in every one of the 34
 comprehensive differential test cases (`tests/test_fcfs_comprehensive.sh`),
@@ -119,7 +130,7 @@ std::unique_ptr<SchedulerBase> scheduler = create_scheduler(
     job_data,
     BackfillPolicy::EASY,
     PriorityPolicy::FCFS,
-    RuntimeEstimateMode::USE_LIMIT,
+    DurationEstimateMode::USE_LIMIT,
     QueueImplementation::CIRCULAR,
     128,   // block_size (unused for circular)
     0,     // circular_capacity: 0 = size of job_data

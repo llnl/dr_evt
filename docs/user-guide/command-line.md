@@ -95,8 +95,8 @@ Job priority/ordering policy.
 
 **Options:**
 - `fcfs` - First Come First Served (default)
-- `sjf` - Shortest Job First (by runtime estimate)
-- `ljf` - Longest Job First (by runtime estimate)
+- `sjf` - Shortest Job First (by run time estimate)
+- `ljf` - Longest Job First (by run time estimate)
 
 **Default:** `fcfs`
 
@@ -194,18 +194,18 @@ What to do if an insert would exceed `--circular_capacity`. Only used when
     --circular_capacity 500 --circular_overflow abort
 ```
 
-### `-r, --runtime_mode MODE`
-How to estimate job runtimes for scheduling decisions.
+### `-r, --duration_mode MODE`
+How to estimate job run times for scheduling decisions.
 
 **Options:**
 - `limit` - Use job's time_limit field (default)
-- `actual` - Use actual runtime (omniscient scheduler, for analysis)
+- `actual` - Use actual run time (omniscient scheduler, for analysis)
 
 **Default:** `limit`
 
 **Example:**
 ```bash
-./build/simulator traces/jobs.csv --runtime_mode actual
+./build/simulator traces/jobs.csv --duration_mode actual
 ```
 
 ## Trace Format Options
@@ -254,23 +254,26 @@ Timezone for ISO timestamp output.
 
 ## Simulation Mode Options
 
-### `-d, --duration_mode MODE`
-How to determine job execution durations in simulation mode.
+### `-d, --run_time_mode MODE`
+How to determine the job's actual, observed execution length in simulation mode.
 
 **Options:**
 - `exact` - Jobs run exactly their time_limit (default)
-- `column` - Use `duration` column from input trace
+- `column` - Use the job's real run time from the input trace (accepted
+  column names: `actual_run_time`, `duration`, `actual_duration`,
+  `run_time` - the trace can use any one of these without needing its
+  header edited)
 - `distribution` - Sample from statistical distribution
 
 **Default:** `exact`
 
 **Example:**
 ```bash
-./build/simulator traces/jobs.csv --duration_mode distribution
+./build/simulator traces/jobs.csv --run_time_mode distribution
 ```
 
-### `-D, --duration_distribution TYPE`
-Statistical distribution for duration sampling (when `--duration_mode distribution`).
+### `-D, --run_time_distribution TYPE`
+Statistical distribution for run time sampling (when `--run_time_mode distribution`).
 
 **Options:**
 - `normal` - Normal (Gaussian) distribution (default)
@@ -282,12 +285,12 @@ Statistical distribution for duration sampling (when `--duration_mode distributi
 **Example:**
 ```bash
 ./build/simulator traces/jobs.csv \
-    --duration_mode distribution \
-    --duration_distribution lognormal
+    --run_time_mode distribution \
+    --run_time_distribution lognormal
 ```
 
-### `-S, --duration_scale FACTOR`
-Scale factor for job durations.
+### `-S, --run_time_scale FACTOR`
+Scale factor for job run times.
 
 **Range:** > 0.0
 
@@ -296,12 +299,12 @@ Scale factor for job durations.
 **Example:** Jobs run 80% of their time_limit on average:
 ```bash
 ./build/simulator traces/jobs.csv \
-    --duration_mode distribution \
-    --duration_scale 0.8
+    --run_time_mode distribution \
+    --run_time_scale 0.8
 ```
 
-### `-V, --duration_stddev FACTOR`
-Standard deviation for duration distribution.
+### `-V, --run_time_stddev FACTOR`
+Standard deviation for run time distribution.
 
 **Range:** >= 0.0
 
@@ -310,9 +313,9 @@ Standard deviation for duration distribution.
 **Example:** 10% standard deviation:
 ```bash
 ./build/simulator traces/jobs.csv \
-    --duration_mode distribution \
-    --duration_scale 0.9 \
-    --duration_stddev 0.1
+    --run_time_mode distribution \
+    --run_time_scale 0.9 \
+    --run_time_stddev 0.1
 ```
 
 ## Limit Options
@@ -402,7 +405,7 @@ Display help message with all options.
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --duration_mode exact \
+    --run_time_mode exact \
     --outfile output.csv
 ```
 
@@ -421,23 +424,24 @@ Display help message with all options.
     --trace_format lassen \
     --timestamp_format iso \
     --timezone America/Los_Angeles \
-    --runtime_mode actual \
+    --duration_mode actual \
     --outfile simulation_results.csv \
     --verbose
 ```
 
 ### Replay Mode (Reproduce Historical Behavior)
 ```bash
-# runtime_mode=actual + duration_mode=column together reproduce exactly
-# what happened on the real system: actual runtimes drive both the
-# scheduler's decisions and how long each job actually takes.
+# duration_mode=actual + run_time_mode=column together reproduce exactly
+# what happened on the real system: the job's real, observed run time
+# drives both the scheduler's decisions and how long each job actually
+# takes.
 ./build/simulator production_trace.csv \
     --total_nodes 2048 \
     --trace_format lassen \
     --timestamp_format iso \
     --timezone America/Los_Angeles \
-    --runtime_mode actual \
-    --duration_mode column \
+    --duration_mode actual \
+    --run_time_mode column \
     --backfill_policy easy \
     --priority_policy fcfs \
     --outfile replay_results.csv
@@ -462,13 +466,13 @@ Display help message with all options.
     --outfile results.csv
 ```
 
-### Distribution-Based Duration Simulation
+### Distribution-Based Run Time Simulation
 ```bash
 ./build/simulator input.csv \
-    --duration_mode distribution \
-    --duration_distribution lognormal \
-    --duration_scale 0.85 \
-    --duration_stddev 0.15 \
+    --run_time_mode distribution \
+    --run_time_distribution lognormal \
+    --run_time_scale 0.85 \
+    --run_time_stddev 0.15 \
     --seed 42 \
     --outfile simulated.csv
 ```

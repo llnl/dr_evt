@@ -106,9 +106,15 @@ if __name__ == '__main__':
     generate_job_trace(num_jobs, total_nodes, output)
 
     print(f"\nTo run DR_EVT simulation:")
+    # This suggested command doesn't pass --duration_mode, so it stays
+    # at Sim_Params' own default, "limit". That matters because
+    # duration_mode="actual" would make the scheduler ignore
+    # --run_time_mode entirely and just use the trace's own real run
+    # time - "limit" is what makes --run_time_mode exact below actually
+    # get used.
     print(f"  ./build/simulator {output} \\")
     print(f"    --total_nodes {total_nodes} \\")
     print(f"    --trace_format simple \\")
     print(f"    --timestamp_format epoch \\")
-    print(f"    --duration_mode exact \\")
+    print(f"    --run_time_mode exact \\")
     print(f"    --outfile sim_{num_jobs}jobs_output.csv")

@@ -101,8 +101,8 @@ void ScheduleWindows::remove_reservation(job_no_t job_idx)
     num_nodes_t nodes = job.get_num_nodes();
 
     // For removal, use actual walltime to determine the backfill space
-    tdiff_t actual_runtime = job.get_exec_time();
-    sim_time_t end_time = start_time + actual_runtime;
+    tdiff_t actual_run_time = job.get_actual_run_time();
+    sim_time_t end_time = start_time + actual_run_time;
 
     m_reserved_jobs.erase(it);
 
@@ -124,8 +124,8 @@ void ScheduleWindows::trim(sim_time_t current_time)
         job_no_t job_idx = pair.first;
         sim_time_t job_start = pair.second;
         const auto& job = (*m_job_data_ptr)[job_idx];
-        tdiff_t runtime = job.get_exec_time();
-        if (job_start + runtime < current_time) {
+        tdiff_t run_time = job.get_actual_run_time();
+        if (job_start + run_time < current_time) {
             to_remove.push_back(job_idx);
         }
     }

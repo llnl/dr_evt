@@ -99,20 +99,20 @@ Jobs finishing before their time_limit.
 
 - **25_early_completion_basic**: Job finishes early, FCFS head starts immediately
 - **26_early_completion_cascading**: Multiple early completions trigger starts
-- **27_early_vs_late_completion**: Mix of early and full-runtime jobs
+- **27_early_vs_late_completion**: Mix of early and full-run-time jobs
 
 ## File Format
 
 ### Input Trace (`.csv`)
 ```csv
-job_submit_time,num_nodes,exit_status,queue,time_limit[,actual_runtime]
+job_submit_time,num_nodes,exit_status,queue,time_limit[,actual_run_time]
 0,70,0,pbatch,200
 10,50,0,pbatch,300
 20,20,0,pbatch,50
 ```
 
-- `actual_runtime` is optional (defaults to `time_limit` if missing)
-- For early completion tests, `actual_runtime < time_limit`
+- `actual_run_time` is optional (defaults to `time_limit` if missing)
+- For early completion tests, `actual_run_time < time_limit`
 
 ### Expected Output (`.expected_output.csv`)
 ```csv

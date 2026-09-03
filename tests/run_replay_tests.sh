@@ -52,11 +52,16 @@ for test_base in "${REPLAY_TESTS[@]}"; do
     sim_job_output="/tmp/replay_sim_${test_base}_jobs.csv"
     sim_resource_output="/tmp/replay_sim_${test_base}_resources.csv"
 
+    # --duration_mode isn't passed in either step below, so it stays at
+    # its default, "limit". That matters because duration_mode="actual"
+    # would make the scheduler ignore --run_time_mode entirely and just
+    # use the trace's own real run time - "limit" is what makes
+    # --run_time_mode exact actually get used in both steps.
     ./build/simulator "$input_trace" \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --duration_mode exact \
+        --run_time_mode exact \
         --outfile "$sim_job_output" \
         --resource_trace "$sim_resource_output" \
         > /dev/null 2>&1
@@ -75,7 +80,7 @@ for test_base in "${REPLAY_TESTS[@]}"; do
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --duration_mode exact \
+        --run_time_mode exact \
         --outfile "$replay_job_output" \
         --resource_trace "$replay_resource_output" \
         > /dev/null 2>&1

@@ -37,8 +37,8 @@ sim_time_t SchedulerBase::calculate_fcfs_reservation(
 
     for (const auto& [job_idx, start_time] : running_jobs) {
         const auto& job = (*m_job_data_ptr)[job_idx];
-        tdiff_t runtime = get_runtime_estimate(job_idx);
-        sim_time_t end_time = start_time + runtime;
+        tdiff_t run_time = get_duration_estimate(job_idx);
+        sim_time_t end_time = start_time + run_time;
         num_nodes_t nodes = job.get_num_nodes();
 
         if (end_time > current_time) {
@@ -79,7 +79,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     const std::vector<Job_Record>& job_data,
     BackfillPolicy backfill_policy,
     PriorityPolicy priority_policy,
-    RuntimeEstimateMode runtime_mode,
+    DurationEstimateMode duration_mode,
     QueueImplementation queue_impl,
     size_t block_size,
     size_t circular_capacity,
@@ -113,19 +113,19 @@ std::unique_ptr<SchedulerBase> create_scheduler(
                 using FactoryFunc = std::function<std::unique_ptr<SchedulerBase>()>;
                 static const std::unordered_map<size_t, FactoryFunc> factories = {
                     {2, [&]() { return std::make_unique<BlockQueueFCFSScheduler<4>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                     {3, [&]() { return std::make_unique<BlockQueueFCFSScheduler<8>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                     {4, [&]() { return std::make_unique<BlockQueueFCFSScheduler<16>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                     {5, [&]() { return std::make_unique<BlockQueueFCFSScheduler<32>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                     {6, [&]() { return std::make_unique<BlockQueueFCFSScheduler<64>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                     {7, [&]() { return std::make_unique<BlockQueueFCFSScheduler<128>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                     {8, [&]() { return std::make_unique<BlockQueueFCFSScheduler<256>>(
-                        total_nodes, job_data, backfill_policy, runtime_mode); }},
+                        total_nodes, job_data, backfill_policy, duration_mode); }},
                 };
 
                 auto it = factories.find(log2_size);
@@ -138,15 +138,23 @@ std::unique_ptr<SchedulerBase> create_scheduler(
                 return it->second();
             } else if (queue_impl == QueueImplementation::MULTIMAP) {
                 return std::make_unique<FCFSAltScheduler>(
-                    total_nodes, job_data, backfill_policy, runtime_mode);
+                    total_nodes, job_data, backfill_policy, duration_mode);
             } else if (queue_impl == QueueImplementation::DEQUE) {
                 return std::make_unique<FCFSScheduler>(
-                    total_nodes, job_data, backfill_policy, runtime_mode);
-            } else {
-                // circular (default)
+                    total_nodes, job_data, backfill_policy, duration_mode);
+            } else if (queue_impl == QueueImplementation::CIRCULAR) {
                 return std::make_unique<CircularBufferFCFSScheduler>(
-                    total_nodes, job_data, backfill_policy, runtime_mode,
+                    total_nodes, job_data, backfill_policy, duration_mode,
                     circular_capacity, circular_overflow);
+            } else {
+                // Defensive: QueueImplementation is a 4-value enum and every
+                // value is explicitly handled above - this is only reachable
+                // if the enum is extended in the future without updating this
+                // factory. Throw rather than silently defaulting to any one
+                // implementation, so a missed case is caught immediately
+                // instead of silently picking the wrong scheduler.
+                throw std::runtime_error(
+                    "create_scheduler: unhandled QueueImplementation value");
             }
 
         case PriorityPolicy::FCFS_ALT:
@@ -157,7 +165,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
                          << "' not supported for FCFS_ALT, using multimap\n";
             }
             return std::make_unique<FCFSAltScheduler>(
-                total_nodes, job_data, backfill_policy, runtime_mode);
+                total_nodes, job_data, backfill_policy, duration_mode);
 
         case PriorityPolicy::SJF:
             // SJF only uses multimap (already efficient)
@@ -167,7 +175,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
                          << "' not supported for SJF, using default multimap\n";
             }
             return std::make_unique<SJFScheduler>(
-                total_nodes, job_data, backfill_policy, runtime_mode);
+                total_nodes, job_data, backfill_policy, duration_mode);
 
         case PriorityPolicy::LJF:
             // LJF only uses multimap (already efficient)
@@ -177,12 +185,12 @@ std::unique_ptr<SchedulerBase> create_scheduler(
                          << "' not supported for LJF, using default multimap\n";
             }
             return std::make_unique<LJFScheduler>(
-                total_nodes, job_data, backfill_policy, runtime_mode);
+                total_nodes, job_data, backfill_policy, duration_mode);
 
         default:
             // Default to FCFS with deque
             return std::make_unique<FCFSScheduler>(
-                total_nodes, job_data, backfill_policy, runtime_mode);
+                total_nodes, job_data, backfill_policy, duration_mode);
     }
 }
 

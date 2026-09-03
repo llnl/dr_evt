@@ -63,7 +63,7 @@ void run_mpi_streaming(const std::string& trace_file, int total_nodes,
     params.m_total_nodes = total_nodes;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_duration_mode = DurationMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.m_seed = 42;
@@ -146,7 +146,7 @@ void run_batch_reference(const std::string& trace_file, int total_nodes) {
     params.m_total_nodes = total_nodes;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_duration_mode = DurationMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.m_seed = 42;

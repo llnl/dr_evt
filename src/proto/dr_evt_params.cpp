@@ -80,18 +80,19 @@ static void set_sim_options(
         sp.m_priority_policy = PriorityPolicy::FCFS;
     }
 
-    // Runtime estimate mode (default: USE_LIMIT)
-    if (!cfg.runtime_mode().empty()) {
-        std::string mode = cfg.runtime_mode();
+    // Duration mode - the scheduler's own estimate of job length,
+    // used for reservation/backfill planning (default: USE_LIMIT)
+    if (!cfg.duration_mode().empty()) {
+        std::string mode = cfg.duration_mode();
         if (mode == "limit") {
-            sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
+            sp.m_duration_mode = DurationEstimateMode::USE_LIMIT;
         } else if (mode == "actual") {
-            sp.m_runtime_mode = RuntimeEstimateMode::USE_ACTUAL;
+            sp.m_duration_mode = DurationEstimateMode::USE_ACTUAL;
         } else {
-            throw std::runtime_error("Unknown runtime_mode in protobuf: " + mode);
+            throw std::runtime_error("Unknown duration_mode in protobuf: " + mode);
         }
     } else {
-        sp.m_runtime_mode = RuntimeEstimateMode::USE_LIMIT;
+        sp.m_duration_mode = DurationEstimateMode::USE_LIMIT;
     }
 
     // Trace format (options: "simple" or "lassen", default: "lassen")
@@ -126,54 +127,55 @@ static void set_sim_options(
         sp.m_timezone = "America/Los_Angeles";
     }
 
-    // Duration mode (default: EXACT)
-    if (!cfg.duration_mode().empty()) {
-        std::string mode = cfg.duration_mode();
+    // Run time mode - how the job's actual, observed execution length
+    // is determined (default: EXACT)
+    if (!cfg.run_time_mode().empty()) {
+        std::string mode = cfg.run_time_mode();
         if (mode == "column") {
-            sp.m_duration_mode = DurationMode::FROM_COLUMN;
+            sp.m_run_time_mode = RunTimeMode::FROM_COLUMN;
         } else if (mode == "exact") {
-            sp.m_duration_mode = DurationMode::EXACT;
+            sp.m_run_time_mode = RunTimeMode::EXACT;
         } else if (mode == "distribution") {
-            sp.m_duration_mode = DurationMode::DISTRIBUTION;
+            sp.m_run_time_mode = RunTimeMode::DISTRIBUTION;
         } else {
-            throw std::runtime_error("Unknown duration_mode in protobuf: " + mode);
+            throw std::runtime_error("Unknown run_time_mode in protobuf: " + mode);
         }
     } else {
-        sp.m_duration_mode = DurationMode::EXACT;
+        sp.m_run_time_mode = RunTimeMode::EXACT;
     }
 
-    // Duration distribution (default: NORMAL)
-    if (!cfg.duration_distribution().empty()) {
-        std::string dist = cfg.duration_distribution();
+    // Run time distribution (default: NORMAL)
+    if (!cfg.run_time_distribution().empty()) {
+        std::string dist = cfg.run_time_distribution();
         if (dist == "normal") {
-            sp.m_duration_distribution = DistributionType::NORMAL;
+            sp.m_run_time_distribution = DistributionType::NORMAL;
         } else if (dist == "lognormal") {
-            sp.m_duration_distribution = DistributionType::LOGNORMAL;
+            sp.m_run_time_distribution = DistributionType::LOGNORMAL;
         } else if (dist == "uniform") {
-            sp.m_duration_distribution = DistributionType::UNIFORM;
+            sp.m_run_time_distribution = DistributionType::UNIFORM;
         } else {
-            throw std::runtime_error("Unknown duration_distribution in protobuf: " + dist);
+            throw std::runtime_error("Unknown run_time_distribution in protobuf: " + dist);
         }
     } else {
-        sp.m_duration_distribution = DistributionType::NORMAL;
+        sp.m_run_time_distribution = DistributionType::NORMAL;
     }
 
-    // Duration scale (default: 1.0 = jobs run 100% of time_limit)
+    // Run time scale (default: 1.0 = jobs run 100% of time_limit)
     // 0.0 doesn't make sense (zero duration), treat as "use default"
-    if (cfg.duration_scale() > 0.0) {
-        sp.m_duration_scale = cfg.duration_scale();
+    if (cfg.run_time_scale() > 0.0) {
+        sp.m_run_time_scale = cfg.run_time_scale();
     } else {
-        sp.m_duration_scale = 1.0;
+        sp.m_run_time_scale = 1.0;
     }
 
-    // Duration stddev (default: 0.0 = no variation)
+    // Run time stddev (default: 0.0 = no variation)
     // Negative values don't make sense, treat as "use default"
-    if (cfg.duration_stddev() >= 0.0) {
-        sp.m_duration_stddev = cfg.duration_stddev();
+    if (cfg.run_time_stddev() >= 0.0) {
+        sp.m_run_time_stddev = cfg.run_time_stddev();
     } else {
-        std::cerr << "Warning: Negative duration_stddev in protobuf: " << cfg.duration_stddev()
+        std::cerr << "Warning: Negative run_time_stddev in protobuf: " << cfg.run_time_stddev()
                  << " (using default: 0.0)" << std::endl;
-        sp.m_duration_stddev = 0.0;
+        sp.m_run_time_stddev = 0.0;
     }
 
     // Queue implementation (default: CIRCULAR)

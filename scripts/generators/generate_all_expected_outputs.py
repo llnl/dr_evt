@@ -71,13 +71,13 @@ def load_trace(filename):
     with open(filename, 'r') as f:
         reader = csv.DictReader(f)
         for idx, row in enumerate(reader):
-            actual_runtime = float(row.get('actual_duration', row['time_limit']))
+            actual_run_time = float(row.get('actual_run_time', row['time_limit']))
             jobs.append(Job(
                 idx=idx,
                 submit_time=float(row['job_submit_time']),
                 nodes=int(row['num_nodes']),
                 duration=float(row['time_limit']),
-                actual_runtime=actual_runtime
+                actual_run_time=actual_run_time
             ))
     return jobs
 

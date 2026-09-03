@@ -5,7 +5,7 @@
 DR_EVT (Discrete Resource Event Modeling) is a high-performance HPC job scheduler simulator implementing SLURM-style backfilling algorithms. Use it to:
 - Evaluate scheduling policies (EASY vs Conservative backfill)
 - Test priority policies (FCFS, SJF, LJF)
-- Compare runtime estimation strategies
+- Compare run time estimation strategies
 - Analyze HPC workload traces
 
 ## Quick Start
@@ -17,7 +17,7 @@ DR_EVT (Discrete Resource Event Modeling) is a high-performance HPC job schedule
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --runtime_mode actual
+  --duration_mode actual
 ```
 
 ### Example Output
@@ -177,7 +177,7 @@ Jobs processed in submission order.
 
 #### SJF (Shortest-Job-First)
 
-Prioritize jobs with shortest runtime.
+Prioritize jobs with shortest run time.
 
 **Usage**: `--priority_policy sjf`
 
@@ -185,11 +185,11 @@ Prioritize jobs with shortest runtime.
 - Maximizes throughput
 - Minimizes average wait time
 - Can starve long jobs
-- Requires runtime estimates
+- Requires run time estimates
 
 #### LJF (Longest-Job-First)
 
-Prioritize jobs with longest runtime.
+Prioritize jobs with longest run time.
 
 **Usage**: `--priority_policy ljf`
 
@@ -198,31 +198,31 @@ Prioritize jobs with longest runtime.
 - Can increase average wait time
 - Research/comparison purposes
 
-### Runtime Estimation
+### Scheduler's Run Time Estimate (Duration Mode)
 
-#### USE_ACTUAL (Oracle Mode) - Default
+#### USE_LIMIT (Realistic Mode) - Default
 
-Scheduler knows exact job runtime (from trace).
+Scheduler uses user-provided time limits for planning.
 
-**Usage**: `--runtime_mode actual`
-
-**Characteristics**:
-- Perfect information
-- Best possible scheduling
-- Unrealistic but useful for upper bound
-- Use for comparison baseline
-
-#### USE_LIMIT (Realistic Mode)
-
-Scheduler uses user-provided time limits.
-
-**Usage**: `--runtime_mode limit`
+**Usage**: `--duration_mode limit`
 
 **Characteristics**:
 - Realistic (users provide limits)
 - Limits often overestimate
 - More resource waste
 - Use for realistic simulations
+
+#### USE_ACTUAL (Omniscient/Oracle Mode)
+
+Scheduler plans using the job's real, observed run time (from trace).
+
+**Usage**: `--duration_mode actual`
+
+**Characteristics**:
+- Perfect information
+- Best possible scheduling
+- Unrealistic but useful for upper bound
+- Use for comparison baseline
 
 **Note**: Requires `time_limit` column in trace
 
@@ -255,7 +255,7 @@ Scheduler uses user-provided time limits.
 ```bash
 -b, --backfill_policy POLICY   # Backfill: easy|conservative (default: easy)
 -p, --priority_policy POLICY   # Priority: fcfs|sjf|ljf (default: fcfs)
--r, --runtime_mode MODE        # Runtime: actual|limit (default: actual)
+-r, --duration_mode MODE        # Scheduler's planning estimate: limit|actual (default: limit)
 -q, --queue_impl IMPL          # FCFS wait queue: circular|deque|multimap|block (default: circular)
 -A, --circular_capacity SIZE   # Initial capacity for queue_impl=circular (default: 0 = size of trace)
 -G, --circular_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
@@ -280,7 +280,7 @@ Test with synthetic trace:
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --runtime_mode actual
+  --duration_mode actual
 ```
 
 ### Example 2: Real HPC Trace
@@ -294,7 +294,7 @@ Simulate Lassen trace:
   --total_nodes 795 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --runtime_mode limit
+  --duration_mode limit
 ```
 
 ### Example 3: Policy Comparison
@@ -322,15 +322,15 @@ Compare FCFS vs SJF:
 ./simulator trace.csv --priority_policy sjf -o results_sjf.txt
 ```
 
-### Example 5: Runtime Estimation Impact
+### Example 5: Run Time Estimation Impact
 
 Compare oracle vs realistic:
 ```bash
 # Oracle (perfect information)
-./simulator trace.csv --runtime_mode actual -o results_oracle.txt
+./simulator trace.csv --duration_mode actual -o results_oracle.txt
 
 # Realistic (user time limits)
-./simulator trace.csv --runtime_mode limit -o results_realistic.txt
+./simulator trace.csv --duration_mode limit -o results_realistic.txt
 ```
 
 ## Understanding Output

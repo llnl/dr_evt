@@ -17,8 +17,8 @@ scheduling and resource management using a set of heterogenous clusters.
 - **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
 - **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
 - **Block Queue Wait Queue**: Optional block-based queue with metadata filtering (7 block sizes: 4-256)
-- **Replay and Simulation Modes**: Replay historical traces or simulate with runtime distributions
-- **Early Completion Support**: Jobs can finish before time_limit (actual_runtime < time_limit)
+- **Replay and Simulation Modes**: Replay historical traces or simulate with run time distributions
+- **Early Completion Support**: Jobs can finish before time_limit (actual_run_time < time_limit)
 
 ### APIs & Integration
 - **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
@@ -173,7 +173,7 @@ simulation_params {
   # Scheduling policies
   backfill_policy: "easy"     # "easy", "conservative", or "none"
   priority_policy: "fcfs"     # "fcfs", "sjf", or "ljf"
-  runtime_mode: "limit"       # "limit" or "actual"
+  duration_mode: "limit"       # "limit" or "actual"
 
   # Trace format
   trace_format: "simple"      # "simple" or "lassen"
@@ -182,9 +182,9 @@ simulation_params {
   # Simulation limits
   max_jobs: 10000
 
-  # Duration simulation (optional)
-  duration_mode: "exact"      # "column", "exact", or "distribution"
-  duration_scale: 1.0
+  # Run time simulation (optional)
+  run_time_mode: "exact"      # "column", "exact", or "distribution"
+  run_time_scale: 1.0
 
   # Output options
   verbose: false
@@ -212,12 +212,12 @@ Run with configuration file:
 
 DR_EVT supports two modes for processing job traces:
 
-#### Replay Mode (`--runtime_mode actual`)
+#### Replay Mode (`--duration_mode actual`)
 
 **Purpose:** Reproduce what actually happened on a real HPC system
 
 **Input:** Historical trace with actual job durations
-- Reads `actual_runtime` from trace file
+- Reads `actual_run_time` from trace file
 - Or uses recorded start/end times
 
 **Output:** Schedule matching the original execution
@@ -232,58 +232,59 @@ DR_EVT supports two modes for processing job traces:
 
 **Example:**
 ```bash
-# Replay with actual runtimes from trace
+# Replay with actual run times from trace
 ./simulator trace.csv \
-    --runtime_mode actual \
-    --duration_mode column
+    --duration_mode actual \
+    --run_time_mode column
 ```
 
-#### Simulation Mode (`--runtime_mode limit`, default)
+#### Simulation Mode (`--duration_mode limit`, default)
 
 **Purpose:** Predict what WOULD happen under different conditions
 
 **Input:** Trace with user-requested time limits
 - Uses `time_limit` column (what users requested)
-- Actual runtime not required
+- Actual run time not required
 
 **Output:** Predicted schedule based on scheduler decisions
-- Jobs run for simulated durations (controlled by `--duration_mode`)
+- Jobs run for simulated durations (controlled by `--run_time_mode`)
 
-**Duration modes:**
+**Run time modes:**
 - `exact` (default): Jobs run exactly `time_limit` (perfect estimates)
 - `distribution`: Sample from statistical distribution (realistic variation)
-- `column`: Read `actual_duration` column (if available)
+- `column`: Read the job's real run time from the trace (accepted column
+  names: `actual_run_time`, `duration`, `actual_duration`, `run_time`)
 
 **Use cases:**
 - What-if analysis: "What if we changed the backfill policy?"
 - Test scheduler modifications before deployment
 - Capacity planning: "Can we handle 20% more jobs?"
-- Explore different runtime estimation strategies
+- Explore different run time estimation strategies
 
 **Examples:**
 ```bash
 # Simulate with perfect estimates (jobs run exactly time_limit)
 ./simulator trace.csv \
-    --runtime_mode limit \
-    --duration_mode exact
+    --duration_mode limit \
+    --run_time_mode exact
 
 # Simulate with realistic variation (80% of time_limit ± 10%)
 ./simulator trace.csv \
-    --runtime_mode limit \
-    --duration_mode distribution \
-    --duration_distribution normal \
-    --duration_scale 0.8 \
-    --duration_stddev 0.1
+    --duration_mode limit \
+    --run_time_mode distribution \
+    --run_time_distribution normal \
+    --run_time_scale 0.8 \
+    --run_time_stddev 0.1
 
 # Simulate but read actual durations from trace column
 ./simulator trace.csv \
-    --runtime_mode limit \
-    --duration_mode column
+    --duration_mode limit \
+    --run_time_mode column
 ```
 
 **Key difference:**
 - **Replay (`actual`)**: Uses actual job durations → reproduces history
-- **Simulation (`limit`)**: Uses scheduler's runtime estimates → predicts future
+- **Simulation (`limit`)**: Uses scheduler's run time estimates → predicts future
 
 **When to use which:**
 | Scenario | Mode | Why |

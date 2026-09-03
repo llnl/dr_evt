@@ -62,11 +62,17 @@ TRACE_NAME=$(basename "$TRACE_FILE" .csv)
 NUM_JOBS=$(wc -l < "$TRACE_FILE" | tr -d ' ')
 
 # Common simulation parameters
-TOTAL_NODES=2000
+TOTAL_NODES=500
 MAX_JOBS=50000
 TRACE_FORMAT="simple"
 TIMESTAMP_FORMAT="epoch"
-DURATION_MODE="exact"
+# duration_mode is deliberately left unset here, at Sim_Params' own
+# default ("limit"). This is what makes RUN_TIME_MODE below actually
+# meaningful: under duration_mode="actual" the scheduler ignores
+# run_time_mode entirely and uses the trace's own real run time
+# directly, which would make this benchmark's --queue_impl comparison
+# no longer sensitive to run_time_mode at all.
+RUN_TIME_MODE="exact"
 BACKFILL_POLICY="easy"
 
 echo "Parameters:"
@@ -94,7 +100,7 @@ START_TIME=$(date +%s%N)
     --max_jobs $MAX_JOBS \
     --trace_format $TRACE_FORMAT \
     --timestamp_format $TIMESTAMP_FORMAT \
-    --duration_mode $DURATION_MODE \
+    --run_time_mode $RUN_TIME_MODE \
     --backfill_policy $BACKFILL_POLICY \
     --outfile "$BASELINE_OUT" \
     --resource_trace "$BASELINE_RESOURCES" \
@@ -168,7 +174,7 @@ for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
         --max_jobs $MAX_JOBS \
         --trace_format $TRACE_FORMAT \
         --timestamp_format $TIMESTAMP_FORMAT \
-        --duration_mode $DURATION_MODE \
+        --run_time_mode $RUN_TIME_MODE \
         --backfill_policy $BACKFILL_POLICY \
         --outfile "$BLOCK_OUT" \
         --resource_trace "$BLOCK_RESOURCES" \
@@ -256,7 +262,7 @@ START_TIME=$(date +%s%N)
     --max_jobs $MAX_JOBS \
     --trace_format $TRACE_FORMAT \
     --timestamp_format $TIMESTAMP_FORMAT \
-    --duration_mode $DURATION_MODE \
+    --run_time_mode $RUN_TIME_MODE \
     --backfill_policy $BACKFILL_POLICY \
     --outfile "$CIRCULAR_OUT" \
     --resource_trace "$CIRCULAR_RESOURCES" \
@@ -416,7 +422,7 @@ if [[ "$BEST_OVERALL_NAME" == "Deque" ]]; then
     DEQUE_ADVANTAGE=$(printf "%.0f" $(echo "scale=4; ($BEST_BLOCK_TIME / $BASELINE_TIME - 1) * 100" | bc))
     echo "  Deque is ${DEQUE_ADVANTAGE}% faster than the best block size"
     echo ""
-    echo "RECOMMENDATION: Use --queue_impl deque"
+    echo "RECOMMENDATION: Use --queue_impl deque for this workload (circular is still the configured default)"
 else
     ADVANTAGE=$(printf "%.0f" $(echo "scale=4; (1 - $BEST_OVERALL_TIME / $BASELINE_TIME) * 100" | bc))
     echo "  ${ADVANTAGE}% faster than deque"
@@ -425,7 +431,7 @@ else
         WINNING_BLOCK_SIZE="${BEST_OVERALL_NAME#Block-}"
         echo "RECOMMENDATION: Use --queue_impl block --block_size $WINNING_BLOCK_SIZE for this workload"
     else
-        echo "RECOMMENDATION: circular is the configured default (no flag needed) - confirmed best for this workload"
+        echo "RECOMMENDATION: circular is already the configured default (no flag needed) - confirmed best for this workload"
     fi
 fi
 echo ""

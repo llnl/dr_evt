@@ -72,7 +72,7 @@ Job_Stat_Texec<N>::Job_Stat_Texec()
 template <std::size_t N>
 void Job_Stat_Texec<N>::add_stat(const Job_Records& j)
 {
-    const auto t_exec = j.get_exec_time();
+    const auto t_exec = j.get_actual_run_time();
     const auto t_limit = j.get_limit_time()
     const auto n_nodes = j.get_num_nodes();
 

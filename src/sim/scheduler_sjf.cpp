@@ -13,19 +13,19 @@ namespace dr_evt {
 SJFScheduler::SJFScheduler(num_nodes_t total_nodes,
                            const std::vector<Job_Record>& job_data,
                            BackfillPolicy backfill_policy,
-                           RuntimeEstimateMode runtime_mode)
-    : SchedulerBase(total_nodes, job_data, backfill_policy, runtime_mode),
+                           DurationEstimateMode duration_mode)
+    : SchedulerBase(total_nodes, job_data, backfill_policy, duration_mode),
       m_current_tracked_time(0.0)
 {
 }
 
 void SJFScheduler::insert_job(job_no_t job_id,
                                sim_time_t submit_time,
-                               tdiff_t runtime,
+                               tdiff_t run_time,
                                num_nodes_t nodes)
 {
-    JobEntry entry{job_id, submit_time, runtime, nodes};
-    m_wait_queue.insert({runtime, entry});
+    JobEntry entry{job_id, submit_time, run_time, nodes};
+    m_wait_queue.insert({run_time, entry});
 
     // If already eligible, add to eligible set
     if (submit_time <= m_current_tracked_time) {
@@ -125,7 +125,7 @@ std::vector<job_no_t> SJFScheduler::schedule(
 
         // Check backfill constraints
         bool fits_nodes = (entry.nodes <= free_nodes);
-        bool fits_window = (entry.runtime <= backfill_window);
+        bool fits_window = (entry.run_time <= backfill_window);
 
         if (m_backfill_policy == BackfillPolicy::EASY) {
             // EASY: must fit both nodes AND window

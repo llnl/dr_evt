@@ -48,7 +48,7 @@ public:
     BlockQueueFCFSScheduler(num_nodes_t total_nodes,
                             const std::vector<Job_Record>& job_data,
                             BackfillPolicy bf_policy,
-                            RuntimeEstimateMode rt_mode)
+                            DurationEstimateMode rt_mode)
         : SchedulerBase(total_nodes, job_data, bf_policy, rt_mode)
         , m_wait_queue()
         , m_eligible_end_idx(0)
@@ -57,7 +57,7 @@ public:
     {}
 
     void insert_job(job_no_t job_id, sim_time_t submit_time,
-                   tdiff_t runtime_estimate, num_nodes_t nodes_requested) override;
+                   tdiff_t run_time_estimate, num_nodes_t nodes_requested) override;
 
     std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,

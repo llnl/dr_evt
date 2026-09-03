@@ -45,7 +45,7 @@ Simulation::Simulation(const Sim_Params& params)
         m_trace.data(),
         params.m_backfill_policy,
         params.m_priority_policy,
-        params.m_runtime_mode,
+        params.m_duration_mode,
         params.m_queue_impl,
         params.m_block_size,
         params.m_circular_capacity,
@@ -135,11 +135,11 @@ void Simulation::print_stats(std::ostream& os) const
             tdiff_t wait = job.get_wait_time();
             total_wait += wait;
 
-            tdiff_t turnaround = wait + job.get_exec_time();
+            tdiff_t turnaround = wait + job.get_actual_run_time();
             total_turnaround += turnaround;
 
             makespan = std::max(makespan,
-                convert_epoch<sim_time_t>(job.get_begin_time()) + job.get_exec_time());
+                convert_epoch<sim_time_t>(job.get_begin_time()) + job.get_actual_run_time());
         }
 
         // Unlike Current time/Makespan above, these are computed averages
@@ -198,7 +198,7 @@ num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
 
     // Determine actual durations (simulation mode only)
     if (m_trace.dcols().get_trace_mode() == TraceMode::SIMULATION) {
-        determine_job_durations();
+        determine_job_run_time();
     }
 
     m_current_time = 0.0;
@@ -208,35 +208,49 @@ num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
     return static_cast<num_jobs_t>(m_trace.data().size());
 }
 
-void Simulation::determine_job_durations()
+void Simulation::determine_job_run_time()
 {
     for (auto& job : m_trace.data()) {
-        tdiff_t duration;
+        // duration_mode=actual means "the scheduler has perfect knowledge of
+        // the real, historical run time" - the simulated execution should
+        // reflect what actually happened, not a run_time_mode-determined
+        // value (exact/column/distribution). This is exactly what
+        // RunTimeMode::FROM_COLUMN already does (read the trace's own
+        // actual_run_time as-is), so duration_mode=actual always behaves
+        // that way, regardless of what run_time_mode is separately set to.
+        // run_time_mode only applies in the duration_mode=limit case, where
+        // there is no "real" duration to fall back on - the simulator must
+        // itself decide how long each job actually takes.
+        if (m_params.m_duration_mode == DurationEstimateMode::USE_ACTUAL) {
+            continue;  // job.m_actual_run_time already holds the trace's own value
+        }
 
-        switch (m_params.m_duration_mode) {
-            case DurationMode::FROM_COLUMN:
-                duration = job.get_actual_duration();
+        tdiff_t run_time;
+
+        switch (m_params.m_run_time_mode) {
+            case RunTimeMode::FROM_COLUMN:
+                run_time = job.get_actual_run_time();
                 break;
 
-            case DurationMode::EXACT:
-                duration = job.get_limit_time();
-                job.set_actual_duration(duration);
+            case RunTimeMode::EXACT:
+                run_time = job.get_limit_time();
+                job.set_actual_run_time(run_time);
                 break;
 
-            case DurationMode::DISTRIBUTION:
-                duration = sample_duration(
+            case RunTimeMode::DISTRIBUTION:
+                run_time = sample_run_time(
                     job.get_limit_time(),
-                    m_params.m_duration_distribution,
-                    m_params.m_duration_scale,
-                    m_params.m_duration_stddev
+                    m_params.m_run_time_distribution,
+                    m_params.m_run_time_scale,
+                    m_params.m_run_time_stddev
                 );
-                job.set_actual_duration(duration);
+                job.set_actual_run_time(run_time);
                 break;
         }
     }
 }
 
-tdiff_t Simulation::sample_duration(
+tdiff_t Simulation::sample_run_time(
     tdiff_t time_limit,
     DistributionType dist,
     double scale,
@@ -251,21 +265,32 @@ tdiff_t Simulation::sample_duration(
             double mean = time_limit * scale;
             double sd = time_limit * stddev;
             std::normal_distribution<double> normal_dist(mean, sd);
-            double duration = normal_dist(m_rng);
-            return std::max(0.0, duration);
+            double run_time = normal_dist(m_rng);
+            // A real HPC scheduler kills a job at its stated time_limit -
+            // it can never actually run longer than that. Cap here so a
+            // wide-tailed sample can't silently let a job run past its own
+            // limit, which would diverge from real system behavior.
+            return std::min(time_limit, std::max(0.0, run_time));
         }
 
         case DistributionType::LOGNORMAL: {
             double mu = std::log(time_limit * scale);
             double sigma = stddev;
             std::lognormal_distribution<double> lognormal_dist(mu, sigma);
-            return lognormal_dist(m_rng);
+            // Always >= 0 by construction; still cap at time_limit for the
+            // same reason as NORMAL above - a real job cannot run past it.
+            return std::min(time_limit, lognormal_dist(m_rng));
         }
 
         case DistributionType::UNIFORM: {
-            double min_duration = time_limit * scale;
-            double max_duration = time_limit * (scale + stddev);
-            std::uniform_real_distribution<double> uniform_dist(min_duration, max_duration);
+            double min_run_time = time_limit * scale;
+            double max_run_time = time_limit * (scale + stddev);
+            std::uniform_real_distribution<double> uniform_dist(min_run_time, max_run_time);
+            // Not capped: unlike NORMAL/LOGNORMAL's unbounded-above tails,
+            // this distribution's upper bound is already an explicit,
+            // direct function of the caller's own scale/stddev choice -
+            // exceeding time_limit here only happens if the caller
+            // deliberately set scale + stddev > 1.0.
             return std::max(0.0, uniform_dist(m_rng));
         }
 
@@ -353,12 +378,12 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
 
     // Submit to scheduler (scheduler maintains internal wait queue)
     const auto& job = m_trace.data()[job_idx];
-    tdiff_t runtime_estimate = (m_params.m_runtime_mode == RuntimeEstimateMode::USE_ACTUAL)
-                               ? job.get_actual_duration()
+    tdiff_t run_time_estimate = (m_params.m_duration_mode == DurationEstimateMode::USE_ACTUAL)
+                               ? job.get_actual_run_time()
                                : job.get_limit_time();
     num_nodes_t nodes = job.get_num_nodes();
 
-    m_scheduler->insert_job(job_idx, submit_time, runtime_estimate, nodes);
+    m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);
 }
 
 void Simulation::advance_to(sim_time_t target_time)
@@ -582,15 +607,13 @@ Simulation::Statistics Simulation::get_statistics() const
     stats.total_nodes = m_params.m_total_nodes;
     stats.nodes_in_use = get_nodes_in_use();
     stats.nodes_available = stats.total_nodes - stats.nodes_in_use;
-    stats.utilization = (stats.total_nodes > 0) ?
-                       static_cast<double>(stats.nodes_in_use) / stats.total_nodes :
-                       0.0;
 
     // Calculate wait times and turnaround times
     tdiff_t total_wait = 0.0;
     tdiff_t total_turnaround = 0.0;
     sim_time_t max_completion = 0.0;
     num_jobs_t completed_count = 0;
+    tdiff_t total_node_seconds = 0.0;
 
     for (const auto& job : m_trace.data()) {
         // Only count jobs that actually completed. Job_Record::is_scheduled()
@@ -603,10 +626,11 @@ Simulation::Statistics Simulation::get_statistics() const
         // above (see the end-of-run() completion count).
         if (job.is_scheduled()) {
             tdiff_t wait = job.get_wait_time();
-            tdiff_t exec = job.get_exec_time();
+            tdiff_t exec = job.get_actual_run_time();
 
             total_wait += wait;
             total_turnaround += (wait + exec);
+            total_node_seconds += static_cast<tdiff_t>(job.get_num_nodes()) * exec;
 
             sim_time_t completion = convert_epoch<sim_time_t>(job.get_end_time());
             max_completion = std::max(max_completion, completion);
@@ -617,6 +641,12 @@ Simulation::Statistics Simulation::get_statistics() const
     stats.avg_wait_time = (completed_count > 0) ? total_wait / completed_count : 0.0;
     stats.avg_turnaround_time = (completed_count > 0) ? total_turnaround / completed_count : 0.0;
     stats.makespan = max_completion;
+
+    // Time-averaged over [0, makespan], not an instantaneous snapshot - see
+    // the field comment in sim.hpp for why.
+    stats.utilization = (stats.total_nodes > 0 && stats.makespan > 0) ?
+                       total_node_seconds / (static_cast<double>(stats.total_nodes) * stats.makespan) :
+                       0.0;
 
     return stats;
 }

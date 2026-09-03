@@ -220,9 +220,16 @@ class Simulation {
         num_jobs_t jobs_waiting;
         sim_time_t current_time;
         num_nodes_t total_nodes;
-        num_nodes_t nodes_in_use;
-        num_nodes_t nodes_available;
-        double utilization;  // nodes_in_use / total_nodes
+        num_nodes_t nodes_in_use;      // instantaneous snapshot at current_time
+        num_nodes_t nodes_available;   // instantaneous snapshot at current_time
+        double utilization;  // time-averaged over [0, makespan]: total
+                              // node-seconds consumed by completed jobs,
+                              // divided by (total_nodes * makespan) - NOT
+                              // an instantaneous snapshot, since callers
+                              // computing "overall" utilization after a
+                              // run typically do so once the cluster has
+                              // gone idle again, where an instantaneous
+                              // reading would always show 0
         tdiff_t avg_wait_time;
         tdiff_t avg_turnaround_time;
         sim_time_t makespan;
@@ -318,7 +325,7 @@ class Simulation {
      * Determine actual durations for all jobs (simulation mode only)
      * Called during initialization before simulation starts
      */
-    void determine_job_durations();
+    void determine_job_run_time();
 
     /**
      * Sample job duration from distribution
@@ -328,7 +335,7 @@ class Simulation {
      * @param stddev Standard deviation factor
      * @return Sampled duration
      */
-    tdiff_t sample_duration(tdiff_t time_limit,
+    tdiff_t sample_run_time(tdiff_t time_limit,
                             DistributionType dist,
                             double scale,
                             double stddev);

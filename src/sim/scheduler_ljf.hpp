@@ -17,7 +17,7 @@ namespace dr_evt {
 /**
  * Longest Job First (LJF) scheduler with iterator tracking
  *
- * Uses std::map with descending order (longest runtime first),
+ * Uses std::map with descending order (longest run_time first),
  * plus tracking of eligibility boundary to avoid rescanning.
  */
 class LJFScheduler : public SchedulerBase {
@@ -25,11 +25,11 @@ public:
     LJFScheduler(num_nodes_t total_nodes,
                  const std::vector<Job_Record>& job_data,
                  BackfillPolicy backfill_policy,
-                 RuntimeEstimateMode runtime_mode);
+                 DurationEstimateMode duration_mode);
 
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,
-                    tdiff_t runtime,
+                    tdiff_t run_time,
                     num_nodes_t nodes) override;
 
     std::vector<job_no_t> schedule(
@@ -73,7 +73,7 @@ private:
     struct JobEntry {
         job_no_t job_id;
         sim_time_t submit_time;
-        tdiff_t runtime;
+        tdiff_t run_time;
         num_nodes_t nodes;
         // No removed flag - see SJFScheduler for full reasoning.
         // schedule() erases scheduled entries from m_wait_queue
@@ -81,14 +81,14 @@ private:
     };
 
     // Comparator for descending order (longest first)
-    struct DescendingRuntime {
+    struct DescendingRunTime {
         bool operator()(tdiff_t a, tdiff_t b) const {
-            return a > b;  // Reverse: larger runtime comes first
+            return a > b;  // Reverse: larger run_time comes first
         }
     };
 
-    // Ordered by runtime (longest first), then by job_id for stability
-    std::multimap<tdiff_t, JobEntry, DescendingRuntime> m_wait_queue;
+    // Ordered by run_time (longest first), then by job_id for stability
+    std::multimap<tdiff_t, JobEntry, DescendingRunTime> m_wait_queue;
 
     // Track eligible jobs (submit_time <= current_time)
     std::set<job_no_t> m_eligible_jobs;
@@ -100,7 +100,7 @@ private:
     void update_eligible_jobs(sim_time_t current_time);
 
     // Find FCFS head (earliest submit_time among eligible jobs)
-    std::multimap<tdiff_t, JobEntry, DescendingRuntime>::iterator find_fcfs_head();
+    std::multimap<tdiff_t, JobEntry, DescendingRunTime>::iterator find_fcfs_head();
 };
 
 } // namespace dr_evt

@@ -174,7 +174,7 @@ std::vector<job_no_t> FCFSScheduler::schedule(
         // at the reservation time, the FCFS head must wait for that completion event
         // to be processed first, causing a delay. Therefore, backfill jobs must
         // complete BEFORE (not at) the reservation time.
-        if (current_time + job.runtime_estimate < m_fcfs_reservation_time) {
+        if (current_time + job.run_time_estimate < m_fcfs_reservation_time) {
             jobs_to_run.push_back(job.job_id);
             available_nodes -= job.nodes_requested;
             // Index already known here - set the flag directly instead of

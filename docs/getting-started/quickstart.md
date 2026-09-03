@@ -9,7 +9,7 @@ This branch (`feature/backfilling-scheduler`) adds a **SLURM-style backfilling s
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
 - **Priority Policies**: FCFS (First-Come-First-Served), SJF (Shortest-Job-First), LJF (Longest-Job-First)
-- **Runtime Modes**: Realistic (use time limits) or Oracle (perfect knowledge)
+- **Run Time Modes**: Realistic (use time limits) or Oracle (perfect knowledge)
 
 ## Build Instructions
 
@@ -52,7 +52,7 @@ All dependencies are automatically downloaded via CMake FetchContent:
   --total_nodes 795 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --runtime_mode limit
+  --duration_mode limit
 ```
 
 ### All Options
@@ -61,7 +61,7 @@ All dependencies are automatically downloaded via CMake FetchContent:
 --total_nodes <N>           Number of nodes in system (default: 795)
 --backfill_policy <policy>  Backfilling algorithm: easy|conservative
 --priority_policy <policy>  Job ordering: fcfs|sjf|ljf
---runtime_mode <mode>       Runtime estimates: limit|actual
+--duration_mode <mode>       Run time estimates: limit|actual
 --max_jobs <N>              Maximum number of jobs to simulate
 --max_time <T>              Maximum simulation time
 --outfile <file>            Output file for results
@@ -78,10 +78,10 @@ All dependencies are automatically downloaded via CMake FetchContent:
   --outfile results_conservative_sjf.txt
 ```
 
-**Oracle mode (perfect runtime knowledge):**
+**Oracle mode (perfect run time knowledge):**
 ```bash
 ./simulator trace.txt \
-  --runtime_mode actual \
+  --duration_mode actual \
   --outfile results_oracle.txt
 ```
 
@@ -107,6 +107,8 @@ Input trace files should have tab-separated columns:
 ```
 num_nodes  begin_time  end_time  submit_time  queue  time_limit
 ```
+`time_limit` is also accepted under the column names `timelimit` or
+`walltime`, so an existing trace can be reused without editing its header.
 
 See existing trace files in the project for examples.
 
@@ -141,7 +143,7 @@ See existing trace files in the project for examples.
 - Useful for throughput optimization
 - May starve short jobs
 
-### Runtime Modes
+### Run Time Modes
 
 **USE_LIMIT (Realistic)**
 - Scheduler uses user-provided time limits
@@ -149,7 +151,7 @@ See existing trace files in the project for examples.
 - Mimics real HPC systems
 
 **USE_ACTUAL (Oracle)**
-- Scheduler knows exact runtimes
+- Scheduler knows exact run times
 - Unrealistic but useful for comparison
 - Upper bound on performance
 

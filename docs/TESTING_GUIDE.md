@@ -30,6 +30,8 @@ correct.
 - [Streaming API Tests](#streaming-api-tests) - Online job submission
 - [Configuration Tests](#configuration-tests) - Protobuf validation
 - [Queue Implementation Testing](#queue-implementation-testing) - Wait-queue data structure consistency
+- [Column Alias Tests](#column-alias-tests) - time_limit/actual_run_time accepted column names
+- [Duration/Run Time Mode Tests](#duration-run-time-mode-tests) - duration_mode/run_time_mode interaction and capping
 - [Test Summary](#test-summary)
 - [Test File Formats](#test-file-formats)
 - [Adding New Tests](#adding-new-tests)
@@ -64,6 +66,12 @@ cd build
 
 # Run queue implementation differential tests (circular/deque/multimap/block)
 ../tests/test_fcfs_comprehensive.sh --correctness
+
+# Run column alias tests (time_limit/actual_run_time accepted column-name variants)
+../tests/test_column_aliases.sh
+
+# Run duration_mode/run_time_mode interaction tests
+../tests/test_duration_run_time_modes.sh
 ```
 
 ---
@@ -159,7 +167,7 @@ Combinations of the above patterns.
 
 ### Tier 9: Early Completion (3 tests)
 
-Jobs that finish before their `time_limit` (actual_runtime < time_limit).
+Jobs that finish before their `time_limit` (actual_run_time < time_limit).
 
 | Test | Description | Jobs | Key Feature | Artifacts |
 |------|-------------|------|-------------|-----------|
@@ -311,10 +319,11 @@ make
 ```
 
 **Config files tested:**
-- `basic_sim.pb`
-- `advanced_sim.pb`
-- `replay_mode.pb`
-- `duration_distribution.pb`
+- `minimal_config.pb`
+- `conservative_config.pb`
+- `full_config.pb`
+- `distribution_config.pb`
+- `resource_trace_config.pb`
 
 ---
 
@@ -356,6 +365,63 @@ for the block-based one.
 
 ---
 
+## Column Alias Tests
+
+**Location:** `tests/test_column_aliases.sh` (generates its own small traces under `/tmp/`)
+**Purpose:** Verify `time_limit` and `actual_run_time` are each recognized
+under multiple accepted column-name aliases, so an existing trace can be
+reused without editing its header - slow to do by hand on a large file.
+
+- `time_limit` accepts: `time_limit`, `timelimit`, `walltime`
+- `actual_run_time` accepts: `actual_run_time`, `duration`, `actual_duration`, `run_time`
+
+8 checks: one per alias (confirming both that it's recognized and that it
+drives the correct execution time), plus one confirming a trace missing
+`time_limit` under all of its aliases is rejected with a clear error
+rather than silently defaulting.
+
+**How to run:**
+```bash
+cd build
+../tests/test_column_aliases.sh
+```
+
+Runs in CI (`.github/workflows/tests.yml`, "Run Column Alias Tests"). See
+[`dev/design-decisions/TRACE_FORMAT.md`](dev/design-decisions/TRACE_FORMAT.md)
+for the full column reference.
+
+---
+
+## Duration/Run Time Mode Tests
+
+**Location:** `tests/test_duration_run_time_modes.sh`
+**Purpose:** Verify two specific behavioral contracts not exercised by any
+other test suite:
+
+1. `duration_mode=actual` (the scheduler's omniscient planning estimate)
+   ignores `run_time_mode` entirely and always uses the trace's own real,
+   historical run time - confirmed using
+   `test_traces/comprehensive/25_early_completion_basic.csv`, where
+   `time_limit` and `actual_run_time` genuinely differ (200s vs 50s), plus
+   a contrast case confirming `duration_mode=limit` still behaves
+   differently.
+2. `run_time_mode=distribution`'s `normal`/`lognormal` samples are capped
+   at `time_limit` - a real HPC scheduler kills a job at its stated
+   limit, so the simulator must respect the same constraint. Checked
+   against 10,000 jobs for a statistically reliable result.
+
+**How to run:**
+```bash
+cd build
+../tests/test_duration_run_time_modes.sh
+```
+
+Runs in CI (`.github/workflows/tests.yml`, "Run Duration/Run Time Mode
+Tests"). See [`reference/terminology.md`](reference/terminology.md) for
+the full duration_mode/run_time_mode relationship.
+
+---
+
 ## Test Summary
 
 | Category | Total | Passing | Broken | Purpose |
@@ -368,7 +434,9 @@ for the block-based one.
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 4 | 4 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
-| **TOTAL** | 95+ | 95+ | 0 | Complete test suite |
+| **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
+| **Duration/Run Time Mode** | 4 | 4 | 0 | duration_mode=actual overrides run_time_mode; distribution capping at time_limit |
+| **TOTAL** | 107+ | 107+ | 0 | Complete test suite |
 
 **All tests passing as of Aug 31, 2026** (commits e6da09c and 68ff506)
 
@@ -378,14 +446,17 @@ for the block-based one.
 
 ### Input Trace (`.csv`)
 ```csv
-job_submit_time,num_nodes,exit_status,queue,time_limit[,actual_duration]
+job_submit_time,num_nodes,exit_status,queue,time_limit[,actual_run_time]
 0,70,0,pbatch,200
 10,50,0,pbatch,300
 20,20,0,pbatch,50
 ```
 
-- `actual_duration` optional (defaults to `time_limit`); used for early
-  completion tests.
+- `actual_run_time` optional (defaults to `time_limit`); used for early
+  completion tests. Also accepted under the names `duration`,
+  `actual_duration`, or `run_time`; `time_limit` is also accepted under
+  `timelimit` or `walltime` - useful for reusing an existing trace
+  without editing its header.
 - `queue` must be `pbatch` (or `pbatch0`-`pbatch3`) - other values are
   silently dropped during load (see `src/trace/job_io.cpp`), producing
   zero loaded jobs with no error. This is not a cosmetic requirement.
@@ -501,7 +572,7 @@ Reservation is whichever completion time first provides enough
 
 ### Early Completion Pattern
 ```
-Job 0: time_limit=200, actual_runtime=50
+Job 0: time_limit=200, actual_run_time=50
 Job 1: FCFS head, reservation calculated using 200 (the estimate), not 50
 ```
 Result: Job 1's reservation is pessimistic (based on the estimate), but

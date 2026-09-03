@@ -17,7 +17,7 @@ namespace dr_evt {
 /**
  * Alternative FCFS scheduler implementation for differential testing
  *
- * Based on SJF scheduler framework but uses submit_time ordering instead of runtime.
+ * Based on SJF scheduler framework but uses submit_time ordering instead of run_time.
  * This provides an independent implementation to verify scheduler_fcfs correctness.
  *
  * Key difference from scheduler_fcfs:
@@ -33,11 +33,11 @@ public:
     FCFSAltScheduler(num_nodes_t total_nodes,
                      const std::vector<Job_Record>& job_data,
                      BackfillPolicy backfill_policy,
-                     RuntimeEstimateMode runtime_mode);
+                     DurationEstimateMode duration_mode);
 
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,
-                    tdiff_t runtime,
+                    tdiff_t run_time,
                     num_nodes_t nodes) override;
 
     std::vector<job_no_t> schedule(
@@ -81,13 +81,13 @@ private:
     struct JobEntry {
         job_no_t job_id;
         sim_time_t submit_time;
-        tdiff_t runtime;
+        tdiff_t run_time;
         num_nodes_t nodes;
         // No removed flag - see SJFScheduler for full reasoning.
     };
 
     // Ordered by submit_time (FCFS order), then by job_id for stability
-    // KEY DIFFERENCE: SJF uses runtime, this uses submit_time
+    // KEY DIFFERENCE: SJF uses run_time, this uses submit_time
     std::multimap<sim_time_t, JobEntry> m_wait_queue;
 
     // Track eligible jobs (submit_time <= current_time)

@@ -3,6 +3,15 @@
 #
 # Verifies that all CLI options are supported via config files and behave identically
 # NOTE: Requires Protobuf support (cmake -DDR_EVT_ENABLE_PROTOBUF=ON)
+#
+# duration_mode is never set on either side of any comparison below
+# (neither the CLI invocations nor the .pb configs), so it stays at its
+# own default, "limit", on both sides consistently. That matters because
+# duration_mode="actual" would make the scheduler ignore --run_time_mode
+# entirely and just use the trace's own real run time - "limit" is what
+# makes --run_time_mode exact actually get used, and keeps the
+# CLI-vs-config comparisons meaningful (both sides are exercising the
+# same setting, even though neither states it explicitly).
 
 set -e
 
@@ -49,7 +58,7 @@ echo "Test 1: Minimal config"
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --duration_mode exact \
+    --run_time_mode exact \
     --outfile /tmp/cli_minimal.csv
 
 ./build/simulator "$TEST_TRACE" \
@@ -70,7 +79,7 @@ echo "Test 2: Full config"
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --duration_mode exact \
+    --run_time_mode exact \
     --backfill_policy easy \
     --priority_policy fcfs \
     --outfile /tmp/cli_full.csv
@@ -93,7 +102,7 @@ echo "Test 3: Conservative policy config"
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --duration_mode exact \
+    --run_time_mode exact \
     --backfill_policy conservative \
     --outfile /tmp/cli_conservative.csv
 

@@ -40,16 +40,16 @@ class Job:
     submit_time: float
     nodes: int
     duration: float  # time_limit (what scheduler sees for planning)
-    actual_runtime: Optional[float] = None  # actual runtime (≤ duration), defaults to duration
+    actual_run_time: Optional[float] = None  # actual run time (<= duration), defaults to duration
 
     # Simulation results (filled in by scheduler)
     start_time: Optional[float] = None
     end_time: Optional[float] = None
 
     def __post_init__(self):
-        # Default actual_runtime to duration if not specified
-        if self.actual_runtime is None:
-            self.actual_runtime = self.duration
+        # Default actual_run_time to duration if not specified
+        if self.actual_run_time is None:
+            self.actual_run_time = self.duration
 
 @dataclass
 class Event:
@@ -215,7 +215,7 @@ class EasyBackfillingScheduler:
     def start_job(self, job: Job):
         """Start a job immediately"""
         job.start_time = self.current_time
-        job.end_time = self.current_time + job.actual_runtime
+        job.end_time = self.current_time + job.actual_run_time
 
         # Track both actual and pessimistic (scheduler's view) end times
         pessimistic_end = self.current_time + job.duration
@@ -314,17 +314,17 @@ def load_trace(filename: str) -> List[Job]:
             nodes = int(row.get('num_nodes', row.get('nodes', 1)))
             duration = float(row.get('time_limit', row.get('duration', 100)))
 
-            # Check for actual_duration column (for early completion tests)
-            actual_runtime = None
-            if 'actual_duration' in row and row['actual_duration']:
-                actual_runtime = float(row['actual_duration'])
+            # Check for actual_run_time column (for early completion tests)
+            actual_run_time = None
+            if 'actual_run_time' in row and row['actual_run_time']:
+                actual_run_time = float(row['actual_run_time'])
 
             jobs.append(Job(
                 idx=idx,
                 submit_time=submit_time,
                 nodes=nodes,
                 duration=duration,
-                actual_runtime=actual_runtime
+                actual_run_time=actual_run_time
             ))
     return jobs
 

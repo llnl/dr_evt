@@ -26,7 +26,7 @@ class SchedulerBase {
 protected:
     num_nodes_t m_total_nodes;
     BackfillPolicy m_backfill_policy;
-    RuntimeEstimateMode m_runtime_mode;
+    DurationEstimateMode m_duration_mode;
     const std::vector<Job_Record>* m_job_data_ptr;
     sim_time_t m_fcfs_reservation_time;
 
@@ -34,10 +34,10 @@ public:
     SchedulerBase(num_nodes_t total_nodes,
                   const std::vector<Job_Record>& job_data,
                   BackfillPolicy bf_policy,
-                  RuntimeEstimateMode rt_mode)
+                  DurationEstimateMode rt_mode)
         : m_total_nodes(total_nodes)
         , m_backfill_policy(bf_policy)
-        , m_runtime_mode(rt_mode)
+        , m_duration_mode(rt_mode)
         , m_job_data_ptr(&job_data)
         , m_fcfs_reservation_time(0)
     {}
@@ -47,7 +47,7 @@ public:
     // Core interface - must be implemented by subclasses
     // STATEFUL: Each scheduler maintains its own internal wait_queue
     virtual void insert_job(job_no_t job_id, sim_time_t submit_time,
-                           tdiff_t runtime_estimate, num_nodes_t nodes_requested) = 0;
+                           tdiff_t run_time_estimate, num_nodes_t nodes_requested) = 0;
 
     virtual std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,
@@ -110,10 +110,10 @@ protected:
      */
     virtual size_t wait_queue_size() const = 0;
 
-    tdiff_t get_runtime_estimate(job_no_t job_idx) const {
+    tdiff_t get_duration_estimate(job_no_t job_idx) const {
         const auto& job = (*m_job_data_ptr)[job_idx];
-        if (m_runtime_mode == RuntimeEstimateMode::USE_ACTUAL) {
-            return job.get_actual_duration();
+        if (m_duration_mode == DurationEstimateMode::USE_ACTUAL) {
+            return job.get_actual_run_time();
         }
         return job.get_limit_time();
     }
@@ -133,7 +133,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     const std::vector<Job_Record>& job_data,
     BackfillPolicy backfill_policy,
     PriorityPolicy priority_policy,
-    RuntimeEstimateMode runtime_mode,
+    DurationEstimateMode duration_mode,
     QueueImplementation queue_impl = QueueImplementation::CIRCULAR,
     size_t block_size = 128,
     size_t circular_capacity = 0,

@@ -15,6 +15,12 @@ Tests all Python bindings including:
 - Monitoring API
 - Statistics
 - Different scheduling policies
+
+Note: none of the SimParams configurations below set duration_mode, so it
+stays at its own default, "limit", throughout this file. That matters
+because duration_mode="actual" would make the scheduler ignore
+run_time_mode entirely and just use the trace's own real run time -
+"limit" is what makes run_time_mode=EXACT actually get used.
 """
 
 import sys
@@ -109,15 +115,15 @@ def test_enumerations(result):
     except Exception as e:
         result.record_fail("PriorityPolicy", str(e))
 
-    # DurationMode
+    # RunTimeMode
     try:
-        assert hasattr(dr_evt, 'DurationMode')
-        assert hasattr(dr_evt.DurationMode, 'FROM_COLUMN')
-        assert hasattr(dr_evt.DurationMode, 'EXACT')
-        assert hasattr(dr_evt.DurationMode, 'DISTRIBUTION')
-        result.record_pass("DurationMode")
+        assert hasattr(dr_evt, 'RunTimeMode')
+        assert hasattr(dr_evt.RunTimeMode, 'FROM_COLUMN')
+        assert hasattr(dr_evt.RunTimeMode, 'EXACT')
+        assert hasattr(dr_evt.RunTimeMode, 'DISTRIBUTION')
+        result.record_pass("RunTimeMode")
     except Exception as e:
-        result.record_fail("DurationMode", str(e))
+        result.record_fail("RunTimeMode", str(e))
 
 
 def test_sim_params(result):
@@ -132,7 +138,7 @@ def test_sim_params(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.duration_mode = dr_evt.DurationMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.EXACT
         params.backfill_policy = dr_evt.BackfillPolicy.EASY
         params.priority_policy = dr_evt.PriorityPolicy.FCFS
         params.verbose = False
@@ -162,7 +168,7 @@ def test_streaming_api(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.duration_mode = dr_evt.DurationMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.EXACT
         params.backfill_policy = dr_evt.BackfillPolicy.EASY
         params.priority_policy = dr_evt.PriorityPolicy.FCFS
 
@@ -180,7 +186,10 @@ def test_streaming_api(result):
         # Test run_until_exclusive
         sim.submit_job(1, 50.0)
         sim.run_until_exclusive(50.0)
-        # Job 1 not started yet (exclusive)
+        # Job 1 must NOT have started yet - the event at exactly the
+        # target time is excluded by run_until_exclusive.
+        assert sim.get_nodes_in_use() == 10, \
+            f"run_until_exclusive(50.0) should not process the t=50 event yet, but nodes_in_use={sim.get_nodes_in_use()}"
         sim.advance_to(50.0)
         assert sim.get_nodes_in_use() == 30
         result.record_pass("run_until_exclusive")
@@ -206,7 +215,7 @@ def test_monitoring_api(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.duration_mode = dr_evt.DurationMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.EXACT
 
         sim = dr_evt.Simulation(params)
         sim.initialize_trace()
@@ -254,7 +263,7 @@ def test_statistics(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.duration_mode = dr_evt.DurationMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.EXACT
 
         sim = dr_evt.Simulation(params)
         sim.initialize_trace()
@@ -320,7 +329,7 @@ def test_backfill_policies(result):
             params.total_nodes = 100
             params.trace_format = "simple"
             params.timestamp_format = "epoch"
-            params.duration_mode = dr_evt.DurationMode.EXACT
+            params.run_time_mode = dr_evt.RunTimeMode.EXACT
             params.backfill_policy = policy
 
             sim = dr_evt.Simulation(params)
@@ -363,7 +372,7 @@ def test_priority_policies(result):
             params.total_nodes = 100
             params.trace_format = "simple"
             params.timestamp_format = "epoch"
-            params.duration_mode = dr_evt.DurationMode.EXACT
+            params.run_time_mode = dr_evt.RunTimeMode.EXACT
             params.priority_policy = policy
 
             sim = dr_evt.Simulation(params)
@@ -402,7 +411,7 @@ def test_batch_mode(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.duration_mode = dr_evt.DurationMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.EXACT
 
         sim = dr_evt.Simulation(params)
         sim.initialize_trace()
@@ -412,6 +421,8 @@ def test_batch_mode(result):
 
         stats = sim.get_statistics()
         assert stats.jobs_completed == 2
+        assert stats.nodes_in_use == 0, \
+            f"All jobs completed but nodes_in_use={stats.nodes_in_use}, expected 0"
 
         result.record_pass("Batch mode run()")
 

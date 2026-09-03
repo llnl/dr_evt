@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <map>
+#include <vector>
 #include "trace/data_columns.hpp"
 #include "trace/job_record.hpp"
 #include "trace/parse_utils.hpp"
@@ -50,8 +51,8 @@ Data_Columns::Data_Columns(const std::string& format)
     m_trace_mode(TraceMode::REPLAY)  // Will be detected in check_header
 {
     if (format == "simple") {
-        // Simple format file columns: [job_submit_time, begin_time, end_time, num_nodes, exit_status, queue, time_limit, actual_duration (optional)]
-        // Job_Record expects: [num_nodes, begin_time, end_time, job_submit_time, queue, time_limit, actual_duration]
+        // Simple format file columns: [job_submit_time, begin_time, end_time, num_nodes, exit_status, queue, time_limit, actual_run_time (optional)]
+        // Job_Record expects: [num_nodes, begin_time, end_time, job_submit_time, queue, time_limit, actual_run_time]
         // After sorting by column index, we need to remap to Job_Record order
         // We define in Job_Record's expected order here, but need different column indices:
         m_cols_to_read = {
@@ -61,7 +62,7 @@ Data_Columns::Data_Columns(const std::string& format)
             {0, "job_submit_time"},  // File column 0 -> Job_Record field 3
             {5, "queue"},            // File column 5 -> Job_Record field 4
             {6, "time_limit"},       // File column 6 -> Job_Record field 5
-            {7, "actual_duration"}   // File column 7 -> Job_Record field 6 (optional)
+            {7, "actual_run_time"}   // File column 7 -> Job_Record field 6 (optional)
         };
         m_col_to_avoid = "";  // No problematic columns in simple format
     } else {
@@ -85,10 +86,10 @@ Data_Columns::Data_Columns(const std::string& format, const std::string& timesta
     m_trace_mode(TraceMode::REPLAY)  // Will be detected in check_header
 {
     if (format == "simple") {
-        // Simple format: [arrival_time, start_time, end_time, num_nodes, exit_status, queue, time_limit, actual_duration (optional)]
+        // Simple format: [arrival_time, start_time, end_time, num_nodes, exit_status, queue, time_limit, actual_run_time (optional)]
         m_cols_to_read = {
             {3, "num_nodes"}, {1, "begin_time"}, {2, "end_time"},
-            {0, "job_submit_time"}, {5, "queue"}, {6, "time_limit"}, {7, "actual_duration"}
+            {0, "job_submit_time"}, {5, "queue"}, {6, "time_limit"}, {7, "actual_run_time"}
         };
         m_col_to_avoid = "";
     } else {
@@ -221,33 +222,56 @@ bool Data_Columns::check_header(const std::string& fname)
         throw std::invalid_argument("Ambiguous trace format: has one of begin_time/end_time but not both");
     }
 
+    // time_limit and actual_run_time each accept multiple column-name
+    // aliases, so an existing trace can be reused without editing its
+    // header (which is slow to do by hand on a large file). Only one of
+    // each alias set is expected to actually be present; if more than one
+    // is, the first match in this list wins.
+    auto find_column = [&col_map](const std::vector<std::string>& names) -> col_no_t {
+        for (const auto& name : names) {
+            auto it = col_map.find(name);
+            if (it != col_map.end()) {
+                return it->second;
+            }
+        }
+        throw std::invalid_argument(
+            "Required column '" + names.front() +
+            "' (or an accepted alias) not found in trace file");
+    };
+    auto find_column_optional = [&col_map](const std::vector<std::string>& names) -> std::pair<bool, col_no_t> {
+        for (const auto& name : names) {
+            auto it = col_map.find(name);
+            if (it != col_map.end()) {
+                return {true, it->second};
+            }
+        }
+        return {false, 0};
+    };
+
+    static const std::vector<std::string> time_limit_aliases =
+        {"time_limit", "timelimit", "walltime"};
+    static const std::vector<std::string> actual_run_time_aliases =
+        {"actual_run_time", "actual_runtime", "duration", "actual_duration", "run_time"};
+
     // Rebuild m_cols_to_read with actual column indices from header
     m_cols_to_read.clear();
 
     if (m_trace_mode == TraceMode::REPLAY) {
         // Replay mode: need all columns including begin_time and end_time
         m_cols_to_read = {
-            {col_map["num_nodes"], "num_nodes"},
-            {col_map["begin_time"], "begin_time"},
-            {col_map["end_time"], "end_time"},
-            {col_map["job_submit_time"], "job_submit_time"},
-            {col_map["queue"], "queue"},
-            {col_map["time_limit"], "time_limit"}
+            {find_column({"num_nodes"}), "num_nodes"},
+            {find_column({"begin_time"}), "begin_time"},
+            {find_column({"end_time"}), "end_time"},
+            {find_column({"job_submit_time"}), "job_submit_time"},
+            {find_column({"queue"}), "queue"},
+            {find_column(time_limit_aliases), "time_limit"}
         };
     } else {
         // Simulation mode: no begin_time or end_time
-        auto find_column = [&col_map](const std::string& name) -> col_no_t {
-            auto it = col_map.find(name);
-            if (it == col_map.end()) {
-                throw std::invalid_argument("Required column '" + name + "' not found in trace file");
-            }
-            return it->second;
-        };
-
-        col_no_t num_nodes_idx = find_column("num_nodes");
-        col_no_t submit_time_idx = find_column("job_submit_time");
-        col_no_t queue_idx = find_column("queue");
-        col_no_t time_limit_idx = find_column("time_limit");
+        col_no_t num_nodes_idx = find_column({"num_nodes"});
+        col_no_t submit_time_idx = find_column({"job_submit_time"});
+        col_no_t queue_idx = find_column({"queue"});
+        col_no_t time_limit_idx = find_column(time_limit_aliases);
 
         m_cols_to_read = {
             {num_nodes_idx, "num_nodes"},
@@ -256,23 +280,15 @@ bool Data_Columns::check_header(const std::string& fname)
             {time_limit_idx, "time_limit"}
         };
 
-        // Optional: actual_duration column for FROM_COLUMN mode
-        auto actual_duration_it = col_map.find("actual_duration");
-        if (actual_duration_it != col_map.end()) {
-            m_cols_to_read.push_back({actual_duration_it->second, "actual_duration"});
-        };
-    }
-
-    // Verify all required columns are present
-    for (const auto& c: m_cols_to_read) {
-        const std::string& col_name = c.second;
-        if (col_map.find(col_name) == col_map.end()) {
-            std::string err_str =
-                "Required column '" + col_name + "' is not present!";
-            throw std::invalid_argument {err_str};
-            return false;
+        // Optional: actual_run_time column for RunTimeMode::FROM_COLUMN
+        auto [found, actual_run_time_idx] = find_column_optional(actual_run_time_aliases);
+        if (found) {
+            m_cols_to_read.push_back({actual_run_time_idx, "actual_run_time"});
         }
     }
+    // No further validation needed here: find_column already throws with a
+    // clear message (naming the canonical column and its accepted aliases)
+    // if a required column - under any of its accepted names - is absent.
     m_total_columns = static_cast<num_cols_t>(col_names.size());
 
     // Sort columns by file index for proper extraction

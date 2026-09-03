@@ -48,7 +48,7 @@ void test_basic_insert_and_run() {
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_duration_mode = DurationMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
 
@@ -115,7 +115,7 @@ void test_exclusive_vs_inclusive() {
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_duration_mode = DurationMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
 
     Simulation sim(params);
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;
@@ -167,7 +167,7 @@ void test_online_scheduling() {
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_duration_mode = DurationMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
 
     Simulation sim(params);
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;
@@ -257,7 +257,7 @@ void test_no_resource_leaks() {
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_duration_mode = DurationMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
 
     Simulation sim(params);
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;

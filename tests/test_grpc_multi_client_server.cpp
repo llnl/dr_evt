@@ -227,8 +227,8 @@ int run_client_rank(int my_rank, int paired_server_rank,
             init->set_timestamp_format("epoch");
             init->set_backfill_policy("easy");
             init->set_priority_policy("fcfs");
-            init->set_runtime_mode("limit");
-            init->set_duration_mode("exact");
+            init->set_duration_mode("limit");
+            init->set_run_time_mode("exact");
             init->set_infile(trace_file);
             client.call(init_req);
             break;
