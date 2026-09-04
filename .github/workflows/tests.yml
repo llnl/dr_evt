@@ -127,6 +127,7 @@ jobs:
           ./build/simulator --help || true
 
       - name: Run Comprehensive Tests
+        id: comprehensive
         run: |
           echo "========================================"
           echo "Running Comprehensive Tests (34 tests)"
@@ -134,6 +135,7 @@ jobs:
           ./tests/test_all_dr_evt.sh
 
       - name: Run Queue Implementation Differential Tests
+        id: queue-impl
         run: |
           echo "========================================"
           echo "Comparing deque/multimap/block/circular queue implementations"
@@ -141,6 +143,7 @@ jobs:
           ./tests/test_fcfs_comprehensive.sh --correctness
 
       - name: Run Column Alias Tests
+        id: column-alias
         run: |
           echo "========================================"
           echo "Testing time_limit/actual_run_time column-name aliases (8 tests)"
@@ -148,6 +151,7 @@ jobs:
           ./tests/test_column_aliases.sh
 
       - name: Run Duration/Run Time Mode Tests
+        id: duration-mode
         run: |
           echo "========================================"
           echo "Testing duration_mode/run_time_mode interaction and distribution capping (4 tests)"
@@ -155,6 +159,7 @@ jobs:
           ./tests/test_duration_run_time_modes.sh
 
       - name: Run Unit Tests
+        id: unit
         run: |
           echo "========================================"
           echo "Running Unit Tests (7 tests)"
@@ -162,13 +167,15 @@ jobs:
           ./tests/run_unit_tests.sh
 
       - name: Run Feature Tests
+        id: feature
         run: |
           echo "========================================"
-          echo "Running Feature Tests (3 tests)"
+          echo "Running Feature Tests (5 tests)"
           echo "========================================"
           ./tests/run_feature_tests.sh
 
       - name: Run Conservative Backfilling Tests
+        id: conservative
         run: |
           echo "========================================"
           echo "Running Conservative Backfilling Tests (2 tests)"
@@ -182,6 +189,7 @@ jobs:
           ./tests/compare_cpp_python_conservative.sh tests/test_traces/scale/large_100jobs.csv 1000
 
       - name: Run Replay Tests
+        id: replay
         run: |
           echo "========================================"
           echo "Running Replay Tests (3 tests)"
@@ -189,6 +197,7 @@ jobs:
           ./tests/run_replay_tests.sh
 
       - name: Run Config Tests
+        id: config
         run: |
           echo "========================================"
           echo "Running Config Tests (4 tests)"
@@ -196,6 +205,7 @@ jobs:
           ./tests/run_configs_tests.sh
 
       - name: Run Python API Tests
+        id: python-api
         run: |
           source venv/bin/activate
           echo "========================================"
@@ -204,6 +214,7 @@ jobs:
           ./tests/run_python_tests.sh
 
       - name: Run Streaming API Tests
+        id: streaming
         run: |
           echo "========================================"
           echo "Running Streaming API Tests (4 tests)"
@@ -211,6 +222,7 @@ jobs:
           ./tests/run_streaming_tests.sh
 
       - name: Run gRPC Client/Server Tests
+        id: grpc
         run: |
           echo "========================================"
           echo "Running gRPC Client/Server Tests (2 tests)"
@@ -218,6 +230,7 @@ jobs:
           ./tests/run_grpc_tests.sh
 
       - name: Run Scale Tests (Optional)
+        id: scale
         continue-on-error: true
         run: |
           echo "========================================"
@@ -234,24 +247,24 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Comprehensive: 34 tests (verified 34/34 in a manual session pass)"
-          echo "  Queue Impl Differential: 34 tests x 4 queue impls (deque/multimap/block/circular)"
-          echo "  Column Aliases: 8 tests (time_limit/actual_run_time accepted column-name variants)"
-          echo "  Duration/Run Time Mode: 4 tests (duration_mode=actual overrides run_time_mode; distribution capping at time_limit)"
-          echo "  Unit: 7 tests (5/7 - 2 known-broken, incomplete fixture data)"
-          echo "  Feature: 3 tests"
-          echo "  Conservative Backfilling: 2 tests (behavioral correctness + C++/Python equivalence)"
-          echo "  Replay: 3 tests (methodology also verified against more)"
-          echo "  Config: 4 tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON, now enabled)"
-          echo "  Python API: 9 tests (requires -DDR_EVT_BUILD_PYTHON=ON)"
-          echo "  Streaming API: 4 tests (requires building test_streaming_api)"
-          echo "  gRPC Client/Server: 2 tests (requires -DDR_EVT_ENABLE_GRPC=ON; MPI-based multi-client test skipped if MPI unavailable)"
-          echo "  Scale: 6 tests, optional (all working - see tests/run_scale_tests.sh)"
+          echo "  Comprehensive (34 tests): ${{ steps.comprehensive.outcome }}"
+          echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
+          echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"
+          echo "  Duration/Run Time Mode (4 tests): ${{ steps.duration-mode.outcome }}"
+          echo "  Unit (7 tests): ${{ steps.unit.outcome }}"
+          echo "  Feature (5 tests): ${{ steps.feature.outcome }}"
+          echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
+          echo "  Replay (3 tests): ${{ steps.replay.outcome }}"
+          echo "  Config (4 tests): ${{ steps.config.outcome }}"
+          echo "  Python API (9 tests): ${{ steps.python-api.outcome }}"
+          echo "  Streaming API (4 tests): ${{ steps.streaming.outcome }}"
+          echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
+          echo "  Scale (6 tests, optional): ${{ steps.scale.outcome }}"
           echo ""
-          echo "These counts reflect what this workflow attempts to run, not"
-          echo "an independently re-verified total on every commit - see"
-          echo "tests/README.md and docs/TESTING_GUIDE.md for known"
-          echo "limitations and what 'passing' does and doesn't demonstrate."
+          echo "Outcome values: success | failure | skipped | cancelled"
+          echo ""
+          echo "Note: Scale tests use continue-on-error, so 'failure' won't fail the job."
+          echo "See tests/README.md and docs/TESTING_GUIDE.md for test details."
           echo "========================================"
 
       - name: Upload test artifacts

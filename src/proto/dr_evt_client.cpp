@@ -139,7 +139,7 @@ int main(int argc, char** argv)
         trace_req.mutable_initialize_trace()->set_max_jobs(0);  // 0 = no limit
         auto trace_resp = client.call(trace_req);
         uint64_t num_jobs = trace_resp.initialize_trace().num_jobs_loaded();
-        std::cout << "Loaded " << num_jobs << " jobs from trace." << std::endl;
+        std::cout << "Loaded " + std::to_string(num_jobs) + " jobs from trace.\n";
 
         if (num_jobs != submit_times.size()) {
             throw std::runtime_error("Server loaded " + std::to_string(num_jobs) +
@@ -159,7 +159,7 @@ int main(int argc, char** argv)
             submit->set_submit_time(submit_times[i]);
             client.call(submit_req);
         }
-        std::cout << "Submitted " << num_jobs << " jobs." << std::endl;
+        std::cout << "Submitted " + std::to_string(num_jobs) + " jobs.\n";
 
         // 4. Advance the simulation far enough to complete all jobs.
         // A real client would typically advance incrementally and check

@@ -253,7 +253,7 @@ Scheduler plans using the job's real, observed run time (from trace).
 ### Scheduler Options
 
 ```bash
--b, --backfill_policy POLICY   # Backfill: easy|conservative (default: easy)
+-b, --backfill_policy POLICY   # Backfill: easy|conservative|none (default: easy)
 -p, --priority_policy POLICY   # Priority: fcfs|sjf|ljf (default: fcfs)
 -r, --duration_mode MODE        # Scheduler's planning estimate: limit|actual (default: limit)
 -q, --queue_impl IMPL          # FCFS wait queue: circular|deque|multimap|block (default: circular)

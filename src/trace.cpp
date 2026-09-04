@@ -42,7 +42,7 @@ int process_trace(const dr_evt::Trace_Params& cfg)
         std::cerr << "trace loading not successful! : " << rc << std::endl;
         return rc;
     }
-    std::cout << trace.data().size() << " jobs have been loaded." << std::endl;
+    std::cout << std::to_string(trace.data().size()) + " jobs have been loaded.\n";
     trace.run_job_trace();
 
     std::cout << "Trace ";
@@ -63,7 +63,7 @@ int process_trace(const dr_evt::Trace_Params& cfg)
     std::ofstream of_stat_sub(cfg.get_subfile());
     stat_sub.print(of_stat_sub);
     of_stat_sub.close();
-    std::cout << "Number of weeks: " << stat_sub.get_num_weeks () << std::endl;
+    std::cout << "Number of weeks: " + std::to_string(stat_sub.get_num_weeks()) + "\n";
 
     const auto sub_summary = stat_sub.get_summary();
     std::ofstream of_sub_summary(cfg.get_subsumfile());

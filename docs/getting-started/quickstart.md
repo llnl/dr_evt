@@ -58,7 +58,8 @@ All dependencies are automatically downloaded via CMake FetchContent:
 ### All Options
 
 This is a quick summary; see [Command-Line Reference](../user-guide/command-line.md)
-for the full description of every option.
+for the full description of every option. DR_EVT also supports prototext-based
+configuration files (see [Protobuf Configuration](../user-guide/protobuf-config.md)).
 
 ```
 Input/Output:
@@ -95,7 +96,8 @@ Duration/run time modeling:
   -V, --run_time_stddev <factor>      Std deviation factor for run time sampling
 
 Config file (requires protobuf support):
-  -c, --config <file>          Read simulation parameters from a config file
+  -c, --config <file>          Read simulation parameters from a protobuf config file
+                               (see [Protobuf Configuration](../user-guide/protobuf-config.md))
 
 Other:
   -v, --verbose                 Enable verbose output
@@ -155,7 +157,7 @@ See existing trace files in the project for examples.
 - **Best for**: Mixed workloads with varying job sizes
 - **Tradeoff**: Simple but may delay some jobs unnecessarily
 
-### Conservative Backfilling  
+### Conservative Backfilling
 - **How it works**: ALL queued jobs get reservations
 - **Backfilling**: Jobs can only backfill if they don't delay ANY reservation
 - **Best for**: Fairness - prevents starvation
@@ -173,7 +175,7 @@ See existing trace files in the project for examples.
 - Minimizes average wait time
 - May starve long jobs
 
-**LJF (Longest-Job-First)**  
+**LJF (Longest-Job-First)**
 - Longer jobs scheduled first
 - Useful for throughput optimization
 - May starve short jobs
@@ -273,8 +275,4 @@ For issues or questions:
 ## What's Next?
 
 Planned features:
-- Python bindings for easier integration
-- Additional scheduling policies
-- Real-time visualization
-- Multi-queue support
-- Checkpoint/restart capability
+- Checkpoint/restart capability for long-running simulations
