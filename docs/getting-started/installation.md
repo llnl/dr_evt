@@ -70,11 +70,17 @@ cmake .. -Wno-author -DDR_EVT_BUILD_PYTHON=ON
 cmake .. -DBOOST_ROOT=/path/to/boost
 # or use environment variable
 export BOOST_ROOT=/path/to/boost
+
+# Skip system paths (useful if system install is broken or mismatched by version)
+cmake .. -DAVOID_SYSTEM_BOOST=ON
 ```
 
 **Protobuf (standalone, when gRPC not used):**
 ```bash
 cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
+
+# Skip system paths (useful if system install is broken or mismatched by version)
+cmake .. -DDR_EVT_ENABLE_PROTOBUF=ON -DAVOID_SYSTEM_PROTOBUF=ON
 ```
 
 **gRPC:**
@@ -83,10 +89,10 @@ cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
 cmake .. -DDR_EVT_ENABLE_GRPC=ON
 
 # Skip system path search (useful if system install is broken or mismatched by version)
-cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
+cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 
 # Force FetchContent download (ignores system install)
-cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
+cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 ```
 
 **Python bindings:**
@@ -194,7 +200,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
 
 # For gRPC, skip system search and force FetchContent:
-cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
+cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 ```
 
 ### gRPC/Protobuf version mismatch
@@ -202,7 +208,7 @@ cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
 ```bash
 # System install conflicts with FetchContent version
 # Solution: Skip system path search
-cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
+cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 ```
 
 ### Python bindings fail to build

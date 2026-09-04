@@ -12,8 +12,8 @@ option(protobuf_MODULE_COMPATIBLE TRUE)
 # package-bundled gRPC/Protobuf whose CMake config references a protoc
 # binary that doesn't exist). find_package() can still succeed via an
 # explicit HINTS path even with this on.
-option(AVOID_ENV_GRPC "Do not search default system paths for gRPC/Protobuf" FALSE)
-if (AVOID_ENV_GRPC)
+option(AVOID_SYSTEM_GRPC "Do not search default system paths for gRPC/Protobuf" FALSE)
+if (AVOID_SYSTEM_GRPC)
   set(DR_EVT_GRPC_SEARCH_MODE NO_DEFAULT_PATH)
 else()
   set(DR_EVT_GRPC_SEARCH_MODE "")

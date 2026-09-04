@@ -142,11 +142,17 @@ Protobuf-only build → standalone Protobuf installation
 cmake .. -Wno-author -DBOOST_ROOT=/path/to/boost
 # or use environment variable
 export BOOST_ROOT=/path/to/boost
+
+# Skip system paths (useful if system install is broken or mismatched by version)
+cmake .. -Wno-author -DAVOID_SYSTEM_BOOST=ON
 ```
 
 **Protobuf (standalone, when gRPC not used):**
 ```bash
 cmake .. -Wno-author -DPROTOBUF_ROOT=/path/to/protobuf
+
+# Skip system paths (useful if system install is broken or mismatched by version)
+cmake .. -Wno-author -DDR_EVT_ENABLE_PROTOBUF=ON -DAVOID_SYSTEM_PROTOBUF=ON
 ```
 
 **gRPC:**
@@ -155,7 +161,7 @@ cmake .. -Wno-author -DPROTOBUF_ROOT=/path/to/protobuf
 cmake .. -Wno-author -DDR_EVT_ENABLE_GRPC=ON
 
 # Skip system path search (useful if system install is broken or mismatched by version)
-cmake .. -Wno-author -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
+cmake .. -Wno-author -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 
 # Clear FetchContent cache to retry system search
 cmake -U DR_EVT_GRPC_FETCHCONTENT ..
