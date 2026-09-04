@@ -104,7 +104,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 | 4 | exit_status | Job exit code | Optional |
 | 5 | queue | Queue name (e.g., "batch") | Optional |
 | 6 | time_limit | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Optional |
-| 7 | actual_run_time | The job's real, historical run time (seconds); used by `--duration_mode actual` and `--run_time_mode column`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Optional |
+| 7 | actual_run_time | The job's real, historical run time (seconds); used by `--duration_mode actual` (always) and `--run_time_mode column` (only when duration_mode=limit). Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Optional |
 
 **Column-name aliases**: `time_limit` and `actual_run_time` are each detected
 under several accepted header names (listed above), so an existing trace

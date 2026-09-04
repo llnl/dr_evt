@@ -272,7 +272,7 @@ Scheduler plans using the job's real, observed run time (from trace).
 
 ### Example 1: Basic Test
 
-Test with synthetic trace:
+Test with synthetic trace (realistic mode):
 ```bash
 ./simulator test_traces/epoch_pbatch.csv \
   --trace_format simple \
@@ -280,7 +280,7 @@ Test with synthetic trace:
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --duration_mode actual
+  --duration_mode limit
 ```
 
 ### Example 2: Real HPC Trace

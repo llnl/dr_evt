@@ -310,7 +310,7 @@ pip install --force-reinstall .
 | Use Case | Missing Parameters Needed | Workaround |
 |----------|--------------------------|------------|
 | **Reproducible simulations** | `seed` | Use config file or CLI |
-| **Replay mode** | `duration_mode=actual` | Now directly settable: `params.duration_mode = dr_evt.DurationEstimateMode.USE_ACTUAL` |
+| **Oracle mode** | `duration_mode=actual` | Now directly settable: `params.duration_mode = dr_evt.DurationEstimateMode.USE_ACTUAL` |
 | **Output to file** | `outfile` | Use CLI or call `write_simulated_trace()` |
 | **Test on subset** | `max_jobs`, `max_time` | Preprocess trace file |
 | **Non-LA timezones** | `timezone` | Convert timestamps to LA time or use epoch |

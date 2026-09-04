@@ -422,7 +422,7 @@ cd build
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --duration_mode exact \
+    --run_time_mode exact \
     --outfile /tmp/output.csv
 
 diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expected_output.csv
@@ -507,7 +507,7 @@ cd ..
    ```bash
    ./build/simulator <input> --total_nodes 100 \
        --trace_format simple --timestamp_format epoch \
-       --duration_mode exact --outfile /tmp/test.csv
+       --run_time_mode exact --outfile /tmp/test.csv
    cat /tmp/test.csv
    ```
 

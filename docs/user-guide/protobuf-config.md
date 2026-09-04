@@ -223,13 +223,13 @@ Replay exactly what happened on a real system:
 ```protobuf
 sim_setup {
   infile: "production_trace.csv"
-  outfile: "replay_results.csv"
+  outfile: "oracle_results.csv"
   
   total_nodes: 2048
   
-  # Replay mode: use actual run times from trace
+  # Oracle mode: scheduler uses actual run times (omniscient)
+  # Note: run_time_mode is ignored when duration_mode=actual
   duration_mode: "actual"
-  run_time_mode: "column"
   
   backfill_policy: "easy"
   priority_policy: "fcfs"

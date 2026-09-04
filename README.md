@@ -103,7 +103,7 @@ make linkcheck
  + **Platforms**: Linux-based systems (macOS may work but not officially supported)
  + **C++ compiler**: C++17 support (GCC 7+, Clang 5+, or newer)
  + **CMake**: 3.24 or later
- + **Boost**: Components required: `regex`, `filesystem`, `system`, `program_options`, `serialization`, `container`
+ + **Boost**: Components required: `regex`, `filesystem`, `system`, `program_options`, `serialization`, `container`, `multi_index`, `circular_buffer`
    - Tested with Boost 1.70+
    - Install: `apt-get install libboost-all-dev` (Ubuntu/Debian) or `brew install boost` (macOS)
  + [**Protocol Buffers**](https://developers.google.com/protocol-buffers): Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
@@ -114,7 +114,7 @@ make linkcheck
 - Python development headers required: `apt-get install python3-dev`
 - pybind11 auto-downloaded via FetchContent if not found
 
-**gRPC**: For online simulation service (`-DDR_EVT_ENABLE_GRPC=ON`)
+**[gRPC](https://grpc.io/)**: For online simulation service (`-DDR_EVT_ENABLE_GRPC=ON`)
 - **Auto-download**: If not found, gRPC (with bundled Protobuf) is auto-downloaded via FetchContent (~5-10 min first build)
 - **Manual install**: `apt-get install libgrpc++-dev protobuf-compiler-grpc` (Ubuntu/Debian)
 - **Important**: gRPC includes its own Protobuf. If gRPC is enabled, you don't need separate Protobuf install.
@@ -276,46 +276,83 @@ Run with configuration file:
 2. Protocol Buffer config file (`--config`)
 3. Built-in defaults (lowest priority)
 
-### Simulation vs Replay Modes
+### Simulation Modes
 
-DR_EVT supports two modes for processing job traces:
-
-#### Replay Mode (`--duration_mode actual`)
-
-**Purpose:** Reproduce what actually happened on a real HPC system
-
-**Input:** Historical trace with actual job durations
-- Reads `actual_run_time` from trace file
-- Or uses recorded start/end times
-
-**Output:** Schedule matching the original execution
-- Jobs run for their actual recorded duration
-- Simulates the exact behavior that occurred
-
-**Use cases:**
-- Validate scheduler correctness against historical data
-- Understand past system behavior
-- Compare how different schedulers would have performed on real workloads
-- Verify trace processing correctness
-
-**Example:**
-```bash
-# Replay with actual run times from trace
-./simulator trace.csv \
-    --duration_mode actual \
-    --run_time_mode column
-```
+DR_EVT supports different modes for processing job traces:
 
 #### Simulation Mode (`--duration_mode limit`, default)
 
-**Purpose:** Predict what WOULD happen under different conditions
+**Purpose:** Simulate scheduling decisions with realistic scheduler knowledge
 
-**Input:** Trace with user-requested time limits
-- Uses `time_limit` column (what users requested)
-- Actual run time not required
+**Input:** Trace with job submissions and time limits
+- Requires: `submit_time`, `time_limit`, job size
+- Scheduler plans using time limits (realistic)
+- Jobs run according to `--run_time_mode` setting
 
-**Output:** Predicted schedule based on scheduler decisions
-- Jobs run for simulated durations (controlled by `--run_time_mode`)
+**Use cases:**
+- Standard HPC scheduling simulation
+- Compare scheduling policies
+- Predict scheduler performance
+
+**Example:**
+```bash
+# Standard simulation
+./simulator trace.csv \
+    --duration_mode limit \
+    --backfill_policy easy
+```
+
+#### Oracle Mode (`--duration_mode actual`)
+
+**Purpose:** Upper bound on scheduler performance (perfect knowledge)
+
+**Input:** Trace with actual job durations
+- Requires: `submit_time`, `actual_run_time`, job size
+- Scheduler knows exact runtime in advance (omniscient)
+- Unrealistic but useful for comparison
+
+**Use cases:**
+- Theoretical best-case performance analysis
+- Algorithm comparison baseline
+- Upper bound on achievable utilization
+
+**Example:**
+```bash
+# Oracle mode (scheduler omniscience)
+./simulator trace.csv \
+    --duration_mode actual
+```
+
+#### Replay Mode
+
+**Purpose:** Generate resource traces from historical or pre-computed schedules
+
+**Input:** Trace with pre-computed schedule
+- Requires: `begin_time`, `end_time`, job size
+- Scheduler is bypassed (uses provided times)
+- Can replay simulation output or historical HPC logs
+- Supports `advance_to()` for incremental processing
+
+**Use cases:**
+- Generate resource usage traces from historical schedules
+- Validate resource accounting correctness
+- Reproduce execution for debugging/visualization
+- Analyze utilization of past system behavior
+- Stream historical data for real-time visualization
+
+**Example:**
+```bash
+# Step 1: Run simulation
+./simulator input.csv --outfile schedule.csv --resource_trace sim.csv
+
+# Step 2: Replay the schedule
+./simulator schedule.csv --resource_trace replay.csv
+
+# Step 3: Verify (should be identical)
+diff sim.csv replay.csv
+```
+
+**Note:** Replay mode works with both batch (`run()`) and streaming (`advance_to()`) APIs, making it suitable for real-time visualization and incremental processing.
 
 **Run time modes:**
 - `exact` (default): Jobs run exactly `time_limit` (perfect estimates)

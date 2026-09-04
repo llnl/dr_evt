@@ -27,7 +27,7 @@ EOF
   --total_nodes 100 \
   --trace_format simple \
   --timestamp_format epoch \
-  --duration_mode exact \
+  --run_time_mode exact \
   --backfill_policy easy \
   --outfile results.csv
 ```

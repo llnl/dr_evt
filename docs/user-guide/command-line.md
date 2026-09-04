@@ -429,22 +429,19 @@ Display help message with all options.
     --verbose
 ```
 
-### Replay Mode (Reproduce Historical Behavior)
+### Oracle Mode (Scheduler Omniscience)
 ```bash
-# duration_mode=actual + run_time_mode=column together reproduce exactly
-# what happened on the real system: the job's real, observed run time
-# drives both the scheduler's decisions and how long each job actually
-# takes.
+# duration_mode=actual gives the scheduler perfect knowledge of job runtimes.
+# This is unrealistic but provides an upper bound on scheduling performance.
 ./build/simulator production_trace.csv \
     --total_nodes 2048 \
     --trace_format lassen \
     --timestamp_format iso \
     --timezone America/Los_Angeles \
     --duration_mode actual \
-    --run_time_mode column \
     --backfill_policy easy \
     --priority_policy fcfs \
-    --outfile replay_results.csv
+    --outfile oracle_results.csv
 ```
 
 ### Different Scheduling Policies
