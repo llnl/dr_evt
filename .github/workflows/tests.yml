@@ -168,6 +168,19 @@ jobs:
           echo "========================================"
           ./tests/run_feature_tests.sh
 
+      - name: Run Conservative Backfilling Tests
+        run: |
+          echo "========================================"
+          echo "Running Conservative Backfilling Tests (2 tests)"
+          echo "========================================"
+          echo ""
+          echo "Test 1: Behavioral Correctness (EASY vs CONSERVATIVE)"
+          ./tests/test_easy_vs_conservative_correctness.sh
+          echo ""
+          echo "Test 2: Implementation Equivalence (C++ vs Python)"
+          echo "Note: Using 100 jobs for CI (full 2000-job test takes ~8 minutes)"
+          ./tests/compare_cpp_python_conservative.sh tests/test_traces/scale/large_100jobs.csv 1000
+
       - name: Run Replay Tests
         run: |
           echo "========================================"
@@ -227,6 +240,7 @@ jobs:
           echo "  Duration/Run Time Mode: 4 tests (duration_mode=actual overrides run_time_mode; distribution capping at time_limit)"
           echo "  Unit: 7 tests (5/7 - 2 known-broken, incomplete fixture data)"
           echo "  Feature: 3 tests"
+          echo "  Conservative Backfilling: 2 tests (behavioral correctness + C++/Python equivalence)"
           echo "  Replay: 3 tests (methodology also verified against more)"
           echo "  Config: 4 tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON, now enabled)"
           echo "  Python API: 9 tests (requires -DDR_EVT_BUILD_PYTHON=ON)"

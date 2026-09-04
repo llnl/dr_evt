@@ -336,9 +336,10 @@ dr_evt.BackfillPolicy.CONSERVATIVE  # Conservative backfilling
 ### PriorityPolicy
 
 ```python
-dr_evt.PriorityPolicy.FCFS  # First-Come-First-Served (default)
-dr_evt.PriorityPolicy.SJF   # Shortest Job First
-dr_evt.PriorityPolicy.LJF   # Longest Job First
+dr_evt.PriorityPolicy.FCFS              # First-Come-First-Served (default)
+dr_evt.PriorityPolicy.FCFS_CONSERVATIVE # FCFS with conservative backfilling
+dr_evt.PriorityPolicy.SJF               # Shortest Job First
+dr_evt.PriorityPolicy.LJF               # Longest Job First
 ```
 
 ### RunTimeMode
@@ -664,7 +665,7 @@ Some parameters are not yet exposed in Python bindings:
 
 ## API Reference
 
-Full API documentation: [python/README.md](../python/README.md)
+Full API documentation: [python/README.md](https://github.com/llnl/dr_evt/blob/main/python/README.md)
 
 CLI options reference: [command-line.md](user-guide/command-line.md)
 
@@ -700,8 +701,8 @@ To add new Python bindings:
 
 - [CLI Options](user-guide/command-line.md) - Complete CLI reference
 - [C++ Streaming API](STREAMING_API.md) - C++ API documentation
-- [Python Examples](../python/example_streaming.py) - Working code examples
-- [Python API Details](../python/README.md) - Detailed Python reference
+- [Python Examples](https://github.com/llnl/dr_evt/blob/main/python/example_streaming.py) - Working code examples
+- [Python API Details](https://github.com/llnl/dr_evt/blob/main/python/README.md) - Detailed Python reference
 - [EASY Backfilling Algorithm](EASY_BACKFILLING_ALGORITHM.md) - Algorithm description
 
 ---

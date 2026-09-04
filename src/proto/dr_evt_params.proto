@@ -31,7 +31,7 @@ message DR_EVT_Params {
         // Scheduling parameters
         uint32 total_nodes = 8;         // System node count (default: 795)
         string backfill_policy = 9;     // "easy", "conservative" or "none" (default: "easy")
-        string priority_policy = 10;    // "fcfs", "sjf", or "ljf" (default: "fcfs")
+        string priority_policy = 10;    // "fcfs", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
         string duration_mode = 11;       // "limit" or "actual" (default: "limit")
 
         // Trace format parameters

@@ -38,7 +38,7 @@ if(NOT Boost_FOUND OR NOT BOOST_LIBS_FOUND)
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
 
-    set(BOOST_INCLUDE_LIBRARIES regex filesystem system program_options serialization container multi_index)
+    set(BOOST_INCLUDE_LIBRARIES regex filesystem system program_options serialization container multi_index circular_buffer)
     set(BOOST_ENABLE_CMAKE ON)
 
     # Boost's own source (e.g. libs/thread/src/future.cpp, pulled in as a
@@ -65,7 +65,7 @@ if(NOT Boost_FOUND OR NOT BOOST_LIBS_FOUND)
     set(Boost_FOUND TRUE CACHE BOOL "Boost found via FetchContent")
     # For boost CMake layout, need to add libs/*/include paths for header-only libraries
     set(Boost_INCLUDE_DIRS
-        "${boost_SOURCE_DIR};${boost_SOURCE_DIR}/libs/multi_index/include;${boost_SOURCE_DIR}/libs/serialization/include;${boost_SOURCE_DIR}/libs/container/include"
+        "${boost_SOURCE_DIR};${boost_SOURCE_DIR}/libs/multi_index/include;${boost_SOURCE_DIR}/libs/serialization/include;${boost_SOURCE_DIR}/libs/container/include;${boost_SOURCE_DIR}/libs/circular_buffer/include"
         CACHE PATH "Boost include directories")
     set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}" CACHE PATH "Boost include directory")
 
@@ -83,7 +83,8 @@ if(NOT Boost_FOUND OR NOT BOOST_LIBS_FOUND)
         "${boost_SOURCE_DIR}"
         "${boost_SOURCE_DIR}/libs/multi_index/include"
         "${boost_SOURCE_DIR}/libs/serialization/include"
-        "${boost_SOURCE_DIR}/libs/container/include")
+        "${boost_SOURCE_DIR}/libs/container/include"
+        "${boost_SOURCE_DIR}/libs/circular_buffer/include")
     set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}")
     set(Boost_LIBRARIES
         Boost::regex

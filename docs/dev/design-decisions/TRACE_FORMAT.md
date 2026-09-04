@@ -119,7 +119,7 @@ than header name.
 - `begin_time` and `end_time` from trace are used to calculate job duration
 - For simulation, the scheduler **computes** actual start time
 - Jobs run for the historical duration: `duration = end_time - begin_time`
-- See [Simulation vs Replay Modes](SIMULATION_VS_REPLAY_MODES.md) for replay vs simulation distinction
+- See [Replay Mode](../../user-guide/command-line.md) (specifically "Replay Mode (Reproduce Historical Behavior)") for replay vs simulation distinction
 
 ### Lassen Format
 33-column format specific to LLNL HPC traces. Columns used:
@@ -145,7 +145,7 @@ than header name.
 
 ## To Complete Epoch Support
 
-The remaining work is in [src/trace/job_io.cpp](src/trace/job_io.cpp) or [src/trace/parse_utils.cpp](src/trace/parse_utils.cpp):
+The remaining work is in [src/trace/job_io.cpp](https://github.com/llnl/dr_evt/blob/main/src/trace/job_io.cpp) or [src/trace/parse_utils.cpp](https://github.com/llnl/dr_evt/blob/main/src/trace/parse_utils.cpp):
 
 ```cpp
 epoch_t parse_time(const std::string& time_str, const Data_Columns& dcols) {
