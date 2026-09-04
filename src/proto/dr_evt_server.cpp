@@ -234,7 +234,7 @@ void RunServer(const std::string& address)
     builder.RegisterService(&service);
 
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "DR_EVT simulation server listening on " << address << std::endl;
+    std::cout << "DR_EVT simulation server listening on " + address + "\n";
     server->Wait();
 }
 

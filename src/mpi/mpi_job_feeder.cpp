@@ -177,8 +177,9 @@ int main(int argc, char** argv) {
                 jobs_submitted++;
 
                 if (params.m_verbose && jobs_submitted <= 5) {
-                    std::cout << "[Rank " << rank << "] Submitted job " << job_idx
-                             << " at t=" << global_next_submit << "\n";
+                    std::cout << "[Rank " + std::to_string(rank) + "] Submitted job " +
+                                 std::to_string(job_idx) + " at t=" +
+                                 std::to_string(global_next_submit) + "\n";
                 }
 
                 next_job_idx++;
@@ -213,21 +214,21 @@ int main(int argc, char** argv) {
 
         // Report results
         if (rank == 0) {
-            std::cout << "\n====================================\n";
-            std::cout << "Distributed Submission Complete\n";
-            std::cout << "====================================\n";
-            std::cout << "Total jobs submitted: " << total_submitted << "\n";
-            std::cout << "Jobs completed: " << sim.get_trace().data().size() << "\n";
-            std::cout << "Final time: " << sim.get_current_time() << "\n";
-            std::cout << "Nodes in use: " << sim.get_nodes_in_use() << "\n";
-            std::cout << "\n";
+            std::cout << "\n====================================\n"
+                         "Distributed Submission Complete\n"
+                         "====================================\n" +
+                         std::string("Total jobs submitted: ") + std::to_string(total_submitted) + "\n" +
+                         std::string("Jobs completed: ") + std::to_string(sim.get_trace().data().size()) + "\n" +
+                         std::string("Final time: ") + std::to_string(sim.get_current_time()) + "\n" +
+                         std::string("Nodes in use: ") + std::to_string(sim.get_nodes_in_use()) + "\n\n";
 
             // Write output
             sim.write_simulated_trace();
             std::cout << "\nResults written to output files.\n";
         } else {
             // Other ranks print their statistics
-            std::cout << "[Rank " << rank << "] Jobs submitted: " << jobs_submitted << "\n";
+            std::cout << "[Rank " + std::to_string(rank) + "] Jobs submitted: " +
+                         std::to_string(jobs_submitted) + "\n";
         }
 
         MPI_Barrier(MPI_COMM_WORLD);

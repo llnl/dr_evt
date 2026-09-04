@@ -71,8 +71,8 @@ void Simulation::run()
     initialize_trace();
 
     if (m_params.m_verbose) {
-        std::cout << "Loaded " << m_trace.data().size() << " jobs from trace" << std::endl;
-        std::cout << "Running simulation with " << m_params.m_total_nodes << " nodes" << std::endl;
+        std::cout << "Loaded " + std::to_string(m_trace.data().size()) + " jobs from trace\n";
+        std::cout << "Running simulation with " + std::to_string(m_params.m_total_nodes) + " nodes\n";
     }
 
     // Record initial resource state (all nodes free)
@@ -99,9 +99,9 @@ void Simulation::run()
     }
 
     if (m_params.m_verbose) {
-        std::cout << "Simulation complete" << std::endl;
-        std::cout << "Jobs submitted: " << m_jobs_submitted << std::endl;
-        std::cout << "Jobs completed: " << m_jobs_completed << std::endl;
+        std::cout << "Simulation complete\n" +
+                     std::string("Jobs submitted: ") + std::to_string(m_jobs_submitted) + "\n" +
+                     std::string("Jobs completed: ") + std::to_string(m_jobs_completed) + "\n";
     }
 }
 
