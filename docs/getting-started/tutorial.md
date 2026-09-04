@@ -135,7 +135,7 @@ Result: Job 1 would wait until Job 0 completes, even though resources are availa
 
 - [Command-Line Options](../user-guide/command-line.md) - All available options
 - [User Guide](../user-guide/overview.md) - Complete guide with trace formats and scheduling policies
-- [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Algorithm specification
+- [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE specifications
 - [Testing Guide](../TESTING_GUIDE.md) - How we verify correctness
 
 ## Exercises
