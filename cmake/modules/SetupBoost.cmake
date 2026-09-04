@@ -3,6 +3,12 @@
 
 cmake_minimum_required(VERSION 3.24)
 
+# CMake 3.30+ deprecated FindBoost.cmake in favor of BoostConfig.cmake
+# Set policy to use modern Boost CMake support
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
+
 # Configure search path for Boost
 if (DEFINED BOOST_ROOT)
     message(STATUS "BOOST_ROOT: ${BOOST_ROOT}")
@@ -38,12 +44,7 @@ if(NOT Boost_FOUND)
     set(BOOST_INCLUDE_LIBRARIES regex filesystem system program_options serialization container multi_index circular_buffer)
     set(BOOST_ENABLE_CMAKE ON)
 
-    # Boost's own source (e.g. libs/thread/src/future.cpp, pulled in as a
-    # transitive dependency of the components above, not requested directly)
-    # triggers warnings under our project's warning flags - e.g.
-    # -Wnon-virtual-dtor on boost::thread_detail::future_error_category. These
-    # are Boost's own code, not ours, and not something we can fix here, so
-    # suppress warnings for Boost's build specifically.
+    # Suppress compiler warnings from third-party Boost code
     set(_dr_evt_saved_cxx_flags "${CMAKE_CXX_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
 

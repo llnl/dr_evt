@@ -1,57 +1,49 @@
+# Setup Protobuf using FetchContent (consistent with Boost, gRPC, pybind11)
+# Replaces old ExternalProject approach
+
 if (BUILD_PROTOBUF)
-  project(Protobuf C CXX)
-  cmake_minimum_required(VERSION 3.12)
-endif ()
+  message(STATUS "Building Protobuf via FetchContent...")
 
-set(PROTOBUF_URL "https://github.com/protocolbuffers/protobuf.git"
-    CACHE STRING "The URL from which to clone PROTOBUF")
+  include(FetchContent)
 
-# ... then the tag.
-# Updated to v21.12 (compatible with modern CMake)
-set(PROTOBUF_TAG "v21.12"
-  CACHE STRING "The git tag or hash to checkout for PROTOBUF")
+  # Pinned version - v21.12 (compatible with modern CMake)
+  set(PROTOBUF_TAG "v21.12" CACHE STRING "The git tag to checkout for Protobuf")
 
-set(PROTOBUF_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}"
-  CACHE STRING "The build type for PROTOBUF.")
+  # Suppress compiler warnings from third-party Protobuf code
+  set(_dr_evt_saved_cxx_flags "${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
 
-set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
-#set(CMAKE_GENERATOR "Ninja" CACHE INTERNAL "" FORCE)
+  # Disable Protobuf tests and examples
+  set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
 
-# Ensure install directory exists and is writable
-file(MAKE_DIRECTORY "${CMAKE_INSTALL_PREFIX}")
+  # Without this, FetchContent re-contacts git on every configure
+  set(FETCHCONTENT_UPDATES_DISCONNECTED_protobuf ON)
 
-message(STATUS "INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
-include(ExternalProject)
-ExternalProject_Add(PROTOBUF_PROJECT
-  PREFIX "${CMAKE_CURRENT_BINARY_DIR}"
-  TMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/tmp"
-  STAMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/stamp"
-  "GIT_REPOSITORY" ${PROTOBUF_URL}
-  "GIT_TAG" ${PROTOBUF_TAG}
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/src"
-  SOURCE_SUBDIR cmake
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/build"
-  INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
-  STEP_TARGETS download
-  USES_TERMINAL_BUILD 1
-  LOG_DOWNLOAD 1
-  LOG_UPDATE 1
-  LOG_CONFIGURE 1
-  LOG_BUILD 1
-  LOG_INSTALL 1
-  LOG_TEST 1
-  CMAKE_ARGS
-  -G${CMAKE_GENERATOR}
-  -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
-  -DCMAKE_BUILD_TYPE=${PROTOBUF_CMAKE_BUILD_TYPE}
-  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-  -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-  -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
-  -DCMAKE_MACOSX_RPATH=ON
-  -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-  -Dprotobuf_BUILD_TESTS=OFF
-  -DBUILD_SHARED_LIBS=ON
+  FetchContent_Declare(
+    protobuf
+    GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
+    GIT_TAG        ${PROTOBUF_TAG}
   )
-set(PROTOBUF_DIR ${CMAKE_INSTALL_PREFIX}
-  CACHE INTERNAL "The install prefix of Protobuf.")
+
+  FetchContent_MakeAvailable(protobuf)
+
+  # Restore flags
+  set(CMAKE_CXX_FLAGS "${_dr_evt_saved_cxx_flags}")
+  unset(_dr_evt_saved_cxx_flags)
+
+  # Create aliases if needed (FetchContent gives non-namespaced targets)
+  if (NOT TARGET protobuf::libprotobuf)
+    add_library(protobuf::libprotobuf ALIAS libprotobuf)
+  endif()
+  if (NOT TARGET protobuf::protoc)
+    add_executable(protobuf::protoc ALIAS protoc)
+  endif()
+
+  # Set variable for SetupProtobuf.cmake to find
+  set(PROTOBUF_DIR "${protobuf_BINARY_DIR}" CACHE INTERNAL "Protobuf build directory")
+  set(Protobuf_FOUND TRUE CACHE BOOL "Protobuf found via FetchContent")
+
+  message(STATUS "Protobuf fetched to: ${protobuf_SOURCE_DIR}")
+endif()

@@ -600,6 +600,20 @@ if(MPI_CXX_FOUND)
   list(APPEND DR_EVT_UNIT_TEST_TARGETS test_mpi_streaming-bin)
 endif()
 
+# Install Boost libraries if built via FetchContent
+if(NOT Boost_FOUND OR EXISTS "${CMAKE_BINARY_DIR}/_deps/boost-build")
+  file(GLOB BOOST_LIBS
+    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/filesystem/libboost_filesystem*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
+    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/program_options/libboost_program_options*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
+    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/system/libboost_system*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
+    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/regex/libboost_regex*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
+    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/container/libboost_container*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
+  )
+  if(BOOST_LIBS)
+    install(FILES ${BOOST_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  endif()
+endif()
+
 # Install the binaries
 install(
   TARGETS  ${DR_EVT_EXEC_TARGETS}

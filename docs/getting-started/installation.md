@@ -58,6 +58,11 @@ make -j$(nproc)
 
 **Note**: First build downloads and compiles dependencies (~5-10 minutes if gRPC/Protobuf not installed). Subsequent builds are fast.
 
+**CMake warnings**: You will see deprecation warnings from third-party dependencies (Boost, pybind11). These are harmless and come from their old cmake_minimum_required versions. To suppress them:
+```bash
+cmake .. -Wno-author -DDR_EVT_BUILD_PYTHON=ON
+```
+
 ### CMake Configuration Options
 
 **Boost:**
