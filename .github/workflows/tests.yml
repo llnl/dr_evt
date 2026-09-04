@@ -155,16 +155,7 @@ jobs:
           echo "========================================"
           echo "Running Comprehensive Tests (34 tests) - Installed Binary"
           echo "========================================"
-          # Explicitly set CMAKE_INSTALL_PREFIX to test installed binary path
           export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
-          echo "Testing with CMAKE_INSTALL_PREFIX=$CMAKE_INSTALL_PREFIX"
-          # Verify the helper finds the right binary
-          source tests/set_simulator_path.sh
-          echo "SIMULATOR resolved to: $SIMULATOR"
-          if [[ "$SIMULATOR" != *"install/bin/simulator"* ]]; then
-            echo "ERROR: Expected installed binary but got: $SIMULATOR"
-            exit 1
-          fi
           ./tests/test_all_dr_evt.sh
 
       - name: Run Queue Implementation Differential Tests

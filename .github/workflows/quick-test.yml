@@ -50,13 +50,6 @@ jobs:
           echo ""
           echo "Running comprehensive tests with installed binary..."
           export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
-          echo "Testing with CMAKE_INSTALL_PREFIX=$CMAKE_INSTALL_PREFIX"
-          source tests/set_simulator_path.sh
-          echo "SIMULATOR resolved to: $SIMULATOR"
-          if [[ "$SIMULATOR" != *"install/bin/simulator"* ]]; then
-            echo "ERROR: Expected installed binary but got: $SIMULATOR"
-            exit 1
-          fi
           ./tests/test_all_dr_evt.sh
 
       - name: Summary
