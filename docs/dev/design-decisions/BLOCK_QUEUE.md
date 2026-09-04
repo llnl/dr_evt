@@ -135,10 +135,10 @@ See [`BLOCK_QUEUE_TESTING.md`](BLOCK_QUEUE_TESTING.md) for details.
 
 ```bash
 # Default (deque)
-./simulator trace.csv --priority_policy fcfs
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs
 
 # Block queue with specific size
-./simulator trace.csv --priority_policy fcfs \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs \
     --queue_impl block --block_size 16
 
 # Supported sizes: 4, 8, 16, 32, 64, 128, 256 (power of 2)

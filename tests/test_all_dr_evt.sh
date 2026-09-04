@@ -6,16 +6,11 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
-TRACE_DIR="tests/test_traces/comprehensive"
-SIMULATOR="./build/simulator"
-TOTAL_NODES=100
+# Find simulator binary (tries CMAKE_INSTALL_PREFIX first, then build dir)
+source "$SCRIPT_DIR/set_simulator_path.sh"
 
-# Check if simulator exists
-if [ ! -f "$SIMULATOR" ]; then
-    echo "Error: Simulator not found: $SIMULATOR"
-    echo "Build first: cd build && cmake .. && make"
-    exit 1
-fi
+TRACE_DIR="tests/test_traces/comprehensive"
+TOTAL_NODES=100
 
 # Test list - all 34 tests
 TESTS=(

@@ -737,12 +737,12 @@ Both algorithms are implemented in DR_EVT:
 
 **EASY**:
 ```bash
-./simulator trace.csv --priority_policy fcfs --backfill_policy easy
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --backfill_policy easy
 ```
 
 **CONSERVATIVE**:
 ```bash
-./simulator trace.csv --priority_policy fcfs_conservative --backfill_policy conservative
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs_conservative --backfill_policy conservative
 ```
 
 **Python References**:

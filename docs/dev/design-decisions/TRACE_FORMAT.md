@@ -50,7 +50,7 @@ Examples:
 
 ### Simple Test Trace with Epoch Times
 ```bash
-./simulator test_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator test_trace.csv \
   --trace_format simple \
   --timestamp_format epoch \
   --total_nodes 100 \
@@ -59,7 +59,7 @@ Examples:
 
 ### Simple Trace with ISO Timestamps
 ```bash
-./simulator test_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator test_trace.csv \
   --trace_format simple \
   --timestamp_format iso \
   --timezone UTC \
@@ -68,7 +68,7 @@ Examples:
 
 ### Lassen Format (Default)
 ```bash
-./simulator lassen_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
   --total_nodes 795
 # Uses defaults: lassen format, iso timestamps, America/Los_Angeles timezone
 ```
@@ -174,7 +174,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 EOF
 
 # Run test
-./simulator test.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator test.csv \
   --trace_format simple \
   --timestamp_format epoch \
   --total_nodes 100 \

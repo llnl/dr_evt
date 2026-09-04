@@ -92,12 +92,12 @@ jobs:
           echo "Building Python bindings against: $PYTHON_EXE ($($PYTHON_EXE --version))"
           # Fresh build directory: avoids picking up a stale .so left over
           # from an earlier configure against a different Python version.
-          rm -rf build
+          rm -rf build install
           mkdir -p build
           cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install \
+            -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install \
             -DDR_EVT_BUILD_PYTHON=ON \
             -DDR_EVT_ENABLE_PROTOBUF=ON \
             -DDR_EVT_ENABLE_GRPC=ON \
@@ -121,17 +121,41 @@ jobs:
           make dr_evt_server-bin dr_evt_client-bin
           make test_grpc_multi_client_server-bin || true
 
+      - name: Install
+        run: |
+          cd build
+          make install
+          echo "Installed binaries:"
+          ls -lh $GITHUB_WORKSPACE/install/bin/
+          echo "Installed libraries:"
+          ls -lh $GITHUB_WORKSPACE/install/lib/ | head -20
+
       - name: Check build artifacts
         run: |
           ls -lh build/simulator
           ./build/simulator --help || true
+          echo ""
+          echo "Testing installed binary:"
+          ls -lh install/bin/simulator
+          install/bin/simulator --help || true
 
-      - name: Run Comprehensive Tests
+      - name: Run Comprehensive Tests (Build Directory)
         id: comprehensive
         run: |
           echo "========================================"
-          echo "Running Comprehensive Tests (34 tests)"
+          echo "Running Comprehensive Tests (34 tests) - Build Directory"
           echo "========================================"
+          # Explicitly unset CMAKE_INSTALL_PREFIX to test build directory fallback
+          unset CMAKE_INSTALL_PREFIX
+          ./tests/test_all_dr_evt.sh
+
+      - name: Run Comprehensive Tests (Installed Binary)
+        id: comprehensive-installed
+        run: |
+          echo "========================================"
+          echo "Running Comprehensive Tests (34 tests) - Installed Binary"
+          echo "========================================"
+          export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
           ./tests/test_all_dr_evt.sh
 
       - name: Run Queue Implementation Differential Tests
@@ -247,7 +271,8 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Comprehensive (34 tests): ${{ steps.comprehensive.outcome }}"
+          echo "  Comprehensive - Build (34 tests): ${{ steps.comprehensive.outcome }}"
+          echo "  Comprehensive - Installed (34 tests): ${{ steps.comprehensive-installed.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
           echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"
           echo "  Duration/Run Time Mode (4 tests): ${{ steps.duration-mode.outcome }}"

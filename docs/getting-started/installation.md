@@ -53,7 +53,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
 # Binary location
-./simulator --help
+${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 ```
 
 **Note**: First build downloads and compiles dependencies (~5-10 minutes if gRPC/Protobuf not installed). Subsequent builds are fast.
@@ -123,6 +123,26 @@ cmake .. \
   -DBOOST_ROOT=/opt/homebrew/opt/boost
 make -j$(nproc)
 ```
+
+**Livermore Computing (LC) HPC systems:**
+```bash
+mkdir build && cd build
+cmake .. \
+  -DDR_EVT_ENABLE_GRPC=ON \
+  -DDR_EVT_BUILD_PYTHON=ON \
+  -DAVOID_SYSTEM_GRPC=ON \
+  -DAVOID_SYSTEM_BOOST=ON \
+  -DCMAKE_INSTALL_PREFIX=$(realpath ../install)
+make -j$(nproc)
+make install
+
+# Set up environment
+export CMAKE_INSTALL_PREFIX=$(realpath ../install)
+export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
+export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
+```
+
+The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed libraries (common on HPC systems with multiple compiler toolchains).
 
 ## Installation
 

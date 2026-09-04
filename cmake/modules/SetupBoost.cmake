@@ -13,23 +13,28 @@ endif()
 option(AVOID_SYSTEM_BOOST "Do not search default system paths for Boost" FALSE)
 
 # Configure search path for Boost
-if (DEFINED BOOST_ROOT)
+if (AVOID_SYSTEM_BOOST)
+    message(STATUS "AVOID_SYSTEM_BOOST=ON: skipping system Boost search")
+    set(Boost_NO_SYSTEM_PATHS ON)
+    set(DR_EVT_BOOST_SEARCH_MODE NO_DEFAULT_PATH)
+elseif (DEFINED BOOST_ROOT)
     message(STATUS "BOOST_ROOT: ${BOOST_ROOT}")
     set(Boost_NO_SYSTEM_PATHS ON)
+    set(DR_EVT_BOOST_SEARCH_MODE NO_DEFAULT_PATH)
 elseif (DEFINED ENV{BOOST_ROOT})
     message(STATUS "ENV BOOST_ROOT: $ENV{BOOST_ROOT}")
     set(Boost_NO_SYSTEM_PATHS ON)
-elseif (AVOID_SYSTEM_BOOST)
-    message(STATUS "AVOID_SYSTEM_BOOST=ON: skipping system Boost search")
-    set(Boost_NO_SYSTEM_PATHS ON)
-endif ()
+    set(DR_EVT_BOOST_SEARCH_MODE NO_DEFAULT_PATH)
+else()
+    set(DR_EVT_BOOST_SEARCH_MODE "")
+endif()
 
 # Modern CMake 3.24+ approach: find_package with REQUIRED COMPONENTS
 # Automatically creates Boost::component imported targets
 #
 # Note: Unlike gRPC/Protobuf (which use CONFIG mode with HINTS), FindBoost
 # uses MODULE mode and reads BOOST_ROOT and Boost_NO_SYSTEM_PATHS variables
-# directly. No HINTS parameter needed.
+# directly, plus NO_DEFAULT_PATH when AVOID_SYSTEM_BOOST is set.
 find_package(Boost QUIET COMPONENTS
     regex
     filesystem
@@ -37,6 +42,7 @@ find_package(Boost QUIET COMPONENTS
     program_options
     serialization
     container
+    ${DR_EVT_BOOST_SEARCH_MODE}
 )
 
 if(NOT Boost_FOUND)

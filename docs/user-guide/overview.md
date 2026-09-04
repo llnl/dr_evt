@@ -13,7 +13,7 @@ DR_EVT (Discrete Resource Event Modeling) is a high-performance HPC job schedule
 ### Basic Usage
 
 ```bash
-./simulator my_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator my_trace.csv \
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
@@ -60,7 +60,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 
 **Usage**:
 ```bash
-./simulator trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
   --trace_format simple \
   --timestamp_format epoch \
   --total_nodes 100
@@ -75,7 +75,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 
 **Usage**:
 ```bash
-./simulator lassen_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
   --trace_format lassen \
   --timestamp_format iso \
   --timezone America/Los_Angeles \
@@ -274,7 +274,7 @@ Scheduler plans using the job's real, observed run time (from trace).
 
 Test with synthetic trace (realistic mode):
 ```bash
-./simulator test_traces/epoch_pbatch.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator test_traces/epoch_pbatch.csv \
   --trace_format simple \
   --timestamp_format epoch \
   --total_nodes 100 \
@@ -287,7 +287,7 @@ Test with synthetic trace (realistic mode):
 
 Simulate Lassen trace:
 ```bash
-./simulator lassen_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
   --trace_format lassen \
   --timestamp_format iso \
   --timezone America/Los_Angeles \
@@ -302,10 +302,10 @@ Simulate Lassen trace:
 Compare EASY vs Conservative:
 ```bash
 # EASY backfill
-./simulator trace.csv --backfill_policy easy -o results_easy.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --backfill_policy easy -o results_easy.txt
 
 # Conservative backfill  
-./simulator trace.csv --backfill_policy conservative -o results_conservative.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --backfill_policy conservative -o results_conservative.txt
 
 # Compare results
 diff results_easy.txt results_conservative.txt
@@ -316,10 +316,10 @@ diff results_easy.txt results_conservative.txt
 Compare FCFS vs SJF:
 ```bash
 # FCFS
-./simulator trace.csv --priority_policy fcfs -o results_fcfs.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs -o results_fcfs.txt
 
 # SJF
-./simulator trace.csv --priority_policy sjf -o results_sjf.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy sjf -o results_sjf.txt
 ```
 
 ### Example 5: Run Time Estimation Impact
@@ -327,10 +327,10 @@ Compare FCFS vs SJF:
 Compare oracle vs realistic:
 ```bash
 # Oracle (perfect information)
-./simulator trace.csv --duration_mode actual -o results_oracle.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --duration_mode actual -o results_oracle.txt
 
 # Realistic (user time limits)
-./simulator trace.csv --duration_mode limit -o results_realistic.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --duration_mode limit -o results_realistic.txt
 ```
 
 ## Understanding Output
@@ -397,7 +397,7 @@ EOF
 ### 2. Run Simulation
 
 ```bash
-./simulator my_test.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator my_test.csv \
   --trace_format simple \
   --timestamp_format epoch \
   --total_nodes 100 \

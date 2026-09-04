@@ -38,12 +38,18 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
           make -j$(nproc)
+          make install
 
       - name: Run Comprehensive Tests Only
         run: |
-          echo "Running comprehensive tests (most important)..."
+          echo "Running comprehensive tests with build directory..."
+          unset CMAKE_INSTALL_PREFIX
+          ./tests/test_all_dr_evt.sh
+          echo ""
+          echo "Running comprehensive tests with installed binary..."
+          export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
           ./tests/test_all_dr_evt.sh
 
       - name: Summary

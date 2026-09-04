@@ -32,7 +32,7 @@ sim_setup {
 
 Run with:
 ```bash
-./simulator --config sim_config.textproto trace.csv
+${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto trace.csv
 ```
 
 ### Complete Example
@@ -80,7 +80,7 @@ sim_setup {
 
 Run with:
 ```bash
-./simulator --config advanced_config.textproto
+${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 ```
 
 ## Configuration Options Reference
@@ -203,7 +203,7 @@ Command-line arguments override protobuf config values:
 
 ```bash
 # Config file says total_nodes: 1000
-./simulator --config sim_config.textproto --total_nodes 2000
+${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto --total_nodes 2000
 
 # Result: Uses 2000 nodes (command-line wins)
 ```
