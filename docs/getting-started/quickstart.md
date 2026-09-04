@@ -275,8 +275,4 @@ For issues or questions:
 ## What's Next?
 
 Planned features:
-- Python bindings for easier integration
-- Additional scheduling policies
-- Real-time visualization
-- Multi-queue support
-- Checkpoint/restart capability
+- Checkpoint/restart capability for long-running simulations

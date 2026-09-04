@@ -7,7 +7,7 @@
 
 DR_EVT simulates HPC job scheduling policies with EASY and CONSERVATIVE backfilling
 implementations. Uniquely supports **online simulation via gRPC**, enabling coordinated
-multi-cluster simulations where distributed schedulers interact in real-time.
+multi-cluster simulations in a distributed fashion and digital-twin scheduler interacting in real-time.
 
 Scheduler behavior is verified against from-scratch Python reference implementations
 (consistency check between implementations, not independently derived ground truth).
@@ -117,7 +117,7 @@ DR_EVT simulates discrete event-driven HPC job scheduling with:
   independent Python reference implementations (consistency checks, not
   mathematical ground truth - see Testing Guide)
 - **gRPC-based online simulation service** enabling coordinated multi-cluster
-  simulations where distributed schedulers interact in real-time
+  simulations in a distributed fashion and digital-twin scheduler interacting in real-time
 - **Replay and simulation modes** for both offline analysis and online operation
 - **Streaming API** for incremental job submission and online scheduling decisions
 - **Real HPC trace support** (Lassen format) plus simpler CSV format

@@ -97,27 +97,84 @@ make linkcheck
 ```
 
 
-## Current Requirements:
- + **Platforms targeted**: Linux-based systems
- + **c++ compiler that supports c++17**
- + **GNU Boost library**
- + **cmake 3.24 or later**
- + [**Protocol Buffers**](https://developers.google.com/protocol-buffers)
+## Requirements
 
-   We use the google protocol buffers library for parsing the configuration file
-   of simulation, which is written by users in the [**protocol buffers language**](https://developers.google.com/protocol-buffers/docs/proto3).
-   This is a required package. A user can indicate the location of a
-   pre-installed copy via `-DPROTOBUF_ROOT=<path>`. Without it, building DR_EVT
-   consists of two stages. In the first stage, the source of protocol buffer will
-   be downloaded. Then, the library as well as the protoc compiler will be built
-   and installed under where the rest of DR_EVT project will be.
-   In the second stage, the DR_EVT project will be built using the protocol buffer
-   installed in the first stage. Both stages require the same set of options for
-   the cmake command.
-   In case of cross-compiling, the path to the protoc compiler and the path to
-   the library built for the target platform can be explicitly specified via
-   `-DProtobuf_PROTOC_EXECUTABLE=<installation-for-host/bin/protoc>`
-   and `-DPROTOBUF_DIR=<installation-for-target>` respectively.
+### Required
+ + **Platforms**: Linux-based systems (macOS may work but not officially supported)
+ + **C++ compiler**: C++17 support (GCC 7+, Clang 5+, or newer)
+ + **CMake**: 3.24 or later
+ + **Boost**: Components required: `regex`, `filesystem`, `system`, `program_options`, `serialization`, `container`
+   - Tested with Boost 1.70+
+   - Install: `apt-get install libboost-all-dev` (Ubuntu/Debian) or `brew install boost` (macOS)
+ + [**Protocol Buffers**](https://developers.google.com/protocol-buffers): Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
+
+### Optional (for full features)
+
+**Python 3.7+**: For Python bindings (`-DDR_EVT_BUILD_PYTHON=ON`)
+- Python development headers required: `apt-get install python3-dev`
+- pybind11 auto-downloaded via FetchContent if not found
+
+**gRPC**: For online simulation service (`-DDR_EVT_ENABLE_GRPC=ON`)
+- **Auto-download**: If not found, gRPC (with bundled Protobuf) is auto-downloaded via FetchContent (~5-10 min first build)
+- **Manual install**: `apt-get install libgrpc++-dev protobuf-compiler-grpc` (Ubuntu/Debian)
+- **Important**: gRPC includes its own Protobuf. If gRPC is enabled, you don't need separate Protobuf install.
+
+**MPI**: For multi-client/server test harness only (optional even with gRPC)
+- Install: `apt-get install libopenmpi-dev openmpi-bin`
+
+### Protocol Buffers & gRPC Details
+
+**Protobuf usage:** Configuration file parsing ([proto3 syntax](https://developers.google.com/protocol-buffers/docs/proto3))
+- Enabled by default (`-DDR_EVT_ENABLE_PROTOBUF=ON`)
+- If gRPC is enabled, Protobuf comes bundled with gRPC (no separate install needed)
+- If gRPC is **not** enabled, standalone Protobuf is auto-downloaded via FetchContent if not found
+
+**Key relationship:**
+```
+gRPC build → includes Protobuf (bundled)
+Protobuf-only build → standalone Protobuf installation
+```
+
+### CMake Configuration Options
+
+**Boost:**
+```bash
+cmake .. -DBOOST_ROOT=/path/to/boost
+# or use environment variable
+export BOOST_ROOT=/path/to/boost
+```
+
+**Protobuf (standalone, when gRPC not used):**
+```bash
+cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
+```
+
+**gRPC:**
+```bash
+# Enable gRPC support (includes Protobuf)
+cmake .. -DDR_EVT_ENABLE_GRPC=ON
+
+# Skip system path search (useful if system install is broken or mismatched by version)
+cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_ENV_GRPC=ON
+
+# Clear FetchContent cache to retry system search
+cmake -U DR_EVT_GRPC_FETCHCONTENT ..
+```
+
+**Python bindings:**
+```bash
+cmake .. -DDR_EVT_BUILD_PYTHON=ON
+
+# Specify Python interpreter (useful with virtual environments)
+cmake .. -DDR_EVT_BUILD_PYTHON=ON -DPython3_EXECUTABLE=/path/to/python3
+```
+
+**Cross-compilation (Protobuf):**
+```bash
+cmake .. \
+  -DProtobuf_PROTOC_EXECUTABLE=/host/bin/protoc \
+  -DPROTOBUF_DIR=/target/protobuf
+```
 
 
 ## Quick Start
@@ -353,7 +410,7 @@ cmake -DProtobuf_PROTOC_EXECUTABLE=/host/bin/protoc \
 ### gRPC Client/Server Mode (Optional)
 
 DR_EVT runs as a network service, enabling **coordinated multi-cluster simulations**
-where distributed schedulers interact in real-time, as well as remote simulation
+in a distributed fashion and digital-twin scheduler interacting in real-time, as well as remote simulation
 control from any gRPC-capable language.
 
 **Start the server:**
