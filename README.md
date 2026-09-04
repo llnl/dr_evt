@@ -56,7 +56,7 @@ interact in real-time.
 ### Quick Reference (GitHub)
 For quick access without leaving GitHub:
 - **[Complete Documentation Index](docs/)** - All guides, references, and specifications
-- **[EASY Backfilling Algorithm](docs/EASY_BACKFILLING_ALGORITHM.md)** - Algorithm specification and verification
+- **[Backfilling Algorithms](docs/BACKFILLING_ALGORITHMS.md)** - EASY and CONSERVATIVE algorithm specifications
 - **[Streaming API](docs/STREAMING_API.md)** - Online simulation API
 - **[Client/Server (gRPC)](docs/CLIENT_SERVER_GUIDE.md)** - Remote simulation over network
 - **[Python API](docs/PYTHON_API.md)** - Python bindings and reference implementation
@@ -151,7 +151,7 @@ cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
 
 **gRPC:**
 ```bash
-# Enable gRPC support (includes Protobuf)
+# Enable gRPC support (auto-enables Protobuf)
 cmake .. -DDR_EVT_ENABLE_GRPC=ON
 
 # Skip system path search (useful if system install is broken or mismatched by version)

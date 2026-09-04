@@ -202,9 +202,8 @@ option(DR_EVT_ENABLE_GRPC "Enable gRPC client/server support" OFF)
 
 if (DR_EVT_ENABLE_GRPC)
   if (NOT DR_EVT_ENABLE_PROTOBUF)
-    message(FATAL_ERROR
-      "DR_EVT_ENABLE_GRPC=ON requires DR_EVT_ENABLE_PROTOBUF=ON, since the "
-      "gRPC service definition is itself built on the Protobuf runtime.")
+    message(STATUS "DR_EVT_ENABLE_GRPC=ON automatically enables DR_EVT_ENABLE_PROTOBUF")
+    set(DR_EVT_ENABLE_PROTOBUF ON CACHE BOOL "Auto-enabled by gRPC" FORCE)
   endif()
   # SetupGRPC.cmake also provides protobuf::libprotobuf/protobuf::protoc
   # and sets DR_EVT_HAS_PROTOBUF itself, so SetupProtobuf.cmake's own

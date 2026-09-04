@@ -34,7 +34,7 @@ user-guide/grpc-setup
 :maxdepth: 2
 :caption: Algorithm & Testing
 
-EASY_BACKFILLING_ALGORITHM
+BACKFILLING_ALGORITHMS
 TESTING_GUIDE
 ```
 
@@ -73,7 +73,7 @@ Complete guide for running simulations:
 
 ### Algorithm and Testing
 
-- **[EASY Backfilling Algorithm](EASY_BACKFILLING_ALGORITHM.md)** - How the scheduling algorithm works with diagrams
+- **[Backfilling Algorithms](BACKFILLING_ALGORITHMS.md)** - EASY and CONSERVATIVE algorithms with diagrams
 - **[Testing Guide](TESTING_GUIDE.md)** - Complete test catalog, how to run tests, test patterns, and verification methodology
 
 ### APIs

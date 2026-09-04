@@ -487,7 +487,7 @@ Display help message with all options.
 - [User Guide Overview](overview.md) - Complete user guide with trace formats and simulation modes
 - [Protobuf Configuration](protobuf-config.md) - Full `.textproto` schema and worked examples
 - [Streaming API](../STREAMING_API.md) - Programmatic C++ API for online simulation
-- [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Scheduling algorithm details
+- [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE algorithm details
 - [Quick Start](../getting-started/quickstart.md) - Quick reference
 - [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
 - [Test Suite](https://github.com/llnl/dr_evt/blob/main/tests/README.md) - Example usage in test scripts

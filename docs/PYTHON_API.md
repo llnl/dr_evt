@@ -703,7 +703,7 @@ To add new Python bindings:
 - [C++ Streaming API](STREAMING_API.md) - C++ API documentation
 - [Python Examples](https://github.com/llnl/dr_evt/blob/main/python/example_streaming.py) - Working code examples
 - [Python API Details](https://github.com/llnl/dr_evt/blob/main/python/README.md) - Detailed Python reference
-- [EASY Backfilling Algorithm](EASY_BACKFILLING_ALGORITHM.md) - Algorithm description
+- [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE algorithm descriptions
 
 ---
 
