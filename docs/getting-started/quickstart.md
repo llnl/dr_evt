@@ -251,8 +251,8 @@ make -j4
 If you use this scheduler implementation in your research, please cite:
 ```bibtex
 @software{dr_evt_scheduler,
-  title = {DR\_EVT SLURM-Style Backfilling Scheduler},
-  author = {Your Name},
+  title = {DR\_EVT: distributed discrete resource event simulation},
+  author = {Jae-Seung Yeom},
   year = {2026},
   url = {https://github.com/llnl/dr_evt}
 }

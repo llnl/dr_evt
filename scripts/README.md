@@ -77,6 +77,56 @@ python3 scripts/python_reference_scheduler.py \
 - No dependencies on DR_EVT code
 - Single-file reference implementation for verification
 
+### python_conservative_scheduler.py
+
+**Pure Python CONSERVATIVE backfilling reference implementation.**
+
+**Purpose:**
+- Provides independent verification of CONSERVATIVE backfilling algorithm
+- Generates oracle outputs for comparison against C++ implementation
+- Used to verify C++/Python implementation equivalence
+
+**Usage:**
+```bash
+python3 scripts/python_conservative_scheduler.py <input.csv> --nodes <num_nodes> [--verbose] [--outdir DIR]
+```
+
+**Example:**
+```bash
+python3 scripts/python_conservative_scheduler.py \
+    tests/test_traces/scale/huge_2000jobs.csv \
+    --nodes 400 \
+    --outdir ./output
+```
+
+**Output:**
+- Creates `<basename>_conservative_reference.csv` with scheduled results
+- Creates `<basename>_conservative_reference_resources.csv` with resource usage timeline
+- Default output directory: `/tmp` (to avoid polluting working directory)
+
+**Called by:** `tests/compare_cpp_python_conservative.sh`
+
+**Algorithm:**
+- Pure implementation of CONSERVATIVE backfilling
+- ALL waiting jobs get reservations (shadow times)
+- Backfill only if completes before ANY waiting job's reservation
+- No dependencies on DR_EVT code
+- Single-file reference for verification
+
+**Key Differences from EASY:**
+- EASY: Only first job gets reservation → O(n) complexity
+- CONSERVATIVE: All jobs get reservations → O(n²) complexity
+- Lower utilization (~87% vs 95%) but stronger fairness guarantee
+
+**Performance:**
+- ~3.5x slower than C++ implementation (interpreter overhead)
+- Example: 2000 jobs takes ~8 minutes (Python) vs ~2.5 minutes (C++)
+- Produces identical schedules to C++ (verified with 0 mismatches)
+
+**See also:**
+- [docs/BACKFILLING_ALGORITHMS.md](https://github.com/llnl/dr_evt/blob/main/docs/BACKFILLING_ALGORITHMS.md) - Full algorithm description
+- [tests/test_easy_vs_conservative_correctness.sh](https://github.com/llnl/dr_evt/blob/main/tests/test_easy_vs_conservative_correctness.sh) - Behavioral test
+
 ## Test Data Generation Scripts
 
 These scripts were used to generate test inputs and ground truth oracles. They are one-time generators, but kept for reproducibility.

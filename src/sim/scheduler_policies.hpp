@@ -44,6 +44,9 @@ enum class PriorityPolicy {
     /** Alternative FCFS implementation (for differential testing) */
     FCFS_ALT,
 
+    /** FCFS with conservative backfilling or no backfilling */
+    FCFS_CONSERVATIVE,
+
     /** Shortest-Job-First: Order by estimated run_time (ascending) */
     SJF,
 

@@ -44,6 +44,7 @@ PYBIND11_MODULE(dr_evt, m) {
 
     py::enum_<PriorityPolicy>(m, "PriorityPolicy")
         .value("FCFS", PriorityPolicy::FCFS)
+        .value("FCFS_CONSERVATIVE", PriorityPolicy::FCFS_CONSERVATIVE)
         .value("SJF", PriorityPolicy::SJF)
         .value("LJF", PriorityPolicy::LJF)
         .export_values();

@@ -69,6 +69,8 @@ static void set_sim_options(
         std::string policy = cfg.priority_policy();
         if (policy == "fcfs") {
             sp.m_priority_policy = PriorityPolicy::FCFS;
+        } else if (policy == "fcfs_conservative") {
+            sp.m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
         } else if (policy == "sjf") {
             sp.m_priority_policy = PriorityPolicy::SJF;
         } else if (policy == "ljf") {

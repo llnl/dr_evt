@@ -46,9 +46,6 @@ CMakeUserPresets.json
 # External dependencies (use FetchContent instead)
 external/
 
-# Duplicate test script in root (use tests/test_scheduler.py)
-/test_scheduler.py
-
 # Temporary test trace files created by test_streaming_api
 test_streaming*.csv
 

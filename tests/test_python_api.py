@@ -109,6 +109,7 @@ def test_enumerations(result):
     try:
         assert hasattr(dr_evt, 'PriorityPolicy')
         assert hasattr(dr_evt.PriorityPolicy, 'FCFS')
+        assert hasattr(dr_evt.PriorityPolicy, 'FCFS_CONSERVATIVE')
         assert hasattr(dr_evt.PriorityPolicy, 'SJF')
         assert hasattr(dr_evt.PriorityPolicy, 'LJF')
         result.record_pass("PriorityPolicy")

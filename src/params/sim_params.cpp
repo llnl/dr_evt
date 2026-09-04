@@ -131,6 +131,8 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         m_priority_policy = PriorityPolicy::FCFS;
                     } else if (policy == "fcfs_alt") {
                         m_priority_policy = PriorityPolicy::FCFS_ALT;
+                    } else if (policy == "fcfs_conservative") {
+                        m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
                     } else if (policy == "sjf") {
                         m_priority_policy = PriorityPolicy::SJF;
                     } else if (policy == "ljf") {
@@ -357,10 +359,11 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        conservative: All jobs get reservations\n"
         "        none: Backfilling disabled - jobs run strictly in FCFS order\n"
         "\n"
-        "    -p, --priority_policy {fcfs|fcfs_alt|sjf|ljf}\n"
+        "    -p, --priority_policy {fcfs|fcfs_alt|fcfs_conservative|sjf|ljf}\n"
         "        Job priority/ordering policy (default: fcfs).\n"
         "        fcfs: First-Come-First-Served\n"
         "        fcfs_alt: Alternative FCFS implementation (for testing)\n"
+        "        fcfs_conservative: FCFS with conservative/no backfilling support\n"
         "        sjf: Shortest-Job-First\n"
         "        ljf: Longest-Job-First\n"
         "\n"
@@ -485,6 +488,7 @@ void Sim_Params::print() const
     msg += " - priority_policy: ";
     if (m_priority_policy == PriorityPolicy::FCFS) msg += "FCFS";
     else if (m_priority_policy == PriorityPolicy::FCFS_ALT) msg += "FCFS_ALT";
+    else if (m_priority_policy == PriorityPolicy::FCFS_CONSERVATIVE) msg += "FCFS_CONSERVATIVE";
     else if (m_priority_policy == PriorityPolicy::SJF) msg += "SJF";
     else msg += "LJF";
     msg += "\n";

@@ -8,6 +8,7 @@ set_full_path(THIS_DIR_HEADERS
     scheduler_base.hpp
     scheduler_fcfs.hpp
     scheduler_fcfs_alt.hpp
+    scheduler_fcfs_conservative.hpp
     scheduler_block_fcfs.hpp
     scheduler_circular_fcfs.hpp
     scheduler_sjf.hpp
@@ -21,6 +22,7 @@ set_full_path(THIS_DIR_SOURCES
     scheduler_base.cpp
     scheduler_fcfs.cpp
     scheduler_fcfs_alt.cpp
+    scheduler_fcfs_conservative.cpp
     scheduler_block_fcfs.cpp
     scheduler_circular_fcfs.cpp
     scheduler_sjf.cpp

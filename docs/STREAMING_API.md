@@ -245,7 +245,7 @@ int main() {
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_runtime_mode = RunTimeMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::EXACT;
     params.m_backfill_policy = BackfillPolicy::EASY;
 
     // Create simulator
@@ -354,7 +354,7 @@ Comprehensive validation comparing batch mode vs streaming mode with large workl
 Tests MPI-coordinated streaming with multiple ranks feeding jobs independently
 (in-process: each rank runs its own `Simulation` object within one MPI
 program, not separate processes - contrast with the gRPC client/server's
-own, separate [MPI multi-client/multi-server harness](GRPC_GUIDE.md), where
+own, separate [MPI multi-client/multi-server harness](CLIENT_SERVER_GUIDE.md), where
 each rank is a distinct process talking over the network).
 
 ```bash
@@ -387,11 +387,11 @@ anything - treat its output as unverified until that happens.
 1. **Jobs must be in trace**: All jobs must exist in the loaded trace before calling `submit_job()`
 2. **Time must advance forward**: Cannot go back in time
 3. **No job cancellation**: Once submitted, jobs cannot be cancelled
-4. **Single scheduler instance**: No support for multi-scheduler coordination in-process (the gRPC client/server's [MPI multi-client/multi-server harness](GRPC_GUIDE.md) coordinates across separate, independent `Simulation` instances instead, each in its own process)
+4. **Single scheduler instance**: No support for multi-scheduler coordination in-process (the gRPC client/server's [MPI multi-client/multi-server harness](CLIENT_SERVER_GUIDE.md) coordinates across separate, independent `Simulation` instances instead, each in its own process)
 
 ## See Also
 
 - `src/sim/sim.hpp` - API declarations
 - `src/sim/sim.cpp` - Implementation
 - `tests/test_streaming_api.cpp` - Usage examples
-- [gRPC Client/Server Guide](GRPC_GUIDE.md) - Network-exposed streaming API, MPI multi-client/multi-server harness
+- [gRPC Client/Server Guide](CLIENT_SERVER_GUIDE.md) - Network-exposed streaming API, MPI multi-client/multi-server harness

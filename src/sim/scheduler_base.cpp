@@ -8,6 +8,7 @@
 #include "sim/scheduler_base.hpp"
 #include "sim/scheduler_fcfs.hpp"
 #include "sim/scheduler_fcfs_alt.hpp"
+#include "sim/scheduler_fcfs_conservative.hpp"
 #include "sim/scheduler_block_fcfs.hpp"
 #include "sim/scheduler_circular_fcfs.hpp"
 #include "sim/scheduler_sjf.hpp"
@@ -165,6 +166,17 @@ std::unique_ptr<SchedulerBase> create_scheduler(
                          << "' not supported for FCFS_ALT, using multimap\n";
             }
             return std::make_unique<FCFSAltScheduler>(
+                total_nodes, job_data, backfill_policy, duration_mode);
+
+        case PriorityPolicy::FCFS_CONSERVATIVE:
+            // FCFS with conservative backfilling or no backfilling
+            // TODO: Implement CircularBufferFCFSConservativeScheduler for better performance
+            // Currently only deque implementation exists
+            if (queue_impl != QueueImplementation::DEQUE) {
+                std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
+                         << "' not supported for FCFS_CONSERVATIVE, only deque is implemented. Using deque.\n";
+            }
+            return std::make_unique<FCFSConservativeScheduler>(
                 total_nodes, job_data, backfill_policy, duration_mode);
 
         case PriorityPolicy::SJF:

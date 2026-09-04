@@ -52,7 +52,7 @@ Write resource usage trace to file.
 **Default:** If not specified, resource trace is written to `<outfile>_resources.csv`
 
 **Output example:**
-```csv
+```text
 time,free_nodes,allocated_nodes
 0,100,0
 0,20,80
@@ -490,6 +490,6 @@ Display help message with all options.
 - [EASY Backfilling Algorithm](../EASY_BACKFILLING_ALGORITHM.md) - Scheduling algorithm details
 - [Quick Start](../getting-started/quickstart.md) - Quick reference
 - [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
-- [Test Suite](../../tests/README.md) - Example usage in test scripts
+- [Test Suite](https://github.com/llnl/dr_evt/blob/main/tests/README.md) - Example usage in test scripts
 - [Block Queue Implementation](../dev/design-decisions/BLOCK_QUEUE.md) - Performance analysis of `--queue_impl block`
 - [Circular Queue Implementation](../dev/design-decisions/CIRCULAR_QUEUE.md) - Performance analysis of `--queue_impl circular`
