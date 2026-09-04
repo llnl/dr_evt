@@ -37,12 +37,15 @@ if (Protobuf_PROTOC_EXECUTABLE)
                         "installation path, PROTOBUF_DIR")
   endif (PROTOBUF_DIR)
 else (Protobuf_PROTOC_EXECUTABLE)
+  # Skip system paths for Protobuf (useful when system install is broken/incompatible)
+  option(AVOID_SYSTEM_PROTOBUF "Do not search default system paths for Protobuf" FALSE)
+
   if (PROTOBUF_ROOT)
     option(protobuf_MODULE_COMPATIBLE
       "Be compatible with FindProtobuf.cmake" ON)
     option(protobuf_VERBOSE
       "Enable verbose protobuf output" OFF)
-  
+
     find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
       NAMES protobuf PROTOBUF
       HINTS
@@ -52,8 +55,10 @@ else (Protobuf_PROTOC_EXECUTABLE)
       NO_DEFAULT_PATH)
 
     if (NOT Protobuf_FOUND)
-      # Redo searching without hint
-      find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET REQUIRED)
+      # Redo searching without hint (unless AVOID_SYSTEM_PROTOBUF is ON)
+      if (NOT AVOID_SYSTEM_PROTOBUF)
+        find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET REQUIRED)
+      endif()
     endif (NOT Protobuf_FOUND)
   else (PROTOBUF_ROOT)
     # Search for Protobuf in FetchContent cache first (build/_deps/protobuf-src),
@@ -64,12 +69,22 @@ else (Protobuf_PROTOC_EXECUTABLE)
       "${CMAKE_INSTALL_PREFIX}"
     )
 
-    find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
-      NAMES protobuf PROTOBUF
-      HINTS ${_PROTOBUF_SEARCH_PATHS}
-      "$ENV{Protobuf_DIR}" "$ENV{PROTOBUF_DIR}"
-      PATH_SUFFIXES lib64/cmake/protobuf lib/cmake/protobuf lib/cmake
-      NO_DEFAULT_PATH)
+    if (AVOID_SYSTEM_PROTOBUF)
+      message(STATUS "AVOID_SYSTEM_PROTOBUF=ON: skipping system Protobuf search")
+      # Only search in FetchContent cache, no system paths
+      find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
+        NAMES protobuf PROTOBUF
+        HINTS ${_PROTOBUF_SEARCH_PATHS}
+        PATH_SUFFIXES lib64/cmake/protobuf lib/cmake/protobuf lib/cmake
+        NO_DEFAULT_PATH)
+    else()
+      # Search FetchContent cache first, then system paths
+      find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
+        NAMES protobuf PROTOBUF
+        HINTS ${_PROTOBUF_SEARCH_PATHS}
+        "$ENV{Protobuf_DIR}" "$ENV{PROTOBUF_DIR}"
+        PATH_SUFFIXES lib64/cmake/protobuf lib/cmake/protobuf lib/cmake)
+    endif()
 
     if (NOT Protobuf_FOUND)
       message(STATUS "Protobuf not found. Building via FetchContent.")

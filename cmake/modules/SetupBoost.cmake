@@ -9,6 +9,9 @@ if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
 
+# Skip system paths for Boost (useful when system install is broken/incompatible)
+option(AVOID_SYSTEM_BOOST "Do not search default system paths for Boost" FALSE)
+
 # Configure search path for Boost
 if (DEFINED BOOST_ROOT)
     message(STATUS "BOOST_ROOT: ${BOOST_ROOT}")
@@ -16,10 +19,17 @@ if (DEFINED BOOST_ROOT)
 elseif (DEFINED ENV{BOOST_ROOT})
     message(STATUS "ENV BOOST_ROOT: $ENV{BOOST_ROOT}")
     set(Boost_NO_SYSTEM_PATHS ON)
+elseif (AVOID_SYSTEM_BOOST)
+    message(STATUS "AVOID_SYSTEM_BOOST=ON: skipping system Boost search")
+    set(Boost_NO_SYSTEM_PATHS ON)
 endif ()
 
 # Modern CMake 3.24+ approach: find_package with REQUIRED COMPONENTS
 # Automatically creates Boost::component imported targets
+#
+# Note: Unlike gRPC/Protobuf (which use CONFIG mode with HINTS), FindBoost
+# uses MODULE mode and reads BOOST_ROOT and Boost_NO_SYSTEM_PATHS variables
+# directly. No HINTS parameter needed.
 find_package(Boost QUIET COMPONENTS
     regex
     filesystem

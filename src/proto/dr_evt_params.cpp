@@ -274,7 +274,9 @@ void read_proto_params(const std::string& filename,
 
     if (verbose) {
         std::string str;
-        google::protobuf::TextFormat::PrintToString(dr_evt_sim_setup, &str);
+        if (!google::protobuf::TextFormat::PrintToString(dr_evt_sim_setup, &str)) {
+            std::cerr << "Warning: Failed to serialize config to textproto format" << std::endl;
+        }
         std::cout << "---- Prototext '" << filename << "' read ----"
                   << std::endl << str << std::endl;
     }
@@ -290,7 +292,9 @@ void read_proto_params(const std::string& filename,
 
     if (verbose) {
         std::string str;
-        google::protobuf::TextFormat::PrintToString(dr_evt_trace_setup, &str);
+        if (!google::protobuf::TextFormat::PrintToString(dr_evt_trace_setup, &str)) {
+            std::cerr << "Warning: Failed to serialize config to textproto format" << std::endl;
+        }
         std::cout << "---- Prototext '" << filename << "' read ----"
                   << std::endl << str << std::endl;
     }
