@@ -92,6 +92,11 @@ if (DR_EVT_GRPC_FETCHCONTENT)
   # policies as if 3.5 had been requested for those subprojects.
   set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
+  # Suppress policy warnings from gRPC's third-party dependencies (RE2, etc.)
+  if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+  endif()
+
   # gRPC's bundled Abseil unconditionally emits both x86_64 and arm64
   # SIMD flags on every Apple build (not just genuine universal
   # builds), via `-Xarch_<arch> <flag>` pairs meant for a multi-arch

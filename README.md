@@ -139,29 +139,29 @@ Protobuf-only build → standalone Protobuf installation
 
 **Boost:**
 ```bash
-cmake .. -Wno-author -DBOOST_ROOT=/path/to/boost
+cmake .. -Wno-author -Wno-dev -DBOOST_ROOT=/path/to/boost
 # or use environment variable
 export BOOST_ROOT=/path/to/boost
 
 # Skip system paths (useful if system install is broken or mismatched by version)
-cmake .. -Wno-author -DAVOID_SYSTEM_BOOST=ON
+cmake .. -Wno-author -Wno-dev -DAVOID_SYSTEM_BOOST=ON
 ```
 
 **Protobuf (standalone, when gRPC not used):**
 ```bash
-cmake .. -Wno-author -DPROTOBUF_ROOT=/path/to/protobuf
+cmake .. -Wno-author -Wno-dev -DPROTOBUF_ROOT=/path/to/protobuf
 
 # Skip system paths (useful if system install is broken or mismatched by version)
-cmake .. -Wno-author -DDR_EVT_ENABLE_PROTOBUF=ON -DAVOID_SYSTEM_PROTOBUF=ON
+cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_PROTOBUF=ON -DAVOID_SYSTEM_PROTOBUF=ON
 ```
 
 **gRPC:**
 ```bash
 # Enable gRPC support (auto-enables Protobuf)
-cmake .. -Wno-author -DDR_EVT_ENABLE_GRPC=ON
+cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_GRPC=ON
 
 # Skip system path search (useful if system install is broken or mismatched by version)
-cmake .. -Wno-author -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
+cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 
 # Clear FetchContent cache to retry system search
 cmake -U DR_EVT_GRPC_FETCHCONTENT ..
@@ -169,15 +169,15 @@ cmake -U DR_EVT_GRPC_FETCHCONTENT ..
 
 **Python bindings:**
 ```bash
-cmake .. -Wno-author -DDR_EVT_BUILD_PYTHON=ON
+cmake .. -Wno-author -Wno-dev -DDR_EVT_BUILD_PYTHON=ON
 
 # Specify Python interpreter (useful with virtual environments)
-cmake .. -Wno-author -DDR_EVT_BUILD_PYTHON=ON -DPython3_EXECUTABLE=/path/to/python3
+cmake .. -Wno-author -Wno-dev -DDR_EVT_BUILD_PYTHON=ON -DPython3_EXECUTABLE=/path/to/python3
 ```
 
 **Cross-compilation (Protobuf):**
 ```bash
-cmake .. -Wno-author \
+cmake .. -Wno-author -Wno-dev \
   -DProtobuf_PROTOC_EXECUTABLE=/host/bin/protoc \
   -DPROTOBUF_DIR=/target/protobuf
 ```
