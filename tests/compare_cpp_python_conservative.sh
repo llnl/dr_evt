@@ -30,7 +30,7 @@ echo -e "${BLUE}================================================================
 echo ""
 
 # Check prerequisites
-if [ ! -f "./build/simulator" ]; then
+if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
     echo -e "${RED}Error: ./build/simulator not found${NC}"
     echo "Build first with:"
     echo "  cd build && cmake .. && make -j8"

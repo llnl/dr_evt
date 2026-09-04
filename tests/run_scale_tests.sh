@@ -19,7 +19,7 @@ echo "Scale Tests (Simulation Mode - Optional)"
 echo "=========================================="
 echo ""
 
-if [ ! -f "./build/simulator" ]; then
+if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
     echo "Error: ./build/simulator not found"
     exit 1
 fi

@@ -119,7 +119,7 @@ enum class RunTimeMode {
 python3 oracle.py input.csv
 
 # Run in oracle mode
-./simulator --oracle-mode input.csv
+${CMAKE_INSTALL_PREFIX}/bin/simulator --oracle-mode input.csv
 
 # Compare against oracle
 compare_with_oracle.py oracle.csv output.csv
@@ -131,7 +131,7 @@ compare_with_oracle.py oracle.csv output.csv
 python3 scripts/python_reference_scheduler.py input.csv
 
 # Run with omniscient scheduler planning
-./simulator --duration_mode actual input.csv  # Oracle mode
+${CMAKE_INSTALL_PREFIX}/bin/simulator --duration_mode actual input.csv  # Oracle mode
 
 # Compare against reference
 python3 scripts/compare_with_oracle.py reference.csv output.csv

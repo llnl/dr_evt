@@ -71,8 +71,8 @@ make install
 
 Verify:
 ```bash
-./dr_evt_server --help
-./dr_evt_client --help
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server --help
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client --help
 ```
 
 ## Server Setup
@@ -81,12 +81,12 @@ Verify:
 
 **Basic startup:**
 ```bash
-./dr_evt_server --port 50051
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server --port 50051
 ```
 
 **With specific configuration:**
 ```bash
-./dr_evt_server \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server \
     --port 50051 \
     --max_connections 10 \
     --timeout 3600
@@ -114,7 +114,7 @@ Ready to accept connections
 
 Enable verbose logging:
 ```bash
-./dr_evt_server --port 50051 --verbose
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server --port 50051 --verbose
 ```
 
 Example output:
@@ -189,7 +189,7 @@ docker run -d -p 50051:50051 --name dr-evt dr-evt-server
 
 **Basic simulation:**
 ```bash
-./dr_evt_client \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client \
     --server localhost:50051 \
     --trace trace.csv \
     --total_nodes 1000
@@ -197,7 +197,7 @@ docker run -d -p 50051:50051 --name dr-evt dr-evt-server
 
 **With configuration:**
 ```bash
-./dr_evt_client \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client \
     --server localhost:50051 \
     --config sim_config.textproto \
     --trace workload.csv \
@@ -353,7 +353,7 @@ openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 
 
 **Start server with TLS:**
 ```bash
-./dr_evt_server \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server \
     --port 50051 \
     --tls_cert server.crt \
     --tls_key server.key
@@ -361,7 +361,7 @@ openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 
 
 **Connect client with TLS:**
 ```bash
-./dr_evt_client \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client \
     --server localhost:50051 \
     --tls \
     --tls_ca_cert server.crt \
@@ -391,7 +391,7 @@ Access remote server securely via SSH tunnel:
 ssh -L 50051:localhost:50051 user@remote-server
 
 # In another terminal: use client as if local
-./dr_evt_client --server localhost:50051 --trace trace.csv
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client --server localhost:50051 --trace trace.csv
 ```
 
 ## Troubleshooting

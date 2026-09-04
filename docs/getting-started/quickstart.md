@@ -34,7 +34,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 
 # 4. Verify
-./simulator --help
+${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 ```
 
 **Note**: First build downloads and compiles Protobuf (~5-10 minutes). Subsequent builds are fast.
@@ -48,7 +48,7 @@ All dependencies are automatically downloaded via CMake FetchContent:
 
 ### Basic Example
 ```bash
-./simulator trace_file.txt \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace_file.txt \
   --total_nodes 795 \
   --backfill_policy easy \
   --priority_policy fcfs \
@@ -109,7 +109,7 @@ Other:
 
 **Conservative backfilling with shortest-job-first:**
 ```bash
-./simulator trace.txt \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
   --backfill_policy conservative \
   --priority_policy sjf \
   --outfile results_conservative_sjf.txt
@@ -117,14 +117,14 @@ Other:
 
 **Oracle mode (perfect run time knowledge):**
 ```bash
-./simulator trace.txt \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
   --duration_mode actual \
   --outfile results_oracle.txt
 ```
 
 **Limited simulation (first 1000 jobs):**
 ```bash
-./simulator trace.txt \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
   --max_jobs 1000 \
   --outfile results_subset.txt
 ```

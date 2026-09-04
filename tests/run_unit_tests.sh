@@ -21,7 +21,7 @@ echo "=========================================="
 echo ""
 
 # Check build exists
-if [ ! -f "./build/simulator" ]; then
+if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
     echo "Error: ./build/simulator not found"
     echo "Please build first: cd build && cmake .. && make"
     exit 1

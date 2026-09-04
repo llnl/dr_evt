@@ -82,7 +82,7 @@ if [ ! -f "$EXPECTED_CONS" ]; then
 fi
 
 # Build if needed
-if [ ! -f "$ROOT_DIR/build/simulator" ]; then
+if [ ! -f "$ROOT_DIR/build/simulator}" ]; then
     echo "Building simulator..."
     cd "$ROOT_DIR"
     cmake -B build -S .
@@ -91,7 +91,7 @@ if [ ! -f "$ROOT_DIR/build/simulator" ]; then
 fi
 
 echo "=== Running EASY Backfilling ==="
-"$ROOT_DIR/build/simulator" "$TRACE" \
+"$ROOT_DIR/build/simulator}" "$TRACE" \
     --total_nodes $NODES \
     --priority_policy fcfs \
     --backfill_policy easy \
@@ -102,7 +102,7 @@ echo "=== Running EASY Backfilling ==="
     > "$OUTDIR/easy.log" 2>&1
 
 echo "=== Running CONSERVATIVE Backfilling ==="
-"$ROOT_DIR/build/simulator" "$TRACE" \
+"$ROOT_DIR/build/simulator}" "$TRACE" \
     --total_nodes $NODES \
     --priority_policy fcfs_conservative \
     --backfill_policy conservative \

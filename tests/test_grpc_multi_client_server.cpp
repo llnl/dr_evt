@@ -181,7 +181,7 @@ int run_server_rank(int my_rank, int paired_client_rank,
     // not assuming the client can derive it (e.g. via shared loopback),
     // since on a real multi-node launch the client is on a different
     // machine entirely.
-    MPI_Send(advertised_address.c_str(), static_cast<int>(advertised_address.size()) + 1,
+    MPI_Send(const_cast<char*>(advertised_address.c_str()), static_cast<int>(advertised_address.size()) + 1,
               MPI_CHAR, paired_client_rank, TAG_SERVER_ADDRESS, MPI_COMM_WORLD);
 
     // Block until the paired client signals it's done with this server.

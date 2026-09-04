@@ -98,11 +98,11 @@ correctness bug, so this needed explicit handling:
 ### Manually Testing Capacity/Overflow
 ```bash
 # Force growth: capacity 10 is far smaller than most real traces
-./simulator trace.csv --priority_policy fcfs --queue_impl circular \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular \
     --circular_capacity 10 --circular_overflow grow
 
 # Force a clean abort instead
-./simulator trace.csv --priority_policy fcfs --queue_impl circular \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular \
     --circular_capacity 10 --circular_overflow abort
 ```
 
@@ -112,13 +112,13 @@ correctness bug, so this needed explicit handling:
 
 ```bash
 # Default (deque)
-./simulator trace.csv --priority_policy fcfs
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs
 
 # Circular queue, default capacity (sized to the job trace)
-./simulator trace.csv --priority_policy fcfs --queue_impl circular
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular
 
 # Circular queue with an explicit capacity and abort-on-overflow
-./simulator trace.csv --priority_policy fcfs --queue_impl circular \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular \
     --circular_capacity 500 --circular_overflow abort
 ```
 

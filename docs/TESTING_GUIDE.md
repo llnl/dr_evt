@@ -55,7 +55,7 @@ cd build
 ../tests/run_feature_tests.sh
 
 # Run scale tests (manually, no wrapper script yet)
-./simulator ../tests/test_traces/scale/small_10jobs.csv --total_nodes 795
+${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.csv --total_nodes 795
 
 # Run replay tests
 ../tests/run_replay_tests.sh
@@ -88,7 +88,7 @@ cd build
 **How to run a single test:**
 ```bash
 cd build
-./simulator ../tests/test_traces/comprehensive/01_backfill_allowed.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/comprehensive/01_backfill_allowed.csv \
     --total_nodes 100 \
     --outfile /tmp/output.csv
 
@@ -237,7 +237,7 @@ Note: The `easy_vs_conservative_test.csv` test is used for differential comparis
 **How to run:**
 ```bash
 cd build
-./simulator ../tests/test_traces/scale/small_10jobs.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.csv \
     --total_nodes 795 \
     --outfile /tmp/output.csv
 

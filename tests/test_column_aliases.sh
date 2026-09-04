@@ -29,7 +29,7 @@ echo "Column Alias Tests"
 echo "=========================================="
 echo ""
 
-if [ ! -f "./build/simulator" ]; then
+if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
     echo "Error: ./build/simulator not found"
     echo "Please build first: cd build && cmake .. && make"
     exit 1

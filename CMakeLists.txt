@@ -904,10 +904,14 @@ if(DR_EVT_HAS_PYBIND11)
     SUFFIX "${PYTHON_MODULE_EXTENSION}"
   )
 
-  # Install to Python site-packages
+  # Install Python module to CMAKE_INSTALL_PREFIX/lib/python instead of system site-packages
+  # to avoid permission errors when Python3_SITELIB is read-only (e.g., Anaconda system install)
+  set(DR_EVT_PYTHON_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib/python)
+
   install(TARGETS dr_evt_python
-    LIBRARY DESTINATION ${Python3_SITELIB}
+    LIBRARY DESTINATION ${DR_EVT_PYTHON_INSTALL_DIR}
   )
 
-  message(STATUS "Python module will be installed to: ${Python3_SITELIB}")
+  message(STATUS "Python module will be installed to: ${DR_EVT_PYTHON_INSTALL_DIR}")
+  message(STATUS "Add to PYTHONPATH: export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH")
 endif()

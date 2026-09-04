@@ -182,6 +182,26 @@ cmake .. -Wno-author -Wno-dev \
   -DPROTOBUF_DIR=/target/protobuf
 ```
 
+**Livermore Computing (LC) HPC systems:**
+```bash
+mkdir build && cd build
+cmake .. \
+  -DDR_EVT_ENABLE_GRPC=ON \
+  -DDR_EVT_BUILD_PYTHON=ON \
+  -DAVOID_SYSTEM_GRPC=ON \
+  -DAVOID_SYSTEM_BOOST=ON \
+  -DCMAKE_INSTALL_PREFIX=$(realpath ../install)
+make -j$(nproc)
+make install
+
+# Set up environment
+export CMAKE_INSTALL_PREFIX=$(realpath ../install)
+export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
+export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
+```
+
+The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed libraries (common on HPC systems with multiple compiler toolchains).
+
 
 ## Quick Start
 
@@ -215,10 +235,14 @@ make install
 
 ### Run Your First Simulation
 
+After installation, the binaries are in `${CMAKE_INSTALL_PREFIX}/bin`:
+
 **Quick test:**
 ```bash
+cd ${CMAKE_INSTALL_PREFIX}/bin
+
 # Run a simple test
-./simulator ../tests/test_traces/unit/simple.csv
+./simulator /path/to/dr_evt/tests/test_traces/unit/simple.csv
 
 # Run with EASY backfilling (default)
 ./simulator trace.csv --priority_policy fcfs --backfill_policy easy
@@ -268,10 +292,10 @@ simulation_params {
 Run with configuration file:
 ```bash
 # Use protobuf config (overrides command-line defaults)
-./simulator --config sim_config.textproto trace.csv
+${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto trace.csv
 
 # Command-line options override config file values
-./simulator --config sim_config.textproto \
+${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto \
     --total_nodes 2000 \
     --verbose \
     trace.csv
@@ -303,7 +327,7 @@ DR_EVT supports different modes for processing job traces:
 **Example:**
 ```bash
 # Standard simulation
-./simulator trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
     --duration_mode limit \
     --backfill_policy easy
 ```
@@ -325,7 +349,7 @@ DR_EVT supports different modes for processing job traces:
 **Example:**
 ```bash
 # Oracle mode (scheduler omniscience)
-./simulator trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
     --duration_mode actual
 ```
 
@@ -349,10 +373,10 @@ DR_EVT supports different modes for processing job traces:
 **Example:**
 ```bash
 # Step 1: Run simulation
-./simulator input.csv --outfile schedule.csv --resource_trace sim.csv
+${CMAKE_INSTALL_PREFIX}/bin/simulator input.csv --outfile schedule.csv --resource_trace sim.csv
 
 # Step 2: Replay the schedule
-./simulator schedule.csv --resource_trace replay.csv
+${CMAKE_INSTALL_PREFIX}/bin/simulator schedule.csv --resource_trace replay.csv
 
 # Step 3: Verify (should be identical)
 diff sim.csv replay.csv
@@ -375,12 +399,12 @@ diff sim.csv replay.csv
 **Examples:**
 ```bash
 # Simulate with perfect estimates (jobs run exactly time_limit)
-./simulator trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
     --duration_mode limit \
     --run_time_mode exact
 
 # Simulate with realistic variation (80% of time_limit ± 10%)
-./simulator trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
     --duration_mode limit \
     --run_time_mode distribution \
     --run_time_distribution normal \
@@ -388,7 +412,7 @@ diff sim.csv replay.csv
     --run_time_stddev 0.1
 
 # Simulate but read actual durations from trace column
-./simulator trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
     --duration_mode limit \
     --run_time_mode column
 ```
@@ -429,7 +453,7 @@ Then control parallelism with environment variables:
 ```bash
 export OMP_NUM_THREADS=4
 export OMP_PROC_BIND=close
-./simulator trace.csv
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv
 ```
 
 **Enable gRPC client/server (optional):**
@@ -458,18 +482,18 @@ control from any gRPC-capable language.
 
 **Start the server:**
 ```bash
-./dr_evt_server --port 50051
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server --port 50051
 ```
 
 **Run a client:**
 ```bash
 # Basic usage
-./dr_evt_client --server localhost:50051 \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client --server localhost:50051 \
     --trace trace.csv \
     --total_nodes 1000
 
 # With custom parameters
-./dr_evt_client --server localhost:50051 \
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client --server localhost:50051 \
     --trace trace.csv \
     --total_nodes 1000 \
     --backfill_policy conservative \
