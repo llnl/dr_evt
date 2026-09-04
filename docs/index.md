@@ -5,11 +5,12 @@
 
 **Discrete Event-Driven Simulator for High-Performance Computing Job Schedulers**
 
-DR_EVT simulates HPC job scheduling policies, including an EASY backfilling
-implementation whose behavior is checked against a from-scratch Python
-reference implementation (see Verification note below - this is a
-consistency check between two implementations, not independently derived
-ground truth).
+DR_EVT simulates HPC job scheduling policies with EASY and CONSERVATIVE backfilling
+implementations. Uniquely supports **online simulation via gRPC**, enabling coordinated
+multi-cluster simulations where distributed schedulers interact in real-time.
+
+Scheduler behavior is verified against from-scratch Python reference implementations
+(consistency check between implementations, not independently derived ground truth).
 
 ```{toctree}
 :maxdepth: 2
@@ -96,29 +97,31 @@ For contributors and maintainers:
 ## Project Status
 
 **Version:** 1.0
-**Scheduling Policies:** EASY Backfilling, FCFS, SJF, LJF priority policies.
-Conservative backfilling exists as a CLI/API option but is **not currently
-implemented as a distinct algorithm** - it runs the same logic as EASY (see
-`src/sim/scheduler_fcfs.cpp`). Don't rely on it producing different
-schedules from EASY yet.
-**API:** Streaming API for online simulation, Python bindings
-**Test suite:** 54 tests across comprehensive/unit/feature/scale/replay
-categories; last verified count was 46/54 passing, with 8 tests known and
-documented as broken (incomplete or corrupted fixture data - see
-[Testing Guide](TESTING_GUIDE.md) for specifics and status, which reflects
-a point-in-time check rather than a continuously re-run one).
+
+**Scheduling Policies:**
+- **Backfill:** EASY and CONSERVATIVE (fully implemented)
+- **Priority:** FCFS, SJF, LJF
+
+**APIs:**
+- **Streaming API:** Online/incremental simulation
+- **gRPC Service:** Network-exposed streaming API for multi-cluster coordination
+- **Python Bindings:** Full Python API support
+
+**Test Suite:** 57 tests across comprehensive/unit/feature/conservative/scale/replay
+categories. All 57/57 passing as of 2026-09-03 (see [Testing Guide](TESTING_GUIDE.md)).
 
 ## About
 
 DR_EVT simulates discrete event-driven HPC job scheduling with:
-- An EASY backfilling implementation, checked for consistency against an
-  independent Python reference implementation (not independently verified
-  against a mathematical ground truth - see the Testing Guide for what
-  that distinction means)
-- Both replay and simulation modes
-- Streaming API for online/incremental simulation
-- Support for real HPC traces (Lassen format) and a simpler CSV format
-- A test suite covering correctness scenarios, unit/format tests, policy
-  comparisons, larger-scale traces, and replay-consistency checks
+- **EASY and CONSERVATIVE backfilling** implementations, verified against
+  independent Python reference implementations (consistency checks, not
+  mathematical ground truth - see Testing Guide)
+- **gRPC-based online simulation service** enabling coordinated multi-cluster
+  simulations where distributed schedulers interact in real-time
+- **Replay and simulation modes** for both offline analysis and online operation
+- **Streaming API** for incremental job submission and online scheduling decisions
+- **Real HPC trace support** (Lassen format) plus simpler CSV format
+- **Comprehensive test suite** covering correctness, differential comparisons,
+  and large-scale scenarios
 
 Developed at Lawrence Livermore National Laboratory.

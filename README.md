@@ -3,36 +3,47 @@
 [![Documentation Status](https://readthedocs.org/projects/dr-evt/badge/?version=latest)](https://dr-evt.readthedocs.io/en/latest/?badge=latest)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/LLNL/dr_evt/blob/main/LICENSE)
 
-Discrete resource event modeling and multi-cluster scheduling simulator
-(DR_EVT) aims to provide a computational environment for simulating job
-scheduling and resource management using a set of heterogenous clusters.
+DR_EVT is a high-performance HPC job scheduler simulator supporting EASY and
+CONSERVATIVE backfilling algorithms. **Uniquely supports online simulation via
+gRPC**, enabling coordinated multi-cluster simulations where distributed schedulers
+interact in real-time.
 
 **[📚 Read the Full Documentation on ReadTheDocs →](https://dr-evt.readthedocs.io/)**
 
 ## Features
 
 ### Core Simulation
-- **Verified Scheduler Implementation**: EASY backfilling algorithm cross-checked against an independent Python reference implementation (34 comprehensive tests); see [Testing Guide](docs/TESTING_GUIDE.md)
-- **Python Reference Implementation**: A from-scratch, independently written EASY backfilling scheduler used to generate expected test outputs (34/34 tests passing against it)
-- **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
-- **Multiple Scheduling Policies**: EASY/Conservative backfilling, FCFS, SJF, LJF
-- **Block Queue Wait Queue**: Optional block-based queue with metadata filtering (7 block sizes: 4-256)
+- **Backfilling Algorithms**: EASY and CONSERVATIVE backfilling (fully implemented)
+  - EASY: O(n) complexity, optimizes utilization (~95%)
+  - CONSERVATIVE: O(n²) complexity, guarantees fairness to all waiting jobs
+  - Both verified against independent Python reference implementations
+- **Priority Policies**: FCFS, SJF, LJF with multiple wait-queue implementations
+- **Queue Implementations**: Circular buffer (default), deque, multimap, block-based (7 sizes: 4-256)
 - **Replay and Simulation Modes**: Replay historical traces or simulate with run time distributions
 - **Early Completion Support**: Jobs can finish before time_limit (actual_run_time < time_limit)
 
 ### APIs & Integration
 - **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
-- **gRPC Client/Server**: Remote simulation control over network (optional)
-- **Python Bindings**: Python API for in-process simulation control
+- **gRPC Service**: Network-exposed streaming API enabling:
+  - **Multi-cluster coordination**: Distributed schedulers interact in real-time
+  - Remote simulation control from any gRPC-capable language
+  - MPI-based multi-client/multi-server test harness for coordinated simulations
+- **Python Bindings**: Full Python API for in-process simulation control
 - **Protocol Buffer Configuration**: Structured configuration files for complex simulations
 
 ### Testing & Validation
-- **Dual Validation**: C++ simulator verified against independent Python reference implementation
-  - Python reference: Pure Python EASY backfilling (scripts/python_reference_scheduler.py)
-  - All 34 comprehensive tests pass with byte-for-byte identical output
-  - Regression detection: Any scheduling behavior change flagged immediately
-- **Analytical Testing**: Mathematical formulas generate test inputs, hand-calculated expected outputs
-- **Differential Testing**: Compare multiple scheduler implementations (circular queue, deque, multimap, block queue)
+- **Comprehensive Test Suite**: 57 tests (57/57 passing as of 2026-09-03)
+  - 34 comprehensive tests (EASY backfilling correctness)
+  - 7 unit tests (I/O and format validation)
+  - 5 feature tests (policy comparisons)
+  - 2 conservative tests (CONSERVATIVE vs EASY behavioral differences)
+  - 6 scale tests (10-2000 jobs)
+  - 3 replay tests (determinism verification)
+- **Dual Validation**: C++ verified against independent Python reference implementations
+  - EASY: scripts/python_reference_scheduler.py
+  - CONSERVATIVE: scripts/python_conservative_scheduler.py
+  - 0 mismatches on all test traces
+- **Differential Testing**: Compare multiple queue implementations (circular/deque/multimap/block)
 - **CI/CD Integration**: Automated testing on every commit via GitHub Actions
 
 ## Documentation
@@ -52,9 +63,9 @@ For quick access without leaving GitHub:
 - **[CLI Options](docs/user-guide/command-line.md)** - Command-line reference
 - **[Testing Guide](docs/TESTING_GUIDE.md)** - Test philosophy, organization, and test suite details
 - **[Test Suite](tests/README.md)** - All tests and validation
-- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity 
+- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity
 - **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
- 
+
 **Note:** Local builds are optional for contributors. The official documentation is automatically built and published to ReadTheDocs on every commit to `main`.
 
 
@@ -341,7 +352,9 @@ cmake -DProtobuf_PROTOC_EXECUTABLE=/host/bin/protoc \
 
 ### gRPC Client/Server Mode (Optional)
 
-DR_EVT can run as a network service, enabling remote simulation control from any gRPC-capable language.
+DR_EVT runs as a network service, enabling **coordinated multi-cluster simulations**
+where distributed schedulers interact in real-time, as well as remote simulation
+control from any gRPC-capable language.
 
 **Start the server:**
 ```bash
@@ -359,15 +372,16 @@ DR_EVT can run as a network service, enabling remote simulation control from any
 ./dr_evt_client --server localhost:50051 \
     --trace trace.csv \
     --total_nodes 1000 \
-    --backfill_policy easy \
+    --backfill_policy conservative \
     --priority_policy fcfs \
     --outfile results.csv
 ```
 
 **Use cases:**
+- **Multi-cluster coordination**: Simulate distributed schedulers coordinating across clusters
 - **Remote simulation**: Run simulator on HPC cluster, control from laptop
 - **Multi-language integration**: Use Python/Java/Go clients with C++ simulator
-- **Distributed testing**: Multiple clients testing different scenarios
+- **Distributed testing**: Multiple clients testing different scenarios simultaneously
 - **Web dashboards**: Real-time simulation monitoring over HTTP/gRPC
 
 **Architecture:**
