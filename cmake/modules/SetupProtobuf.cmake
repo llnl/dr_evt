@@ -56,17 +56,23 @@ else (Protobuf_PROTOC_EXECUTABLE)
       find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET REQUIRED)
     endif (NOT Protobuf_FOUND)
   else (PROTOBUF_ROOT)
-    set(Protobuf_DIR ${CMAKE_INSTALL_PREFIX})
+    # Search for Protobuf in FetchContent cache first (build/_deps/protobuf-src),
+    # then CMAKE_INSTALL_PREFIX, then system paths
+    set(_PROTOBUF_SEARCH_PATHS
+      "${CMAKE_BINARY_DIR}/_deps/protobuf-build"
+      "${CMAKE_BINARY_DIR}/_deps/protobuf-src/cmake"
+      "${CMAKE_INSTALL_PREFIX}"
+    )
+
     find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
       NAMES protobuf PROTOBUF
-      HINTS
-      "${Protobuf_DIR}" "${PROTOBUF_DIR}"
+      HINTS ${_PROTOBUF_SEARCH_PATHS}
       "$ENV{Protobuf_DIR}" "$ENV{PROTOBUF_DIR}"
-      PATH_SUFFIXES lib64/cmake/protobuf lib/cmake/protobuf
+      PATH_SUFFIXES lib64/cmake/protobuf lib/cmake/protobuf lib/cmake
       NO_DEFAULT_PATH)
 
     if (NOT Protobuf_FOUND)
-      message(STATUS "Protobuf not found. Need to build and install it first.")
+      message(STATUS "Protobuf not found. Building via FetchContent.")
       set(BUILD_PROTOBUF ON)
       include(${CMAKE_SOURCE_DIR}/external/protobuf/CMakeLists.txt)
       return()
