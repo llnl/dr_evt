@@ -60,7 +60,7 @@ make -j$(nproc)
 
 **CMake warnings**: You will see deprecation warnings from third-party dependencies (Boost, pybind11). These are harmless and come from their old cmake_minimum_required versions. To suppress them:
 ```bash
-cmake .. -Wno-author -DDR_EVT_BUILD_PYTHON=ON
+cmake .. -Wno-author -Wno-dev -DDR_EVT_BUILD_PYTHON=ON
 ```
 
 ### CMake Configuration Options
