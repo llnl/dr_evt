@@ -25,18 +25,7 @@ def main():
     params.total_nodes = 100
     params.trace_format = "simple"
     params.timestamp_format = "epoch"
-    # duration_mode is the scheduler's own planning estimate (limit vs
-    # actual) - kept explicit here even though "limit" is also
-    # Sim_Params' own default, since run_time_mode below is silently
-    # ignored entirely under duration_mode=USE_ACTUAL. Under "limit",
-    # the scheduler plans using the trace's time_limit column (or its
-    # accepted aliases, timelimit/walltime), so this trace file must
-    # have a valid, meaningful time_limit - it does not need an
-    # actual_run_time column at all (that's only read under
-    # duration_mode=USE_ACTUAL, or under run_time_mode=FROM_COLUMN
-    # below).
-    params.duration_mode = dr_evt.DurationEstimateMode.USE_LIMIT
-    params.run_time_mode = dr_evt.RunTimeMode.EXACT
+    params.run_time_mode = dr_evt.RunTimeMode.LIMIT
     params.backfill_policy = dr_evt.BackfillPolicy.EASY
     params.priority_policy = dr_evt.PriorityPolicy.FCFS
     params.verbose = False

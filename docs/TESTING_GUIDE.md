@@ -31,7 +31,6 @@ correct.
 - [Configuration Tests](#configuration-tests) - Protobuf validation
 - [Queue Implementation Testing](#queue-implementation-testing) - Wait-queue data structure consistency
 - [Column Alias Tests](#column-alias-tests) - time_limit/actual_run_time accepted column names
-- [Duration and Run Time Mode Tests](#duration-and-run-time-mode-tests) - duration_mode/run_time_mode interaction and capping
 - [Test Summary](#test-summary)
 - [Test File Formats](#test-file-formats)
 - [Adding New Tests](#adding-new-tests)
@@ -55,7 +54,7 @@ cd build
 ../tests/run_feature_tests.sh
 
 # Run scale tests (manually, no wrapper script yet)
-${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.csv --total_nodes 795
+${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.csv --total_nodes 795 --run_time_mode limit
 
 # Run replay tests
 ../tests/run_replay_tests.sh
@@ -70,8 +69,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.cs
 # Run column alias tests (time_limit/actual_run_time accepted column-name variants)
 ../tests/test_column_aliases.sh
 
-# Run duration_mode/run_time_mode interaction tests
-../tests/test_duration_run_time_modes.sh
+../tests/test_run_time_modes.sh
 ```
 
 ---
@@ -90,6 +88,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.cs
 cd build
 ${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/comprehensive/01_backfill_allowed.csv \
     --total_nodes 100 \
+    --run_time_mode limit \
     --outfile /tmp/output.csv
 
 # Compare with expected
@@ -123,7 +122,7 @@ diff /tmp/output.csv ../tests/test_traces/comprehensive/01_backfill_allowed.expe
 Tests where job completions and arrivals interact in complex ways.
 
 **Note:** the descriptions below are inferred from each test's name and job
-count only - the previous version of this table had invented, unverified
+count only - the earlier implementation of this table had invented, unverified
 descriptions that didn't match the actual trace files. Where a
 `.construction.md` file exists, it's linked as the authoritative
 description; where it doesn't, treat the name as the only claim being made.
@@ -153,8 +152,8 @@ description; where it doesn't, treat the name as the only claim being made.
 ### Tier 6-9: Completion Interactions & Backfill Edge Cases (10 tests)
 
 Jobs completing early (`actual_run_time < time_limit`) and other backfill
-edge cases - see [Duration and Run Time Mode Tests](#duration-and-run-time-mode-tests)
-above for the duration/run_time_mode mechanics these traces exercise.
+edge cases - see [Run Time Mode Tests](#run-time-mode-tests)
+above for the run_time_mode mechanics these traces exercise.
 
 | Test | Jobs | Artifacts |
 |------|------|-----------|
@@ -239,6 +238,7 @@ Note: The `easy_vs_conservative_test.csv` test is used for differential comparis
 cd build
 ${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.csv \
     --total_nodes 795 \
+    --run_time_mode limit \
     --outfile /tmp/output.csv
 
 # Compare with expected
@@ -386,19 +386,15 @@ for the full column reference.
 
 ---
 
-## Duration and Run Time Mode Tests
+## Run Time Mode Tests
 
-**Location:** `tests/test_duration_run_time_modes.sh`
+**Location:** `tests/test_run_time_modes.sh`
 **Purpose:** Verify two specific behavioral contracts not exercised by any
 other test suite:
 
-1. `duration_mode=actual` (the scheduler's omniscient planning estimate)
-   ignores `run_time_mode` entirely and always uses the trace's own real,
-   historical run time - confirmed using
-   `test_traces/comprehensive/25_early_completion_basic.csv`, where
-   `time_limit` and `actual_run_time` genuinely differ (200s vs 50s), plus
-   a contrast case confirming `duration_mode=limit` still behaves
-   differently.
+1. **Replay mode** uses the trace's own real, historical begin/end times -
+   confirmed using `test_traces/comprehensive/25_early_completion_basic.csv`,
+   where `time_limit` and `actual_run_time` genuinely differ (200s vs 50s).
 2. `run_time_mode=distribution`'s `normal`/`lognormal` samples are capped
    at `time_limit` - a real HPC scheduler kills a job at its stated
    limit, so the simulator must respect the same constraint. Checked
@@ -407,12 +403,11 @@ other test suite:
 **How to run:**
 ```bash
 cd build
-../tests/test_duration_run_time_modes.sh
+../tests/test_run_time_modes.sh
 ```
 
 Runs in CI (`.github/workflows/tests.yml`, "Run Duration/Run Time Mode
 Tests"). See [`reference/terminology.md`](reference/terminology.md) for
-the full duration_mode/run_time_mode relationship.
 
 ---
 
@@ -430,7 +425,6 @@ the full duration_mode/run_time_mode relationship.
 | **Config** | 4 | 4 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **Duration/Run Time Mode** | 4 | 4 | 0 | duration_mode=actual overrides run_time_mode; distribution capping at time_limit |
 | **TOTAL** | 111+ | 111+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**

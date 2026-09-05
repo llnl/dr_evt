@@ -247,7 +247,7 @@ void run_batch_mode(const std::string& input_file, const std::string& output_fil
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_run_time_mode = RunTimeMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::LIMIT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.set_outfile(output_file);
@@ -266,7 +266,7 @@ void run_streaming_mode(const std::string& input_file, const std::string& output
     params.m_total_nodes = 100;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_run_time_mode = RunTimeMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::LIMIT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.set_outfile(output_file);

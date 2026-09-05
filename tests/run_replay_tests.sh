@@ -13,6 +13,9 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Source common simulator path finder
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 echo "=========================================="
 echo "Replay Mode Tests"
 echo "=========================================="
@@ -20,12 +23,6 @@ echo ""
 echo "Testing that replay mode reproduces simulation resource usage"
 echo ""
 
-# Check build exists
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo "Error: ./build/simulator not found"
-    echo "Please build first: cd build && cmake .. && make"
-    exit 1
-fi
 
 PASS=0
 FAIL=0
@@ -52,16 +49,12 @@ for test_base in "${REPLAY_TESTS[@]}"; do
     sim_job_output="/tmp/replay_sim_${test_base}_jobs.csv"
     sim_resource_output="/tmp/replay_sim_${test_base}_resources.csv"
 
-    # --duration_mode isn't passed in either step below, so it stays at
-    # its default, "limit". That matters because duration_mode="actual"
-    # would make the scheduler ignore --run_time_mode entirely and just
-    # use the trace's own real run time - "limit" is what makes
-    # --run_time_mode exact actually get used in both steps.
-    ./build/simulator "$input_trace" \
+    # Use run_time_mode=limit (jobs run for full time_limit)
+    $SIMULATOR "$input_trace" \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --run_time_mode exact \
+        --run_time_mode limit \
         --outfile "$sim_job_output" \
         --resource_trace "$sim_resource_output" \
         > /dev/null 2>&1
@@ -76,11 +69,11 @@ for test_base in "${REPLAY_TESTS[@]}"; do
     replay_job_output="/tmp/replay_rep_${test_base}_jobs.csv"
     replay_resource_output="/tmp/replay_rep_${test_base}_resources.csv"
 
-    ./build/simulator "$sim_job_output" \
+    $SIMULATOR "$sim_job_output" \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --run_time_mode exact \
+        --run_time_mode limit \
         --outfile "$replay_job_output" \
         --resource_trace "$replay_resource_output" \
         > /dev/null 2>&1

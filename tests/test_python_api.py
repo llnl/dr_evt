@@ -16,11 +16,8 @@ Tests all Python bindings including:
 - Statistics
 - Different scheduling policies
 
-Note: none of the SimParams configurations below set duration_mode, so it
-stays at its own default, "limit", throughout this file. That matters
-because duration_mode="actual" would make the scheduler ignore
-run_time_mode entirely and just use the trace's own real run time -
-"limit" is what makes run_time_mode=EXACT actually get used.
+Note: Scheduler uses time_limit as the best estimator for planning.
+run_time_mode is set to LIMIT so jobs run exactly their time_limit.
 """
 
 import sys
@@ -116,12 +113,12 @@ def test_enumerations(result):
     except Exception as e:
         result.record_fail("PriorityPolicy", str(e))
 
-    # RunTimeMode
+    # RunTimeMode enum values
     try:
         assert hasattr(dr_evt, 'RunTimeMode')
-        assert hasattr(dr_evt.RunTimeMode, 'FROM_COLUMN')
-        assert hasattr(dr_evt.RunTimeMode, 'EXACT')
+        assert hasattr(dr_evt.RunTimeMode, 'ACTUAL')
         assert hasattr(dr_evt.RunTimeMode, 'DISTRIBUTION')
+        assert hasattr(dr_evt.RunTimeMode, 'LIMIT')
         result.record_pass("RunTimeMode")
     except Exception as e:
         result.record_fail("RunTimeMode", str(e))
@@ -139,7 +136,7 @@ def test_sim_params(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.run_time_mode = dr_evt.RunTimeMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
         params.backfill_policy = dr_evt.BackfillPolicy.EASY
         params.priority_policy = dr_evt.PriorityPolicy.FCFS
         params.verbose = False
@@ -169,7 +166,7 @@ def test_streaming_api(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.run_time_mode = dr_evt.RunTimeMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
         params.backfill_policy = dr_evt.BackfillPolicy.EASY
         params.priority_policy = dr_evt.PriorityPolicy.FCFS
 
@@ -216,7 +213,7 @@ def test_monitoring_api(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.run_time_mode = dr_evt.RunTimeMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 
         sim = dr_evt.Simulation(params)
         sim.initialize_trace()
@@ -264,7 +261,7 @@ def test_statistics(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.run_time_mode = dr_evt.RunTimeMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 
         sim = dr_evt.Simulation(params)
         sim.initialize_trace()
@@ -330,7 +327,7 @@ def test_backfill_policies(result):
             params.total_nodes = 100
             params.trace_format = "simple"
             params.timestamp_format = "epoch"
-            params.run_time_mode = dr_evt.RunTimeMode.EXACT
+            params.run_time_mode = dr_evt.RunTimeMode.LIMIT
             params.backfill_policy = policy
 
             sim = dr_evt.Simulation(params)
@@ -373,7 +370,7 @@ def test_priority_policies(result):
             params.total_nodes = 100
             params.trace_format = "simple"
             params.timestamp_format = "epoch"
-            params.run_time_mode = dr_evt.RunTimeMode.EXACT
+            params.run_time_mode = dr_evt.RunTimeMode.LIMIT
             params.priority_policy = policy
 
             sim = dr_evt.Simulation(params)
@@ -412,7 +409,7 @@ def test_batch_mode(result):
         params.total_nodes = 100
         params.trace_format = "simple"
         params.timestamp_format = "epoch"
-        params.run_time_mode = dr_evt.RunTimeMode.EXACT
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 
         sim = dr_evt.Simulation(params)
         sim.initialize_trace()

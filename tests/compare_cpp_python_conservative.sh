@@ -94,8 +94,7 @@ START_CPP=$(date +%s)
     --total_nodes "$NODES" \
     --priority_policy fcfs_conservative \
     --backfill_policy conservative \
-    --duration_mode limit \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --max_jobs 999999 \
     --trace_format simple \
     --outfile "$OUTDIR/cpp_conservative.csv" \

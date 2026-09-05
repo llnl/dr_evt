@@ -66,13 +66,8 @@ TOTAL_NODES=500
 MAX_JOBS=50000
 TRACE_FORMAT="simple"
 TIMESTAMP_FORMAT="epoch"
-# duration_mode is deliberately left unset here, at Sim_Params' own
-# default ("limit"). This is what makes RUN_TIME_MODE below actually
-# meaningful: under duration_mode="actual" the scheduler ignores
-# run_time_mode entirely and uses the trace's own real run time
-# directly, which would make this benchmark's --queue_impl comparison
-# no longer sensitive to run_time_mode at all.
-RUN_TIME_MODE="exact"
+# Use run_time_mode=limit (jobs run for full time_limit) for consistent benchmarking
+RUN_TIME_MODE="limit"
 BACKFILL_POLICY="easy"
 
 echo "Parameters:"

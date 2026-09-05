@@ -26,18 +26,15 @@ class SchedulerBase {
 protected:
     num_nodes_t m_total_nodes;
     BackfillPolicy m_backfill_policy;
-    DurationEstimateMode m_duration_mode;
     const std::vector<Job_Record>* m_job_data_ptr;
     sim_time_t m_fcfs_reservation_time;
 
 public:
     SchedulerBase(num_nodes_t total_nodes,
                   const std::vector<Job_Record>& job_data,
-                  BackfillPolicy bf_policy,
-                  DurationEstimateMode rt_mode)
+                  BackfillPolicy bf_policy)
         : m_total_nodes(total_nodes)
         , m_backfill_policy(bf_policy)
-        , m_duration_mode(rt_mode)
         , m_job_data_ptr(&job_data)
         , m_fcfs_reservation_time(0)
     {}
@@ -111,10 +108,8 @@ protected:
     virtual size_t wait_queue_size() const = 0;
 
     tdiff_t get_duration_estimate(job_no_t job_idx) const {
+        // Scheduler uses time_limit as the best estimator for planning (realistic mode)
         const auto& job = (*m_job_data_ptr)[job_idx];
-        if (m_duration_mode == DurationEstimateMode::USE_ACTUAL) {
-            return job.get_actual_run_time();
-        }
         return job.get_limit_time();
     }
 
@@ -133,7 +128,6 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     const std::vector<Job_Record>& job_data,
     BackfillPolicy backfill_policy,
     PriorityPolicy priority_policy,
-    DurationEstimateMode duration_mode,
     QueueImplementation queue_impl = QueueImplementation::CIRCULAR,
     size_t block_size = 128,
     size_t circular_capacity = 0,

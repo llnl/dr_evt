@@ -85,17 +85,14 @@ for TEST in "${TESTS[@]}"; do
     # Check if trace has actual_run_time column (for early completion tests)
     HEADER=$(head -1 "$INPUT")
     if echo "$HEADER" | grep -q "actual_run_time"; then
-        RUN_TIME_MODE="column"
+        RUN_TIME_MODE="actual"
     else
-        RUN_TIME_MODE="exact"
+        RUN_TIME_MODE="limit"
     fi
 
     # Run simulator with resource trace
-    # --duration_mode isn't passed, so it stays at its default, "limit".
-    # That matters because duration_mode="actual" would make the
-    # scheduler ignore --run_time_mode entirely and just use the
-    # trace's own real run time - "limit" is what makes the
-    # --run_time_mode below actually get used.
+    # Scheduler uses time_limit as the best estimator for planning.
+    # --run_time_mode controls job execution behavior.
     "$SIMULATOR" "$INPUT" --total_nodes "$TOTAL_NODES" --trace_format simple \
         --timestamp_format epoch --run_time_mode "$RUN_TIME_MODE" --outfile "$SIM_OUT" \
         --backfill_policy easy --resource_trace "${SIM_OUT}_resources.csv" > /dev/null 2>&1

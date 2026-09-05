@@ -35,11 +35,12 @@ struct JobInfo {
     sim_time_t submit_time;
 };
 
-// Get jobs for this rank (round-robin partitioning)
+// Get all jobs for this rank (each rank processes ALL jobs to test determinism)
 std::vector<JobInfo> get_rank_jobs(const Trace& trace, int rank, int size) {
     std::vector<JobInfo> my_jobs;
 
-    for (size_t i = rank; i < trace.data().size(); i += size) {
+    // All ranks get ALL jobs - we're testing determinism, not partitioning
+    for (size_t i = 0; i < trace.data().size(); i++) {
         const auto& job = trace.data()[i];
         sim_time_t submit = static_cast<sim_time_t>(job.get_submit_time().first) +
                            job.get_submit_time().second;
@@ -63,7 +64,7 @@ void run_mpi_streaming(const std::string& trace_file, int total_nodes,
     params.m_total_nodes = total_nodes;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_run_time_mode = RunTimeMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::LIMIT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.m_seed = 42;
@@ -146,7 +147,7 @@ void run_batch_reference(const std::string& trace_file, int total_nodes) {
     params.m_total_nodes = total_nodes;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";
-    params.m_run_time_mode = RunTimeMode::EXACT;
+    params.m_run_time_mode = RunTimeMode::LIMIT;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.m_seed = 42;
@@ -155,6 +156,7 @@ void run_batch_reference(const std::string& trace_file, int total_nodes) {
 
     Simulation sim(params);
     sim.run();
+    sim.write_simulated_trace();  // Must explicitly write output file
 
     std::cout << "Batch mode output: " << params.get_outfile() << std::endl;
 }
@@ -168,14 +170,25 @@ bool compare_files(const std::string& file1, const std::string& file2) {
     }
 
     std::string line1, line2;
-    while (std::getline(f1, line1) && std::getline(f2, line2)) {
+    while (true) {
+        bool has1 = static_cast<bool>(std::getline(f1, line1));
+        bool has2 = static_cast<bool>(std::getline(f2, line2));
+
+        // If one has more lines than the other
+        if (has1 != has2) {
+            return false;
+        }
+
+        // Both reached end
+        if (!has1 && !has2) {
+            return true;
+        }
+
+        // Compare lines
         if (line1 != line2) {
             return false;
         }
     }
-
-    // Check both reached EOF
-    return f1.eof() && f2.eof();
 }
 
 int main(int argc, char** argv) {

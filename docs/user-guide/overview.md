@@ -17,7 +17,6 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator my_trace.csv \
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --duration_mode actual
 ```
 
 ### Example Output
@@ -198,33 +197,48 @@ Prioritize jobs with longest run time.
 - Can increase average wait time
 - Research/comparison purposes
 
-### Scheduler's Run Time Estimate (Duration Mode)
+### Run Time Modes
 
-#### USE_LIMIT (Realistic Mode) - Default
+Controls how the job's actual execution length is determined in simulation.
 
-Scheduler uses user-provided time limits for planning.
+**Note**: The scheduler **always** uses `time_limit` for planning decisions (realistic behavior).
+This setting only affects how long jobs actually run in the simulation.
 
-**Usage**: `--duration_mode limit`
+#### actual (Default)
 
-**Characteristics**:
-- Realistic (users provide limits)
-- Limits often overestimate
-- More resource waste
-- Use for realistic simulations
+Read the job's real run time from the trace's `actual_run_time` column.
 
-#### USE_ACTUAL (Omniscient/Oracle Mode)
-
-Scheduler plans using the job's real, observed run time (from trace).
-
-**Usage**: `--duration_mode actual`
+**Usage**: `--run_time_mode actual` (or `-r actual`)
 
 **Characteristics**:
-- Perfect information
-- Best possible scheduling
-- Unrealistic but useful for upper bound
-- Use for comparison baseline
+- Most realistic - uses historical execution times
+- Jobs run for their actual observed duration
+- Scheduler still plans using time_limit
+- Best for realistic simulations
 
-**Note**: Requires `time_limit` column in trace
+#### distribution
+
+Sample from a statistical distribution around `time_limit * scale`.
+
+**Usage**: `--run_time_mode distribution`
+
+**Characteristics**:
+- Adds realistic variability
+- Supports normal, lognormal, uniform distributions
+- Capped at time_limit (scheduler kills jobs at limit)
+- Useful for synthetic workloads
+
+#### limit (Debug Mode)
+
+Jobs run for exactly their `time_limit`.
+
+**Usage**: `--run_time_mode limit` (or `-r limit`)
+
+**Characteristics**:
+- Unrealistic but predictable
+- Debug and test friendly
+- Every job uses its full time allocation
+- Useful for scheduler algorithm testing
 
 ## Command-Line Options
 
@@ -245,7 +259,7 @@ Scheduler plans using the job's real, observed run time (from trace).
 ### Trace Format Options
 
 ```bash
--f, --trace_format FORMAT     # Trace format: simple|lassen (default: lassen)
+-f, --trace_format FORMAT     # Trace format: simple|lassen (default: simple)
 -T, --timestamp_format FORMAT # Timestamp: epoch|iso (default: iso)
 -z, --timezone ZONE           # Timezone for ISO timestamps (default: America/Los_Angeles)
 ```
@@ -255,10 +269,17 @@ Scheduler plans using the job's real, observed run time (from trace).
 ```bash
 -b, --backfill_policy POLICY   # Backfill: easy|conservative|none (default: easy)
 -p, --priority_policy POLICY   # Priority: fcfs|sjf|ljf (default: fcfs)
--r, --duration_mode MODE        # Scheduler's planning estimate: limit|actual (default: limit)
 -q, --queue_impl IMPL          # FCFS wait queue: circular|deque|multimap|block (default: circular)
 -A, --circular_capacity SIZE   # Initial capacity for queue_impl=circular (default: 0 = size of trace)
 -G, --circular_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
+```
+
+### Run Time Options
+
+```bash
+-r, --run_time_mode MODE       # How jobs actually run: actual|distribution|limit (default: actual)
+-D, --run_time_distribution    # Distribution type: normal|lognormal|uniform (for mode=distribution)
+-S, --run_time_scale FACTOR    # Scale factor for run times (for mode=distribution)
 ```
 
 ### Other Options
@@ -272,15 +293,15 @@ Scheduler plans using the job's real, observed run time (from trace).
 
 ### Example 1: Basic Test
 
-Test with synthetic trace (realistic mode):
+Test with synthetic trace:
 ```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator test_traces/epoch_pbatch.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator tests/test_traces/unit/timestamp_epoch_simple.csv \
   --trace_format simple \
   --timestamp_format epoch \
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --duration_mode limit
+  --run_time_mode limit \
 ```
 
 ### Example 2: Real HPC Trace
@@ -294,7 +315,6 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
   --total_nodes 795 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --duration_mode limit
 ```
 
 ### Example 3: Policy Comparison
@@ -324,13 +344,13 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy sjf -o results
 
 ### Example 5: Run Time Estimation Impact
 
-Compare oracle vs realistic:
+Compare different run time modes:
 ```bash
-# Oracle (perfect information)
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --duration_mode actual -o results_oracle.txt
+# Using actual run times from trace (most realistic, default)
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --run_time_mode actual
 
-# Realistic (user time limits)
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --duration_mode limit -o results_realistic.txt
+# Using time limits (debug/test mode)
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --run_time_mode limit
 ```
 
 ## Understanding Output

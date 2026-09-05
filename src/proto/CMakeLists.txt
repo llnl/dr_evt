@@ -116,9 +116,13 @@ if (DR_EVT_HAS_GRPC)
 
     add_dependencies(dr_evt_service_proto dr_evt_service_proto_genSrc)
 
-    # Not installed (unlike dr_evt_proto above): the gRPC service is only
-    # consumed by the dr_evt_server/dr_evt_client executables built in
-    # the root CMakeLists.txt, not by any installed library's public API.
+    # Install the library - needed by dr_evt_server, dr_evt_client, and test executables at runtime
+    install(TARGETS dr_evt_service_proto
+        EXPORT DR_EVTTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif (DR_EVT_HAS_GRPC)
 
 

@@ -53,7 +53,7 @@ params.infile = "jobs.csv"
 params.total_nodes = 100
 params.trace_format = "simple"
 params.timestamp_format = "epoch"
-params.run_time_mode = dr_evt.RunTimeMode.EXACT
+params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 params.backfill_policy = dr_evt.BackfillPolicy.EASY
 params.priority_policy = dr_evt.PriorityPolicy.FCFS
 
@@ -125,19 +125,18 @@ params.priority_policy = dr_evt.PriorityPolicy.FCFS
 # Options: FCFS, SJF (Shortest Job First), LJF (Longest Job First)
 
 # Scheduler's own job-length estimate for reservation/backfill planning
-# params.duration_mode = dr_evt.DurationEstimateMode.USE_LIMIT  # Not exposed in bindings yet
-# Options: USE_LIMIT (use time_limit), USE_ACTUAL (omniscient/oracle mode)
+# Scheduler uses time_limit as the best estimator for planning
 ```
 
 ### Run Time Mode (Simulation)
 
 ```python
 # How the job's actual, observed execution length is determined
-params.run_time_mode = dr_evt.RunTimeMode.EXACT
+params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 # Options:
-# - FROM_COLUMN: Read from actual_run_time column (also accepted:
+# - ACTUAL: Read from actual_run_time column (also accepted:
 #   duration, actual_duration, run_time)
-# - EXACT: Jobs run exactly their time_limit
+# - LIMIT: Jobs run exactly their time_limit
 # - DISTRIBUTION: Sample from statistical distribution
 
 # Distribution parameters (when run_time_mode=DISTRIBUTION)
@@ -162,8 +161,7 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 ✅ `total_nodes` - Total compute nodes  
 ✅ `trace_format` - Trace format (simple/lassen)  
 ✅ `timestamp_format` - Timestamp format (epoch/iso)  
-✅ `duration_mode` - Scheduler's own planning estimate (limit/actual); determines whether run_time_mode below is consulted at all  
-✅ `run_time_mode` - How the job's actual run time is determined (exact/column/distribution)  
+✅ `run_time_mode` - How the job's actual run time is determined (actual/distribution/limit)  
 ✅ `backfill_policy` - Backfilling policy (easy/conservative/none)  
 ✅ `priority_policy` - Priority policy (fcfs/sjf/ljf)  
 ✅ `verbose` - Verbose output flag  
@@ -177,7 +175,7 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 | `seed` | uint32 | Random | RNG seed for reproducibility | **High** - Can't reproduce simulations |
 | `max_jobs` | uint32 | Unlimited | Limit jobs processed | **Medium** - Can't test subsets |
 | `max_time` | double | Unlimited | Stop at simulation time | **Medium** - Can't limit runtime |
-| `timezone` | string | "America/Los_Angeles" | Timezone for ISO timestamps | **Medium** - Can't parse non-LA times correctly |
+| `timezone` | string | "America/Los_Angeles" | Timezone for ISO timestamps | **Medium** - Can't parse non-Pacific times correctly |
 
 **Run Time Simulation (only if run_time_mode=DISTRIBUTION):**
 
@@ -230,8 +228,8 @@ sim_setup {
   seed: 42
   max_jobs: 5000
   max_time: 86400.0
-  duration_mode: "actual"
   timezone: "UTC"
+  run_time_mode: "distribution"
   run_time_distribution: "normal"
   run_time_scale: 0.8
   run_time_stddev: 0.1
@@ -261,8 +259,8 @@ result = subprocess.run([
     "--total_nodes", "1000",
     "--seed", "42",
     "--max_jobs", "5000",
-    "--duration_mode", "actual",
     "--timezone", "UTC",
+    "--run_time_mode", "distribution",
     "--run_time_distribution", "normal",
     "--run_time_scale", "0.8",
     "--outfile", "results.csv"
@@ -310,11 +308,10 @@ pip install --force-reinstall .
 | Use Case | Missing Parameters Needed | Workaround |
 |----------|--------------------------|------------|
 | **Reproducible simulations** | `seed` | Use config file or CLI |
-| **Oracle mode** | `duration_mode=actual` | Now directly settable: `params.duration_mode = dr_evt.DurationEstimateMode.USE_ACTUAL` |
 | **Output to file** | `outfile` | Use CLI or call `write_simulated_trace()` |
 | **Test on subset** | `max_jobs`, `max_time` | Preprocess trace file |
-| **Non-LA timezones** | `timezone` | Convert timestamps to LA time or use epoch |
-| **Realistic run time variation** | `run_time_distribution`, `run_time_scale`, `run_time_stddev` | Use `run_time_mode=EXACT` or config file |
+| **Non-Pacific timezones** | `timezone` | Convert timestamps to Pacific time or use epoch |
+| **Realistic run time variation** | `run_time_distribution`, `run_time_scale`, `run_time_stddev` | Set `run_time_mode=DISTRIBUTION` in config file |
 
 ### Recommendation
 
@@ -345,9 +342,9 @@ dr_evt.PriorityPolicy.LJF               # Longest Job First
 ### RunTimeMode
 
 ```python
-dr_evt.RunTimeMode.FROM_COLUMN   # Read actual_run_time from trace
-dr_evt.RunTimeMode.EXACT         # Jobs run exactly time_limit
+dr_evt.RunTimeMode.ACTUAL        # Read actual_run_time from trace (default)
 dr_evt.RunTimeMode.DISTRIBUTION  # Sample from distribution
+dr_evt.RunTimeMode.LIMIT         # Jobs run exactly time_limit (debug only)
 ```
 
 ## Streaming API

@@ -55,41 +55,17 @@ enum class PriorityPolicy {
 };
 
 /**
- * Scheduler's own job-length estimate, used for reservation/backfill
- * planning decisions. Distinct from RunTimeMode below, which controls
- * how the job's actual, observed execution length is determined.
- */
-enum class DurationEstimateMode {
-    /**
-     * Use user-provided time limit (realistic mode).
-     * Scheduler makes decisions based on requested walltime limit.
-     * Jobs complete at their actual execution time.
-     */
-    USE_LIMIT,
-
-    /**
-     * Use the job's actual, observed run_time (oracle mode, for
-     * comparison studies). Scheduler knows exact run_times in advance.
-     * Unrealistic but useful for comparison with optimal schedules.
-     * When this mode is active, RunTimeMode below is ignored entirely -
-     * the trace's own real run_time is used directly.
-     */
-    USE_ACTUAL
-};
-
-/**
  * @brief How the job's actual, observed run_time is determined in
  * simulation mode
  *
- * In simulation mode, the scheduler computes start times but the job's
- * actual run_time must be determined. This enum controls the method.
- * Only consulted when DurationEstimateMode::USE_LIMIT is active - ignored
- * entirely under USE_ACTUAL, which uses the trace's own real run_time.
+ * In simulation mode, the scheduler uses time_limit as the best estimator for planning
+ * (realistic - what real schedulers know). This enum controls how the job's
+ * actual observed execution length is determined.
  */
 enum class RunTimeMode {
-    FROM_COLUMN,    ///< Read actual_run_time from trace column
-    EXACT,          ///< Use time_limit as the run_time (perfect estimation)
-    DISTRIBUTION    ///< Sample from statistical distribution
+    ACTUAL,         ///< Read actual_run_time from trace column (most realistic)
+    DISTRIBUTION,   ///< Sample from statistical distribution (realistic with variation)
+    LIMIT           ///< Use time_limit as the run_time (unrealistic, for debugging/testing only)
 };
 
 /**

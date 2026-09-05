@@ -66,7 +66,7 @@ Test streaming job submission APIs:
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --outfile /tmp/output.csv
 
 # Run C++ test (if built)

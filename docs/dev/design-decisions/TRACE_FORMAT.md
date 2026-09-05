@@ -9,12 +9,12 @@ DR_EVT now supports flexible trace file formats with command-line options for fo
 --trace_format {simple|lassen}
 ```
 
-**simple**: Minimal CSV format for testing
+**simple** (default): Minimal CSV format for testing
 - Format: `[arrival_time, start_time, end_time, num_nodes, exit_status, queue, time_limit]`
 - First 4 columns required
 - Additional columns optional
 
-**lassen** (default): LLNL Lassen 33-column format
+**lassen**: LLNL Lassen 33-column format
 - Full HPC trace format
 - Backward compatible with existing traces
 
@@ -70,7 +70,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator test_trace.csv \
 ```bash
 ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
   --total_nodes 795
-# Uses defaults: lassen format, iso timestamps, America/Los_Angeles timezone
+# Uses defaults: simple format, iso timestamps, America/Los_Angeles timezone
 ```
 
 ## Simple Format CSV Structure
@@ -104,7 +104,7 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 | 4 | exit_status | Job exit code | Optional |
 | 5 | queue | Queue name (e.g., "batch") | Optional |
 | 6 | time_limit | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Optional |
-| 7 | actual_run_time | The job's real, historical run time (seconds); used by `--duration_mode actual` (always) and `--run_time_mode column` (only when duration_mode=limit). Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Optional |
+| 7 | actual_run_time | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Optional |
 
 **Column-name aliases**: `time_limit` and `actual_run_time` are each detected
 under several accepted header names (listed above), so an existing trace
@@ -180,7 +180,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator test.csv \
   --total_nodes 100 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --duration_mode actual
+  --run_time_mode actual
 ```
 
 Expected output should show:

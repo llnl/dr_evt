@@ -25,15 +25,12 @@ PYBIND11_MODULE(dr_evt, m) {
     m.doc() = "DR_EVT: HPC Job Scheduler Simulator - Python API";
 
     // Enumerations
-    py::enum_<DurationEstimateMode>(m, "DurationEstimateMode")
-        .value("USE_LIMIT", DurationEstimateMode::USE_LIMIT)
-        .value("USE_ACTUAL", DurationEstimateMode::USE_ACTUAL)
-        .export_values();
-
+    // RunTimeMode: How the job's actual execution length is determined
+    // Scheduler uses time_limit as the best estimator for planning
     py::enum_<RunTimeMode>(m, "RunTimeMode")
-        .value("FROM_COLUMN", RunTimeMode::FROM_COLUMN)
-        .value("EXACT", RunTimeMode::EXACT)
+        .value("ACTUAL", RunTimeMode::ACTUAL)
         .value("DISTRIBUTION", RunTimeMode::DISTRIBUTION)
+        .value("LIMIT", RunTimeMode::LIMIT)
         .export_values();
 
     py::enum_<BackfillPolicy>(m, "BackfillPolicy")
@@ -56,13 +53,6 @@ PYBIND11_MODULE(dr_evt, m) {
         .def_readwrite("total_nodes", &Sim_Params::m_total_nodes)
         .def_readwrite("trace_format", &Sim_Params::m_trace_format)
         .def_readwrite("timestamp_format", &Sim_Params::m_timestamp_format)
-        // duration_mode is the scheduler's own planning estimate (limit vs
-        // actual) - it must be exposed alongside run_time_mode, since
-        // duration_mode=USE_ACTUAL makes the scheduler ignore run_time_mode
-        // entirely and use the trace's own real run time directly. Without
-        // being able to see/set this, a caller has no way to know whether
-        // their run_time_mode setting will actually take effect.
-        .def_readwrite("duration_mode", &Sim_Params::m_duration_mode)
         .def_readwrite("run_time_mode", &Sim_Params::m_run_time_mode)
         .def_readwrite("backfill_policy", &Sim_Params::m_backfill_policy)
         .def_readwrite("priority_policy", &Sim_Params::m_priority_policy)

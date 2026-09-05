@@ -95,8 +95,7 @@ echo "=== Running EASY Backfilling ==="
     --total_nodes $NODES \
     --priority_policy fcfs \
     --backfill_policy easy \
-    --duration_mode limit \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --trace_format simple \
     --outfile "$OUTDIR/easy.csv" \
     > "$OUTDIR/easy.log" 2>&1
@@ -106,8 +105,7 @@ echo "=== Running CONSERVATIVE Backfilling ==="
     --total_nodes $NODES \
     --priority_policy fcfs_conservative \
     --backfill_policy conservative \
-    --duration_mode limit \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --trace_format simple \
     --outfile "$OUTDIR/conservative.csv" \
     > "$OUTDIR/conservative.log" 2>&1

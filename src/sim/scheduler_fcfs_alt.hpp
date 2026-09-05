@@ -32,8 +32,7 @@ class FCFSAltScheduler : public SchedulerBase {
 public:
     FCFSAltScheduler(num_nodes_t total_nodes,
                      const std::vector<Job_Record>& job_data,
-                     BackfillPolicy backfill_policy,
-                     DurationEstimateMode duration_mode);
+                     BackfillPolicy backfill_policy);
 
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,

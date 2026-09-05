@@ -52,6 +52,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 #include "dr_evt_service.grpc.pb.h"
 
@@ -71,6 +73,14 @@ std::string get_own_hostname()
         return "localhost";
     }
     return std::string(buf);
+}
+
+std::string get_own_ip()
+{
+    // For single-node testing, always use loopback
+    // For multi-node MPI, the real IP would be needed, but this test
+    // is designed for single-node with multiple ranks
+    return "127.0.0.1";
 }
 
 // Reads job_submit_time (column 0) from a simple-format trace CSV. Same
@@ -151,7 +161,9 @@ int run_server_rank(int my_rank, int paired_client_rank,
 {
     std::string hostname = get_own_hostname();
     std::string address = "0.0.0.0:" + std::to_string(port);
-    std::string advertised_address = hostname + ":" + std::to_string(port);
+    // Use IP address instead of hostname for better compatibility
+    std::string ip = get_own_ip();
+    std::string advertised_address = ip + ":" + std::to_string(port);
 
     pid_t child_pid = fork();
     if (child_pid < 0) {
@@ -172,7 +184,7 @@ int run_server_rank(int my_rank, int paired_client_rank,
     // Parent: give the server a moment to bind and start listening before
     // advertising its address - the client side also retries its initial
     // connection, so this is a courtesy, not a hard requirement.
-    usleep(500 * 1000);
+    usleep(1500 * 1000);
 
     std::cout << "[server rank " << my_rank << "] listening on "
               << advertised_address << " (pid " << child_pid << ")" << std::endl;
@@ -212,36 +224,56 @@ int run_client_rank(int my_rank, int paired_server_rank,
     std::cout << "[client rank " << my_rank << "] connecting to "
               << server_address << std::endl;
 
-    SimulationClient client(
-        grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+    // Create channel and wait for it to be ready before opening the stream.
+    // The stream is opened in SimulationClient's constructor, and if the
+    // server isn't ready yet, the stream fails permanently - retrying with
+    // the same broken stream won't help.
+    auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
 
-    // Retry the initial call briefly - the server may still be starting.
-    const int max_retries = 20;
+    const int max_retries = 60;  // Increased from 20 to 60 (30 seconds total)
     int attempt = 0;
-    while (true) {
-        try {
-            ClientMessage init_req;
-            auto* init = init_req.mutable_init();
-            init->set_total_nodes(total_nodes);
-            init->set_trace_format("simple");
-            init->set_timestamp_format("epoch");
-            init->set_backfill_policy("easy");
-            init->set_priority_policy("fcfs");
-            init->set_duration_mode("limit");
-            init->set_run_time_mode("exact");
-            init->set_infile(trace_file);
-            client.call(init_req);
+    bool connected = false;
+
+    // Wait for channel to be ready
+    std::cout << "[client rank " << my_rank << "] waiting for channel to be ready..." << std::endl;
+    while (attempt < max_retries) {
+        auto state = channel->GetState(true);  // try_to_connect = true
+        if (state == GRPC_CHANNEL_READY) {
+            connected = true;
+            std::cout << "[client rank " << my_rank << "] channel ready after "
+                      << attempt << " attempts" << std::endl;
             break;
-        } catch (const std::exception& e) {
-            if (++attempt >= max_retries) {
-                std::cerr << "[client rank " << my_rank << "] failed to "
-                          << "initialize session after " << max_retries
-                          << " attempts: " << e.what() << std::endl;
-                throw;
-            }
-            usleep(250 * 1000);
+        }
+        if (!channel->WaitForStateChange(state, std::chrono::system_clock::now() + std::chrono::milliseconds(500))) {
+            // Timeout - try again
+        }
+        attempt++;
+        if (attempt % 10 == 0) {
+            std::cout << "[client rank " << my_rank << "] still waiting (attempt "
+                      << attempt << "/" << max_retries << ", state=" << state << ")" << std::endl;
         }
     }
+
+    if (!connected) {
+        std::cerr << "[client rank " << my_rank << "] channel never became ready after "
+                  << max_retries << " attempts" << std::endl;
+        throw std::runtime_error("Failed to connect to server");
+    }
+
+    // Now that channel is ready, create the client (which opens the stream)
+    SimulationClient client(channel);
+
+    // Send initialization request
+    ClientMessage init_req;
+    auto* init = init_req.mutable_init();
+    init->set_total_nodes(total_nodes);
+    init->set_trace_format("simple");
+    init->set_timestamp_format("epoch");
+    init->set_backfill_policy("easy");
+    init->set_priority_policy("fcfs");
+    init->set_run_time_mode("limit");
+    init->set_infile(trace_file);
+    client.call(init_req);
 
     ClientMessage trace_req;
     trace_req.mutable_initialize_trace()->set_max_jobs(0);
@@ -377,8 +409,9 @@ int main(int argc, char** argv)
                                    total_nodes, client_comm);
         }
     } catch (const std::exception& e) {
-        std::cerr << "[rank " << world_rank << "] error: " << e.what() << std::endl;
-        rc = 1;
+        std::cerr << "[rank " << world_rank << "] FATAL ERROR: " << e.what() << std::endl;
+        std::cerr << "[rank " << world_rank << "] Calling MPI_Abort to terminate all ranks" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     if (client_comm != MPI_COMM_NULL) {

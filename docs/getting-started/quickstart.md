@@ -9,7 +9,7 @@ This branch (`feature/backfilling-scheduler`) adds a **SLURM-style backfilling s
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
 - **Priority Policies**: FCFS (First-Come-First-Served), SJF (Shortest-Job-First), LJF (Longest-Job-First)
-- **Run Time Modes**: Realistic (use time limits) or Oracle (perfect knowledge)
+- **Run Time Modes**: Read from trace (actual), sample from distribution, or use time limits
 
 ## Build Instructions
 
@@ -52,7 +52,6 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace_file.txt \
   --total_nodes 795 \
   --backfill_policy easy \
   --priority_policy fcfs \
-  --duration_mode limit
 ```
 
 ### All Options
@@ -82,14 +81,13 @@ Scheduling policy:
   -G, --circular_overflow <mode>   abort|grow when queue_impl=circular (default: grow)
 
 Trace format:
-  -f, --trace_format <fmt>     simple|lassen (default: lassen)
+  -f, --trace_format <fmt>     simple|lassen (default: simple)
   -T, --timestamp_format <fmt> epoch|iso (default: iso)
   -z, --timezone <tz>          Timezone for iso timestamps (default: America/Los_Angeles)
 
 Duration/run time modeling:
-  -r, --duration_mode <mode>          limit|actual (default: limit) - scheduler's
                                        planning estimate
-  -d, --run_time_mode <mode>          column|exact|distribution (default: exact) -
+  -r, --run_time_mode <mode>          actual|distribution|limit (default: actual)
                                        how the job's actual run time is determined
   -D, --run_time_distribution <type>  normal|lognormal|uniform (default: normal)
   -S, --run_time_scale <factor>       Scale factor for run time sampling (default: 1.0)
@@ -115,11 +113,11 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
   --outfile results_conservative_sjf.txt
 ```
 
-**Oracle mode (perfect run time knowledge):**
+**Using actual run times from trace:**
 ```bash
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
-  --duration_mode actual \
-  --outfile results_oracle.txt
+  --run_time_mode actual \
+  --outfile results_actual.txt
 ```
 
 **Limited simulation (first 1000 jobs):**
@@ -182,14 +180,13 @@ See existing trace files in the project for examples.
 
 ### Run Time Modes
 
-**USE_LIMIT (Realistic)**
-- Scheduler uses user-provided time limits
-- Jobs may finish earlier than estimated
-- Mimics real HPC systems
+**How jobs actually run (run_time_mode):**
 
-**USE_ACTUAL (Oracle)**
-- Scheduler knows exact run times
-- Unrealistic but useful for comparison
+- `actual` (default) - Read actual run time from trace (most realistic)
+- `distribution` - Sample from statistical distribution
+- `limit` - Run for exactly time_limit (debug mode)
+
+**Note:** Scheduler uses time_limit as the best estimator for planning
 - Upper bound on performance
 
 ## Troubleshooting

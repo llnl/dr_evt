@@ -33,6 +33,7 @@
 
 # Build directories
 build/
+install/
 venv/
 
 # Development notes (local only - but keep design-decisions/)

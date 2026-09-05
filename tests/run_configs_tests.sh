@@ -4,14 +4,8 @@
 # Verifies that all CLI options are supported via config files and behave identically
 # NOTE: Requires Protobuf support (cmake -DDR_EVT_ENABLE_PROTOBUF=ON)
 #
-# duration_mode is never set on either side of any comparison below
-# (neither the CLI invocations nor the .pb configs), so it stays at its
-# own default, "limit", on both sides consistently. That matters because
-# duration_mode="actual" would make the scheduler ignore --run_time_mode
-# entirely and just use the trace's own real run time - "limit" is what
-# makes --run_time_mode exact actually get used, and keeps the
-# CLI-vs-config comparisons meaningful (both sides are exercising the
-# same setting, even though neither states it explicitly).
+# This test uses --run_time_mode limit throughout (test traces lack actual_run_time column).
+# Both CLI and config-file invocations use the same run_time_mode for meaningful comparison.
 
 set -e
 
@@ -20,6 +14,9 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Source common simulator path finder
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 echo "=========================================="
 echo "Configuration File Tests"
 echo "=========================================="
@@ -27,15 +24,9 @@ echo ""
 echo "Testing that config files match CLI options"
 echo ""
 
-# Check build exists
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo "Error: ./build/simulator not found"
-    echo "Please build first: cd build && cmake .. && make"
-    exit 1
-fi
 
 # Check if simulator supports --config option (requires Protobuf)
-if ! ./build/simulator --help 2>&1 | grep -q -- "--config"; then
+if ! $SIMULATOR --help 2>&1 | grep -q -- "--config"; then
     echo "Simulator built without Protobuf support (no --config option)"
     echo "Skipping config tests (require -DDR_EVT_ENABLE_PROTOBUF=ON)"
     exit 0
@@ -54,14 +45,14 @@ FAIL=0
 
 # Test 1: Minimal config vs CLI
 echo "Test 1: Minimal config"
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --outfile /tmp/cli_minimal.csv
 
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --config tests/test_configs/minimal_config.pb \
     --outfile /tmp/pb_minimal.csv
 
@@ -75,16 +66,16 @@ fi
 
 # Test 2: Full config vs CLI
 echo "Test 2: Full config"
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --backfill_policy easy \
     --priority_policy fcfs \
     --outfile /tmp/cli_full.csv
 
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --config tests/test_configs/full_config.pb \
     --outfile /tmp/pb_full.csv
 
@@ -98,15 +89,15 @@ fi
 
 # Test 3: Conservative config vs CLI
 echo "Test 3: Conservative policy config"
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --backfill_policy conservative \
     --outfile /tmp/cli_conservative.csv
 
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --config tests/test_configs/conservative_config.pb \
     --outfile /tmp/pb_conservative.csv
 
@@ -120,7 +111,7 @@ fi
 
 # Test 4: Distribution config
 echo "Test 4: Distribution config"
-./build/simulator "$TEST_TRACE" \
+$SIMULATOR "$TEST_TRACE" \
     --config tests/test_configs/distribution_config.pb \
     --outfile /tmp/pb_distribution.csv
 

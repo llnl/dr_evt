@@ -30,33 +30,33 @@ message DR_EVT_Params {
 
         // Scheduling parameters
         uint32 total_nodes = 8;         // System node count (default: 795)
-        string backfill_policy = 9;     // "easy", "conservative" or "none" (default: "easy")
+        string backfill_policy = 9;     // "easy", "conservative", or "none" (default: "easy")
         string priority_policy = 10;    // "fcfs", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
-        string duration_mode = 11;       // "limit" or "actual" (default: "limit")
 
         // Trace format parameters
-        string trace_format = 12;       // "simple" or "lassen" (default: "lassen")
-        string timestamp_format = 13;   // "epoch" or "iso" (default: "iso")
-        string timezone = 14;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
+        string trace_format = 11;       // "simple" or "lassen" (default: "simple")
+        string timestamp_format = 12;   // "epoch" or "iso" (default: "iso")
+        string timezone = 13;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
 
-        // Duration simulation parameters
-        string run_time_mode = 15;      // "column", "exact", or "distribution" (default: "exact")
-        string run_time_distribution = 16; // "normal", "lognormal", or "uniform" (default: "normal")
-        double run_time_scale = 17;     // Scale factor (default: 1.0)
-        double run_time_stddev = 18;    // Standard deviation factor (default: 0.0)
+        // Run time determination parameters
+        // Scheduler uses time_limit as the best estimator for planning
+        string run_time_mode = 14;      // "actual", "distribution", or "limit" (default: "actual")
+        string run_time_distribution = 15; // "normal", "lognormal", or "uniform" (default: "normal")
+        double run_time_scale = 16;     // Scale factor (default: 1.0)
+        double run_time_stddev = 17;    // Standard deviation factor (default: 0.0)
 
         // Queue implementation (FCFS scheduler only)
-        string queue_impl = 19;         // "circular", "deque", "multimap", or "block" (default: "circular")
+        string queue_impl = 18;         // "circular", "deque", "multimap", or "block" (default: "circular")
 
         // Block size for block queue implementation (must be power of 2)
-        uint32 block_size = 20;         // 32, 64, 128, or 256 (default: 128)
+        uint32 block_size = 19;         // 32, 64, 128, or 256 (default: 128)
 
         // Initial capacity for circular queue implementation. 0 means
         // the size of the job trace (large enough it can never overflow).
-        uint64 circular_capacity = 21;  // (default: 0)
+        uint64 circular_capacity = 20;  // (default: 0)
 
         // What to do if a circular queue insert would exceed circular_capacity
-        string circular_overflow = 22;  // "abort" or "grow" (default: "grow")
+        string circular_overflow = 21;  // "abort" or "grow" (default: "grow")
     }
 
     message Tracing_Params {

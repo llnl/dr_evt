@@ -51,9 +51,8 @@ private:
 public:
     FCFSConservativeScheduler(num_nodes_t total_nodes,
                               const std::vector<Job_Record>& job_data,
-                              BackfillPolicy bf_policy,
-                              DurationEstimateMode rt_mode)
-        : SchedulerBase(total_nodes, job_data, bf_policy, rt_mode)
+                              BackfillPolicy bf_policy)
+        : SchedulerBase(total_nodes, job_data, bf_policy)
         , m_eligible_end_idx(0)
         , m_current_tracked_time(0.0)
         , m_removed_count(0)
