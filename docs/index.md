@@ -62,6 +62,7 @@ dev/READTHEDOCS_SETUP
 dev/design-decisions/README
 dev/design-decisions/SIMULATION_VS_REPLAY_MODES
 dev/design-decisions/TIMEZONE_SUPPORT
+dev/design-decisions/RESOURCE_HISTORY_STREAMING
 ```
 
 ## Documentation

@@ -43,7 +43,7 @@ int process_trace(const dr_evt::Trace_Params& cfg)
         return rc;
     }
     std::cout << std::to_string(trace.data().size()) + " jobs have been loaded.\n";
-    trace.run_job_trace();
+    trace.run_job_trace(cfg.get_resource_trace(), cfg.get_total_nodes());
 
     std::cout << "Trace ";
     trace.print_span(std::cout);

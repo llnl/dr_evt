@@ -55,6 +55,11 @@ class Trace {
         num_nodes_t m_n_nodes_in_use;
         event_q_t m_evtq;
 
+        /// (time, allocated_nodes) sampled every time an event changes
+        /// occupancy. free_nodes isn't stored here since total_nodes isn't
+        /// known to Context - it's derived by write_resource_trace() below.
+        std::vector<std::pair<epoch_t, num_nodes_t>> m_resource_history;
+
         Context();
         std::string to_string() const;
     };
@@ -77,9 +82,29 @@ class Trace {
     /**
      *  Run the trace from the begining to the end. i.e., run the simulation
      *  of 3 job events--submit, start, and end--in order to find out how many
-     *  nodes were in use at the time of each job submission.
+     *  nodes were in use at the time of each job submission. This never
+     *  consults a scheduler - begin_time/end_time are taken directly from
+     *  the trace.
+     *  @param ctx Context to run into (its m_evtq/m_resource_history get
+     *         populated) - lets a caller (e.g. Simulation) inspect state
+     *         afterward instead of it being thrown away.
+     *  @param resource_trace_file Optional path to also write a
+     *         time,free_nodes,allocated_nodes resource-occupancy trace; no
+     *         such file is written if left empty.
+     *  @param total_nodes Pool size used only to derive free_nodes above.
      */
-    void run_job_trace();
+    void run_job_trace(Context& ctx,
+                        const std::string& resource_trace_file = std::string(),
+                        num_nodes_t total_nodes = static_cast<num_nodes_t>(0u));
+
+    /// Convenience overload for standalone callers (the tracer binary) that
+    /// don't need the Context afterward.
+    void run_job_trace(const std::string& resource_trace_file = std::string(),
+                        num_nodes_t total_nodes = static_cast<num_nodes_t>(0u))
+    {
+        Context ctx;
+        run_job_trace(ctx, resource_trace_file, total_nodes);
+    }
 
     /**
      * NEW SIMULATION API: Insert a job into the event queue
@@ -136,6 +161,19 @@ class Trace {
 
     /// Print out the total span of time of the trace
     std::ostream& print_span(std::ostream& os) const;
+
+    /**
+     * @brief Write ctx's recorded resource-occupancy history to a CSV file
+     * (same "time,free_nodes,allocated_nodes" format used by the simulator).
+     * Shared by the standalone tracer and the scheduling simulator, since
+     * both populate their Context's history through the same
+     * process_events_until()/process_single_event() code path.
+     * @param ctx Context whose m_resource_history to write
+     * @param filename Output path; no-op if empty
+     * @param total_nodes Pool size, used to derive free_nodes at write time
+     */
+    void write_resource_trace(const Context& ctx, const std::string& filename,
+                               num_nodes_t total_nodes) const;
 
   #if MARK_DAT_PERIOD
     std::ostream& print_DAT(std::ostream& os);

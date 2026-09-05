@@ -279,7 +279,6 @@ simulation_params {
   # Scheduling policies
   backfill_policy: "easy"     # "easy", "conservative", or "none"
   priority_policy: "fcfs"     # "fcfs", "sjf", or "ljf"
-  run_time_mode: "actual"      # "actual", "distribution", or "limit"
 
   # Trace format
   trace_format: "simple"      # "simple" or "lassen"
@@ -289,7 +288,7 @@ simulation_params {
   max_jobs: 10000
 
   # Run time simulation (optional)
-  run_time_mode: "actual"     # "actual", "distribution", or "limit"
+  run_time_mode: "actual"     # "actual" (default), "distribution", or "limit"
   run_time_scale: 1.0
 
   # Output options
@@ -316,7 +315,9 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto \
 
 ### Simulation Modes
 
-DR_EVT supports different modes for processing job traces:
+DR_EVT supports two top-level modes for processing job traces: **Simulation
+Mode**, where the scheduler makes real decisions, and **Replay Mode**, where
+the scheduler is bypassed.
 
 #### Simulation Mode
 
@@ -324,116 +325,98 @@ DR_EVT supports different modes for processing job traces:
 
 **Input:** Trace with job submissions and time limits
 - Requires: `submit_time`, `time_limit`, job size
-- Scheduler plans using time limits (realistic)
-- Jobs run according to `--run_time_mode` setting
+- Scheduler plans based on time limits as the estimation of job duration (realistic but limited)
+- Each job's actual duration is then determined by `--run_time_mode`:
+  - `actual` (default): use the trace's real duration (accepted columns:
+    `actual_run_time`, `duration`, `actual_duration`, `run_time`)
+  - `distribution`: sample from a statistical distribution
+  - `limit`: job runs exactly to its `time_limit` (no early completion —
+    an upper bound on scheduler performance, since the scheduler's estimate
+    is never wrong)
 
 **Use cases:**
-- Standard HPC scheduling simulation
-- Compare scheduling policies
-- Predict scheduler performance
-
-**Example:**
-```bash
-# Standard simulation
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --run_time_mode limit \
-    --backfill_policy easy
-```
-
-#### Run Time Modes
-
-**Purpose:** Upper bound on scheduler performance (perfect knowledge)
-
-**Input:** Trace with actual job durations
-- Requires: `submit_time`, `actual_run_time`, job size
-- Scheduler knows exact runtime in advance (omniscient)
-- Unrealistic but useful for comparison
-
-**Use cases:**
-- Theoretical best-case performance analysis
-- Algorithm comparison baseline
-- Upper bound on achievable utilization
-
-**Example:**
-```bash
-# Oracle mode (scheduler omniscience)
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --run_time_mode actual
-```
-
-#### Replay Mode
-
-**Purpose:** Generate resource traces from historical or pre-computed schedules
-
-**Input:** Trace with pre-computed schedule
-- Requires: `begin_time`, `end_time`, job size
-- Scheduler is bypassed (uses provided times)
-- Can replay simulation output or historical HPC logs
-- Supports `advance_to()` for incremental processing
-
-**Use cases:**
-- Generate resource usage traces from historical schedules
-- Validate resource accounting correctness
-- Reproduce execution for debugging/visualization
-- Analyze utilization of past system behavior
-- Stream historical data for real-time visualization
-
-**Example:**
-```bash
-# Step 1: Run simulation
-${CMAKE_INSTALL_PREFIX}/bin/simulator input.csv --outfile schedule.csv --resource_trace sim.csv
-
-# Step 2: Replay the schedule
-${CMAKE_INSTALL_PREFIX}/bin/simulator schedule.csv --resource_trace replay.csv
-
-# Step 3: Verify (should be identical)
-diff sim.csv replay.csv
-```
-
-**Note:** Replay mode works with both batch (`run()`) and streaming (`advance_to()`) APIs, making it suitable for real-time visualization and incremental processing.
-
-**Run time modes:**
-- `exact` (default): Jobs run exactly `time_limit` (perfect estimates)
-- `distribution`: Sample from statistical distribution (realistic variation)
-- `column`: Read the job's real run time from the trace (accepted column
-  names: `actual_run_time`, `duration`, `actual_duration`, `run_time`)
-
-**Use cases:**
+- Standard HPC scheduling simulation; compare scheduling policies
 - What-if analysis: "What if we changed the backfill policy?"
-- Test scheduler modifications before deployment
 - Capacity planning: "Can we handle 20% more jobs?"
-- Explore different run time estimation strategies
+- Theoretical best-case performance analysis (`limit`, since the scheduler's
+  plan always matches reality)
 
 **Examples:**
 ```bash
-# Simulate with perfect estimates (jobs run exactly time_limit)
+# Use the trace's own actual, historical run times (default)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --run_time_mode limit
+    --run_time_mode actual \
+    --backfill_policy easy
 
-# Simulate with realistic variation (80% of time_limit ± 10%)
+# Realistic variation (80% of time_limit ± 10%)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
     --run_time_mode distribution \
     --run_time_distribution normal \
     --run_time_scale 0.8 \
     --run_time_stddev 0.1
 
-# Simulate using the trace's own actual, historical run times
+# Upper bound: jobs run exactly their time_limit
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --run_time_mode actual
+    --run_time_mode limit
+```
+
+#### Replay Mode
+
+**Purpose:** Reproduce a known execution's resource usage from historical or
+pre-computed job times, with no scheduler involved
+
+**Tool:** `tracer` (installed as `${CMAKE_INSTALL_PREFIX}/bin/tracer`) - a
+separate binary from `simulator`, with no scheduler code linked in at all.
+Feeding a `begin_time`/`end_time` file into `simulator` instead does **not**
+bypass its scheduler - `simulator` always calls into the same FCFS/backfill
+logic and computes its own start times, discarding any recorded `begin_time`.
+Only `tracer` honors the file's own times directly.
+
+**Input:** Trace with pre-computed schedule
+- Requires: `num_nodes`, `begin_time`, `end_time`, `job_submit_time`, `queue`,
+  `time_limit` - all six are required columns. `job_submit_time` isn't used
+  to decide when a job runs (that's `begin_time`), but it drives a per-job
+  "nodes busy at submission" stat for downstream analysis/visualization, and
+  there's no shorter format that omits it.
+- No scheduler is consulted - `begin_time`/`end_time` are used as-is
+- Can replay simulation output or historical HPC logs
+
+**Use cases:**
+- Generate resource usage traces from historical schedules
+- Validate resource accounting correctness
+- Reproduce execution for debugging/visualization
+- Analyze utilization of past system behavior
+
+**Example:**
+```bash
+# Step 1: Run simulation
+${CMAKE_INSTALL_PREFIX}/bin/simulator input.csv \
+    --total_nodes 100 --outfile schedule.csv --resource_trace sim.csv
+
+# Step 2: Replay the schedule with tracer - no scheduler-related flags exist for it
+${CMAKE_INSTALL_PREFIX}/bin/tracer --infile schedule.csv \
+    --total_nodes 100 --resource_trace replay.csv \
+    --outfile tracer_out.csv --subfile tracer_sub.csv --subsumf tracer_subsum.csv
+
+# Step 3: Verify (should be identical)
+diff sim.csv replay.csv
 ```
 
 **Key difference:**
-- **Replay (`actual`)**: Uses actual job durations → reproduces history
-- **Simulation (`limit`)**: Uses scheduler's run time estimates → predicts future
+- **Simulation Mode** (`simulator`): the scheduler makes real decisions as
+  jobs are submitted; `--run_time_mode` controls how each job's actual
+  duration is determined
+- **Replay** (`tracer`): no scheduler is linked in; a previously computed
+  schedule (`begin_time`/`end_time`) is read directly and run straight
+  through resource accounting
 
 **When to use which:**
 | Scenario | Mode | Why |
 |----------|------|-----|
-| Validate against historical data | Replay | Need to match what actually happened |
-| Test scheduler changes | Simulation | Explore hypothetical scenarios |
-| Capacity planning | Simulation | Predict future with different loads |
-| Understand past incidents | Replay | Reproduce exact historical behavior |
-| Compare schedulers | Either | Replay = fair comparison, Simulation = realistic estimates |
+| Test scheduler or policy changes | Simulation | Scheduler must make real decisions to see the effect |
+| Capacity planning | Simulation | Need the scheduler in the loop under hypothetical load |
+| Reproduce a specific historical schedule | Replay | Bypasses the scheduler; replays known begin/end times exactly |
+| Validate resource-accounting correctness | Replay | Compare against a known-correct trace |
 
 ### Verify Installation
 

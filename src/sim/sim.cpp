@@ -77,17 +77,26 @@ void Simulation::run()
     // Record initial resource state (all nodes free)
     m_resource_history.emplace_back(m_current_time, m_params.m_total_nodes, 0);
 
-    // Batch mode: Submit all jobs upfront, then advance to infinity
-    // This uses the streaming API internally
-    for (num_jobs_t i = 0; i < m_trace.data().size(); ++i) {
-        const auto& job = m_trace.data()[i];
-        sim_time_t submit_time = convert_epoch<sim_time_t>(job.get_submit_time());
-        submit_job(i, submit_time);
-    }
+    if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
+        // Replay-format input (begin_time/end_time present): don't consult
+        // the scheduler at all - reuse the same bypass logic the standalone
+        // tracer binary uses, driven into our own m_replay_ctx so the rest
+        // of this class (write_simulated_trace(), write_resource_trace())
+        // sees the result exactly as if the scheduler had run.
+        m_trace.run_job_trace(m_replay_ctx);
+    } else {
+        // Batch mode: Submit all jobs upfront, then advance to infinity
+        // This uses the streaming API internally
+        for (num_jobs_t i = 0; i < m_trace.data().size(); ++i) {
+            const auto& job = m_trace.data()[i];
+            sim_time_t submit_time = convert_epoch<sim_time_t>(job.get_submit_time());
+            submit_job(i, submit_time);
+        }
 
-    // Batch mode: advance to infinity to process all jobs
-    // The loop will exit when both wait_queue and event_queue are empty
-    advance_to(std::numeric_limits<sim_time_t>::max());
+        // Batch mode: advance to infinity to process all jobs
+        // The loop will exit when both wait_queue and event_queue are empty
+        advance_to(std::numeric_limits<sim_time_t>::max());
+    }
 
     // Count actual completions from trace data
     m_jobs_completed = 0;
@@ -306,8 +315,18 @@ void Simulation::write_simulated_trace() const
     // Write header
     ofs << "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
 
-    // Write job records
+    // Write job records - only for jobs that actually ran. A rejected-at-
+    // submit-time or otherwise never-scheduled job's begin_time/end_time
+    // is Job_Record::unscheduled_sentinel(), an internal marker never
+    // meant to be treated as a real timestamp or written out as one -
+    // job.is_scheduled() (backed by m_is_simulated, the flag the scheduler
+    // sets via set_begin_time() once it actually assigns this job a real
+    // start time) is the same check used elsewhere in this class to tell
+    // "ran" from "never ran".
     for (const auto& job : m_trace.data()) {
+        if (!job.is_scheduled()) {
+            continue;
+        }
         std::string line = format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_params.m_msec_output) + "," +
                            format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_params.m_msec_output) + "," +
                            format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_params.m_msec_output) + "," +
@@ -326,6 +345,17 @@ void Simulation::write_simulated_trace() const
 void Simulation::write_resource_trace(const std::string& filename) const
 {
     if (filename.empty()) {
+        return;
+    }
+
+    if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
+        // m_resource_history (below) is only populated by the scheduler-
+        // driven path; replay mode instead recorded into m_replay_ctx via
+        // the same shared writer the tracer binary uses.
+        m_trace.write_resource_trace(m_replay_ctx, filename, m_params.m_total_nodes);
+        if (m_params.m_verbose) {
+            std::cout << "Resource trace written to: " << filename << std::endl;
+        }
         return;
     }
 
@@ -372,6 +402,21 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
     const auto& job = m_trace.data()[job_idx];
     tdiff_t run_time_estimate = job.get_limit_time();
     num_nodes_t nodes = job.get_num_nodes();
+
+    if (nodes > m_params.m_total_nodes) {
+        // This job can never be scheduled, regardless of how long the
+        // simulation runs - total_nodes is fixed for the whole run, so
+        // no future state ever frees up enough capacity. Reject it here,
+        // before it ever enters the wait queue: leaving it there would
+        // silently block every job behind it in FCFS order, and its
+        // begin_time/end_time would stay at unscheduled_sentinel()
+        // forever - exactly the "reaches output still unresolved" state
+        // that shouldn't be possible.
+        std::cerr << "Job " << job_idx << " rejected: requests " << nodes
+                  << " nodes, exceeds total_nodes (" << m_params.m_total_nodes
+                  << "); this job can never be scheduled." << std::endl;
+        return;
+    }
 
     m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);
 }
