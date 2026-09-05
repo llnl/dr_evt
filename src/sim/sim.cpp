@@ -18,24 +18,6 @@
 
 namespace dr_evt {
 
-namespace {
-// Format a sim_time_t for trace/resource-trace output. Default (msec=false)
-// truncates to whole seconds as a plain integer, matching all existing
-// traces and tests, which only ever use integer-second submit times.
-// When msec=true, formats with millisecond precision (3 decimal places)
-// instead, for traces that need sub-second timing.
-std::string format_sim_time(sim_time_t t, bool msec)
-{
-    std::ostringstream oss;
-    if (msec) {
-        oss << std::fixed << std::setprecision(3) << t;
-    } else {
-        oss << static_cast<int64_t>(t);
-    }
-    return oss.str();
-}
-} // anonymous namespace
-
 Simulation::Simulation(const Sim_Params& params)
   : m_params(params),
     m_trace(params.m_infile, params.m_trace_format,
@@ -72,9 +54,6 @@ void Simulation::run()
         std::cout << "Loaded " + std::to_string(m_trace.data().size()) + " jobs from trace\n";
         std::cout << "Running simulation with " + std::to_string(m_params.m_total_nodes) + " nodes\n";
     }
-
-    // Record initial resource state (all nodes free)
-    m_resource_history.emplace_back(m_current_time, m_params.m_total_nodes, 0);
 
     if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
         // Replay-format input (begin_time/end_time present): don't consult
@@ -311,8 +290,15 @@ void Simulation::write_simulated_trace() const
         return;
     }
 
-    // Write header
-    ofs << "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
+    // Batch lines into a block buffer before writing, matching
+    // job_io.cpp::print()'s pattern - far fewer I/O calls than one
+    // ofs << per job, which matters once the trace holds many thousands
+    // of jobs.
+    const size_t blk_sz = 65536ul;
+    std::string buf;
+    buf.reserve(blk_sz + 4096);
+
+    buf += "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
 
     // Write job records - only for jobs that actually ran. A rejected-at-
     // submit-time or otherwise never-scheduled job's begin_time/end_time
@@ -326,14 +312,21 @@ void Simulation::write_simulated_trace() const
         if (!job.is_scheduled()) {
             continue;
         }
-        std::string line = format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_params.m_msec_output) + "," +
-                           format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_params.m_msec_output) + "," +
-                           format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_params.m_msec_output) + "," +
-                           std::to_string(job.get_num_nodes()) + "," +
-                           "0," +
-                           dr_evt::to_string(job.get_queue()) + "," +
-                           format_sim_time(job.get_limit_time(), m_params.m_msec_output) + "\n";
-        ofs << line;
+        buf += format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_params.m_msec_output) + "," +
+               format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_params.m_msec_output) + "," +
+               format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_params.m_msec_output) + "," +
+               std::to_string(job.get_num_nodes()) + "," +
+               "0," +
+               dr_evt::to_string(job.get_queue()) + "," +
+               format_sim_time(job.get_limit_time(), m_params.m_msec_output) + "\n";
+        if (buf.size() >= blk_sz) {
+            ofs << buf;
+            buf.clear();
+        }
+    }
+
+    if (!buf.empty()) {
+        ofs << buf;
     }
 
     if (m_params.m_verbose) {
@@ -347,33 +340,11 @@ void Simulation::write_resource_trace(const std::string& filename) const
         return;
     }
 
-    if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
-        // m_resource_history (below) is only populated by the scheduler-
-        // driven path; replay mode instead recorded into Trace's own context via
-        // the same shared writer the tracer binary uses.
-        m_trace.write_resource_trace(filename, m_params.m_total_nodes);
-        if (m_params.m_verbose) {
-            std::cout << "Resource trace written to: " << filename << std::endl;
-        }
-        return;
-    }
-
-    std::ofstream ofs(filename);
-    if (!ofs) {
-        std::cerr << "Failed to open resource trace file: " << filename << std::endl;
-        return;
-    }
-
-    // Write header
-    ofs << "time,free_nodes,allocated_nodes\n";
-
-    // Write resource state history
-    for (const auto& entry : m_resource_history) {
-        ofs << format_sim_time(std::get<0>(entry), m_params.m_msec_output) << ","
-            << std::get<1>(entry) << ","
-            << std::get<2>(entry) << "\n";
-    }
-
+    // Trace's own context is populated identically regardless of trace
+    // mode (both go through the same process_single_event()/
+    // process_events_until() choke points), so this is unconditional now -
+    // no more separate simulation-mode-only tracking to maintain here.
+    m_trace.write_resource_trace(filename, m_params.m_total_nodes, m_params.m_msec_output);
     if (m_params.m_verbose) {
         std::cout << "Resource trace written to: " << filename << std::endl;
     }
@@ -442,19 +413,14 @@ void Simulation::advance_to(sim_time_t target_time)
             }
 
             // Process ALL jobs returned by scheduler (backfilling can return multiple)
-            // Record resource state after EACH job starts
             for (job_no_t job : jobs_to_run) {
                 m_trace.insert_job(job, m_current_time);
                 m_running_jobs[job] = m_current_time;
                 m_jobs_submitted++;
 
+                // Records a resource-history sample internally (Trace's own
+                // Context, via process_events_until()) - no separate call needed.
                 m_trace.run_until_inclusive(m_current_time);
-
-                // Record resource state after starting this job
-                num_nodes_t allocated = m_trace.get_nodes_in_use();
-                m_resource_history.emplace_back(m_current_time,
-                                                m_params.m_total_nodes - allocated,
-                                                allocated);
             }
         }
     }
@@ -519,14 +485,9 @@ void Simulation::advance_to(sim_time_t target_time)
                 bool is_end = !event.is_arrival();
                 job_no_t event_job_idx = event.get_job_idx();
 
-                // Process this event (END or START)
+                // Process this event (END or START) - records a
+                // resource-history sample internally (Trace's own Context).
                 m_trace.process_single_event();
-
-                // Record resource state after event
-                num_nodes_t allocated = m_trace.get_nodes_in_use();
-                m_resource_history.emplace_back(m_current_time,
-                                                m_params.m_total_nodes - allocated,
-                                                allocated);
 
                 // If END event: remove from running_jobs
                 if (is_end) {
@@ -579,13 +540,13 @@ void Simulation::advance_to(sim_time_t target_time)
                 }
 
                 // Process ALL jobs returned by scheduler (backfilling can return multiple)
-                // Record resource state after EACH job starts
                 for (job_no_t job : jobs_to_run) {
                     m_trace.insert_job(job, m_current_time);
                     m_running_jobs[job] = m_current_time;
                     m_jobs_submitted++;
 
-                    // Process this START event
+                    // Process this START event - records a resource-history
+                    // sample internally (Trace's own Context).
                     while (!m_trace.pending_events().empty()) {
                         const auto& event = *m_trace.pending_events().begin();
                         sim_time_t event_time = convert_epoch<sim_time_t>(event.get_time());
@@ -597,12 +558,6 @@ void Simulation::advance_to(sim_time_t target_time)
                         m_trace.process_single_event();
                         break;  // Process only one START event per job
                     }
-
-                    // Record resource state after this job starts
-                    num_nodes_t allocated = m_trace.get_nodes_in_use();
-                    m_resource_history.emplace_back(m_current_time,
-                                                    m_params.m_total_nodes - allocated,
-                                                    allocated);
                 }
             }
         }

@@ -70,9 +70,6 @@ class Simulation {
     /// Running jobs for streaming mode (job_idx -> start_time)
     std::map<job_no_t, sim_time_t> m_running_jobs;
 
-    /// Resource state history: (time, free_nodes, allocated_nodes) for verification
-    mutable std::vector<std::tuple<sim_time_t, num_nodes_t, num_nodes_t>> m_resource_history;
-
     /// Queue length statistics for performance analysis
     mutable size_t m_queue_length_sum;
     mutable size_t m_queue_length_samples;
@@ -100,14 +97,6 @@ class Simulation {
      * Write simulated job trace to CSV file
      */
     void write_simulated_trace() const;
-
-    /**
-     * Get resource state history for verification
-     * Returns: vector of (time, free_nodes, allocated_nodes)
-     */
-    const std::vector<std::tuple<sim_time_t, num_nodes_t, num_nodes_t>>& get_resource_history() const {
-        return m_resource_history;
-    }
 
     /**
      * Write resource state trace to file

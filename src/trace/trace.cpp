@@ -270,7 +270,7 @@ bool Trace::process_single_event()
 }
 
 void Trace::write_resource_trace(const std::string& filename,
-                                  num_nodes_t total_nodes) const
+                                  num_nodes_t total_nodes, bool msec) const
 {
     if (filename.empty()) {
         return;
@@ -282,16 +282,32 @@ void Trace::write_resource_trace(const std::string& filename,
         return;
     }
 
-    ofs << "time,free_nodes,allocated_nodes\n";
+    // Batch lines into a block buffer before writing, matching
+    // job_io.cpp::print()'s pattern - far fewer I/O calls than one
+    // ofs << per entry, which matters once m_resource_history holds many
+    // thousands of samples.
+    const size_t blk_sz = 65536ul;
+    std::string buf;
+    buf.reserve(blk_sz + 4096);
+
+    buf += "time,free_nodes,allocated_nodes\n";
 
     // Baseline row: all nodes free at time 0, matching Simulation's own
     // convention of recording this before any event is processed.
-    ofs << "0," << total_nodes << ",0\n";
+    buf += format_sim_time(0.0, msec) + "," + std::to_string(total_nodes) + ",0\n";
 
     for (const auto& [time, allocated] : m_ctx.m_resource_history) {
-        ofs << static_cast<int64_t>(convert_epoch<sim_time_t>(time)) << ","
-            << (total_nodes - allocated) << ","
-            << allocated << "\n";
+        buf += format_sim_time(convert_epoch<sim_time_t>(time), msec) + "," +
+               std::to_string(total_nodes - allocated) + "," +
+               std::to_string(allocated) + "\n";
+        if (buf.size() >= blk_sz) {
+            ofs << buf;
+            buf.clear();
+        }
+    }
+
+    if (!buf.empty()) {
+        ofs << buf;
     }
 }
 

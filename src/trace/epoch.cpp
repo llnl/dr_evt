@@ -29,6 +29,17 @@ std::string to_string(const epoch_t& t)
     return std::string(buffer);
 }
 
+std::string format_sim_time(sim_time_t t, bool msec)
+{
+    std::ostringstream oss;
+    if (msec) {
+        oss << std::fixed << std::setprecision(3) << t;
+    } else {
+        oss << static_cast<int64_t>(t);
+    }
+    return oss.str();
+}
+
 std::ostream& operator<<(std::ostream& os, const epoch_t& t)
 {
     const tm* timeinfo = std::localtime(&t.first);

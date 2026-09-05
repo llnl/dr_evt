@@ -159,9 +159,13 @@ class Trace {
      * process_events_until()/process_single_event() code path.
      * @param filename Output path; no-op if empty
      * @param total_nodes Pool size, used to derive free_nodes at write time
+     * @param msec Format timestamps with millisecond precision instead of
+     *        truncating to whole seconds (matches Sim_Params::m_msec_output;
+     *        tracer has no equivalent option, so it always leaves this false)
      */
     void write_resource_trace(const std::string& filename,
-                               num_nodes_t total_nodes) const;
+                               num_nodes_t total_nodes,
+                               bool msec = false) const;
 
   #if MARK_DAT_PERIOD
     std::ostream& print_DAT(std::ostream& os);
