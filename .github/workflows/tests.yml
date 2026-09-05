@@ -131,6 +131,8 @@ jobs:
           make install
           echo "Installed binaries:"
           ls -lh $GITHUB_WORKSPACE/install/bin/
+          echo "Installed test binaries:"
+          ls -lh $GITHUB_WORKSPACE/install/bin/tests/
           echo "Installed libraries:"
           ls -lh $GITHUB_WORKSPACE/install/lib/ | head -20
 

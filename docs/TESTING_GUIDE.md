@@ -22,6 +22,7 @@ correct.
 ## Quick Navigation
 
 - [How to Run Tests](#how-to-run-tests)
+- [Installed Test Binaries](#installed-test-binaries) - Where `make install` puts C++ test binaries
 - [Comprehensive Tests (34)](#comprehensive-tests) - Scheduler correctness (Tiers 1-9)
 - [Unit Tests (7)](#unit-tests) - Basic I/O and format tests
 - [Feature Tests (3)](#feature-tests) - Policy comparisons
@@ -42,34 +43,49 @@ correct.
 ## How to Run Tests
 
 ```bash
-cd build
+cd tests
 
 # Run comprehensive test suite (34 tests)
-../tests/test_all_dr_evt.sh
+./test_all_dr_evt.sh
 
 # Run unit tests
-../tests/run_unit_tests.sh
+./run_unit_tests.sh
 
 # Run feature tests
-../tests/run_feature_tests.sh
+./run_feature_tests.sh
 
 # Run scale tests (manually, no wrapper script yet)
-${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scale/small_10jobs.csv --total_nodes 795 --run_time_mode limit
+${CMAKE_INSTALL_PREFIX}/bin/simulator test_traces/scale/small_10jobs.csv --total_nodes 795 --run_time_mode limit
 
 # Run replay tests
-../tests/run_replay_tests.sh
+./run_replay_tests.sh
 
-# Run streaming API tests
-./tests/test_streaming_api
-./tests/test_batch_vs_streaming
+# Run streaming API tests (compiled binaries, installed under bin/tests/ - not shell scripts, so not in tests/)
+${CMAKE_INSTALL_PREFIX}/bin/tests/test_streaming_api
+${CMAKE_INSTALL_PREFIX}/bin/tests/test_batch_vs_streaming
 
 # Run queue implementation differential tests (circular/deque/multimap/block)
-../tests/test_fcfs_comprehensive.sh --correctness
+./test_fcfs_comprehensive.sh --correctness
 
 # Run column alias tests (time_limit/actual_run_time accepted column-name variants)
-../tests/test_column_aliases.sh
+./test_column_aliases.sh
 
-../tests/test_run_time_modes.sh
+./test_run_time_modes.sh
+```
+
+### Installed Test Binaries
+
+`make install` installs the C++ test binaries (`test_streaming_api`,
+`test_batch_vs_streaming`, `test_block_queue`, `test_mpi_streaming`,
+`test_grpc_multi_client_server`, `t_state`, `t_state_cereal`,
+`t_state_rngen`, `t_rngen`) under `${CMAKE_INSTALL_PREFIX}/bin/tests/`,
+separate from the production binaries (`simulator`, `tracer`,
+`dr_evt_server`, `dr_evt_client`) directly under
+`${CMAKE_INSTALL_PREFIX}/bin/`:
+
+```bash
+${CMAKE_INSTALL_PREFIX}/bin/tests/test_streaming_api
+${CMAKE_INSTALL_PREFIX}/bin/tests/t_state
 ```
 
 ---
