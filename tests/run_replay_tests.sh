@@ -36,6 +36,7 @@ REPLAY_TESTS=(
     "01_backfill_allowed"
     "05_multiple_backfills"
     "13_consecutive_fcfs"
+    "21_sustained_high_load"
 )
 
 for test_base in "${REPLAY_TESTS[@]}"; do

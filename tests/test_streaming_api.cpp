@@ -286,6 +286,70 @@ void test_no_resource_leaks() {
     std::cout << "Test 4: PASSED" << std::endl;
 }
 
+// Test 5: advance_to() idle-gap postcondition (m_current_time == target_time
+// even when nothing is left to process before target_time). Same job
+// pattern as tests/test_traces/comprehensive/10_queue_drain_idle.csv: two
+// jobs finish early, then a long idle gap before a third job arrives -
+// exactly the situation a real streaming caller sits in while waiting for
+// the next submission.
+void test_advance_to_idle_gap() {
+    std::cout << "\n=== Test 5: advance_to() Idle Gap Postcondition ===" << std::endl;
+
+    std::ofstream ofs("/tmp/test_streaming_idle_gap.csv");
+    ofs << "job_submit_time,num_nodes,exit_status,queue,time_limit\n";
+    ofs << "0,30,0,pbatch,50\n";   // Job 0: submits at 0, runs 0->50
+    ofs << "10,30,0,pbatch,50\n";  // Job 1: submits at 10, runs 10->60
+    ofs << "500,30,0,pbatch,50\n"; // Job 2: submits at 500, runs 500->550
+    ofs.close();
+
+    Sim_Params params;
+    params.m_infile = "/tmp/test_streaming_idle_gap.csv";
+    params.m_total_nodes = 100;
+    params.m_trace_format = "simple";
+    params.m_timestamp_format = "epoch";
+    params.m_run_time_mode = RunTimeMode::LIMIT;
+    params.m_backfill_policy = BackfillPolicy::EASY;
+    params.m_priority_policy = PriorityPolicy::FCFS;
+
+    Simulation sim(params);
+    [[maybe_unused]] int rc = sim.get_trace().load_data(0);
+    assert(rc == EXIT_SUCCESS);
+    assert(sim.get_trace().data().size() == 3);
+
+    // Submit only the first two jobs - job 2 (submit_time=500) isn't known
+    // yet, exactly like a real streaming caller that hasn't seen it arrive.
+    sim.submit_job(0, 0.0);
+    sim.submit_job(1, 10.0);
+
+    // Repeatedly advance in fixed 100-unit steps, like a caller polling at
+    // a regular interval rather than knowing exactly where the gap ends.
+    // Job 1 finishes at t=60, so every step from 100 through 400 lands in
+    // the idle gap with nothing left to process - this exercises the
+    // postcondition (m_current_time == target_time) across several
+    // consecutive idle calls, not just one.
+    for (sim_time_t target = 100.0; target <= 400.0; target += 100.0) {
+        sim.advance_to(target);
+        assert(approx_equal(sim.get_current_time(), target));
+        assert(sim.get_nodes_in_use() == 0);
+        std::cout << "✓ get_current_time() == " << target
+                  << " during idle gap, 0 nodes in use" << std::endl;
+    }
+
+    // Job 2 "arrives" at t=500 - submit it before advancing to that point.
+    sim.submit_job(2, 500.0);
+    sim.advance_to(500.0);
+    assert(approx_equal(sim.get_current_time(), 500.0));
+    assert(sim.get_nodes_in_use() == 30);
+    std::cout << "✓ get_current_time() == 500, job 2 running (30 nodes)" << std::endl;
+
+    // Drain to completion.
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
+    assert(sim.get_nodes_in_use() == 0);
+    std::cout << "✓ All jobs complete after draining to infinity" << std::endl;
+
+    std::cout << "Test 5: PASSED" << std::endl;
+}
+
 int main() {
     std::cout << "====================================" << std::endl;
     std::cout << "Streaming API Test Suite" << std::endl;
@@ -296,6 +360,7 @@ int main() {
         test_exclusive_vs_inclusive();
         test_online_scheduling();
         test_no_resource_leaks();
+        test_advance_to_idle_gap();
 
         std::cout << "\n====================================" << std::endl;
         std::cout << "ALL TESTS PASSED!" << std::endl;
