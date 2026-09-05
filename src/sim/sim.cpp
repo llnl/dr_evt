@@ -626,6 +626,19 @@ void Simulation::advance_to(sim_time_t target_time)
     }
 
     // Don't record spurious final state - last event already recorded the final state
+
+    // Honor the documented postcondition (m_current_time == target_time)
+    // even when the loop above exited early because nothing was left to
+    // process before target_time (an idle gap - e.g. all currently-known
+    // jobs finished, and the next arrival, if any, is later than
+    // target_time). Without this, m_current_time stays stuck at the last
+    // real event, silently understating elapsed time to any caller of
+    // get_current_time() and weakening submit_job()'s own precondition
+    // check (submit_time < m_current_time) against a stale value. This
+    // is pure bookkeeping - every scheduling decision above was already
+    // made using real event times, never target_time, so this can't
+    // change any of them.
+    m_current_time = target_time;
 }
 
 num_nodes_t Simulation::get_nodes_in_use() const
