@@ -16,16 +16,18 @@
 
 namespace dr_evt {
 
-#define OPTIONS "d:hi:j:o:s:m:t:"
+#define OPTIONS "d:hi:j:o:s:m:t:n:r:"
 static const struct option longopts[] = {
-    {"datfile",  required_argument,  0, 'd'},
-    {"help",     no_argument,        0, 'h'},
-    {"infile",   required_argument,  0, 'i'},
-    {"max_jobs", required_argument,  0, 'j'},
-    {"outfile",  required_argument,  0, 'o'},
-    {"subfile",  required_argument,  0, 's'},
-    {"subsumf",  required_argument,  0, 'm'},
-    {"max_time", required_argument,  0, 't'},
+    {"datfile",       required_argument,  0, 'd'},
+    {"help",          no_argument,        0, 'h'},
+    {"infile",        required_argument,  0, 'i'},
+    {"max_jobs",      required_argument,  0, 'j'},
+    {"outfile",       required_argument,  0, 'o'},
+    {"subfile",       required_argument,  0, 's'},
+    {"subsumf",       required_argument,  0, 'm'},
+    {"max_time",      required_argument,  0, 't'},
+    {"total_nodes",   required_argument,  0, 'n'},
+    {"resource_trace",required_argument,  0, 'r'},
     { 0, 0, 0, 0 },
 };
 
@@ -35,6 +37,7 @@ Trace_Params::Trace_Params()
     m_datfile("out-dat.txt"),
     m_subfile("out-stat_submission.txt"),
     m_subsumfile("out-stat_submission_summary.txt"),
+    m_total_nodes(dr_evt::total_nodes),
     m_is_jobs_set(false),
     m_is_time_set(false)
 {}
@@ -77,6 +80,12 @@ bool Trace_Params::getopt(int& argc, char** &argv)
             case 't': /* --max_time */
                 m_max_time = optarg;
                 m_is_time_set = true;
+                break;
+            case 'n': /* --total_nodes */
+                m_total_nodes = static_cast<dr_evt::num_nodes_t>(atoi(optarg));
+                break;
+            case 'r': /* --resource_trace */
+                m_resource_trace = std::string(optarg);
                 break;
             default:
                 print_usage(argv[0], 1);
@@ -136,6 +145,16 @@ void Trace_Params::print_usage(const std::string exec, int code)
         "\n"
         "    -t, --max_time\n"
         "        Specify the upper limit of simulation time to run.\n"
+        "\n"
+        "    -n, --total_nodes\n"
+        "        Pool size for the resource trace. Only used to derive\n"
+        "        free_nodes; the tracer does no scheduling.\n"
+        "\n"
+        "    -r, --resource_trace\n"
+        "        Specify the output file name for the resource-occupancy\n"
+        "        trace (time,free_nodes,allocated_nodes). Uses the\n"
+        "        begin_time/end_time already in the trace directly - no\n"
+        "        scheduler involved.\n"
         "\n";
     exit(code);
 }
@@ -153,6 +172,8 @@ void Trace_Params::print() const
     msg += " - datfile: " + m_datfile + "\n";
     msg += " - subfile: " + m_subfile + "\n";
     msg += " - subsumf: " + m_subsumfile + "\n";
+    msg += " - total_nodes: " + to_string(m_total_nodes) + "\n";
+    msg += " - resource_trace: " + m_resource_trace + "\n";
     msg += " - is_jobs_set: " + string{m_is_jobs_set? "true" : "false"} + "\n";
     msg += " - is_time_set: " + string{m_is_time_set? "true" : "false"} + "\n";
 

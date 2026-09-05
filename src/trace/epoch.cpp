@@ -18,6 +18,9 @@ namespace dr_evt {
 std::string to_string(const epoch_t& t)
 {
     const tm* timeinfo = std::localtime(&t.first);
+    if (!timeinfo) {
+        return "Invalid time";
+    }
     char buffer[256] = {'\0'};
     strftime(buffer, 124, "%Y-%m-%d %H:%M:%S", timeinfo);
     char frac_buf[128] = {'\0'};
@@ -29,6 +32,10 @@ std::string to_string(const epoch_t& t)
 std::ostream& operator<<(std::ostream& os, const epoch_t& t)
 {
     const tm* timeinfo = std::localtime(&t.first);
+    if (!timeinfo) {
+        os << "Invalid time";
+        return os;
+    }
     char buffer[256] = {'\0'};
     strftime(buffer, 124, "%Y-%m-%d %H:%M:%S", timeinfo);
     char frac_buf[128] = {'\0'};
