@@ -18,7 +18,7 @@
 - pybind11 auto-downloaded via FetchContent if not found
 
 **[gRPC](https://grpc.io/)**: For online simulation service (`-DDR_EVT_ENABLE_GRPC=ON`)
-- **Auto-download**: If not found, gRPC (with bundled Protobuf) is auto-downloaded via FetchContent (~5-10 min first build)
+- **Auto-download**: If not found, gRPC (with bundled Protobuf) is auto-downloaded via FetchContent (~5-10 min first build). Can OOM under full parallelism on memory-constrained machines - see "Livermore Computing (LC) HPC systems" below.
 - **Manual install**: `apt-get install libgrpc++-dev protobuf-compiler-grpc` (Ubuntu/Debian)
 - **Important**: gRPC includes its own Protobuf. If gRPC is enabled, you don't need separate Protobuf install.
 
@@ -123,6 +123,8 @@ cmake .. \
   -DBOOST_ROOT=/opt/homebrew/opt/boost
 make -j$(nproc)
 ```
+(if gRPC isn't installed, this falls back to the same from-source
+build discussed under "Livermore Computing (LC) HPC systems" below)
 
 **Livermore Computing (LC) HPC systems:**
 ```bash
@@ -133,7 +135,7 @@ cmake .. \
   -DAVOID_SYSTEM_GRPC=ON \
   -DAVOID_SYSTEM_BOOST=ON \
   -DCMAKE_INSTALL_PREFIX=$(realpath ../install)
-make -j$(nproc)
+make -j4
 make install
 
 # Set up environment
@@ -142,7 +144,15 @@ export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
 export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
 ```
 
-The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed libraries (common on HPC systems with multiple compiler toolchains).
+The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed libraries (common on HPC systems with multiple compiler toolchains), but force gRPC/BoringSSL/Protobuf and Boost to build from source via FetchContent. That from-source build can OOM on memory-constrained nodes under full parallelism, with output like:
+
+```
+make[2]: *** [.../boringssl_gtest.dir/build.make:90: .../gtest-all.cc.o] Killed
+make[1]: *** [CMakeFiles/Makefile2:12579: .../boringssl_gtest.dir/all] Error 2
+```
+
+`Killed` means memory pressure, not a compiler error. `-j4` above is deliberately conservative for this reason (~2 GB/job is a reasonable estimate for gRPC); lower it further if you still hit this.
+When using pre-built gRPC, `make -j$(nproc)` should still be ok.
 
 ## Installation
 

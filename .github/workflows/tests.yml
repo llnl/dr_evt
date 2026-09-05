@@ -108,6 +108,10 @@ jobs:
           source venv/bin/activate
           cd build
           make -j$(nproc)
+          # You may cap it to -j2 as defense-in-depth against
+          # the gRPC/BoringSSL FetchContent OOM issue; see
+          # docs/getting-started/installation.md's "Livermore Computing
+          # (LC) HPC systems" section for the full explanation).
           # Build test binaries
           make test_streaming_api-bin test_batch_vs_streaming-bin
           # gRPC client/server + MPI multi-client/server test harness

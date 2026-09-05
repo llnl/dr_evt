@@ -97,15 +97,11 @@ if (DR_EVT_GRPC_FETCHCONTENT)
     cmake_policy(SET CMP0077 NEW)
   endif()
 
-  # gRPC's bundled Abseil unconditionally emits both x86_64 and arm64
-  # SIMD flags on every Apple build (not just genuine universal
-  # builds), via `-Xarch_<arch> <flag>` pairs meant for a multi-arch
-  # compiler invocation. On a single-architecture build this doesn't
-  # reliably suppress the other architecture's flag, and the compiler
-  # rejects it once it knows the actual target. The fix is the
-  # PATCH_COMMAND below, which restricts that loop to the
-  # architecture(s) actually being built; this block just gives it (and
-  # Abseil's own code) an explicit CMAKE_OSX_ARCHITECTURES to work with.
+  # gRPC's bundled Abseil emits both x86_64 and arm64 SIMD flags on
+  # every Apple build via -Xarch_<arch> pairs, which a single-arch
+  # compiler rejects. The PATCH_COMMAND below restricts that loop to
+  # the actual target arch; this just sets CMAKE_OSX_ARCHITECTURES
+  # explicitly so the patch has something to work with.
   if (APPLE AND NOT CMAKE_OSX_ARCHITECTURES)
     execute_process(COMMAND uname -m OUTPUT_VARIABLE DR_EVT_HOST_ARCH
                      OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -113,14 +109,34 @@ if (DR_EVT_GRPC_FETCHCONTENT)
     unset(DR_EVT_HOST_ARCH)
   endif()
 
-  # This project builds shared libraries by default, which would
-  # otherwise propagate into gRPC's own dependencies (upb, Abseil,
-  # etc.). On macOS, building gRPC's bundled upb as a shared library
-  # fails to link ("undefined symbols") - macOS requires every symbol
-  # resolved at shared-library build time, unlike Linux's .so. Force
-  # static for gRPC's own dependencies only, restored right after.
+  # Force static for gRPC's own dependencies (upb, Abseil, etc.) -
+  # shared would otherwise fail to link on macOS. Restored after.
   set(DR_EVT_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
   set(BUILD_SHARED_LIBS OFF)
+
+  # gRPC's own tests - and BoringSSL's bundled googletest they pull
+  # in - are memory-hungry to compile and unused by dr_evt. Skipping
+  # them avoids OOM-killing the build on memory-constrained machines
+  # (e.g. `make -j$(nproc)` on standard GitHub Actions runners).
+  set(DR_EVT_SAVED_BUILD_TESTING ${BUILD_TESTING})
+  set(BUILD_TESTING OFF)
+  set(gRPC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+  # dr_evt only compiles .proto files to C++, so skip gRPC's codegen
+  # plugins for other languages. (Python client authors: use
+  # `pip install grpcio-tools` instead - see CLIENT_SERVER_GUIDE.md.)
+  set(gRPC_BUILD_GRPC_CSHARP_PLUGIN OFF CACHE BOOL "" FORCE)
+  set(gRPC_BUILD_GRPC_NODE_PLUGIN OFF CACHE BOOL "" FORCE)
+  set(gRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN OFF CACHE BOOL "" FORCE)
+  set(gRPC_BUILD_GRPC_PHP_PLUGIN OFF CACHE BOOL "" FORCE)
+  set(gRPC_BUILD_GRPC_PYTHON_PLUGIN OFF CACHE BOOL "" FORCE)
+  set(gRPC_BUILD_GRPC_RUBY_PLUGIN OFF CACHE BOOL "" FORCE)
+
+  # NOT set here: gRPC_SSL_PROVIDER=package would skip building
+  # BoringSSL from source entirely (the biggest remaining compile
+  # cost), using system OpenSSL instead. Left as an opt-in
+  # (`-DgRPC_SSL_PROVIDER=package`, requires libssl-dev) since it's
+  # unverified end-to-end and BoringSSL/OpenSSL can drift apart.
 
   # This project's own -Wall -Wextra (SetupCXX.cmake) would otherwise
   # apply to gRPC's own source too. Trailing -w overrides them
@@ -154,6 +170,8 @@ if (DR_EVT_GRPC_FETCHCONTENT)
   unset(DR_EVT_SAVED_CXX_FLAGS)
   set(BUILD_SHARED_LIBS ${DR_EVT_SAVED_BUILD_SHARED_LIBS})
   unset(DR_EVT_SAVED_BUILD_SHARED_LIBS)
+  set(BUILD_TESTING ${DR_EVT_SAVED_BUILD_TESTING})
+  unset(DR_EVT_SAVED_BUILD_TESTING)
 
   # FetchContent's add_subdirectory gives gRPC's own (non-namespaced)
   # target names directly. Alias them to the same protobuf::* / gRPC::*

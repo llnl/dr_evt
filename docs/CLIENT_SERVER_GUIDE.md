@@ -2,7 +2,7 @@
 
 ## Overview
 
-DR_EVT's [streaming API](STREAMING_API.md) (`submit_job()`, `advance_to()`,
+DR_EVT's [streaming API](api/STREAMING_API.md) (`submit_job()`, `advance_to()`,
 and the monitoring/statistics methods) lets external code feed jobs
 incrementally and control simulation time advancement, rather than loading
 a full trace and running it start-to-finish in one call. The gRPC
