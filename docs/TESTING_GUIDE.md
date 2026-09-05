@@ -381,7 +381,7 @@ cd build
 ```
 
 Runs in CI (`.github/workflows/tests.yml`, "Run Column Alias Tests"). See
-[`dev/design-decisions/TRACE_FORMAT.md`](dev/design-decisions/TRACE_FORMAT.md)
+[`user-guide/trace-formats.md`](user-guide/trace-formats.md)
 for the full column reference.
 
 ---

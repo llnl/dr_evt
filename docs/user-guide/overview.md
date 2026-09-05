@@ -574,7 +574,7 @@ grep "Average wait time" results/*.txt | \
 - [Testing Guide](../TESTING_GUIDE.md) - Running test suite and test philosophy
 - [CLI Options](command-line.md) - Complete command-line reference
 - [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE specifications
-- [Streaming API](../STREAMING_API.md) - Online simulation API
+- [Streaming API](../api/STREAMING_API.md) - Online simulation API
 
 ## Support
 

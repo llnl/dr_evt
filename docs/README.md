@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # DR_EVT Documentation
 
 Complete documentation for the DR_EVT HPC Job Scheduler Simulator.
@@ -6,34 +10,31 @@ Complete documentation for the DR_EVT HPC Job Scheduler Simulator.
 
 ```
 docs/
-├── index.md                    # Main documentation index
-├── getting-started/            # New user guides
-│   ├── quickstart.md          # 5-minute quick start
-│   ├── installation.md        # Build and install
-│   └── tutorial.md            # Step-by-step tutorial
-├── user-guide/                 # Complete user manual
-│   ├── overview.md            # User guide overview
-│   ├── command-line.md        # All CLI options
-│   ├── trace-formats.md       # Input file formats
-│   ├── scheduling-policies.md # Algorithm explanations
-│   └── simulation-modes.md    # Replay vs simulation
-├── verification/               # Correctness verification
-│   ├── summary.md             # ✓ 23/23 tests pass
-│   ├── analytical.md          # Hand-traced verification
-│   ├── easy-backfilling.md    # Algorithm properties
-│   └── test-descriptions.md   # Test explanations
-├── development/                # Developer documentation
-│   ├── algorithm.md           # Simulation algorithm
-│   ├── architecture.md        # System design
-│   ├── design-decisions/      # Why we made choices
-│   └── contributing.md        # How to contribute
-├── reference/                  # Technical reference
-│   ├── terminology.md         # Terms and definitions
-│   └── config-files.md        # Configuration formats
-├── api/                        # API documentation
-│   ├── index.md               # C++ API reference
-│   └── streaming-api.md       # Streaming/Online API
-└── STREAMING_API.md            # Streaming API guide (NEW)
+├── index.md                       # Main documentation index
+├── getting-started/                # New user guides
+│   ├── quickstart.md              # 5-minute quick start
+│   ├── installation.md            # Build and install
+│   └── tutorial.md                # Step-by-step tutorial
+├── user-guide/                     # Complete user manual
+│   ├── overview.md                # User guide overview
+│   ├── command-line.md            # All CLI options
+│   ├── trace-formats.md           # Input trace file formats
+│   ├── protobuf-config.md         # Protobuf config file format
+│   └── grpc-setup.md              # gRPC build/setup
+├── dev/                             # Developer documentation
+│   ├── README.md                  # Developer docs index
+│   └── design-decisions/          # Why we made choices
+│       ├── BLOCK_QUEUE.md
+│       ├── BLOCK_QUEUE_TESTING.md
+│       └── CIRCULAR_QUEUE.md
+├── reference/                      # Technical reference
+│   └── terminology.md             # Terms and definitions
+├── api/                             # API documentation
+│   ├── PYTHON_API.md              # Python bindings reference
+│   └── STREAMING_API.md           # Streaming/online API guide
+├── BACKFILLING_ALGORITHMS.md       # EASY and Conservative backfilling
+├── CLIENT_SERVER_GUIDE.md         # gRPC client/server guide
+└── TESTING_GUIDE.md               # Test suite documentation
 ```
 
 ## Quick Navigation
@@ -49,15 +50,14 @@ docs/
 3. [Trace Formats](user-guide/trace-formats.md) - Input files
 
 ### For Researchers
-1. [Verification Summary](verification/summary.md) - ✓ All tests pass
-2. [EASY Backfilling](verification/easy-backfilling.md) - Algorithm
-3. [Analytical Verification](verification/analytical.md) - Ground truth
+1. [Test Summary](TESTING_GUIDE.md#test-summary) - ✓ All tests pass
+2. [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - EASY and Conservative
+3. [Comprehensive Tests](TESTING_GUIDE.md#comprehensive-tests) - Python-reference ground truth comparison
 
 ### For Developers
-1. [Algorithm](development/algorithm.md) - How it works
-2. [Architecture](development/architecture.md) - System design
-3. [Design Decisions](development/design-decisions.md) - Why
-4. [Streaming API](STREAMING_API.md) - Online simulation API (NEW)
+1. [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - How it works
+2. [Design Decisions](dev/README.md) - Why, and system design notes
+3. [Streaming API](api/STREAMING_API.md) - Online simulation API
 
 ## Building Documentation
 
@@ -142,9 +142,9 @@ All code examples should:
 
 When code changes:
 1. **New feature** → Update user guide + add example
-2. **New test** → Update verification docs
-3. **API change** → Update API reference
-4. **Bug fix** → Update development notes
+2. **New test** → Update TESTING_GUIDE.md
+3. **API change** → Update PYTHON_API.md or STREAMING_API.md
+4. **Bug fix** → Update dev/design-decisions/ if it reflects a design choice
 
 ## Contributing
 

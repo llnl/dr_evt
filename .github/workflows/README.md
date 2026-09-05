@@ -102,7 +102,9 @@ runner is `test_all_dr_evt.sh`.
 
 1. Install dependencies (CMake, Boost, Python, compilers)
 2. Configure CMake with Release build
-3. Build with all CPU cores (`make -j$(nproc)`)
+3. Build with all CPU cores (`make -j$(nproc)`). You may cap it to -j2
+   as defense-in-depth against the gRPC/BoringSSL FetchContent OOM
+   issue; see `docs/getting-started/installation.md`)
 4. Verify build artifacts exist
 
 ### Test Steps

@@ -18,7 +18,7 @@ Configuration files use Protocol Buffer text format (`.textproto` extension).
 ### Basic Example
 
 `sim_config.textproto`:
-```protobuf
+```text
 sim_setup {
   infile: "trace.csv"
   outfile: "results.csv"
@@ -37,7 +37,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto trace.csv
 ### Complete Example
 
 `advanced_config.textproto`:
-```protobuf
+```text
 sim_setup {
   # Input/Output
   infile: "workload.csv"
@@ -172,7 +172,7 @@ Control how a job's actual, observed execution length is determined in simulatio
 - `"uniform"` - Uniform distribution: [0, `time_limit × run_time_scale`]
 
 **Example: Realistic Run Time Variation**
-```protobuf
+```text
 sim_setup {
   run_time_mode: "distribution"
   run_time_distribution: "normal"
@@ -210,7 +210,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto --total_node
 Replay exactly what happened on a real system:
 
 `replay.textproto`:
-```protobuf
+```text
 sim_setup {
   infile: "production_trace.csv"
   outfile: "results.csv"
@@ -232,7 +232,7 @@ sim_setup {
 Simulate how system would behave with different policy:
 
 `what_if.textproto`:
-```protobuf
+```text
 sim_setup {
   infile: "production_trace.csv"
   outfile: "what_if_results.csv"
@@ -259,7 +259,7 @@ sim_setup {
 Test if system can handle increased load:
 
 `capacity_test.textproto`:
-```protobuf
+```text
 sim_setup {
   infile: "synthetic_high_load.csv"
   outfile: "capacity_results.csv"
@@ -284,7 +284,7 @@ sim_setup {
 Benchmark different queue implementations:
 
 `circular_queue_test.textproto` (default, typically fastest):
-```protobuf
+```text
 sim_setup {
   infile: "large_scale_10k_jobs.csv"
   outfile: "circular_queue_results.csv"
@@ -309,7 +309,7 @@ sim_setup {
 
 `block_queue_test.textproto` (reference implementation, not recommended
 for performance):
-```protobuf
+```text
 sim_setup {
   infile: "large_scale_10k_jobs.csv"
   outfile: "block_queue_results.csv"
@@ -334,7 +334,7 @@ sim_setup {
 
 The full schema is defined in `src/proto/dr_evt_params.proto`:
 
-```protobuf
+```text
 message Simulation_Params {
   // Random seed (default: system clock-dependent if unset)
   uint32 seed = 1;

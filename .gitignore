@@ -37,9 +37,9 @@ install/
 venv/
 
 # Development notes (local only - but keep design-decisions/)
-docs/dev/
-!docs/dev/design-decisions/
-!docs/dev/README.md
+#docs/dev/
+#!docs/dev/design-decisions/
+#!docs/dev/README.md
 
 # User-specific CMake presets
 CMakeUserPresets.json

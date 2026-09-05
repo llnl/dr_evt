@@ -486,6 +486,6 @@ channel = grpc.insecure_channel(
 
 ## See Also
 
-- [Streaming API](../STREAMING_API.md) - Streaming API concepts and examples
+- [Streaming API](../api/STREAMING_API.md) - Streaming API concepts and examples
 - [Command-Line Options](command-line.md) - CLI configuration options
-- [Python API](../PYTHON_API.md) - Python bindings (in-process, no network)
+- [Python API](../api/PYTHON_API.md) - Python bindings (in-process, no network)

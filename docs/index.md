@@ -27,6 +27,8 @@ getting-started/tutorial
 
 user-guide/overview
 user-guide/command-line
+user-guide/trace-formats
+user-guide/protobuf-config
 user-guide/grpc-setup
 ```
 
@@ -42,8 +44,9 @@ TESTING_GUIDE
 :maxdepth: 2
 :caption: APIs
 
-STREAMING_API
-PYTHON_API
+api/STREAMING_API
+api/PYTHON_API
+CLIENT_SERVER_GUIDE
 ```
 
 ```{toctree}
@@ -51,7 +54,14 @@ PYTHON_API
 :caption: Development
 
 dev/README
-DOCUMENTATION_ORGANIZATION
+reference/terminology
+dev/design-decisions/BLOCK_QUEUE
+dev/design-decisions/BLOCK_QUEUE_TESTING
+dev/design-decisions/CIRCULAR_QUEUE
+dev/READTHEDOCS_SETUP
+dev/design-decisions/README
+dev/design-decisions/SIMULATION_VS_REPLAY_MODES
+dev/design-decisions/TIMEZONE_SUPPORT
 ```
 
 ## Documentation
@@ -78,8 +88,8 @@ Complete guide for running simulations:
 
 ### APIs
 
-- **[Streaming API](STREAMING_API.md)** - Online/incremental simulation API
-- **[Python API](PYTHON_API.md)** - Python bindings reference
+- **[Streaming API](api/STREAMING_API.md)** - Online/incremental simulation API
+- **[Python API](api/PYTHON_API.md)** - Python bindings reference
 - **[gRPC Client/Server](CLIENT_SERVER_GUIDE.md)** - Network-exposed streaming API, including the MPI-based multi-client/multi-server test harness
 
 ### Development

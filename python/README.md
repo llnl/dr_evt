@@ -306,7 +306,7 @@ The Python API has minimal overhead - it's a thin wrapper around the verified C+
 
 ## See Also
 
-- [C++ Streaming API Documentation](../docs/STREAMING_API.md)
+- [C++ Streaming API Documentation](../docs/api/STREAMING_API.md)
 - [Main DR_EVT Documentation](../docs/)
 - [Test Suite](../tests/)
 

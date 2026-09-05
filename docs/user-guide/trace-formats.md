@@ -119,7 +119,7 @@ than header name.
 - `begin_time` and `end_time` from trace are used to calculate job duration
 - For simulation, the scheduler **computes** actual start time
 - Jobs run for the historical duration: `duration = end_time - begin_time`
-- See [Replay Mode](../../user-guide/command-line.md) (specifically "Replay Mode (Reproduce Historical Behavior)") for replay vs simulation distinction
+- See [Replay Mode](command-line.md) (specifically "Replay Mode (Reproduce Historical Behavior)") for replay vs simulation distinction
 
 ### Lassen Format
 33-column format specific to LLNL HPC traces. Columns used:
@@ -191,6 +191,6 @@ Expected output should show:
 
 ## See Also
 
-- [User Guide](../../user-guide/overview.md) - Complete usage guide with trace formats
-- [Testing Guide](../../TESTING_GUIDE.md) - Test suite and validation
-- [Quick Start](../../getting-started/quickstart.md) - Getting started guide
+- [User Guide](overview.md) - Complete usage guide with trace formats
+- [Testing Guide](../TESTING_GUIDE.md) - Test suite and validation
+- [Quick Start](../getting-started/quickstart.md) - Getting started guide

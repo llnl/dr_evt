@@ -31,6 +31,11 @@ myst_enable_extensions = [
     "html_image",
 ]
 
+# Without this, MyST only auto-generates anchor IDs for H1 headings,
+# so any link to a deeper (H2-H4) section heading - within the same
+# document or across documents - fails cross-reference validation.
+myst_heading_anchors = 4
+
 # Mermaid configuration
 mermaid_version = "10.6.1"  # Use specific stable version
 mermaid_init_js = """
@@ -71,7 +76,6 @@ html_favicon = '_static/favicon.ico'
 # Theme options
 html_theme_options = {
     'logo_only': False,
-    'display_version': True,
     'style_nav_header_background': '#2c3e50',
     'navigation_depth': 4,
     'collapse_navigation': False,
