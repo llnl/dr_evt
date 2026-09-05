@@ -65,9 +65,6 @@ class Simulation {
     /// Random number generator for duration sampling
     std::mt19937 m_rng;
 
-    /// Replay context for event processing
-    Trace::Context m_replay_ctx;
-
     // NOTE: Wait queue now owned by scheduler (m_scheduler maintains internal queue)
 
     /// Running jobs for streaming mode (job_idx -> start_time)

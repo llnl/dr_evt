@@ -76,19 +76,19 @@ std::string Trace::Context::to_string() const
     return msg;
 }
 
-void Trace::process_events_until(Trace::Context& ctx, const epoch_t& t_sub)
+void Trace::process_events_until(const epoch_t& t_sub)
 {
-    if (ctx.m_evtq.empty()) {
+    if (m_ctx.m_evtq.empty()) {
       #if MARK_DAT_PERIOD
-        if (ctx.m_dat_span > 0.0) {
-            m_reserved.emplace_back(ctx.m_dat_start, ctx.m_dat_end);
+        if (m_ctx.m_dat_span > 0.0) {
+            m_reserved.emplace_back(m_ctx.m_dat_start, m_ctx.m_dat_end);
         }
       #endif
         return;
     }
 
-    auto it = ctx.m_evtq.begin();
-    while (it != ctx.m_evtq.end()) {
+    auto it = m_ctx.m_evtq.begin();
+    while (it != m_ctx.m_evtq.end()) {
         auto cur = it ++;
         // Time of the earliest event in the queue
         auto& t = cur->get_time();
@@ -105,57 +105,57 @@ void Trace::process_events_until(Trace::Context& ctx, const epoch_t& t_sub)
         if (cur->is_arrival()) {
           #if MARK_DAT_PERIOD
             if (job_q == pAll) {
-                if ((ctx.m_prev_job_q != pAll) &&
-                    (ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u))) {
+                if ((m_ctx.m_prev_job_q != pAll) &&
+                    (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u))) {
                     // No other DAT job is running and
                     // the last job seen was not a DAT job
-                    if (ctx.m_dat_span > 0.0) {
-                        m_reserved.emplace_back(ctx.m_dat_start, ctx.m_dat_end);
+                    if (m_ctx.m_dat_span > 0.0) {
+                        m_reserved.emplace_back(m_ctx.m_dat_start, m_ctx.m_dat_end);
                     }
 
-                    ctx.m_dat_start = cur->get_time();
-                    ctx.m_dat_span = 0.0;
+                    m_ctx.m_dat_start = cur->get_time();
+                    m_ctx.m_dat_span = 0.0;
                 }
                 m_data[cur->get_job_idx()].set_busy_nodes(total_nodes, true);
-                ctx.m_pAll_cnt ++;
+                m_ctx.m_pAll_cnt ++;
             } else {
-                ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
+                m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
             }
           #else
-            ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
+            m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
           #endif
         } else {
           #if MARK_DAT_PERIOD
             if (job_q == pAll) {
               #if !EVENT_TIME_ORDER
-                if (ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
+                if (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
                     std::string err = "Inconsistent event times with job "
                                     + to_string(cur->get_job_idx());
                     throw std::runtime_error {err.c_str()};
                 }
               #endif
-                ctx.m_pAll_cnt --;
-                if (ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
-                    ctx.m_dat_span = cur->get_time() - ctx.m_dat_start;
-                    ctx.m_dat_end = cur->get_time();
+                m_ctx.m_pAll_cnt --;
+                if (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
+                    m_ctx.m_dat_span = cur->get_time() - m_ctx.m_dat_start;
+                    m_ctx.m_dat_end = cur->get_time();
                 }
             } else {
-                ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
+                m_ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
             }
           #else
-            ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
+            m_ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
           #endif
         }
         const epoch_t event_time = t; // copy: erase() below invalidates t
-        ctx.m_evtq.erase(cur); // Remove processed event from the queue
-        ctx.m_resource_history.emplace_back(event_time, ctx.m_n_nodes_in_use);
+        m_ctx.m_evtq.erase(cur); // Remove processed event from the queue
+        m_ctx.m_resource_history.emplace_back(event_time, m_ctx.m_n_nodes_in_use);
       #if MARK_DAT_PERIOD
-        ctx.m_prev_job_q = job_q;
+        m_ctx.m_prev_job_q = job_q;
       #endif
     }
 }
 
-void Trace::run_job_trace(Context& ctx, const std::string& resource_trace_file, num_nodes_t total_nodes)
+void Trace::run_job_trace(const std::string& resource_trace_file, num_nodes_t total_nodes)
 {
     if (m_data.empty()) {
         return;
@@ -164,25 +164,25 @@ void Trace::run_job_trace(Context& ctx, const std::string& resource_trace_file, 
     for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < m_data.size(); ++i) {
         const auto& job = m_data[i]; // A new job submission
         auto t_sub = job.get_submit_time();
-        process_events_until(ctx, t_sub);
+        process_events_until(t_sub);
 
       #if MARK_DAT_PERIOD
-        m_data[i].set_busy_nodes(ctx.m_n_nodes_in_use, (ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u)));
+        m_data[i].set_busy_nodes(m_ctx.m_n_nodes_in_use, (m_ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u)));
       #else
-        m_data[i].set_busy_nodes(ctx.m_n_nodes_in_use);
+        m_data[i].set_busy_nodes(m_ctx.m_n_nodes_in_use);
       #endif
         // Add the events created by this submission
-        ctx.m_evtq.emplace(i, job.get_begin_time(), arrival);
-        ctx.m_evtq.emplace(i, job.get_end_time(), departure);
+        m_ctx.m_evtq.emplace(i, job.get_begin_time(), arrival);
+        m_ctx.m_evtq.emplace(i, job.get_end_time(), departure);
     }
     // Process all the remaiing events. Use any time later than any timestamp
     // in the trace for flushing.
-    process_events_until(ctx, convert_time(max_tstamp));
+    process_events_until(convert_time(max_tstamp));
 
-    write_resource_trace(ctx, resource_trace_file, total_nodes);
+    write_resource_trace(resource_trace_file, total_nodes);
 }
 
-void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
+void Trace::insert_job(job_no_t job_idx, sim_time_t start_time)
 {
     auto& job = m_data[job_idx];
 
@@ -207,15 +207,15 @@ void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
     epoch_t end_epoch = {end_sec, end_frac};
 
     // Insert events into queue (will be automatically sorted by event_q_t)
-    ctx.m_evtq.emplace(job_idx, start_epoch, arrival);
-    ctx.m_evtq.emplace(job_idx, end_epoch, departure);
+    m_ctx.m_evtq.emplace(job_idx, start_epoch, arrival);
+    m_ctx.m_evtq.emplace(job_idx, end_epoch, departure);
 
     // Update job record with computed times (for output)
     m_data[job_idx].set_begin_time(start_epoch);
     m_data[job_idx].compute_end_time();
 }
 
-void Trace::run_until_exclusive(Context& ctx, sim_time_t target_time)
+void Trace::run_until_exclusive(sim_time_t target_time)
 {
     // Convert sim_time_t to epoch_t for comparison
     time_t target_sec = static_cast<time_t>(target_time);
@@ -223,14 +223,14 @@ void Trace::run_until_exclusive(Context& ctx, sim_time_t target_time)
     epoch_t target_epoch = {target_sec, target_frac};
 
     // Process events until we reach target_time (exclusive)
-    process_events_until(ctx, target_epoch);
+    process_events_until(target_epoch);
 }
 
-void Trace::run_until_inclusive(Context& ctx, sim_time_t target_time)
+void Trace::run_until_inclusive(sim_time_t target_time)
 {
     // Process events at and before target_time
-    while (!ctx.m_evtq.empty()) {
-        const auto& event = *ctx.m_evtq.begin();
+    while (!m_ctx.m_evtq.empty()) {
+        const auto& event = *m_ctx.m_evtq.begin();
         sim_time_t event_time = static_cast<sim_time_t>(event.get_time().first) +
                                event.get_time().second;
 
@@ -239,37 +239,37 @@ void Trace::run_until_inclusive(Context& ctx, sim_time_t target_time)
         }
 
         // Process this event by running slightly past it
-        process_events_until(ctx, event.get_time());
+        process_events_until(event.get_time());
     }
 }
 
-bool Trace::process_single_event(Context& ctx)
+bool Trace::process_single_event()
 {
-    if (ctx.m_evtq.empty()) {
+    if (m_ctx.m_evtq.empty()) {
         return false;
     }
 
     // Get and remove the earliest event
-    auto it = ctx.m_evtq.begin();
+    auto it = m_ctx.m_evtq.begin();
     auto event = *it;  // Copy before erase
-    ctx.m_evtq.erase(it);
+    m_ctx.m_evtq.erase(it);
 
     // Process this event using replay engine's accounting logic
     const auto& job = m_data[event.get_job_idx()];
 
     if (event.is_arrival()) {
         // START event: allocate nodes (same logic as process_events_until)
-        ctx.m_n_nodes_in_use += job.get_num_nodes();
+        m_ctx.m_n_nodes_in_use += job.get_num_nodes();
     } else {
         // END event: free nodes (same logic as process_events_until)
-        ctx.m_n_nodes_in_use -= job.get_num_nodes();
+        m_ctx.m_n_nodes_in_use -= job.get_num_nodes();
     }
-    ctx.m_resource_history.emplace_back(event.get_time(), ctx.m_n_nodes_in_use);
+    m_ctx.m_resource_history.emplace_back(event.get_time(), m_ctx.m_n_nodes_in_use);
 
     return true;
 }
 
-void Trace::write_resource_trace(const Context& ctx, const std::string& filename,
+void Trace::write_resource_trace(const std::string& filename,
                                   num_nodes_t total_nodes) const
 {
     if (filename.empty()) {
@@ -288,7 +288,7 @@ void Trace::write_resource_trace(const Context& ctx, const std::string& filename
     // convention of recording this before any event is processed.
     ofs << "0," << total_nodes << ",0\n";
 
-    for (const auto& [time, allocated] : ctx.m_resource_history) {
+    for (const auto& [time, allocated] : m_ctx.m_resource_history) {
         ofs << static_cast<int64_t>(convert_epoch<sim_time_t>(time)) << ","
             << (total_nodes - allocated) << ","
             << allocated << "\n";

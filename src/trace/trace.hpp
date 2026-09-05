@@ -42,8 +42,8 @@ class Trace {
     std::map<std::string, std::string> m_queue_timezones; ///< Per-queue timezone overrides
 
   public:
-    /// Tracing context, i.e., temporary data while running simulation
-    /// Made public to allow external simulation controllers (e.g., gRPC) to manage context
+    /// Tracing context, i.e., temporary data while running simulation -
+    /// now owned by Trace itself (m_ctx below), not supplied externally.
     struct Context {
       #if MARK_DAT_PERIOD
         num_jobs_t m_pAll_cnt; // On-going pAll job
@@ -63,6 +63,15 @@ class Trace {
         Context();
         std::string to_string() const;
     };
+
+  protected:
+    /// This Trace's own simulation context - owned here so that a Trace
+    /// handed to any caller (Simulation, or a future streaming driver)
+    /// always carries its own state together, rather than a caller having
+    /// to keep a separate Context in sync with the right Trace.
+    Context m_ctx;
+
+  public:
     Trace(const std::string& fname);
     Trace(const std::string& fname, const std::string& format);
     Trace(const std::string& fname, const std::string& format,
@@ -85,74 +94,54 @@ class Trace {
      *  nodes were in use at the time of each job submission. This never
      *  consults a scheduler - begin_time/end_time are taken directly from
      *  the trace.
-     *  @param ctx Context to run into (its m_evtq/m_resource_history get
-     *         populated) - lets a caller (e.g. Simulation) inspect state
-     *         afterward instead of it being thrown away.
      *  @param resource_trace_file Optional path to also write a
      *         time,free_nodes,allocated_nodes resource-occupancy trace; no
      *         such file is written if left empty.
      *  @param total_nodes Pool size used only to derive free_nodes above.
      */
-    void run_job_trace(Context& ctx,
-                        const std::string& resource_trace_file = std::string(),
-                        num_nodes_t total_nodes = static_cast<num_nodes_t>(0u));
-
-    /// Convenience overload for standalone callers (the tracer binary) that
-    /// don't need the Context afterward.
     void run_job_trace(const std::string& resource_trace_file = std::string(),
-                        num_nodes_t total_nodes = static_cast<num_nodes_t>(0u))
-    {
-        Context ctx;
-        run_job_trace(ctx, resource_trace_file, total_nodes);
-    }
+                        num_nodes_t total_nodes = static_cast<num_nodes_t>(0u));
 
     /**
      * NEW SIMULATION API: Insert a job into the event queue
      * Creates start and end events for the job at specified times
      * @param job_idx Index of job in m_data
      * @param start_time When the job should start
-     * @param ctx Simulation context (event queue and resource state)
      */
-    void insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx);
+    void insert_job(job_no_t job_idx, sim_time_t start_time);
 
     /**
      * NEW SIMULATION API: Run simulation until (but not including) target time
      * Processes all events with time < target_time
-     * @param ctx Simulation context
      * @param target_time Time to run until (exclusive)
      */
-    void run_until_exclusive(Context& ctx, sim_time_t target_time);
+    void run_until_exclusive(sim_time_t target_time);
 
     /**
      * NEW SIMULATION API: Run simulation until and including target time
      * Processes all events with time <= target_time
-     * @param ctx Simulation context
      * @param target_time Time to run until (inclusive)
      */
-    void run_until_inclusive(Context& ctx, sim_time_t target_time);
+    void run_until_inclusive(sim_time_t target_time);
 
     /**
      * NEW SIMULATION API: Process exactly one event from the replay queue
      * Processes the earliest event in the queue, regardless of its time
-     * @param ctx Simulation context
      * @return true if an event was processed, false if queue was empty
      */
-    bool process_single_event(Context& ctx);
-
-    /**
-     * NEW SIMULATION API: Create a new context for simulation
-     * @return Fresh context with empty event queue
-     */
-    Context create_context() { return Context(); }
+    bool process_single_event();
 
     /**
      * NEW SIMULATION API: Get current number of nodes in use
-     * @param ctx Simulation context
      * @return Number of nodes currently allocated
      */
-    num_nodes_t get_nodes_in_use(const Context& ctx) const {
-        return ctx.m_n_nodes_in_use;
+    num_nodes_t get_nodes_in_use() const {
+        return m_ctx.m_n_nodes_in_use;
     }
+
+    /// Read-only access to the pending-completion event queue, for a
+    /// caller (Simulation) driving its own event loop against this Trace.
+    const event_q_t& pending_events() const { return m_ctx.m_evtq; }
 
     /**
      *  Print out the job trace with extra information obtained from simulation.
@@ -163,16 +152,15 @@ class Trace {
     std::ostream& print_span(std::ostream& os) const;
 
     /**
-     * @brief Write ctx's recorded resource-occupancy history to a CSV file
-     * (same "time,free_nodes,allocated_nodes" format used by the simulator).
-     * Shared by the standalone tracer and the scheduling simulator, since
-     * both populate their Context's history through the same
+     * @brief Write this Trace's recorded resource-occupancy history to a
+     * CSV file (same "time,free_nodes,allocated_nodes" format used by the
+     * simulator). Shared by the standalone tracer and the scheduling
+     * simulator, since both populate this history through the same
      * process_events_until()/process_single_event() code path.
-     * @param ctx Context whose m_resource_history to write
      * @param filename Output path; no-op if empty
      * @param total_nodes Pool size, used to derive free_nodes at write time
      */
-    void write_resource_trace(const Context& ctx, const std::string& filename,
+    void write_resource_trace(const std::string& filename,
                                num_nodes_t total_nodes) const;
 
   #if MARK_DAT_PERIOD
@@ -211,7 +199,7 @@ class Trace {
     }
 
   protected:
-    void process_events_until(Context& ctx, const epoch_t& t_sub);
+    void process_events_until(const epoch_t& t_sub);
 };
 
 /**@}*/
