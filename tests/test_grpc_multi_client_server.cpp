@@ -338,7 +338,7 @@ int run_client_rank(int my_rank, int paired_server_rank,
     std::cout << "[client rank " << my_rank << "] final stats: "
               << "submitted=" << stats.jobs_submitted()
               << " completed=" << stats.jobs_completed()
-              << " makespan=" << stats.current_time() << std::endl;
+              << " makespan=" << stats.makespan() << std::endl;
 
     int completed_ok = (stats.jobs_completed() == num_jobs) ? 1 : 0;
 
