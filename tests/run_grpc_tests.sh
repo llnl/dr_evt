@@ -69,7 +69,7 @@ fi
 # --- Test 2: MPI multi-client/multi-server lockstep synchronization ---
 echo "Testing: mpi_multi_client_server_lockstep"
 
-MPI_TEST="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_grpc_multi_client_server"
+MPI_TEST="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_multi_client_server"
 if [ ! -f "$MPI_TEST" ]; then
     echo "  ⚠ SKIP - $MPI_TEST not found"
     echo "    (MPI not found at configure time, or not yet built)"

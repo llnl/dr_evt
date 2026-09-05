@@ -280,25 +280,57 @@ void run_streaming_mode(const std::string& input_file, const std::string& output
 
     size_t num_jobs = sim.get_trace().data().size();
 
-    // Submit all jobs at their submit times (streaming mode)
-    for (size_t i = 0; i < num_jobs; i++) {
-        const auto& job = sim.get_trace().data()[i];
+    // Trace::load_data() sorts by submit_time, so data().back() is always
+    // the last-arriving job - a rough estimate of the whole simulated
+    // period's length.
+    sim_time_t last_submit_time = 0.0;
+    if (num_jobs > 0) {
+        const auto& last_job = sim.get_trace().data().back();
+        last_submit_time = static_cast<sim_time_t>(last_job.get_submit_time().first) +
+                            last_job.get_submit_time().second;
+    }
+
+    // Genuinely incremental streaming: divide the arrival period into 4
+    // sub-periods; each iteration submits only the jobs arriving within
+    // that sub-period, then advances to its end - jobs due later are
+    // still queued to arrive on subsequent iterations, exactly like a
+    // real streaming caller that doesn't know the whole future trace
+    // upfront. A job doesn't need to finish within any one advance_to()
+    // call.
+    constexpr int NUM_PERIODS = 4;
+    sim_time_t period = last_submit_time / NUM_PERIODS;
+    size_t next_job_idx = 0;
+
+    for (int k = 1; k <= NUM_PERIODS; ++k) {
+        sim_time_t period_end = period * k;
+
+        while (next_job_idx < num_jobs) {
+            const auto& job = sim.get_trace().data()[next_job_idx];
+            sim_time_t submit_time = static_cast<sim_time_t>(job.get_submit_time().first) +
+                                     job.get_submit_time().second;
+            if (submit_time > period_end) {
+                break;
+            }
+            sim.submit_job(next_job_idx, submit_time);
+            ++next_job_idx;
+        }
+
+        sim.advance_to(period_end);
+    }
+
+    // Submit anything left over (rounding at the last boundary), then
+    // advance to infinity to fully drain whatever's still running or
+    // queued - matching sim.run() (batch mode)'s own final call, and
+    // guaranteeing a target time past every job's actual completion
+    // without having to estimate one.
+    while (next_job_idx < num_jobs) {
+        const auto& job = sim.get_trace().data()[next_job_idx];
         sim_time_t submit_time = static_cast<sim_time_t>(job.get_submit_time().first) +
                                  job.get_submit_time().second;
-        sim.submit_job(i, submit_time);
+        sim.submit_job(next_job_idx, submit_time);
+        ++next_job_idx;
     }
-
-    // Find max time
-    sim_time_t max_time = 0.0;
-    for (const auto& job : sim.get_trace().data()) {
-        sim_time_t submit = static_cast<sim_time_t>(job.get_submit_time().first) +
-                           job.get_submit_time().second;
-        sim_time_t duration = job.get_limit_time();
-        max_time = std::max(max_time, submit + duration * 2);
-    }
-
-    // Advance to completion
-    sim.advance_to(max_time);
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
 
     // Write output
     sim.write_simulated_trace();

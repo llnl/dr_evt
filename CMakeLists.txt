@@ -470,7 +470,7 @@ if (DR_EVT_HAS_GRPC)
       OUTPUT_NAME test_grpc_multi_client_server)
     set_target_properties(test_grpc_multi_client_server-bin PROPERTIES
       CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-    list(APPEND DR_EVT_EXEC_TARGETS test_grpc_multi_client_server-bin)
+    list(APPEND DR_EVT_UNIT_TEST_TARGETS test_grpc_multi_client_server-bin)
   else()
     message(STATUS "MPI not found - skipping test_grpc_multi_client_server "
                     "(gRPC client/server themselves are unaffected)")
@@ -628,7 +628,7 @@ install(
 install(
   TARGETS  ${DR_EVT_UNIT_TEST_TARGETS}
 #  EXPORT   DR_EVT_Targets
-  RUNTIME  DESTINATION ${CMAKE_INSTALL_PREFIX}/tests/unit
+  RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}/tests
   ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
   INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
