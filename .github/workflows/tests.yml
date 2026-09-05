@@ -174,13 +174,13 @@ jobs:
           echo "========================================"
           ./tests/test_column_aliases.sh
 
-      - name: Run Duration/Run Time Mode Tests
-        id: duration-mode
+      - name: Run Run Time Mode Tests
+        id: run-time-mode
         run: |
           echo "========================================"
-          echo "Testing duration_mode/run_time_mode interaction and distribution capping (4 tests)"
+          echo "Testing run_time_mode (actual/distribution/limit) and distribution capping (7 tests)"
           echo "========================================"
-          ./tests/test_duration_run_time_modes.sh
+          ./tests/test_run_time_modes.sh
 
       - name: Run Unit Tests
         id: unit
@@ -233,7 +233,7 @@ jobs:
         run: |
           source venv/bin/activate
           echo "========================================"
-          echo "Running Python API Tests (9 tests)"
+          echo "Running Python API Tests (14 tests)"
           echo "========================================"
           ./tests/run_python_tests.sh
 
@@ -275,13 +275,13 @@ jobs:
           echo "  Comprehensive - Installed (34 tests): ${{ steps.comprehensive-installed.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
           echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"
-          echo "  Duration/Run Time Mode (4 tests): ${{ steps.duration-mode.outcome }}"
+          echo "  Run Time Mode (7 tests): ${{ steps.run-time-mode.outcome }}"
           echo "  Unit (7 tests): ${{ steps.unit.outcome }}"
           echo "  Feature (5 tests): ${{ steps.feature.outcome }}"
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
           echo "  Replay (3 tests): ${{ steps.replay.outcome }}"
           echo "  Config (4 tests): ${{ steps.config.outcome }}"
-          echo "  Python API (9 tests): ${{ steps.python-api.outcome }}"
+          echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
           echo "  Streaming API (4 tests): ${{ steps.streaming.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (6 tests, optional): ${{ steps.scale.outcome }}"

@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
         params.m_total_nodes = total_nodes;
         params.m_trace_format = "simple";
         params.m_timestamp_format = "epoch";
-        params.m_run_time_mode = RunTimeMode::EXACT;
+        params.m_run_time_mode = RunTimeMode::LIMIT;
         params.m_backfill_policy = BackfillPolicy::EASY;
         params.m_priority_policy = PriorityPolicy::FCFS;
         params.m_seed = 42;

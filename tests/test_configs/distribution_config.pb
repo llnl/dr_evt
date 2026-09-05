@@ -1,7 +1,7 @@
 total_nodes: 100
 trace_format: "simple"
 timestamp_format: "epoch"
-runtime_mode: "distribution"
-runtime_distribution: "normal"
-runtime_scale: 0.9
-runtime_stddev: 0.1
+run_time_mode: "distribution"
+run_time_distribution: "normal"
+run_time_scale: 0.9
+run_time_stddev: 0.1

@@ -24,7 +24,7 @@ Data_Columns::Data_Columns()
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
-    m_trace_format("lassen"),
+    m_trace_format("simple"),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
     m_trace_mode(TraceMode::REPLAY)  // Default to replay
@@ -280,7 +280,7 @@ bool Data_Columns::check_header(const std::string& fname)
             {time_limit_idx, "time_limit"}
         };
 
-        // Optional: actual_run_time column for RunTimeMode::FROM_COLUMN
+        // Optional: actual_run_time column for RunTimeMode::ACTUAL
         auto [found, actual_run_time_idx] = find_column_optional(actual_run_time_aliases);
         if (found) {
             m_cols_to_read.push_back({actual_run_time_idx, "actual_run_time"});

@@ -48,19 +48,18 @@ message ClientMessage {
 // protobuf --config schema). Must be sent before any other request.
 message InitRequest {
     uint32 total_nodes = 1;
-    string trace_format = 2;       // "simple" or "lassen"
+    string trace_format = 2;       // "simple" or "lassen" (default: "simple")
     string timestamp_format = 3;   // "epoch" or "iso"
     string timezone = 4;
     string backfill_policy = 5;    // "easy", "conservative", or "none"
     string priority_policy = 6;    // "fcfs", "fcfs_alt", "sjf", or "ljf"
-    string duration_mode = 7;       // "limit" or "actual"
-    string run_time_mode = 8;      // "column", "exact", or "distribution"
-    bool msec_output = 9;
-    string infile = 10;            // trace file path (server-side path)
+    string run_time_mode = 7;      // "actual", "distribution", or "limit" (default: "actual")
+    bool msec_output = 8;
+    string infile = 9;             // trace file path (server-side path)
 
     // Queue implementation (FCFS scheduler only). Empty string keeps
     // Sim_Params' own default (circular).
-    string queue_impl = 11;        // "circular", "deque", "multimap", or "block"
+    string queue_impl = 10;        // "circular", "deque", "multimap", or "block"
 
     // Block size for block queue implementation (must be power of 2).
     // Ignored unless queue_impl is "block". 0 keeps Sim_Params' own

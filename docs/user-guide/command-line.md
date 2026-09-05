@@ -194,18 +194,16 @@ What to do if an insert would exceed `--circular_capacity`. Only used when
     --circular_capacity 500 --circular_overflow abort
 ```
 
-### `-r, --duration_mode MODE`
 How to estimate job run times for scheduling decisions.
 
 **Options:**
 - `limit` - Use job's time_limit field (default)
-- `actual` - Use actual run time (omniscient scheduler, for analysis)
+- `actual` - Read actual run time from trace (most realistic)
 
 **Default:** `limit`
 
 **Example:**
 ```bash
-./build/simulator traces/jobs.csv --duration_mode actual
 ```
 
 ## Trace Format Options
@@ -254,18 +252,16 @@ Timezone for ISO timestamp output.
 
 ## Simulation Mode Options
 
-### `-d, --run_time_mode MODE`
+### `-r, --run_time_mode MODE`
 How to determine the job's actual, observed execution length in simulation mode.
 
 **Options:**
-- `exact` - Jobs run exactly their time_limit (default)
-- `column` - Use the job's real run time from the input trace (accepted
-  column names: `actual_run_time`, `duration`, `actual_duration`,
-  `run_time` - the trace can use any one of these without needing its
-  header edited)
-- `distribution` - Sample from statistical distribution
+- `actual` - Read job's actual run time from trace column (default, most realistic).
+  Accepted column names: `actual_run_time`, `duration`, `actual_duration`, `run_time`
+- `distribution` - Sample from statistical distribution (realistic with variation)
+- `limit` - Jobs run exactly their time_limit (unrealistic, for debugging only)
 
-**Default:** `exact`
+**Default:** `actual`
 
 **Example:**
 ```bash
@@ -405,7 +401,7 @@ Display help message with all options.
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --outfile output.csv
 ```
 
@@ -424,24 +420,22 @@ Display help message with all options.
     --trace_format lassen \
     --timestamp_format iso \
     --timezone America/Los_Angeles \
-    --duration_mode actual \
     --outfile simulation_results.csv \
     --verbose
 ```
 
-### Oracle Mode (Scheduler Omniscience)
+### Realistic Simulation with Actual Run Times
 ```bash
-# duration_mode=actual gives the scheduler perfect knowledge of job runtimes.
-# This is unrealistic but provides an upper bound on scheduling performance.
+# Most realistic - uses historical execution times from trace
 ./build/simulator production_trace.csv \
     --total_nodes 2048 \
     --trace_format lassen \
     --timestamp_format iso \
     --timezone America/Los_Angeles \
-    --duration_mode actual \
     --backfill_policy easy \
     --priority_policy fcfs \
-    --outfile oracle_results.csv
+    --run_time_mode actual \
+    --outfile results.csv
 ```
 
 ### Different Scheduling Policies

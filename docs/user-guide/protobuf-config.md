@@ -26,7 +26,6 @@ sim_setup {
   
   backfill_policy: "easy"
   priority_policy: "fcfs"
-  duration_mode: "limit"
 }
 ```
 
@@ -52,7 +51,6 @@ sim_setup {
   # Scheduling Policies
   backfill_policy: "easy"        # Options: "easy", "conservative", "none"
   priority_policy: "fcfs"         # Options: "fcfs", "sjf", "ljf"
-  duration_mode: "limit"           # Options: "limit", "actual"
   
   # Queue Implementation (FCFS scheduler only)
   queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
@@ -68,7 +66,7 @@ sim_setup {
   max_time: 86400                 # Stop after 86400 seconds (24 hours)
   
   # Duration Simulation
-  run_time_mode: "distribution"   # Options: "exact", "column", "distribution"
+  run_time_mode: "distribution"   # Options: "actual", "distribution", "limit"
   run_time_distribution: "normal" # Options: "normal", "lognormal", "uniform"
   run_time_scale: 0.8             # Jobs run for 80% of time_limit on average
   run_time_stddev: 0.1            # Standard deviation: 10%
@@ -106,7 +104,6 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 |-------|------|---------|---------|
 | `backfill_policy` | string | `"easy"` | `"easy"`, `"conservative"`, `"none"` |
 | `priority_policy` | string | `"fcfs"` | `"fcfs"`, `"sjf"`, `"ljf"` |
-| `duration_mode` | string | `"limit"` | `"limit"`, `"actual"` |
 | `queue_impl` | string | `"circular"` | `"circular"`, `"deque"`, `"multimap"`, `"block"` |
 | `block_size` | uint32 | `128` | Power of 2; only used when `queue_impl="block"` |
 | `circular_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
@@ -121,12 +118,6 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 - `"fcfs"` - First-Come-First-Served (arrival order)
 - `"sjf"` - Shortest Job First (by run time estimate)
 - `"ljf"` - Longest Job First (by run time estimate)
-
-**duration_mode:**
-- `"limit"` - Scheduler plans using the job's `time_limit` (realistic - what a real scheduler knows)
-- `"actual"` - Scheduler plans using the job's real, observed run time (omniscient/oracle, for
-  comparison studies); when set, `run_time_mode` below is ignored entirely and the job's
-  simulated execution also uses this same real run time directly
 
 **queue_impl** (FCFS scheduler only - SJF/LJF always use multimap):
 - `"circular"` - boost::circular_buffer-based (default; measured 14-28% faster
@@ -165,15 +156,15 @@ Control how a job's actual, observed execution length is determined in simulatio
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `run_time_mode` | string | `"exact"` | How to determine the job's actual run time |
+| `run_time_mode` | string | `"actual"` | How to determine the job's actual run time |
 | `run_time_distribution` | string | `"normal"` | Statistical distribution for sampling |
 | `run_time_scale` | double | `1.0` | Scale factor for run times |
 | `run_time_stddev` | double | `0.0` | Standard deviation (for distributions) |
 
 **run_time_mode:**
-- `"exact"` - Jobs run for exactly `time_limit` (perfect estimates)
-- `"column"` - Read `actual_run_time` from trace file
-- `"distribution"` - Sample from statistical distribution
+- `"actual"` - Read job's actual run time from trace's `actual_run_time` column (default, most realistic)
+- `"distribution"` - Sample from statistical distribution around `time_limit × run_time_scale`
+- `"limit"` - Jobs run for exactly `time_limit` (debugging only, unrealistic)
 
 **run_time_distribution:**
 - `"normal"` - Normal distribution: mean=`time_limit × run_time_scale`, stddev=`run_time_stddev`
@@ -183,7 +174,6 @@ Control how a job's actual, observed execution length is determined in simulatio
 **Example: Realistic Run Time Variation**
 ```protobuf
 sim_setup {
-  duration_mode: "limit"
   run_time_mode: "distribution"
   run_time_distribution: "normal"
   run_time_scale: 0.8          # Jobs run for 80% of time_limit on average
@@ -223,13 +213,10 @@ Replay exactly what happened on a real system:
 ```protobuf
 sim_setup {
   infile: "production_trace.csv"
-  outfile: "oracle_results.csv"
+  outfile: "results.csv"
   
   total_nodes: 2048
-  
-  # Oracle mode: scheduler uses actual run times (omniscient)
-  # Note: run_time_mode is ignored when duration_mode=actual
-  duration_mode: "actual"
+  run_time_mode: "actual"  # Use actual run times from trace
   
   backfill_policy: "easy"
   priority_policy: "fcfs"
@@ -253,7 +240,6 @@ sim_setup {
   total_nodes: 2048
   
   # Simulation mode with realistic variation
-  duration_mode: "limit"
   run_time_mode: "distribution"
   run_time_distribution: "normal"
   run_time_scale: 0.85
@@ -281,8 +267,7 @@ sim_setup {
   # Test with fewer nodes
   total_nodes: 1500
   
-  duration_mode: "limit"
-  run_time_mode: "exact"
+  run_time_mode: "limit"
   
   backfill_policy: "easy"
   priority_policy: "fcfs"
@@ -315,8 +300,7 @@ sim_setup {
   # overflow.
   queue_impl: "circular"
   
-  duration_mode: "limit"
-  run_time_mode: "exact"
+  run_time_mode: "limit"
   
   trace_format: "simple"
   timestamp_format: "epoch"
@@ -339,8 +323,7 @@ sim_setup {
   queue_impl: "block"
   block_size: 128
   
-  duration_mode: "limit"
-  run_time_mode: "exact"
+  run_time_mode: "limit"
   
   trace_format: "simple"
   timestamp_format: "epoch"
@@ -372,24 +355,23 @@ message Simulation_Params {
   int32 total_nodes = 8;          // default: 795
   string backfill_policy = 9;     // "easy", "conservative", or "none" (default: "easy")
   string priority_policy = 10;    // "fcfs", "sjf", or "ljf" (default: "fcfs")
-  string duration_mode = 11;       // "limit" or "actual" (default: "limit")
 
   // Trace format
-  string trace_format = 12;       // "simple" or "lassen" (default: "lassen")
-  string timestamp_format = 13;   // "epoch" or "iso" (default: "iso")
-  string timezone = 14;           // e.g. "UTC", "America/Los_Angeles"
+  string trace_format = 11;       // "simple" or "lassen" (default: "simple")
+  string timestamp_format = 12;   // "epoch" or "iso" (default: "iso")
+  string timezone = 13;           // e.g. "UTC", "America/Los_Angeles"
 
   // Duration simulation
-  string run_time_mode = 15;          // "column", "exact", or "distribution" (default: "exact")
-  string run_time_distribution = 16;  // "normal", "lognormal", or "uniform" (default: "normal")
-  double run_time_scale = 17;         // default: 1.0
-  double run_time_stddev = 18;        // default: 0.0
+  string run_time_mode = 14;          // "actual", "distribution", or "limit" (default: "actual")
+  string run_time_distribution = 15;  // "normal", "lognormal", or "uniform" (default: "normal")
+  double run_time_scale = 16;         // default: 1.0
+  double run_time_stddev = 17;        // default: 0.0
 
   // Queue implementation (FCFS scheduler only)
-  string queue_impl = 19;         // "circular", "deque", "multimap", or "block" (default: "circular")
-  uint32 block_size = 20;         // power of 2 (default: 128); only used when queue_impl="block"
-  uint64 circular_capacity = 21;  // 0 = size of job trace (default: 0); only used when queue_impl="circular"
-  string circular_overflow = 22;  // "abort" or "grow" (default: "grow"); only used when queue_impl="circular"
+  string queue_impl = 18;         // "circular", "deque", "multimap", or "block" (default: "circular")
+  uint32 block_size = 19;         // power of 2 (default: 128); only used when queue_impl="block"
+  uint64 circular_capacity = 20;  // 0 = size of job trace (default: 0); only used when queue_impl="circular"
+  string circular_overflow = 21;  // "abort" or "grow" (default: "grow"); only used when queue_impl="circular"
 }
 ```
 

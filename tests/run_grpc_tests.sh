@@ -25,11 +25,14 @@ echo "gRPC Client/Server Tests"
 echo "=========================================="
 echo ""
 
-if [ ! -f "./build/dr_evt_server" ] || [ ! -f "./build/dr_evt_client" ]; then
-    echo "Error: ./build/dr_evt_server and/or ./build/dr_evt_client not found"
+if [ ! -f "${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server" ] || [ ! -f "${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_client" ]; then
+    echo "Error: dr_evt_server and/or dr_evt_client not found"
     echo "Build with -DDR_EVT_ENABLE_GRPC=ON (implies -DDR_EVT_ENABLE_PROTOBUF=ON)"
     exit 1
 fi
+
+SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
+CLIENT="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_client"
 
 PASS=0
 FAIL=0
@@ -39,11 +42,11 @@ TRACE_DIR="tests/test_traces/grpc"
 echo "Testing: basic_server_client_session"
 
 PORT=53001
-./build/dr_evt_server "127.0.0.1:${PORT}" > /tmp/grpc_test_server.log 2>&1 &
+$SERVER "127.0.0.1:${PORT}" > /tmp/grpc_test_server.log 2>&1 &
 SERVER_PID=$!
 sleep 1
 
-CLIENT_OUT=$(./build/dr_evt_client "127.0.0.1:${PORT}" "$TRACE_DIR/trace_a.csv" 2>&1) || true
+CLIENT_OUT=$($CLIENT "127.0.0.1:${PORT}" "$TRACE_DIR/trace_a.csv" 2>&1) || true
 kill "$SERVER_PID" 2>/dev/null || true
 wait "$SERVER_PID" 2>/dev/null || true
 
@@ -66,15 +69,16 @@ fi
 # --- Test 2: MPI multi-client/multi-server lockstep synchronization ---
 echo "Testing: mpi_multi_client_server_lockstep"
 
-if [ ! -f "./build/test_grpc_multi_client_server" ]; then
-    echo "  ⚠ SKIP - ./build/test_grpc_multi_client_server not found "
+MPI_TEST="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_grpc_multi_client_server"
+if [ ! -f "$MPI_TEST" ]; then
+    echo "  ⚠ SKIP - $MPI_TEST not found"
     echo "    (MPI not found at configure time, or not yet built)"
 elif ! command -v mpirun > /dev/null 2>&1; then
     echo "  ⚠ SKIP - mpirun not found on PATH"
 else
-    MPI_OUT=$(timeout 30 mpirun --allow-run-as-root --oversubscribe -np 4 \
-        ./build/test_grpc_multi_client_server \
-        ./build/dr_evt_server 53100 \
+    MPI_OUT=$(mpirun --allow-run-as-root --oversubscribe -np 4 \
+        $MPI_TEST \
+        $SERVER 53100 \
         "$TRACE_DIR/trace_a.csv" "$TRACE_DIR/trace_b.csv" 2>&1) || true
 
     # Independently-verified expected makespans: trace_a=40, trace_b=30

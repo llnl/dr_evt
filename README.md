@@ -271,7 +271,7 @@ simulation_params {
   # Scheduling policies
   backfill_policy: "easy"     # "easy", "conservative", or "none"
   priority_policy: "fcfs"     # "fcfs", "sjf", or "ljf"
-  duration_mode: "limit"       # "limit" or "actual"
+  run_time_mode: "actual"      # "actual", "distribution", or "limit"
 
   # Trace format
   trace_format: "simple"      # "simple" or "lassen"
@@ -281,7 +281,7 @@ simulation_params {
   max_jobs: 10000
 
   # Run time simulation (optional)
-  run_time_mode: "exact"      # "column", "exact", or "distribution"
+  run_time_mode: "actual"     # "actual", "distribution", or "limit"
   run_time_scale: 1.0
 
   # Output options
@@ -310,7 +310,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto \
 
 DR_EVT supports different modes for processing job traces:
 
-#### Simulation Mode (`--duration_mode limit`, default)
+#### Simulation Mode
 
 **Purpose:** Simulate scheduling decisions with realistic scheduler knowledge
 
@@ -328,11 +328,11 @@ DR_EVT supports different modes for processing job traces:
 ```bash
 # Standard simulation
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --duration_mode limit \
+    --run_time_mode limit \
     --backfill_policy easy
 ```
 
-#### Oracle Mode (`--duration_mode actual`)
+#### Run Time Modes
 
 **Purpose:** Upper bound on scheduler performance (perfect knowledge)
 
@@ -350,7 +350,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
 ```bash
 # Oracle mode (scheduler omniscience)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --duration_mode actual
+    --run_time_mode actual
 ```
 
 #### Replay Mode
@@ -400,12 +400,12 @@ diff sim.csv replay.csv
 ```bash
 # Simulate with perfect estimates (jobs run exactly time_limit)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --duration_mode limit \
-    --run_time_mode exact
+    --run_time_mode limit \
+    --run_time_mode limit
 
 # Simulate with realistic variation (80% of time_limit ± 10%)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --duration_mode limit \
+    --run_time_mode limit \
     --run_time_mode distribution \
     --run_time_distribution normal \
     --run_time_scale 0.8 \
@@ -413,7 +413,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
 
 # Simulate but read actual durations from trace column
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
-    --duration_mode limit \
+    --run_time_mode limit \
     --run_time_mode column
 ```
 

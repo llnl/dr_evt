@@ -11,11 +11,9 @@
 #
 # No other test suite exercises any alias other than the canonical name.
 #
-# --duration_mode is never passed below, so it stays at its own default,
-# "limit", throughout. That matters because duration_mode="actual" would
-# make the scheduler ignore --run_time_mode entirely and just use the
-# trace's own real run time - "limit" is what makes both
-# --run_time_mode exact and --run_time_mode column actually get used.
+# Tests verify that column name aliases work correctly with run_time_mode.
+# Uses --run_time_mode limit for traces without actual_run_time column,
+# and --run_time_mode actual for traces with that column.
 
 set -e
 
@@ -24,16 +22,14 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Source common simulator path finder
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 echo "=========================================="
 echo "Column Alias Tests"
 echo "=========================================="
 echo ""
 
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo "Error: ./build/simulator not found"
-    echo "Please build first: cd build && cmake .. && make"
-    exit 1
-fi
 
 PASS=0
 FAIL=0
@@ -49,18 +45,18 @@ job_submit_time,num_nodes,exit_status,queue,${alias}
 0,70,0,pbatch,200
 EOF
 
-    ./build/simulator "/tmp/alias_tl_${alias}.csv" \
+    $SIMULATOR "/tmp/alias_tl_${alias}.csv" \
         --priority_policy fcfs \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --run_time_mode exact \
+        --run_time_mode limit \
         --backfill_policy easy \
         --outfile "/tmp/alias_tl_${alias}_out.csv" \
         > "/tmp/alias_tl_${alias}_err.txt" 2>&1
 
     if [ $? -eq 0 ]; then
-        # run_time_mode=exact should use the column's value (200) as the
+        # run_time_mode=limit should use the column's value (200) as the
         # job's execution time, regardless of which alias named it.
         LINE=$(awk -F, '$1 == 0' "/tmp/alias_tl_${alias}_out.csv")
         BEGIN=$(echo "$LINE" | cut -d, -f2)
@@ -85,7 +81,7 @@ echo ""
 # ------------------------------------------------------------------------
 # actual_run_time aliases
 # ------------------------------------------------------------------------
-echo "--- actual_run_time column aliases (run_time_mode=column) ---"
+echo "--- actual_run_time column aliases (run_time_mode=actual) ---"
 
 for alias in actual_run_time duration actual_duration run_time; do
     cat > "/tmp/alias_ar_${alias}.csv" << EOF
@@ -93,18 +89,18 @@ job_submit_time,num_nodes,exit_status,queue,time_limit,${alias}
 0,70,0,pbatch,200,50
 EOF
 
-    ./build/simulator "/tmp/alias_ar_${alias}.csv" \
+    $SIMULATOR "/tmp/alias_ar_${alias}.csv" \
         --priority_policy fcfs \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --run_time_mode column \
+        --run_time_mode actual \
         --backfill_policy easy \
         --outfile "/tmp/alias_ar_${alias}_out.csv" \
         > "/tmp/alias_ar_${alias}_err.txt" 2>&1
 
     if [ $? -eq 0 ]; then
-        # run_time_mode=column should read the real run time (50), not
+        # run_time_mode=actual should read the real run time (50), not
         # time_limit (200), from whichever alias named the column.
         LINE=$(awk -F, '$1 == 0' "/tmp/alias_ar_${alias}_out.csv")
         BEGIN=$(echo "$LINE" | cut -d, -f2)
@@ -136,12 +132,12 @@ job_submit_time,num_nodes,exit_status,queue
 0,70,0,pbatch
 EOF
 
-ERR_MSG=$(./build/simulator /tmp/alias_no_time_limit.csv \
+ERR_MSG=$($SIMULATOR /tmp/alias_no_time_limit.csv \
     --priority_policy fcfs \
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --backfill_policy easy \
     --outfile /tmp/alias_no_tl_out.csv 2>&1) || true
 

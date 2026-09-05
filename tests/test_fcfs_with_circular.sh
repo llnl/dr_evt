@@ -91,13 +91,15 @@ run_correctness_tests() {
     FAIL=0
     TRACE_DIR="tests/test_traces/comprehensive"
 
-    # Auto-detect duration_mode based on file contents
-    detect_duration_mode() {
+    # Auto-detect run_time_mode based on file contents.
+    # If trace has actual_duration column, use run_time_mode=actual.
+    # Otherwise, use run_time_mode=limit (jobs run for full time_limit).
+    detect_run_time_mode() {
         local test_file="$1"
         if head -1 "$test_file" | grep -q "actual_duration"; then
-            echo "column"
+            echo "actual"
         else
-            echo "exact"
+            echo "limit"
         fi
     }
 
@@ -110,8 +112,8 @@ run_correctness_tests() {
 
         test_name=$(basename "$test_file" .csv)
 
-        # Detect duration mode
-        duration_mode=$(detect_duration_mode "$test_file")
+        # Detect run_time_mode
+        run_time_mode=$(detect_run_time_mode "$test_file")
 
         # Run with scheduler_fcfs (priority_policy=fcfs)
         if [ "$VERBOSE" = true ]; then
@@ -122,7 +124,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_${test_name}_resources.csv" \
@@ -137,7 +139,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_alt_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_alt_${test_name}_resources.csv" \
@@ -153,7 +155,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_block_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_block_${test_name}_resources.csv" \
@@ -169,7 +171,7 @@ run_correctness_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode "$duration_mode" \
+            --run_time_mode "$run_time_mode" \
             --backfill_policy easy \
             --outfile "/tmp/fcfs_circular_${test_name}.csv" \
             --resource_trace "/tmp/fcfs_circular_${test_name}_resources.csv" \
@@ -340,7 +342,7 @@ run_performance_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode exact \
+            --run_time_mode limit \
             --backfill_policy easy \
             --outfile /tmp/fcfs_out.csv \
             > /dev/null 2>&1
@@ -364,7 +366,7 @@ run_performance_tests() {
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --duration_mode exact \
+            --run_time_mode limit \
             --backfill_policy easy \
             --outfile /tmp/fcfs_alt_out.csv \
             > /dev/null 2>&1

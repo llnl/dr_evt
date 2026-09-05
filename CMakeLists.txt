@@ -580,9 +580,10 @@ set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
 
-message(STATUS "Block queue test enabled")
 
 # MPI streaming test (requires MPI)
+# Only search for MPI for this test - dr_evt library itself has no MPI dependency
+find_package(MPI)
 if(MPI_CXX_FOUND)
   add_executable( test_mpi_streaming-bin tests/test_mpi_streaming.cpp )
 

@@ -15,17 +15,13 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Source common simulator path finder
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 echo "=========================================="
 echo "Unit Tests (Simulation Mode)"
 echo "=========================================="
 echo ""
-
-# Check build exists
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo "Error: ./build/simulator not found"
-    echo "Please build first: cd build && cmake .. && make"
-    exit 1
-fi
 
 PASS=0
 FAIL=0
@@ -54,16 +50,12 @@ for test_file in "$TRACE_DIR"/*.csv; do
     SIM_OUT="/tmp/unit_${test_name}.csv"
     SIM_RESOURCES="/tmp/unit_${test_name}_resources.csv"
 
-    # --duration_mode isn't passed, so it stays at its default, "limit".
-    # That matters because duration_mode="actual" would make the
-    # scheduler ignore --run_time_mode entirely and just use the
-    # trace's own real run time - "limit" is what makes --run_time_mode
-    # exact below actually get used.
-    ./build/simulator "$test_file" \
+    # These test traces lack actual_run_time column, so use run_time_mode=limit
+    $SIMULATOR "$test_file" \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \
-        --run_time_mode exact \
+        --run_time_mode limit \
         --backfill_policy easy \
         --priority_policy fcfs \
         --outfile "$SIM_OUT" \

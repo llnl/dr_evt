@@ -16,22 +16,19 @@ echo "Python API Tests"
 echo "=========================================="
 echo ""
 
-# Check if Python bindings were built
-if [ ! -d "build" ]; then
-    echo "✗ Error: build/ directory not found"
-    echo "Build first: cd build && cmake .. && make"
-    exit 1
+# Check if Python bindings are installed
+INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-./install}"
+PYTHON_MODULE=$(find "$INSTALL_PREFIX/lib/python" -name "dr_evt*.so" 2>/dev/null | head -1)
+if [ -z "$PYTHON_MODULE" ]; then
+    # Fallback to build directory
+    PYTHON_MODULE=$(find build -name "dr_evt*.so" 2>/dev/null | head -1)
 fi
 
-# Check if Python module exists
-PYTHON_MODULE=$(find build -name "dr_evt*.so" 2>/dev/null | head -1)
 if [ -z "$PYTHON_MODULE" ]; then
-    echo "✗ Error: Python module not found in build/"
+    echo "✗ Error: Python module not found"
     echo ""
     echo "Build Python bindings with:"
-    echo "  cd build"
-    echo "  cmake .. -DDR_EVT_BUILD_PYTHON=ON"
-    echo "  make"
+    echo "  cd build && cmake .. -DDR_EVT_BUILD_PYTHON=ON && make && make install"
     exit 1
 fi
 
@@ -46,6 +43,10 @@ echo ""
 # Run Python API tests
 echo "Running Python API test suite..."
 echo ""
+
+# Set PYTHONPATH to include the module directory
+MODULE_DIR=$(dirname "$PYTHON_MODULE")
+export PYTHONPATH="$MODULE_DIR:$PYTHONPATH"
 
 python3 tests/test_python_api.py
 

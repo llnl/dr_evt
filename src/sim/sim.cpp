@@ -45,7 +45,6 @@ Simulation::Simulation(const Sim_Params& params)
         m_trace.data(),
         params.m_backfill_policy,
         params.m_priority_policy,
-        params.m_duration_mode,
         params.m_queue_impl,
         params.m_block_size,
         params.m_circular_capacity,
@@ -211,39 +210,31 @@ num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
 void Simulation::determine_job_run_time()
 {
     for (auto& job : m_trace.data()) {
-        // duration_mode=actual means "the scheduler has perfect knowledge of
-        // the real, historical run time" - the simulated execution should
-        // reflect what actually happened, not a run_time_mode-determined
-        // value (exact/column/distribution). This is exactly what
-        // RunTimeMode::FROM_COLUMN already does (read the trace's own
-        // actual_run_time as-is), so duration_mode=actual always behaves
-        // that way, regardless of what run_time_mode is separately set to.
-        // run_time_mode only applies in the duration_mode=limit case, where
-        // there is no "real" duration to fall back on - the simulator must
-        // itself decide how long each job actually takes.
-        if (m_params.m_duration_mode == DurationEstimateMode::USE_ACTUAL) {
-            continue;  // job.m_actual_run_time already holds the trace's own value
-        }
+        // Scheduler uses time_limit as the best estimator for planning (realistic mode).
+        // run_time_mode controls how the job's actual execution length is determined.
 
         tdiff_t run_time;
 
         switch (m_params.m_run_time_mode) {
-            case RunTimeMode::FROM_COLUMN:
+            case RunTimeMode::ACTUAL:
+                // Read actual_run_time from trace (most realistic)
                 run_time = job.get_actual_run_time();
                 break;
 
-            case RunTimeMode::EXACT:
-                run_time = job.get_limit_time();
-                job.set_actual_run_time(run_time);
-                break;
-
             case RunTimeMode::DISTRIBUTION:
+                // Sample from distribution (realistic with variation)
                 run_time = sample_run_time(
                     job.get_limit_time(),
                     m_params.m_run_time_distribution,
                     m_params.m_run_time_scale,
                     m_params.m_run_time_stddev
                 );
+                job.set_actual_run_time(run_time);
+                break;
+
+            case RunTimeMode::LIMIT:
+                // Use time_limit in place of run_time (unrealistic, for debugging/testing)
+                run_time = job.get_limit_time();
                 job.set_actual_run_time(run_time);
                 break;
         }
@@ -377,10 +368,9 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
     }
 
     // Submit to scheduler (scheduler maintains internal wait queue)
+    // Scheduler uses time_limit as the best estimator for planning
     const auto& job = m_trace.data()[job_idx];
-    tdiff_t run_time_estimate = (m_params.m_duration_mode == DurationEstimateMode::USE_ACTUAL)
-                               ? job.get_actual_run_time()
-                               : job.get_limit_time();
+    tdiff_t run_time_estimate = job.get_limit_time();
     num_nodes_t nodes = job.get_num_nodes();
 
     m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);

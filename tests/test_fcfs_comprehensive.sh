@@ -12,6 +12,9 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Source common simulator path finder
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 # Parse command-line options
 MODE="both"  # Default: run both tests
 VERBOSE=false
@@ -64,11 +67,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check prerequisites
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo "Error: ./build/simulator not found"
-    echo "Build first: cd build && cmake .. && make"
-    exit 1
-fi
 
 ################################################################################
 # PART 1: DIFFERENTIAL CORRECTNESS TESTING
@@ -92,19 +90,15 @@ run_correctness_tests() {
     FAIL=0
     TRACE_DIR="tests/test_traces/comprehensive"
 
-    # Auto-detect run_time_mode based on file contents. --duration_mode
-    # is never passed anywhere in this script, so it stays at its own
-    # default, "limit", throughout. That matters because
-    # duration_mode="actual" would make the scheduler ignore
-    # run_time_mode entirely and just use the trace's own real run
-    # time - "limit" is what makes whichever run_time_mode gets
-    # detected below actually get used.
+    # Auto-detect run_time_mode based on file contents.
+    # If trace has actual_run_time column, use run_time_mode=actual.
+    # Otherwise, use run_time_mode=limit (jobs run for full time_limit).
     detect_run_time_mode() {
         local test_file="$1"
         if head -1 "$test_file" | grep -q "actual_run_time"; then
-            echo "column"
+            echo "actual"
         else
-            echo "exact"
+            echo "limit"
         fi
     }
 
@@ -124,7 +118,7 @@ run_correctness_tests() {
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs: $test_name"
         fi
-        ./build/simulator "$test_file" \
+        $SIMULATOR "$test_file" \
             --priority_policy fcfs \
             --queue_impl deque \
             --total_nodes 100 \
@@ -140,7 +134,7 @@ run_correctness_tests() {
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs_alt: $test_name"
         fi
-        ./build/simulator "$test_file" \
+        $SIMULATOR "$test_file" \
             --priority_policy fcfs_alt \
             --total_nodes 100 \
             --trace_format simple \
@@ -155,7 +149,7 @@ run_correctness_tests() {
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs (block queue): $test_name"
         fi
-        ./build/simulator "$test_file" \
+        $SIMULATOR "$test_file" \
             --priority_policy fcfs \
             --queue_impl block \
             --total_nodes 100 \
@@ -171,7 +165,7 @@ run_correctness_tests() {
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs (circular queue): $test_name"
         fi
-        ./build/simulator "$test_file" \
+        $SIMULATOR "$test_file" \
             --priority_policy fcfs \
             --queue_impl circular \
             --total_nodes 100 \
@@ -356,18 +350,13 @@ run_performance_tests() {
         # 2. C++ fcfs (deque-based)
         echo -n "  C++ fcfs (deque):  "
         FCFS_START=$(date +%s.%N)
-        # --duration_mode isn't passed, so it stays at its default,
-        # "limit". That matters because duration_mode="actual" would
-        # make the scheduler ignore --run_time_mode entirely and just
-        # use the trace's own real run time - "limit" is what makes
-        # --run_time_mode exact below (and the circular-queue run
-        # further down) actually get used.
-        ./build/simulator "$test_file" \
+        # Comprehensive test traces lack actual_run_time column, so use run_time_mode=limit
+        $SIMULATOR "$test_file" \
             --priority_policy fcfs \
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --run_time_mode exact \
+            --run_time_mode limit \
             --backfill_policy easy \
             --outfile /tmp/fcfs_out.csv \
             > /dev/null 2>&1
@@ -386,12 +375,12 @@ run_performance_tests() {
         # 3. C++ fcfs_alt (multimap-based)
         echo -n "  C++ fcfs_alt (map): "
         ALT_START=$(date +%s.%N)
-        ./build/simulator "$test_file" \
+        $SIMULATOR "$test_file" \
             --priority_policy fcfs_alt \
             --total_nodes 100 \
             --trace_format simple \
             --timestamp_format epoch \
-            --run_time_mode exact \
+            --run_time_mode limit \
             --backfill_policy easy \
             --outfile /tmp/fcfs_alt_out.csv \
             > /dev/null 2>&1

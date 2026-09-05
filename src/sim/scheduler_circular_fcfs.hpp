@@ -62,10 +62,9 @@ public:
     CircularBufferFCFSScheduler(num_nodes_t total_nodes,
                                 const std::vector<Job_Record>& job_data,
                                 BackfillPolicy bf_policy,
-                                DurationEstimateMode rt_mode,
                                 size_t initial_capacity = 0,
                                 CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW)
-        : SchedulerBase(total_nodes, job_data, bf_policy, rt_mode)
+        : SchedulerBase(total_nodes, job_data, bf_policy)
         , m_wait_queue(initial_capacity != 0 ? initial_capacity : job_data.size())
         , m_overflow_policy(overflow_policy)
         , m_eligible_end_idx(0)

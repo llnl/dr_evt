@@ -82,22 +82,7 @@ static void set_sim_options(
         sp.m_priority_policy = PriorityPolicy::FCFS;
     }
 
-    // Duration mode - the scheduler's own estimate of job length,
-    // used for reservation/backfill planning (default: USE_LIMIT)
-    if (!cfg.duration_mode().empty()) {
-        std::string mode = cfg.duration_mode();
-        if (mode == "limit") {
-            sp.m_duration_mode = DurationEstimateMode::USE_LIMIT;
-        } else if (mode == "actual") {
-            sp.m_duration_mode = DurationEstimateMode::USE_ACTUAL;
-        } else {
-            throw std::runtime_error("Unknown duration_mode in protobuf: " + mode);
-        }
-    } else {
-        sp.m_duration_mode = DurationEstimateMode::USE_LIMIT;
-    }
-
-    // Trace format (options: "simple" or "lassen", default: "lassen")
+    // Trace format (options: "simple" or "lassen", default: "simple")
     if (!cfg.trace_format().empty()) {
         std::string format = cfg.trace_format();
         if (format == "simple" || format == "lassen") {
@@ -106,7 +91,7 @@ static void set_sim_options(
             throw std::runtime_error("Unknown trace_format in protobuf: " + format);
         }
     } else {
-        sp.m_trace_format = "lassen";
+        sp.m_trace_format = "simple";
     }
 
     // Timestamp format (options: "epoch" or "iso", default: "iso")
@@ -130,20 +115,19 @@ static void set_sim_options(
     }
 
     // Run time mode - how the job's actual, observed execution length
-    // is determined (default: EXACT)
-    if (!cfg.run_time_mode().empty()) {
-        std::string mode = cfg.run_time_mode();
-        if (mode == "column") {
-            sp.m_run_time_mode = RunTimeMode::FROM_COLUMN;
-        } else if (mode == "exact") {
-            sp.m_run_time_mode = RunTimeMode::EXACT;
-        } else if (mode == "distribution") {
-            sp.m_run_time_mode = RunTimeMode::DISTRIBUTION;
-        } else {
-            throw std::runtime_error("Unknown run_time_mode in protobuf: " + mode);
-        }
+    // is determined. Scheduler uses time_limit as the best estimator for planning.
+    // (default: ACTUAL - most realistic)
+    std::string mode = cfg.run_time_mode();
+    if (mode.empty()) {
+        sp.m_run_time_mode = RunTimeMode::ACTUAL;  // default
+    } else if (mode == "actual") {
+        sp.m_run_time_mode = RunTimeMode::ACTUAL;
+    } else if (mode == "distribution") {
+        sp.m_run_time_mode = RunTimeMode::DISTRIBUTION;
+    } else if (mode == "limit") {
+        sp.m_run_time_mode = RunTimeMode::LIMIT;
     } else {
-        sp.m_run_time_mode = RunTimeMode::EXACT;
+        throw std::runtime_error("Unknown run_time_mode in protobuf: " + mode + " (valid: actual, distribution, limit)");
     }
 
     // Run time distribution (default: NORMAL)

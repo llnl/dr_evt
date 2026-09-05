@@ -395,11 +395,6 @@ verify_against_analytical.py            # still present, covers only the subset
                                          # design - see docs/TESTING_GUIDE.md
 ```
 
-`generate_correctness_traces.py` and `generate_all_analytical_oracles.py`
-are also still present but write to `tests/test_traces/correctness/`,
-which doesn't exist in this checkout - they appear to be unused remnants
-of an earlier design (see `tests/test_traces/README.md`'s History note).
-
 ## Running Tests
 
 ```bash
@@ -422,7 +417,7 @@ cd build
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
-    --run_time_mode exact \
+    --run_time_mode limit \
     --outfile /tmp/output.csv
 
 diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expected_output.csv
@@ -507,7 +502,7 @@ cd ..
    ```bash
    ./build/simulator <input> --total_nodes 100 \
        --trace_format simple --timestamp_format epoch \
-       --run_time_mode exact --outfile /tmp/test.csv
+       --run_time_mode limit --outfile /tmp/test.csv
    cat /tmp/test.csv
    ```
 
