@@ -6,6 +6,7 @@ This directory contains architectural decisions and design rationales for DR_EVT
 
 - **[Simulation vs Replay Modes](SIMULATION_VS_REPLAY_MODES.md)** - Why we have two distinct operating modes and how they differ
 - **[Timezone Support](TIMEZONE_SUPPORT.md)** - How timezone handling works for ISO timestamp traces
+- **[Resource-History Streaming](RESOURCE_HISTORY_STREAMING.md)** (proposed, not yet implemented) - Plan for replacing the resource-history vector with a circular buffer to support long-running streaming use
 
 ## Purpose
 

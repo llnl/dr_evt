@@ -146,20 +146,20 @@ void Trace::process_events_until(Trace::Context& ctx, const epoch_t& t_sub)
             ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
           #endif
         }
+        const epoch_t event_time = t; // copy: erase() below invalidates t
         ctx.m_evtq.erase(cur); // Remove processed event from the queue
+        ctx.m_resource_history.emplace_back(event_time, ctx.m_n_nodes_in_use);
       #if MARK_DAT_PERIOD
         ctx.m_prev_job_q = job_q;
       #endif
     }
 }
 
-void Trace::run_job_trace()
+void Trace::run_job_trace(Context& ctx, const std::string& resource_trace_file, num_nodes_t total_nodes)
 {
     if (m_data.empty()) {
         return;
     }
-
-    Context ctx;
 
     for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < m_data.size(); ++i) {
         const auto& job = m_data[i]; // A new job submission
@@ -178,6 +178,8 @@ void Trace::run_job_trace()
     // Process all the remaiing events. Use any time later than any timestamp
     // in the trace for flushing.
     process_events_until(ctx, convert_time(max_tstamp));
+
+    write_resource_trace(ctx, resource_trace_file, total_nodes);
 }
 
 void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
@@ -262,8 +264,35 @@ bool Trace::process_single_event(Context& ctx)
         // END event: free nodes (same logic as process_events_until)
         ctx.m_n_nodes_in_use -= job.get_num_nodes();
     }
+    ctx.m_resource_history.emplace_back(event.get_time(), ctx.m_n_nodes_in_use);
 
     return true;
+}
+
+void Trace::write_resource_trace(const Context& ctx, const std::string& filename,
+                                  num_nodes_t total_nodes) const
+{
+    if (filename.empty()) {
+        return;
+    }
+
+    std::ofstream ofs(filename);
+    if (!ofs) {
+        std::cerr << "Failed to open resource trace file: " << filename << std::endl;
+        return;
+    }
+
+    ofs << "time,free_nodes,allocated_nodes\n";
+
+    // Baseline row: all nodes free at time 0, matching Simulation's own
+    // convention of recording this before any event is processed.
+    ofs << "0," << total_nodes << ",0\n";
+
+    for (const auto& [time, allocated] : ctx.m_resource_history) {
+        ofs << static_cast<int64_t>(convert_epoch<sim_time_t>(time)) << ","
+            << (total_nodes - allocated) << ","
+            << allocated << "\n";
+    }
 }
 
 std::ostream& Trace::print(std::ostream& os) const

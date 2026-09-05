@@ -144,9 +144,19 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
 
       #if EVENT_TIME_ORDER
         if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
-            m_t_submit = convert_time(dr_evt::to_string(m_t_submit));
-            m_t_begin  = convert_time(dr_evt::to_string(m_t_begin));
-            m_t_end  = convert_time(dr_evt::to_string(m_t_end));
+            // Round-trip through to_string()/convert_time() as a sanity
+            // recheck. An out-of-range epoch (e.g. the unscheduled
+            // sentinel - never a genuine job time here) can't round-trip;
+            // treat that the same as "times are incorrect" below rather
+            // than letting convert_time()'s parse failure escape uncaught.
+            try {
+                m_t_submit = convert_time(dr_evt::to_string(m_t_submit));
+                m_t_begin  = convert_time(dr_evt::to_string(m_t_begin));
+                m_t_end  = convert_time(dr_evt::to_string(m_t_end));
+            } catch (const std::invalid_argument&) {
+                throw std::domain_error
+                    {"Job event times are incorrect! (unable to normalize)"};
+            }
 
             if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
                 throw std::domain_error

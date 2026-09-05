@@ -1,9 +1,12 @@
 #!/bin/bash
 # Replay Mode Tests
 #
-# Verifies that replay mode faithfully reproduces simulation resource usage:
-# 1. Run simulation mode → job_trace + resource_trace_sim
-# 2. Replay job_trace → resource_trace_replay
+# Verifies that the tracer (standalone replay binary - no scheduler
+# involved) faithfully reproduces the resource usage a simulator run
+# already produced:
+# 1. Run simulation mode (simulator) → job_trace + resource_trace_sim
+# 2. Replay job_trace (tracer, using its begin_time/end_time directly)
+#    → resource_trace_replay
 # 3. Compare: resource_trace_sim == resource_trace_replay
 
 set -e
@@ -13,8 +16,9 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
-# Source common simulator path finder
+# Source common simulator and tracer path finders
 source "$SCRIPT_DIR/set_simulator_path.sh"
+source "$SCRIPT_DIR/set_tracer_path.sh"
 
 echo "=========================================="
 echo "Replay Mode Tests"
@@ -65,17 +69,15 @@ for test_base in "${REPLAY_TESTS[@]}"; do
         continue
     fi
 
-    # Step 2: Replay the job trace
-    replay_job_output="/tmp/replay_rep_${test_base}_jobs.csv"
+    # Step 2: Replay the job trace - tracer only, no scheduler involved
     replay_resource_output="/tmp/replay_rep_${test_base}_resources.csv"
 
-    $SIMULATOR "$sim_job_output" \
+    $TRACER --infile "$sim_job_output" \
         --total_nodes 100 \
-        --trace_format simple \
-        --timestamp_format epoch \
-        --run_time_mode limit \
-        --outfile "$replay_job_output" \
         --resource_trace "$replay_resource_output" \
+        --outfile "/tmp/replay_rep_${test_base}_tracer_out.csv" \
+        --subfile "/tmp/replay_rep_${test_base}_sub.csv" \
+        --subsumf "/tmp/replay_rep_${test_base}_subsum.csv" \
         > /dev/null 2>&1
 
     if [ ! -f "$replay_resource_output" ]; then
