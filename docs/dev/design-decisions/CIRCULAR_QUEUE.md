@@ -71,9 +71,9 @@ correctness bug, so this needed explicit handling:
   overflow - the same "always correct, uses the worst-case amount of
   memory upfront" trade-off as sizing any fixed buffer to the largest
   possible input.
-- **`--circular_capacity SIZE`:** an explicit, smaller capacity, trading
+- **`--wait_queue_capacity SIZE`:** an explicit, smaller capacity, trading
   that guarantee for a smaller initial allocation.
-- **`--circular_overflow {abort|grow}`:** what happens if an insert
+- **`--wait_queue_overflow {abort|grow}`:** what happens if an insert
   exceeds the capacity actually chosen.
   - `abort` throws `std::runtime_error`, caught by the top-level handler
     (or reported back to the gRPC client), ending the simulation cleanly
@@ -99,11 +99,11 @@ correctness bug, so this needed explicit handling:
 ```bash
 # Force growth: capacity 10 is far smaller than most real traces
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular \
-    --circular_capacity 10 --circular_overflow grow
+    --wait_queue_capacity 10 --wait_queue_overflow grow
 
 # Force a clean abort instead
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular \
-    --circular_capacity 10 --circular_overflow abort
+    --wait_queue_capacity 10 --wait_queue_overflow abort
 ```
 
 ## Usage
@@ -119,7 +119,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_i
 
 # Circular queue with an explicit capacity and abort-on-overflow
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl circular \
-    --circular_capacity 500 --circular_overflow abort
+    --wait_queue_capacity 500 --wait_queue_overflow abort
 ```
 
 ### Factory Pattern
@@ -133,7 +133,7 @@ std::unique_ptr<SchedulerBase> scheduler = create_scheduler(
     DurationEstimateMode::USE_LIMIT,
     QueueImplementation::CIRCULAR,
     128,   // block_size (unused for circular)
-    0,     // circular_capacity: 0 = size of job_data
+    0,     // wait_queue_capacity: 0 = size of job_data
     CircularOverflowPolicy::GROW
 );
 ```
@@ -141,15 +141,15 @@ std::unique_ptr<SchedulerBase> scheduler = create_scheduler(
 ### Also Reachable via Protobuf
 
 Both protobuf-based configuration paths support `queue_impl`,
-`circular_capacity`, and `circular_overflow` alongside their existing
+`wait_queue_capacity`, and `wait_queue_overflow` alongside their existing
 `block_size` field:
 
 - The gRPC service's `InitRequest` message (`src/proto/dr_evt_service.proto`)
 - The `.prototext` config file format read via `--config`
   (`src/proto/dr_evt_params.proto`)
 
-An empty `queue_impl` string, empty `circular_overflow` string, or a `0`
-`circular_capacity` keeps `Sim_Params`' own defaults (circular; grow;
+An empty `queue_impl` string, empty `wait_queue_overflow` string, or a `0`
+`wait_queue_capacity` keeps `Sim_Params`' own defaults (circular; grow;
 sized to the job trace) in both paths.
 
 ## Recommendations
@@ -165,7 +165,7 @@ measured here is real but not dramatic.
 ### Research/Testing
 ✅ Use the default capacity (0) unless you specifically want to test the
 overflow/grow path or bound memory usage - a wrong guess at capacity with
-`--circular_overflow grow` costs nothing but a doubling reallocation partway
+`--wait_queue_overflow grow` costs nothing but a doubling reallocation partway
 through the run.
 
 ## Files

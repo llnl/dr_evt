@@ -226,6 +226,14 @@ jobs:
           echo "========================================"
           ./tests/run_replay_tests.sh
 
+      - name: Run Resource History Tests
+        id: resource-history
+        run: |
+          echo "========================================"
+          echo "Running Resource History Tests (4 tests)"
+          echo "========================================"
+          ./tests/run_resource_history_tests.sh
+
       - name: Run Config Tests
         id: config
         run: |
@@ -286,6 +294,7 @@ jobs:
           echo "  Feature (5 tests): ${{ steps.feature.outcome }}"
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
           echo "  Replay (3 tests): ${{ steps.replay.outcome }}"
+          echo "  Resource History (4 tests): ${{ steps.resource-history.outcome }}"
           echo "  Config (4 tests): ${{ steps.config.outcome }}"
           echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
           echo "  Streaming API (4 tests): ${{ steps.streaming.outcome }}"

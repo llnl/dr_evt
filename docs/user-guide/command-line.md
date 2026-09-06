@@ -116,8 +116,8 @@ Wait queue implementation (FCFS scheduler only).
     rather than a chunk-lookup-then-offset
   - **Performance:** measured 14-28% *faster* than `deque` on a 10,000
     job / 2,000 node benchmark (see [`dev/design-decisions/CIRCULAR_QUEUE.md`](../dev/design-decisions/CIRCULAR_QUEUE.md))
-  - Has a fixed capacity, unlike `deque` - see `--circular_capacity`
-    and `--circular_overflow` below
+  - Has a fixed capacity, unlike `deque` - see `--wait_queue_capacity`
+    and `--wait_queue_overflow` below
 - `deque` - std::deque-based
   - Simple, well-tested sequential container
   - Linear backfill search O(n)
@@ -159,7 +159,7 @@ is specified with SJF/LJF, a warning is printed and the default multimap is used
 diff output_deque.csv output_multimap.csv  # Should be identical
 ```
 
-### `-A, --circular_capacity SIZE`
+### `-A, --wait_queue_capacity SIZE`
 Initial capacity of the circular queue. Only used when `--queue_impl circular`.
 
 **Default:** `0`, meaning the size of the job trace - large enough that the
@@ -167,15 +167,15 @@ queue can never overflow, since at most one entry is inserted per job in the
 trace over the scheduler's lifetime.
 
 A smaller, explicit value trades that guarantee for a smaller initial
-allocation; see `--circular_overflow` for what happens if it's exceeded.
+allocation; see `--wait_queue_overflow` for what happens if it's exceeded.
 
 **Example:**
 ```bash
-./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular --circular_capacity 1000
+./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular --wait_queue_capacity 1000
 ```
 
-### `-G, --circular_overflow {abort|grow}`
-What to do if an insert would exceed `--circular_capacity`. Only used when
+### `-G, --wait_queue_overflow {abort|grow}`
+What to do if an insert would exceed `--wait_queue_capacity`. Only used when
 `--queue_impl circular`.
 
 **Options:**
@@ -191,19 +191,92 @@ What to do if an insert would exceed `--circular_capacity`. Only used when
 ```bash
 # Fail fast if the queue ever needs more than the pre-sized capacity
 ./build/simulator traces/jobs.csv --priority_policy fcfs --queue_impl circular \
-    --circular_capacity 500 --circular_overflow abort
+    --wait_queue_capacity 500 --wait_queue_overflow abort
 ```
 
-How to estimate job run times for scheduling decisions.
+### `-J, --job_store {vector|circular}`
+Container implementation for the job-record store (`Trace::m_data`) - a
+runtime choice specifically so vector and circular-buffer performance can
+be compared before deciding whether to keep both or replace `std::vector`
+permanently.
+
+**Not yet implemented:** this option is parsed and validated, but not yet
+wired to any actual container change - `circular` currently behaves
+identically to `vector`. See
+[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
+for the design.
 
 **Options:**
-- `limit` - Use job's time_limit field (default)
-- `actual` - Read actual run time from trace (most realistic)
+- `vector` (default) - `std::vector`, unbounded, direct O(1) indexed access
+- `circular` - `boost::circular_buffer`, bounds memory via front-only
+  eviction of job records already safe to reclaim; see `--job_store_capacity`
+  and `--job_store_overflow` below
 
-**Default:** `limit`
+**Default:** `vector`
 
 **Example:**
 ```bash
+./build/simulator traces/jobs.csv --job_store circular --job_store_capacity 1000
+```
+
+### `-K, --job_store_capacity SIZE`
+Initial capacity of the job store. Only used when `--job_store circular`.
+
+**Not yet implemented** - see `--job_store` above.
+
+**Default:** `0`, meaning the size of the job trace - large enough that the
+store can never overflow, since at most one entry is inserted per job.
+
+A smaller, explicit value trades that guarantee for a smaller initial
+allocation; see `--job_store_overflow` for what happens if it's exceeded.
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --job_store circular --job_store_capacity 1000
+```
+
+### `-W, --job_store_overflow {abort|grow}`
+What to do if an insert would exceed `--job_store_capacity`. Only used when
+`--job_store circular`.
+
+**Not yet implemented** - see `--job_store` above.
+
+**Options:**
+- `abort` - end the simulation with a clean error (`std::runtime_error`,
+  reported to stderr / to the gRPC client, exit code 1)
+- `grow` (default) - reallocate to a larger capacity, copying every
+  existing entry over; the simulation continues normally
+
+**Default:** `grow`
+
+**Example:**
+```bash
+# Fail fast if the job store ever needs more than the pre-sized capacity
+./build/simulator traces/jobs.csv --job_store circular \
+    --job_store_capacity 500 --job_store_overflow abort
+```
+
+### `-H, --resource_history_capacity SIZE`
+Initial capacity of the resource-history circular buffer (the
+`time,free_nodes,allocated_nodes` samples behind `--resource_trace`).
+Bounds memory for long-running/streaming sessions: once full, the whole
+buffer is flushed to the `--resource_trace` file (if one was given) and
+cleared, in one batch, rather than growing without limit.
+
+Unlike `--wait_queue_overflow`/`--job_store_overflow`, there's no overflow
+policy here to configure - every entry is a strictly time-ordered,
+already-finalized sample, so it's always immediately safe to evict; the
+abort/grow fallback those two need for entries that aren't safe to evict
+yet never applies here.
+
+**Default:** `0`, meaning the size of the job trace (large enough it never
+needs to evict purely to make room) - though never less than 4096, since
+the trace size may still be tiny (or 0, early in a streaming session) at
+the moment the very first sample is recorded.
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --resource_trace resources.csv --resource_history_capacity 10000
 ```
 
 ## Trace Format Options
@@ -366,8 +439,8 @@ Load parameters from a Protobuf `.textproto` configuration file.
 ```
 
 For the full `.textproto` schema, worked examples (including how to set
-`queue_impl`/`circular_capacity`/`circular_overflow` this way), and common
-configuration patterns, see
+`queue_impl`/`wait_queue_capacity`/`wait_queue_overflow`/`job_store` this way),
+and common configuration patterns, see
 [Protobuf Configuration](protobuf-config.md).
 
 ## Debug Options

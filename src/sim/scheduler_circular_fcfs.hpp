@@ -79,7 +79,7 @@ public:
                 throw std::runtime_error(
                     "CircularBufferFCFSScheduler: wait queue capacity (" +
                     std::to_string(m_wait_queue.capacity()) + ") exceeded; "
-                    "use --circular_overflow grow or a larger --circular_capacity");
+                    "use --wait_queue_overflow grow or a larger --wait_queue_capacity");
             }
             // GROW: doubling matches std::vector's amortized-growth
             // strategy. set_capacity() copies all existing entries over

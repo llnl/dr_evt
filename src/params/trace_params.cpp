@@ -16,7 +16,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "d:hi:j:o:s:m:t:n:r:"
+#define OPTIONS "d:hi:j:o:s:m:t:n:r:H:"
 static const struct option longopts[] = {
     {"datfile",       required_argument,  0, 'd'},
     {"help",          no_argument,        0, 'h'},
@@ -28,6 +28,7 @@ static const struct option longopts[] = {
     {"max_time",      required_argument,  0, 't'},
     {"total_nodes",   required_argument,  0, 'n'},
     {"resource_trace",required_argument,  0, 'r'},
+    {"resource_history_capacity", required_argument, 0, 'H'},
     { 0, 0, 0, 0 },
 };
 
@@ -37,6 +38,7 @@ Trace_Params::Trace_Params()
     m_datfile("out-dat.txt"),
     m_subfile("out-stat_submission.txt"),
     m_subsumfile("out-stat_submission_summary.txt"),
+    m_resource_history_capacity(0),
     m_total_nodes(dr_evt::total_nodes),
     m_is_jobs_set(false),
     m_is_time_set(false)
@@ -86,6 +88,9 @@ bool Trace_Params::getopt(int& argc, char** &argv)
                 break;
             case 'r': /* --resource_trace */
                 m_resource_trace = std::string(optarg);
+                break;
+            case 'H': /* --resource_history_capacity */
+                m_resource_history_capacity = std::stoull(optarg);
                 break;
             default:
                 print_usage(argv[0], 1);
@@ -155,6 +160,10 @@ void Trace_Params::print_usage(const std::string exec, int code)
         "        trace (time,free_nodes,allocated_nodes). Uses the\n"
         "        begin_time/end_time already in the trace directly - no\n"
         "        scheduler involved.\n"
+        "\n"
+        "    -H, --resource_history_capacity SIZE\n"
+        "        Initial capacity of the resource-history circular buffer\n"
+        "        (default: 0, meaning the size of the job trace).\n"
         "\n";
     exit(code);
 }
@@ -174,6 +183,7 @@ void Trace_Params::print() const
     msg += " - subsumf: " + m_subsumfile + "\n";
     msg += " - total_nodes: " + to_string(m_total_nodes) + "\n";
     msg += " - resource_trace: " + m_resource_trace + "\n";
+    msg += " - resource_history_capacity: " + std::to_string(m_resource_history_capacity) + "\n";
     msg += " - is_jobs_set: " + string{m_is_jobs_set? "true" : "false"} + "\n";
     msg += " - is_time_set: " + string{m_is_time_set? "true" : "false"} + "\n";
 

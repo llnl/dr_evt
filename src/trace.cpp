@@ -43,6 +43,7 @@ int process_trace(const dr_evt::Trace_Params& cfg)
         return rc;
     }
     std::cout << std::to_string(trace.data().size()) + " jobs have been loaded.\n";
+    trace.set_resource_history_capacity(cfg.get_resource_history_capacity());
     trace.run_job_trace(cfg.get_resource_trace(), cfg.get_total_nodes());
 
     std::cout << "Trace ";
@@ -85,7 +86,13 @@ int main(int argc, char** argv)
 
     double t_start = dr_evt::get_time();
 
-    rc = process_trace(cfg);
+    try {
+        rc = process_trace(cfg);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        rc = EXIT_FAILURE;
+    }
 
     std::cout << "Wall clock time to process trace: "
               << dr_evt::get_time() - t_start << " (sec)" << std::endl;

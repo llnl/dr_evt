@@ -77,8 +77,8 @@ Scheduling policy:
   -p, --priority_policy <policy>   fcfs|fcfs_alt|sjf|ljf (default: fcfs)
   -q, --queue_impl <impl>          circular|deque|multimap|block (default: circular)
   -Q, --block_size <size>          Block size when queue_impl=block (default: 128)
-  -A, --circular_capacity <size>   Initial wait queue capacity when queue_impl=circular
-  -G, --circular_overflow <mode>   abort|grow when queue_impl=circular (default: grow)
+  -A, --wait_queue_capacity <size>   Initial wait queue capacity when queue_impl=circular
+  -G, --wait_queue_overflow <mode>   abort|grow when queue_impl=circular (default: grow)
 
 Trace format:
   -f, --trace_format <fmt>     simple|lassen (default: simple)

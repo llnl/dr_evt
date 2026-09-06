@@ -13,7 +13,9 @@
 namespace dr_evt {
 
 Trace::Trace(const std::string& fname)
-  : m_fname(fname), m_default_timezone("+00:00")
+  : m_fname(fname), m_default_timezone("+00:00"),
+    m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -22,7 +24,9 @@ Trace::Trace(const std::string& fname)
 }
 
 Trace::Trace(const std::string& fname, const std::string& format)
-  : m_fname(fname), m_dcols(format), m_default_timezone("+00:00")
+  : m_fname(fname), m_dcols(format), m_default_timezone("+00:00"),
+    m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -33,7 +37,9 @@ Trace::Trace(const std::string& fname, const std::string& format)
 Trace::Trace(const std::string& fname, const std::string& format,
              const std::string& timestamp_format, const std::string& timezone)
   : m_fname(fname), m_dcols(format, timestamp_format, timezone),
-    m_default_timezone("+00:00")  // Default to UTC
+    m_default_timezone("+00:00"),  // Default to UTC
+    m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -76,19 +82,19 @@ std::string Trace::Context::to_string() const
     return msg;
 }
 
-void Trace::process_events_until(Trace::Context& ctx, const epoch_t& t_sub)
+void Trace::process_events_until(const epoch_t& t_sub)
 {
-    if (ctx.m_evtq.empty()) {
+    if (m_ctx.m_evtq.empty()) {
       #if MARK_DAT_PERIOD
-        if (ctx.m_dat_span > 0.0) {
-            m_reserved.emplace_back(ctx.m_dat_start, ctx.m_dat_end);
+        if (m_ctx.m_dat_span > 0.0) {
+            m_reserved.emplace_back(m_ctx.m_dat_start, m_ctx.m_dat_end);
         }
       #endif
         return;
     }
 
-    auto it = ctx.m_evtq.begin();
-    while (it != ctx.m_evtq.end()) {
+    auto it = m_ctx.m_evtq.begin();
+    while (it != m_ctx.m_evtq.end()) {
         auto cur = it ++;
         // Time of the earliest event in the queue
         auto& t = cur->get_time();
@@ -105,84 +111,107 @@ void Trace::process_events_until(Trace::Context& ctx, const epoch_t& t_sub)
         if (cur->is_arrival()) {
           #if MARK_DAT_PERIOD
             if (job_q == pAll) {
-                if ((ctx.m_prev_job_q != pAll) &&
-                    (ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u))) {
+                if ((m_ctx.m_prev_job_q != pAll) &&
+                    (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u))) {
                     // No other DAT job is running and
                     // the last job seen was not a DAT job
-                    if (ctx.m_dat_span > 0.0) {
-                        m_reserved.emplace_back(ctx.m_dat_start, ctx.m_dat_end);
+                    if (m_ctx.m_dat_span > 0.0) {
+                        m_reserved.emplace_back(m_ctx.m_dat_start, m_ctx.m_dat_end);
                     }
 
-                    ctx.m_dat_start = cur->get_time();
-                    ctx.m_dat_span = 0.0;
+                    m_ctx.m_dat_start = cur->get_time();
+                    m_ctx.m_dat_span = 0.0;
                 }
                 m_data[cur->get_job_idx()].set_busy_nodes(total_nodes, true);
-                ctx.m_pAll_cnt ++;
+                m_ctx.m_pAll_cnt ++;
             } else {
-                ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
+                m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
             }
           #else
-            ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
+            m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
           #endif
         } else {
           #if MARK_DAT_PERIOD
             if (job_q == pAll) {
               #if !EVENT_TIME_ORDER
-                if (ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
+                if (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
                     std::string err = "Inconsistent event times with job "
                                     + to_string(cur->get_job_idx());
                     throw std::runtime_error {err.c_str()};
                 }
               #endif
-                ctx.m_pAll_cnt --;
-                if (ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
-                    ctx.m_dat_span = cur->get_time() - ctx.m_dat_start;
-                    ctx.m_dat_end = cur->get_time();
+                m_ctx.m_pAll_cnt --;
+                if (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
+                    m_ctx.m_dat_span = cur->get_time() - m_ctx.m_dat_start;
+                    m_ctx.m_dat_end = cur->get_time();
                 }
             } else {
-                ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
+                m_ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
             }
           #else
-            ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
+            m_ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
           #endif
         }
         const epoch_t event_time = t; // copy: erase() below invalidates t
-        ctx.m_evtq.erase(cur); // Remove processed event from the queue
-        ctx.m_resource_history.emplace_back(event_time, ctx.m_n_nodes_in_use);
+        m_ctx.m_evtq.erase(cur); // Remove processed event from the queue
+        record_resource_sample(event_time, m_ctx.m_n_nodes_in_use);
       #if MARK_DAT_PERIOD
-        ctx.m_prev_job_q = job_q;
+        m_ctx.m_prev_job_q = job_q;
       #endif
     }
 }
 
-void Trace::run_job_trace(Context& ctx, const std::string& resource_trace_file, num_nodes_t total_nodes)
+void Trace::run_job_trace(const std::string& resource_trace_file, num_nodes_t total_nodes)
 {
     if (m_data.empty()) {
         return;
     }
 
+    if (m_dcols.get_trace_mode() != TraceMode::REPLAY) {
+        // This function only replays begin_time/end_time that's already
+        // present in the input - it never schedules anything itself. If
+        // the header lacks those columns (simulation-format input:
+        // submit_time/time_limit only), every job's begin_time/end_time
+        // is still at Job_Record::unscheduled_sentinel() from load time
+        // (see job_record.cpp) - reject here, before any of it reaches
+        // the event queue or any output-generating code, rather than let
+        // an unresolvable state flow downstream. Mirrors submit_job()'s
+        // own upfront rejection in sim.cpp for the analogous case there
+        // (a job that can never be scheduled).
+        throw std::runtime_error(
+            "run_job_trace() requires replay-format input (begin_time/"
+            "end_time columns present) - this trace has neither, so "
+            "every job's begin_time/end_time would stay unresolved the "
+            "whole run. This looks like simulation-format input "
+            "(submit_time/time_limit only): run it through simulator "
+            "first, and feed tracer *its* output - simulator's "
+            "write_simulated_trace() - instead.");
+    }
+
+    start_resource_trace(resource_trace_file, total_nodes);
+
     for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < m_data.size(); ++i) {
         const auto& job = m_data[i]; // A new job submission
         auto t_sub = job.get_submit_time();
-        process_events_until(ctx, t_sub);
+        process_events_until(t_sub);
 
       #if MARK_DAT_PERIOD
-        m_data[i].set_busy_nodes(ctx.m_n_nodes_in_use, (ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u)));
+        m_data[i].set_busy_nodes(m_ctx.m_n_nodes_in_use, (m_ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u)));
       #else
-        m_data[i].set_busy_nodes(ctx.m_n_nodes_in_use);
+        m_data[i].set_busy_nodes(m_ctx.m_n_nodes_in_use);
       #endif
         // Add the events created by this submission
-        ctx.m_evtq.emplace(i, job.get_begin_time(), arrival);
-        ctx.m_evtq.emplace(i, job.get_end_time(), departure);
+        m_ctx.m_evtq.emplace(i, job.get_begin_time(), arrival);
+        m_ctx.m_evtq.emplace(i, job.get_end_time(), departure);
     }
     // Process all the remaiing events. Use any time later than any timestamp
     // in the trace for flushing.
-    process_events_until(ctx, convert_time(max_tstamp));
+    process_events_until(convert_time(max_tstamp));
 
-    write_resource_trace(ctx, resource_trace_file, total_nodes);
+    write_resource_trace(resource_trace_file, total_nodes);
 }
 
-void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
+void Trace::insert_job(job_no_t job_idx, sim_time_t start_time)
 {
     auto& job = m_data[job_idx];
 
@@ -207,15 +236,15 @@ void Trace::insert_job(job_no_t job_idx, sim_time_t start_time, Context& ctx)
     epoch_t end_epoch = {end_sec, end_frac};
 
     // Insert events into queue (will be automatically sorted by event_q_t)
-    ctx.m_evtq.emplace(job_idx, start_epoch, arrival);
-    ctx.m_evtq.emplace(job_idx, end_epoch, departure);
+    m_ctx.m_evtq.emplace(job_idx, start_epoch, arrival);
+    m_ctx.m_evtq.emplace(job_idx, end_epoch, departure);
 
     // Update job record with computed times (for output)
     m_data[job_idx].set_begin_time(start_epoch);
     m_data[job_idx].compute_end_time();
 }
 
-void Trace::run_until_exclusive(Context& ctx, sim_time_t target_time)
+void Trace::run_until_exclusive(sim_time_t target_time)
 {
     // Convert sim_time_t to epoch_t for comparison
     time_t target_sec = static_cast<time_t>(target_time);
@@ -223,14 +252,14 @@ void Trace::run_until_exclusive(Context& ctx, sim_time_t target_time)
     epoch_t target_epoch = {target_sec, target_frac};
 
     // Process events until we reach target_time (exclusive)
-    process_events_until(ctx, target_epoch);
+    process_events_until(target_epoch);
 }
 
-void Trace::run_until_inclusive(Context& ctx, sim_time_t target_time)
+void Trace::run_until_inclusive(sim_time_t target_time)
 {
     // Process events at and before target_time
-    while (!ctx.m_evtq.empty()) {
-        const auto& event = *ctx.m_evtq.begin();
+    while (!m_ctx.m_evtq.empty()) {
+        const auto& event = *m_ctx.m_evtq.begin();
         sim_time_t event_time = static_cast<sim_time_t>(event.get_time().first) +
                                event.get_time().second;
 
@@ -239,60 +268,148 @@ void Trace::run_until_inclusive(Context& ctx, sim_time_t target_time)
         }
 
         // Process this event by running slightly past it
-        process_events_until(ctx, event.get_time());
+        process_events_until(event.get_time());
     }
 }
 
-bool Trace::process_single_event(Context& ctx)
+bool Trace::process_single_event()
 {
-    if (ctx.m_evtq.empty()) {
+    if (m_ctx.m_evtq.empty()) {
         return false;
     }
 
     // Get and remove the earliest event
-    auto it = ctx.m_evtq.begin();
+    auto it = m_ctx.m_evtq.begin();
     auto event = *it;  // Copy before erase
-    ctx.m_evtq.erase(it);
+    m_ctx.m_evtq.erase(it);
 
     // Process this event using replay engine's accounting logic
     const auto& job = m_data[event.get_job_idx()];
 
     if (event.is_arrival()) {
         // START event: allocate nodes (same logic as process_events_until)
-        ctx.m_n_nodes_in_use += job.get_num_nodes();
+        m_ctx.m_n_nodes_in_use += job.get_num_nodes();
     } else {
         // END event: free nodes (same logic as process_events_until)
-        ctx.m_n_nodes_in_use -= job.get_num_nodes();
+        m_ctx.m_n_nodes_in_use -= job.get_num_nodes();
     }
-    ctx.m_resource_history.emplace_back(event.get_time(), ctx.m_n_nodes_in_use);
+    record_resource_sample(event.get_time(), m_ctx.m_n_nodes_in_use);
 
     return true;
 }
 
-void Trace::write_resource_trace(const Context& ctx, const std::string& filename,
-                                  num_nodes_t total_nodes) const
+void Trace::start_resource_trace(const std::string& filename,
+                                  num_nodes_t total_nodes, bool msec)
 {
     if (filename.empty()) {
         return;
     }
-
-    std::ofstream ofs(filename);
-    if (!ofs) {
+    if (m_resource_trace_ofs.is_open()) {
+        // Already started - e.g. Simulation::run() started it for real
+        // with a real filename, and run_job_trace()'s own internal call
+        // (with empty defaults, in Simulation's replay-mode branch) must
+        // not clobber that. Ignore this call rather than reopening.
+        return;
+    }
+    m_resource_trace_ofs.open(filename);
+    if (!m_resource_trace_ofs) {
         std::cerr << "Failed to open resource trace file: " << filename << std::endl;
         return;
     }
+    m_resource_trace_total_nodes = total_nodes;
+    m_resource_trace_msec = msec;
 
-    ofs << "time,free_nodes,allocated_nodes\n";
+    std::string header = "time,free_nodes,allocated_nodes\n";
+    m_resource_trace_ofs << header;
 
-    // Baseline row: all nodes free at time 0, matching Simulation's own
-    // convention of recording this before any event is processed.
-    ofs << "0," << total_nodes << ",0\n";
+    // Baseline row: all nodes free at time 0, matching the convention
+    // used elsewhere for this file format.
+    std::string baseline = format_sim_time(0.0, msec) + "," +
+                            std::to_string(total_nodes) + ",0\n";
+    m_resource_trace_ofs << baseline;
+}
 
-    for (const auto& [time, allocated] : ctx.m_resource_history) {
-        ofs << static_cast<int64_t>(convert_epoch<sim_time_t>(time)) << ","
-            << (total_nodes - allocated) << ","
-            << allocated << "\n";
+void Trace::resolve_resource_history_capacity()
+{
+    if (m_resource_history_capacity_resolved) {
+        return;
     }
+    size_t cap = m_resource_history_capacity;
+    if (cap == 0) {
+        // Auto-size: every job contributes at most 2 events (start,
+        // end), each producing one resource-history sample - large
+        // enough that eviction is never needed purely to make room,
+        // matching the "0 = size of job trace" convention the wait
+        // queue and job store both use.
+        // 4096 floor: m_data.size() may still be tiny (or 0, in a
+        // streaming session where jobs arrive one at a time) at the
+        // moment the very first sample is recorded, well before most
+        // jobs have actually arrived - sizing purely off what's loaded
+        // so far would cause needless eviction thrashing right from the
+        // start of a long-running session.
+        cap = std::max<size_t>(m_data.size() * 2, 4096ul);
+    }
+    m_ctx.m_resource_history.set_capacity(cap);
+    m_resource_history_capacity_resolved = true;
+}
+
+void Trace::flush_resource_history()
+{
+    if (!m_resource_trace_ofs.is_open() || m_ctx.m_resource_history.empty()) {
+        // No file open to receive these - discard. Bounded memory still
+        // applies either way; nobody asked for this output.
+        m_ctx.m_resource_history.clear();
+        return;
+    }
+
+    const size_t blk_sz = 65536ul;
+    std::string buf;
+    buf.reserve(blk_sz + 4096);
+
+    for (const auto& [time, allocated] : m_ctx.m_resource_history) {
+        buf += format_sim_time(convert_epoch<sim_time_t>(time), m_resource_trace_msec) + "," +
+               std::to_string(m_resource_trace_total_nodes - allocated) + "," +
+               std::to_string(allocated) + "\n";
+        if (buf.size() >= blk_sz) {
+            m_resource_trace_ofs << buf;
+            buf.clear();
+        }
+    }
+    if (!buf.empty()) {
+        m_resource_trace_ofs << buf;
+    }
+    m_ctx.m_resource_history.clear();
+}
+
+void Trace::record_resource_sample(const epoch_t& time, num_nodes_t allocated)
+{
+    resolve_resource_history_capacity();
+    if (m_ctx.m_resource_history.full()) {
+        // Every entry here is always safe to evict (see m_resource_history's
+        // own comment in trace.hpp) - flush the whole buffer to make room
+        // in one batch, rather than evicting one at a time.
+        flush_resource_history();
+    }
+    m_ctx.m_resource_history.push_back(std::make_pair(time, allocated));
+}
+
+void Trace::write_resource_trace(const std::string& filename,
+                                  num_nodes_t total_nodes, bool msec)
+{
+    if (filename.empty()) {
+        return;
+    }
+    if (!m_resource_trace_ofs.is_open()) {
+        // start_resource_trace() was never called (or was called with a
+        // different/empty filename) - open fresh here. Note: anything
+        // already evicted before this point (silently discarded, since no
+        // file was open yet to receive it) is already gone; callers that
+        // want everything preserved should call start_resource_trace()
+        // before any processing begins instead.
+        start_resource_trace(filename, total_nodes, msec);
+    }
+    flush_resource_history();
+    m_resource_trace_ofs.close();
 }
 
 std::ostream& Trace::print(std::ostream& os) const

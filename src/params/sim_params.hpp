@@ -41,6 +41,19 @@ enum class CircularOverflowPolicy {
     GROW    // Reallocate to a larger capacity, copying existing entries over
 };
 
+/**
+ * Container implementation for Trace::m_data (the job-record store).
+ * A runtime choice rather than a permanent decision, specifically so
+ * vector and circular-buffer performance can be compared before deciding
+ * whether to keep both or replace std::vector permanently.
+ */
+enum class JobStoreImpl {
+    VECTOR,    // std::vector - unbounded, direct O(1) indexed access
+    CIRCULAR   // boost::circular_buffer - bounded memory via front-only
+               // eviction once entries are safe to reclaim (capacity-driven,
+               // or at the end of the run - never on every insert)
+};
+
 class Sim_Params {
  public:
     Sim_Params();
@@ -68,8 +81,18 @@ class Sim_Params {
     // m_run_time_mode below controls how jobs actually execute.
     QueueImplementation m_queue_impl;
     size_t m_block_size;  // Block size for block queue (must be power of 2)
-    size_t m_circular_capacity;  // Initial capacity for circular queue (0 = size of job trace)
-    CircularOverflowPolicy m_circular_overflow;  // What to do if circular queue capacity is exceeded
+    size_t m_wait_queue_capacity;  // Initial capacity for circular queue (0 = size of job trace)
+    CircularOverflowPolicy m_wait_queue_overflow;  // What to do if circular queue capacity is exceeded
+    JobStoreImpl m_job_store_impl;  // Container choice for Trace::m_data
+    size_t m_job_store_capacity;  // Initial capacity if circular (0 = size of job trace)
+    CircularOverflowPolicy m_job_store_overflow;  // What to do if job store capacity is exceeded
+    size_t m_resource_history_capacity;  // Initial capacity for the resource-history
+                                          // circular buffer (0 = size of job trace).
+                                          // No overflow policy: unlike the wait queue
+                                          // or job store, every entry here is always
+                                          // immediately safe to evict (a strictly
+                                          // time-ordered append log), so eviction on
+                                          // capacity never needs an abort/grow fallback.
     num_nodes_t m_total_nodes;
     std::string m_trace_format;  // "simple" or "lassen"
     std::string m_timestamp_format;  // "epoch" or "iso"

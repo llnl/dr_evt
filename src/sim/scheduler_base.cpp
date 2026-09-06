@@ -82,8 +82,8 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     PriorityPolicy priority_policy,
     QueueImplementation queue_impl,
     size_t block_size,
-    size_t circular_capacity,
-    CircularOverflowPolicy circular_overflow)
+    size_t wait_queue_capacity,
+    CircularOverflowPolicy wait_queue_overflow)
 {
     switch (priority_policy) {
         case PriorityPolicy::FCFS:
@@ -145,7 +145,7 @@ std::unique_ptr<SchedulerBase> create_scheduler(
             } else if (queue_impl == QueueImplementation::CIRCULAR) {
                 return std::make_unique<CircularBufferFCFSScheduler>(
                     total_nodes, job_data, backfill_policy,
-                    circular_capacity, circular_overflow);
+                    wait_queue_capacity, wait_queue_overflow);
             } else {
                 // Defensive: QueueImplementation is a 4-value enum and every
                 // value is explicitly handled above - this is only reachable

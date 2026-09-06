@@ -90,7 +90,7 @@ public:
                             throw std::runtime_error("Unknown run_time_mode: " + r.run_time_mode() + " (valid: actual, distribution, limit)");
                         }
 
-                        // block_size/circular_capacity: 0 means "use Sim_Params'
+                        // block_size/wait_queue_capacity: 0 means "use Sim_Params'
                         // own constructor default" - handled by Sim_Params
                         // itself when constructing CircularBufferFCFSScheduler/
                         // BlockQueueFCFSScheduler, not by this function.
@@ -104,13 +104,13 @@ public:
                         }
 
                         if (r.block_size() != 0) sp.m_block_size = r.block_size();
-                        if (r.circular_capacity() != 0) sp.m_circular_capacity = r.circular_capacity();
+                        if (r.wait_queue_capacity() != 0) sp.m_wait_queue_capacity = r.wait_queue_capacity();
 
-                        if (r.circular_overflow().empty()) sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::GROW;
-                        else if (r.circular_overflow() == "abort") sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::ABORT;
-                        else if (r.circular_overflow() == "grow") sp.m_circular_overflow = dr_evt::CircularOverflowPolicy::GROW;
+                        if (r.wait_queue_overflow().empty()) sp.m_wait_queue_overflow = dr_evt::CircularOverflowPolicy::GROW;
+                        else if (r.wait_queue_overflow() == "abort") sp.m_wait_queue_overflow = dr_evt::CircularOverflowPolicy::ABORT;
+                        else if (r.wait_queue_overflow() == "grow") sp.m_wait_queue_overflow = dr_evt::CircularOverflowPolicy::GROW;
                         else {
-                            throw std::runtime_error("Unknown circular_overflow: " + r.circular_overflow());
+                            throw std::runtime_error("Unknown wait_queue_overflow: " + r.wait_queue_overflow());
                         }
 
                         sim = std::make_unique<dr_evt::Simulation>(sp);

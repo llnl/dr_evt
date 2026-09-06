@@ -54,8 +54,18 @@ sim_setup {
   
   # Queue Implementation (FCFS scheduler only)
   queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
-  circular_capacity: 0            # 0 = size of job trace; only used when queue_impl="circular"
-  circular_overflow: "grow"       # "abort" | "grow"; only used when queue_impl="circular"
+  wait_queue_capacity: 0            # 0 = size of job trace; only used when queue_impl="circular"
+  wait_queue_overflow: "grow"       # "abort" | "grow"; only used when queue_impl="circular"
+
+  # Job-record store implementation (NOT YET IMPLEMENTED - parsed and
+  # validated, but "circular" currently behaves identically to "vector";
+  # see docs/dev/design-decisions/OUT_TRACE_STREAMING.md for the design)
+  job_store: "vector"             # Options: "vector", "circular"
+  job_store_capacity: 0           # 0 = size of job trace; only used when job_store="circular"
+  job_store_overflow: "grow"      # "abort" | "grow"; only used when job_store="circular"
+
+  # Resource-history circular buffer (bounds memory for --resource_trace)
+  resource_history_capacity: 0    # 0 = size of job trace, floored at 4096
   
   # Trace Format
   trace_format: "simple"          # Options: "simple", "lassen"
@@ -106,8 +116,17 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 | `priority_policy` | string | `"fcfs"` | `"fcfs"`, `"sjf"`, `"ljf"` |
 | `queue_impl` | string | `"circular"` | `"circular"`, `"deque"`, `"multimap"`, `"block"` |
 | `block_size` | uint32 | `128` | Power of 2; only used when `queue_impl="block"` |
-| `circular_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
-| `circular_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
+| `wait_queue_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
+| `wait_queue_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
+| `job_store` | string | `"vector"` | `"vector"`, `"circular"` |
+| `job_store_capacity` | uint64 | `0` | `0` = size of job trace; only used when `job_store="circular"` |
+| `job_store_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `job_store="circular"` |
+| `resource_history_capacity` | uint64 | `0` | `0` = size of job trace, floored at 4096 |
+
+**`job_store` is not yet implemented:** parsed and validated, but `"circular"`
+currently behaves identically to `"vector"` - see
+[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
+for the design.
 
 **backfill_policy:**
 - `"easy"` - EASY backfilling (only first queued job gets reservation)
@@ -295,7 +314,7 @@ sim_setup {
   priority_policy: "fcfs"
   
   # queue_impl defaults to "circular" - explicit here for clarity.
-  # circular_capacity/circular_overflow are optional; omitting them
+  # wait_queue_capacity/wait_queue_overflow are optional; omitting them
   # defaults to a capacity sized to the job trace, which can never
   # overflow.
   queue_impl: "circular"
@@ -370,8 +389,16 @@ message Simulation_Params {
   // Queue implementation (FCFS scheduler only)
   string queue_impl = 18;         // "circular", "deque", "multimap", or "block" (default: "circular")
   uint32 block_size = 19;         // power of 2 (default: 128); only used when queue_impl="block"
-  uint64 circular_capacity = 20;  // 0 = size of job trace (default: 0); only used when queue_impl="circular"
-  string circular_overflow = 21;  // "abort" or "grow" (default: "grow"); only used when queue_impl="circular"
+  uint64 wait_queue_capacity = 20;  // 0 = size of job trace (default: 0); only used when queue_impl="circular"
+  string wait_queue_overflow = 21;  // "abort" or "grow" (default: "grow"); only used when queue_impl="circular"
+
+  // Job-record store implementation
+  string job_store = 22;          // "vector" or "circular" (default: "vector")
+  uint64 job_store_capacity = 23; // 0 = size of job trace (default: 0); only used when job_store="circular"
+  string job_store_overflow = 24; // "abort" or "grow" (default: "grow"); only used when job_store="circular"
+
+  // Resource-history circular buffer (bounds memory for --resource_trace)
+  uint64 resource_history_capacity = 25; // 0 = size of job trace, floored at 4096 (default: 0)
 }
 ```
 

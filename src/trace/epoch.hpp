@@ -57,6 +57,16 @@ std::string to_string(const epoch_t& t);
 std::ostream& operator<<(std::ostream& os, const epoch_t& t);
 
 /**
+ * Format a sim_time_t for trace/resource-trace output. Default (msec=false)
+ * truncates to whole seconds as a plain integer, matching all existing
+ * traces and tests, which only ever use integer-second submit times.
+ * When msec=true, formats with millisecond precision (3 decimal places)
+ * instead, for traces that need sub-second timing. Shared by Simulation
+ * and Trace, since both write this same trace/resource-trace format.
+ */
+std::string format_sim_time(sim_time_t t, bool msec);
+
+/**
  *  Check if the give string is timestamp
  */
 bool is_timestamp(const std::string& time_str);
