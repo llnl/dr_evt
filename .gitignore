@@ -40,6 +40,7 @@ venv/
 #docs/dev/
 #!docs/dev/design-decisions/
 #!docs/dev/README.md
+docs/dev/wip-notes
 
 # User-specific CMake presets
 CMakeUserPresets.json

@@ -23,7 +23,7 @@ namespace dr_evt {
 class SJFScheduler : public SchedulerBase {
 public:
     SJFScheduler(num_nodes_t total_nodes,
-                 const std::vector<Job_Record>& job_data,
+                 const Trace& job_data,
                  BackfillPolicy backfill_policy);
 
     void insert_job(job_no_t job_id,

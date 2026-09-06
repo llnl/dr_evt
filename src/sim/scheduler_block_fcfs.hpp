@@ -46,7 +46,7 @@ private:
 
 public:
     BlockQueueFCFSScheduler(num_nodes_t total_nodes,
-                            const std::vector<Job_Record>& job_data,
+                            const Trace& job_data,
                             BackfillPolicy bf_policy)
         : SchedulerBase(total_nodes, job_data, bf_policy)
         , m_wait_queue()

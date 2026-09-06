@@ -29,7 +29,7 @@ namespace dr_evt {
  * boost::circular_buffer has a fixed capacity, unlike std::deque, which
  * grows automatically - a push_back() on a full buffer overwrites the
  * oldest element rather than growing. initial_capacity sets that
- * capacity explicitly (0 defaults to job_data.size(), large enough that
+ * capacity explicitly (0 defaults to job_data.data().size(), large enough that
  * it can never overflow, since insert_job() is called at most once per
  * entry in job_data over the scheduler's lifetime - see
  * Simulation::submit_job()). A caller may instead choose a smaller
@@ -60,12 +60,12 @@ private:
 
 public:
     CircularBufferFCFSScheduler(num_nodes_t total_nodes,
-                                const std::vector<Job_Record>& job_data,
+                                const Trace& job_data,
                                 BackfillPolicy bf_policy,
                                 size_t initial_capacity = 0,
                                 CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW)
         : SchedulerBase(total_nodes, job_data, bf_policy)
-        , m_wait_queue(initial_capacity != 0 ? initial_capacity : job_data.size())
+        , m_wait_queue(initial_capacity != 0 ? initial_capacity : job_data.data().size())
         , m_overflow_policy(overflow_policy)
         , m_eligible_end_idx(0)
         , m_current_tracked_time(0.0)

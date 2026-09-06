@@ -90,6 +90,15 @@ else (Protobuf_PROTOC_EXECUTABLE)
       message(STATUS "Protobuf not found. Building via FetchContent.")
       set(BUILD_PROTOBUF ON)
       include(${CMAKE_SOURCE_DIR}/external/protobuf/CMakeLists.txt)
+      # That include() sets Protobuf_FOUND but not DR_EVT_HAS_PROTOBUF -
+      # the return() right after it means the find_package() path below
+      # (which normally sets DR_EVT_HAS_PROTOBUF once found) never runs,
+      # so this needed setting explicitly here too. Without this, building
+      # protobuf from source (the fallback whenever no CMake-config-
+      # compatible install is found - e.g. Debian/Ubuntu's libprotobuf-dev,
+      # which only ships the older FindProtobuf.cmake module, not a CONFIG
+      # package) silently never actually enables protobuf support at all.
+      set(DR_EVT_HAS_PROTOBUF TRUE)
       return()
     endif (NOT Protobuf_FOUND)
   endif (PROTOBUF_ROOT)

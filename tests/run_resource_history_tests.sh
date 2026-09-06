@@ -2,11 +2,11 @@
 # Resource-History Circular Buffer Tests
 #
 # Trace::Context::m_resource_history is a boost::circular_buffer, bounded
-# via --resource_history_capacity, with entries evicted (flushed to the
+# via --resource_history_capacity, with entries reclaimed (flushed to the
 # resource-trace file, then discarded from memory) once it fills. This
-# verifies that forcing a tiny capacity - so eviction fires on nearly
+# verifies that forcing a tiny capacity - so reclaiming fires on nearly
 # every insert - still produces byte-identical resource-trace output to
-# the default (auto-sized, effectively never-evicts) capacity. Exercises
+# the default (auto-sized, effectively never-reclaims) capacity. Exercises
 # both call sites that populate resource-history:
 # 1. simulator (Simulation's scheduler-driven advance_to() loop)
 # 2. tracer (Trace::run_job_trace(), fed simulator's own replay-format
@@ -16,6 +16,13 @@
 # input directly (no begin_time/end_time - never valid input for
 # run_job_trace(), which only replays times that are already set), it
 # must reject cleanly with an actionable error, not crash.
+#
+# Also measures (informational, not pass/fail) the wall-clock cost of
+# genuinely repeated flushing at a too-small capacity vs. a sufficient
+# one - unlike job-store's m_data, resource-history has no grow option
+# and no preload phase, so a too-small capacity here causes real,
+# ongoing flush-and-discard for the whole run, not a one-time
+# reallocation. "Sufficient" is 2x the job count here, not 1x.
 
 set -e
 
@@ -33,14 +40,14 @@ echo "Resource-History Circular Buffer Tests"
 echo "=========================================="
 echo ""
 echo "Testing that --resource_history_capacity produces identical output"
-echo "to the default capacity, even under forced extreme eviction"
+echo "to the default capacity, even under forced extreme reclaiming"
 echo ""
 
 PASS=0
 FAIL=0
 
-# Forces eviction on nearly every insert - the most thorough test of the
-# eviction/flush path's correctness.
+# Forces reclaiming on nearly every insert - the most thorough test of the
+# reclaiming/flush path's correctness.
 TINY_CAPACITY=5
 
 # Use a couple of comprehensive tests (fast) - simulator side only.
@@ -52,7 +59,7 @@ RH_SIM_TESTS=(
 for test_base in "${RH_SIM_TESTS[@]}"; do
     echo "Testing: $test_base (simulator)"
 
-    input_trace="tests/test_traces/comprehensive/${test_base}.csv"
+    input_trace="tests/test_traces/feature/${test_base}.csv"
 
     if [ ! -f "$input_trace" ]; then
         echo "  ✗ Input not found: $input_trace"
@@ -89,10 +96,10 @@ for test_base in "${RH_SIM_TESTS[@]}"; do
     fi
 
     if diff -q "$default_res" "$tiny_res" > /dev/null; then
-        echo "  ✓ PASS - identical under forced eviction (capacity=$TINY_CAPACITY)"
+        echo "  ✓ PASS - identical under forced reclaiming (capacity=$TINY_CAPACITY)"
         PASS=$((PASS + 1))
     else
-        echo "  ✗ FAIL - resource traces differ under forced eviction"
+        echo "  ✗ FAIL - resource traces differ under forced reclaiming"
         echo "    Default capacity: $default_res"
         echo "    Tiny capacity:    $tiny_res"
         FAIL=$((FAIL + 1))
@@ -107,7 +114,7 @@ echo "Testing: tracer (run_job_trace(), replay-format input)"
 # it never schedules anything itself (see run_job_trace()'s own upfront
 # validation, tested separately below).
 replay_input="/tmp/rh_tracer_replay_input.csv"
-$SIMULATOR "tests/test_traces/scale/huge_2000jobs.csv" \
+$SIMULATOR "tests/test_traces/feature/huge_2000jobs.csv" \
     --total_nodes 500 \
     --trace_format simple \
     --timestamp_format epoch \
@@ -144,10 +151,10 @@ else
         echo "  ✗ Tracer run failed"
         FAIL=$((FAIL + 1))
     elif diff -q "$tracer_default_res" "$tracer_tiny_res" > /dev/null; then
-        echo "  ✓ PASS - identical under forced eviction (capacity=$TINY_CAPACITY)"
+        echo "  ✓ PASS - identical under forced reclaiming (capacity=$TINY_CAPACITY)"
         PASS=$((PASS + 1))
     else
-        echo "  ✗ FAIL - resource traces differ under forced eviction"
+        echo "  ✗ FAIL - resource traces differ under forced reclaiming"
         echo "    Default capacity: $tracer_default_res"
         echo "    Tiny capacity:    $tracer_tiny_res"
         FAIL=$((FAIL + 1))
@@ -162,7 +169,7 @@ echo "Testing: tracer rejects simulation-format input upfront"
 # and crash with std::bad_alloc before run_job_trace()'s upfront check
 # was added. Must now fail cleanly (nonzero exit, no crash), not abort.
 set +e
-misuse_output=$($TRACER --infile "tests/test_traces/scale/huge_2000jobs.csv" \
+misuse_output=$($TRACER --infile "tests/test_traces/feature/huge_2000jobs.csv" \
     --total_nodes 500 \
     --outfile /tmp/rh_misuse_out.csv \
     --resource_trace /tmp/rh_misuse_resources.csv \
@@ -185,6 +192,72 @@ fi
 
 echo ""
 echo "=========================================="
+echo "Flush-overhead benchmark (informational, not pass/fail)"
+echo "=========================================="
+echo ""
+echo "Unlike job-store, resource-history has no grow option - every entry"
+echo "is always immediately safe to reclaim, so a too-small capacity causes"
+echo "genuine, repeated flush-and-discard throughout the run, not a"
+echo "one-time reallocation during loading. Sufficient capacity here is"
+echo "2x the job count (each job contributes at most 2 events - start,"
+echo "end), not 1x like job-store."
+
+RH_GROW_TRACE="tests/test_traces/feature/huge_10000jobs.csv"
+RH_GROW_TRIALS=3
+
+if [ ! -f "$RH_GROW_TRACE" ]; then
+    echo "  ⚠ SKIP - $RH_GROW_TRACE not found"
+else
+    sufficient_total=0
+    tiny_total=0
+
+    for i in $(seq 1 $RH_GROW_TRIALS); do
+        t0=$(date +%s.%N)
+        $SIMULATOR "$RH_GROW_TRACE" \
+            --total_nodes 500 \
+            --trace_format simple \
+            --timestamp_format epoch \
+            --run_time_mode limit \
+            --resource_history_capacity 20000 \
+            --outfile /tmp/rh_flush_sufficient_out.csv \
+            --resource_trace /tmp/rh_flush_sufficient_resources.csv \
+            > /dev/null 2>&1
+        t1=$(date +%s.%N)
+        sufficient_total=$(echo "$sufficient_total + ($t1 - $t0)" | bc)
+
+        t0=$(date +%s.%N)
+        $SIMULATOR "$RH_GROW_TRACE" \
+            --total_nodes 500 \
+            --trace_format simple \
+            --timestamp_format epoch \
+            --run_time_mode limit \
+            --resource_history_capacity $TINY_CAPACITY \
+            --outfile /tmp/rh_flush_tiny_out.csv \
+            --resource_trace /tmp/rh_flush_tiny_resources.csv \
+            > /dev/null 2>&1
+        t1=$(date +%s.%N)
+        tiny_total=$(echo "$tiny_total + ($t1 - $t0)" | bc)
+    done
+
+    sufficient_avg=$(echo "scale=4; $sufficient_total / $RH_GROW_TRIALS" | bc)
+    tiny_avg=$(echo "scale=4; $tiny_total / $RH_GROW_TRIALS" | bc)
+    diff_pct=$(echo "scale=2; ($tiny_avg - $sufficient_avg) / $sufficient_avg * 100" | bc)
+
+    echo "  Sufficient capacity (2x job count = 20000): ${sufficient_avg}s avg over $RH_GROW_TRIALS runs"
+    echo "  Tiny capacity ($TINY_CAPACITY, flushes repeatedly all run): ${tiny_avg}s avg over $RH_GROW_TRIALS runs"
+    echo "  Difference: ${diff_pct}%"
+
+    if diff -q /tmp/rh_flush_sufficient_resources.csv /tmp/rh_flush_tiny_resources.csv > /dev/null; then
+        echo "  ✓ Resource trace identical either way (correctness unaffected by capacity choice)"
+        PASS=$((PASS + 1))
+    else
+        echo "  ✗ FAIL - resource trace differs between sufficient and tiny capacity"
+        FAIL=$((FAIL + 1))
+    fi
+fi
+
+echo ""
+echo "=========================================="
 echo "Results: $PASS passed, $FAIL failed"
 echo "=========================================="
 
@@ -192,7 +265,7 @@ if [ $FAIL -eq 0 ]; then
     echo "✓ ALL RESOURCE-HISTORY TESTS PASSED"
     echo ""
     echo "The resource-history circular buffer produces identical output"
-    echo "to the default capacity, even under forced extreme eviction, and"
+    echo "to the default capacity, even under forced extreme reclaiming, and"
     echo "invalid input is rejected cleanly rather than crashing."
     exit 0
 else

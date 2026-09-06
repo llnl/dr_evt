@@ -26,17 +26,13 @@ int process_trace(const dr_evt::Trace_Params& cfg)
 {
     Trace trace (cfg.get_infile());
 
-    Trace::trace_data_t& data = trace.data();
     const auto max_num_jobs =
         cfg.is_max_jobs_set()?
             cfg.max_num_jobs() :
             static_cast<num_jobs_t>(0u);
 
-    if (max_num_jobs == static_cast<num_jobs_t>(0u))
-        data.reserve(static_cast<num_jobs_t>(1467542u));
-    else
-        data.reserve(max_num_jobs);
-
+    // No .reserve() here anymore - load_data() sizes m_data's capacity
+    // itself.
     int rc = trace.load_data(max_num_jobs);
     if (rc != EXIT_SUCCESS) {
         std::cerr << "trace loading not successful! : " << rc << std::endl;

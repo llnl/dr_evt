@@ -77,6 +77,11 @@ class Job_Record {
     epoch_t get_begin_time() const { return m_t_begin; }
     epoch_t get_end_time() const { return m_t_end; }
     epoch_t get_submit_time() const { return m_t_submit; }
+    /// Marks a job as permanently rejected (e.g. requests more nodes than
+    /// exist) by setting submit_time to unscheduled_sentinel() - a job's
+    /// front-reclaim eligibility check treats this as "skip immediately,
+    /// will never resolve" rather than "still waiting."
+    void set_submit_time(const epoch_t& t) { m_t_submit = t; }
     tdiff_t get_wait_time() const { return (m_t_begin - m_t_submit); }
     timeout_t get_limit_time() const { return m_t_limit; }
     tdiff_t get_actual_run_time() const { return m_actual_run_time; }

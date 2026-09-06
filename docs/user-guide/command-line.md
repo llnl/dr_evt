@@ -194,52 +194,28 @@ What to do if an insert would exceed `--wait_queue_capacity`. Only used when
     --wait_queue_capacity 500 --wait_queue_overflow abort
 ```
 
-### `-J, --job_store {vector|circular}`
-Container implementation for the job-record store (`Trace::m_data`) - a
-runtime choice specifically so vector and circular-buffer performance can
-be compared before deciding whether to keep both or replace `std::vector`
-permanently.
-
-**Not yet implemented:** this option is parsed and validated, but not yet
-wired to any actual container change - `circular` currently behaves
-identically to `vector`. See
-[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
-for the design.
-
-**Options:**
-- `vector` (default) - `std::vector`, unbounded, direct O(1) indexed access
-- `circular` - `boost::circular_buffer`, bounds memory via front-only
-  eviction of job records already safe to reclaim; see `--job_store_capacity`
-  and `--job_store_overflow` below
-
-**Default:** `vector`
-
-**Example:**
-```bash
-./build/simulator traces/jobs.csv --job_store circular --job_store_capacity 1000
-```
-
 ### `-K, --job_store_capacity SIZE`
-Initial capacity of the job store. Only used when `--job_store circular`.
-
-**Not yet implemented** - see `--job_store` above.
+Initial capacity of the job-record store (`Trace::m_data`, a
+`boost::circular_buffer`). See
+[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
+for what this actually buys you - in short: for a batch run (loading a
+whole trace file upfront, the only mode that exists today), capacity
+always grows to fit the whole trace during loading regardless of this
+setting, so a smaller value here does not reduce the final allocation
+and essentially never triggers reclaiming a slot mid-run. This option
+mainly exists for a future streaming mode, and to exercise
+`--job_store_overflow` deliberately.
 
 **Default:** `0`, meaning the size of the job trace - large enough that the
 store can never overflow, since at most one entry is inserted per job.
 
-A smaller, explicit value trades that guarantee for a smaller initial
-allocation; see `--job_store_overflow` for what happens if it's exceeded.
-
 **Example:**
 ```bash
-./build/simulator traces/jobs.csv --job_store circular --job_store_capacity 1000
+./build/simulator traces/jobs.csv --job_store_capacity 1000
 ```
 
 ### `-W, --job_store_overflow {abort|grow}`
-What to do if an insert would exceed `--job_store_capacity`. Only used when
-`--job_store circular`.
-
-**Not yet implemented** - see `--job_store` above.
+What to do if an insert would exceed `--job_store_capacity`.
 
 **Options:**
 - `abort` - end the simulation with a clean error (`std::runtime_error`,
@@ -252,7 +228,7 @@ What to do if an insert would exceed `--job_store_capacity`. Only used when
 **Example:**
 ```bash
 # Fail fast if the job store ever needs more than the pre-sized capacity
-./build/simulator traces/jobs.csv --job_store circular \
+./build/simulator traces/jobs.csv \
     --job_store_capacity 500 --job_store_overflow abort
 ```
 
@@ -265,12 +241,12 @@ cleared, in one batch, rather than growing without limit.
 
 Unlike `--wait_queue_overflow`/`--job_store_overflow`, there's no overflow
 policy here to configure - every entry is a strictly time-ordered,
-already-finalized sample, so it's always immediately safe to evict; the
-abort/grow fallback those two need for entries that aren't safe to evict
+already-finalized sample, so it's always immediately safe to reclaim; the
+abort/grow fallback those two need for entries that aren't safe to reclaim
 yet never applies here.
 
 **Default:** `0`, meaning the size of the job trace (large enough it never
-needs to evict purely to make room) - though never less than 4096, since
+needs to reclaim purely to make room) - though never less than 4096, since
 the trace size may still be tiny (or 0, early in a streaming session) at
 the moment the very first sample is recorded.
 
@@ -439,7 +415,7 @@ Load parameters from a Protobuf `.textproto` configuration file.
 ```
 
 For the full `.textproto` schema, worked examples (including how to set
-`queue_impl`/`wait_queue_capacity`/`wait_queue_overflow`/`job_store` this way),
+`queue_impl`/`wait_queue_capacity`/`wait_queue_overflow`/`job_store_capacity` this way),
 and common configuration patterns, see
 [Protobuf Configuration](protobuf-config.md).
 

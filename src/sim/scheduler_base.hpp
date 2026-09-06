@@ -13,6 +13,7 @@
 #include <memory>
 #include "common.hpp"
 #include "trace/job_record.hpp"
+#include "trace/trace.hpp"
 #include "sim/scheduler_policies.hpp"
 #include "params/sim_params.hpp"
 
@@ -26,16 +27,20 @@ class SchedulerBase {
 protected:
     num_nodes_t m_total_nodes;
     BackfillPolicy m_backfill_policy;
-    const std::vector<Job_Record>* m_job_data_ptr;
+    /// Raw pointer to the owning Trace, not the job-record container
+    /// directly: reading a job's data by job_no needs Trace::job_at()'s
+    /// translation (job_no - m_num_reclaimed), which only Trace can do -
+    /// m_data's own physical layout shifts as reclaiming advances.
+    const Trace* m_trace_ptr;
     sim_time_t m_fcfs_reservation_time;
 
 public:
     SchedulerBase(num_nodes_t total_nodes,
-                  const std::vector<Job_Record>& job_data,
+                  const Trace& trace,
                   BackfillPolicy bf_policy)
         : m_total_nodes(total_nodes)
         , m_backfill_policy(bf_policy)
-        , m_job_data_ptr(&job_data)
+        , m_trace_ptr(&trace)
         , m_fcfs_reservation_time(0)
     {}
 
@@ -109,7 +114,7 @@ protected:
 
     tdiff_t get_duration_estimate(job_no_t job_idx) const {
         // Scheduler uses time_limit as the best estimator for planning (realistic mode)
-        const auto& job = (*m_job_data_ptr)[job_idx];
+        const auto& job = m_trace_ptr->job_at(job_idx);
         return job.get_limit_time();
     }
 
@@ -125,7 +130,7 @@ protected:
  */
 std::unique_ptr<SchedulerBase> create_scheduler(
     num_nodes_t total_nodes,
-    const std::vector<Job_Record>& job_data,
+    const Trace& job_data,
     BackfillPolicy backfill_policy,
     PriorityPolicy priority_policy,
     QueueImplementation queue_impl = QueueImplementation::CIRCULAR,
