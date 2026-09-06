@@ -241,6 +241,12 @@ static void set_sim_options(
         sp.m_job_store_overflow = CircularOverflowPolicy::GROW;
     }
 
+    // Initial capacity for the resource-history circular buffer (0 means
+    // use default from Sim_Params constructor - size of the job trace)
+    if (cfg.resource_history_capacity() > 0) {
+        sp.m_resource_history_capacity = cfg.resource_history_capacity();
+    }
+
     // Handle defaults
     if (!sp.m_is_time_set) {
         sp.m_max_time = dr_evt::max_sim_time;

@@ -20,7 +20,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MJ:K:W:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MJ:K:W:H:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -38,6 +38,7 @@ static const struct option longopts[] = {
     {"job_store",             required_argument,  0, 'J'},
     {"job_store_capacity",    required_argument,  0, 'K'},
     {"job_store_overflow",    required_argument,  0, 'W'},
+    {"resource_history_capacity", required_argument, 0, 'H'},
     {"trace_format",          required_argument,  0, 'f'},
     {"timestamp_format",      required_argument,  0, 'T'},
     {"timezone",              required_argument,  0, 'z'},
@@ -66,6 +67,7 @@ Sim_Params::Sim_Params()
     m_job_store_impl(JobStoreImpl::VECTOR),  // Default: preserve current behavior
     m_job_store_capacity(0),  // 0 = size of job trace (never overflows)
     m_job_store_overflow(CircularOverflowPolicy::GROW),
+    m_resource_history_capacity(0),
     m_total_nodes(dr_evt::total_nodes),
     m_trace_format("simple"),  // Default to simple format
     m_timestamp_format("iso"),  // Default to ISO/human-readable timestamps
@@ -231,6 +233,11 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         std::cerr << "Valid options: 'abort', 'grow' (default)" << std::endl;
                         print_usage(argv[0], 1);
                     }
+                }
+                break;
+            case 'H': /* --resource_history_capacity */
+                {
+                    m_resource_history_capacity = std::stoull(optarg);
                 }
                 break;
             case 'f': /* --trace_format */
@@ -435,6 +442,13 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        grow: reallocate to a larger capacity, copying existing\n"
         "        entries over.\n"
         "        Only used when --job_store=circular\n"
+        "\n"
+        "    -H, --resource_history_capacity SIZE\n"
+        "        Initial capacity of the resource-history circular buffer\n"
+        "        (default: 0, meaning the size of the job trace - large\n"
+        "        enough it never needs to evict purely to make room). No\n"
+        "        overflow policy: every entry here is always immediately\n"
+        "        safe to evict, so eviction on capacity always succeeds.\n"
         "\n"
         "    -f, --trace_format {simple|lassen}\n"
         "        Trace file format (default: simple).\n"

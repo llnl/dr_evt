@@ -55,6 +55,13 @@ void Simulation::run()
         std::cout << "Running simulation with " + std::to_string(m_params.m_total_nodes) + " nodes\n";
     }
 
+    // Open the resource-trace file early (if one was requested) so
+    // eviction from the now-bounded circular buffer can flush to it
+    // incrementally during the run, rather than only at the very end.
+    m_trace.set_resource_history_capacity(m_params.m_resource_history_capacity);
+    m_trace.start_resource_trace(m_params.get_resource_trace(), m_params.m_total_nodes,
+                                  m_params.m_msec_output);
+
     if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
         // Replay-format input (begin_time/end_time present): don't consult
         // the scheduler at all - reuse the same bypass logic the standalone
@@ -334,7 +341,7 @@ void Simulation::write_simulated_trace() const
     }
 }
 
-void Simulation::write_resource_trace(const std::string& filename) const
+void Simulation::write_resource_trace(const std::string& filename)
 {
     if (filename.empty()) {
         return;

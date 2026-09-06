@@ -67,6 +67,13 @@ message DR_EVT_Params {
 
         // What to do if a job_store=circular insert would exceed job_store_capacity
         string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
+
+        // Initial capacity for the resource-history circular buffer. 0
+        // means the size of the job trace. No overflow-policy field:
+        // unlike job_store, every entry here is always immediately safe
+        // to evict, so eviction on capacity never needs an abort/grow
+        // fallback.
+        uint64 resource_history_capacity = 25; // (default: 0)
     }
 
     message Tracing_Params {

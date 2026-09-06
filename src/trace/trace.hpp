@@ -12,7 +12,9 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <map>
+#include <boost/circular_buffer.hpp>
 
 #include "common.hpp"
 #include "trace/data_columns.hpp"
@@ -58,7 +60,16 @@ class Trace {
         /// (time, allocated_nodes) sampled every time an event changes
         /// occupancy. free_nodes isn't stored here since total_nodes isn't
         /// known to Context - it's derived by write_resource_trace() below.
-        std::vector<std::pair<epoch_t, num_nodes_t>> m_resource_history;
+        /// A circular buffer bounds memory for long-running/streaming
+        /// sessions: every entry here is immediately safe to evict (this
+        /// is a strictly time-ordered append log, unlike the job-record
+        /// store, which must wait for a job's end_time to pass) so, unlike
+        /// a wait queue or job store, eviction here never needs an
+        /// abort/grow fallback - it always succeeds. Capacity is resolved
+        /// lazily (see Trace::start_resource_trace()) since the natural
+        /// default depends on the job trace's size, known only once
+        /// loaded, not at Context's own construction time.
+        boost::circular_buffer<std::pair<epoch_t, num_nodes_t>> m_resource_history;
 
         Context();
         std::string to_string() const;
@@ -70,6 +81,20 @@ class Trace {
     /// always carries its own state together, rather than a caller having
     /// to keep a separate Context in sync with the right Trace.
     Context m_ctx;
+
+    /// Requested capacity for m_ctx.m_resource_history (0 = auto-size to
+    /// the job trace once loaded - see resolve_resource_history_capacity()).
+    /// Set via set_resource_history_capacity()/start_resource_trace(),
+    /// resolved lazily the first time a sample is recorded.
+    size_t m_resource_history_capacity;
+    bool m_resource_history_capacity_resolved;
+
+    /// Set once start_resource_trace() opens a real output file - lets
+    /// eviction flush incrementally during the run instead of only at
+    /// the very end.
+    std::ofstream m_resource_trace_ofs;
+    num_nodes_t m_resource_trace_total_nodes;
+    bool m_resource_trace_msec;
 
   public:
     Trace(const std::string& fname);
@@ -152,11 +177,49 @@ class Trace {
     std::ostream& print_span(std::ostream& os) const;
 
     /**
+     * @brief Set the initial capacity for the resource-history circular
+     * buffer. Call before any processing begins - a no-op once the first
+     * sample has already been recorded (capacity is resolved lazily then,
+     * from m_data's size if this was never called or was called with 0).
+     * @param capacity Entry count; 0 = auto-size to the job trace, large
+     *        enough that no entry needs evicting purely to make room.
+     */
+    void set_resource_history_capacity(size_t capacity) {
+        m_resource_history_capacity = capacity;
+    }
+
+    /**
+     * @brief Open filename early so resource-history samples evicted from
+     * the circular buffer during the run get flushed to it incrementally,
+     * instead of only being available at the very end via
+     * write_resource_trace() below. Call once, before any processing
+     * begins (e.g. before submit_job()/advance_to(), or run_job_trace()).
+     * @param filename Output path; a no-op if empty - samples evicted
+     *        before write_resource_trace() is later called are then
+     *        simply discarded, which is fine since nobody asked for them.
+     * @param total_nodes Pool size, used to derive free_nodes at write time.
+     * @param msec Format timestamps with millisecond precision instead of
+     *        truncating to whole seconds (matches Sim_Params::m_msec_output;
+     *        tracer has no equivalent option, so it always leaves this false)
+     */
+    void start_resource_trace(const std::string& filename,
+                               num_nodes_t total_nodes,
+                               bool msec = false);
+
+    /**
      * @brief Write this Trace's recorded resource-occupancy history to a
      * CSV file (same "time,free_nodes,allocated_nodes" format used by the
      * simulator). Shared by the standalone tracer and the scheduling
      * simulator, since both populate this history through the same
      * process_events_until()/process_single_event() code path.
+     *
+     * If start_resource_trace() was already called with the same filename,
+     * this only flushes whatever's left buffered and closes the file -
+     * everything evicted mid-run was already written incrementally. If
+     * start_resource_trace() was never called, this opens filename fresh
+     * and writes the buffer's current contents in one shot - the original,
+     * pre-streaming behavior - but note anything evicted before this call
+     * (from a capacity smaller than the trace) is then already gone.
      * @param filename Output path; no-op if empty
      * @param total_nodes Pool size, used to derive free_nodes at write time
      * @param msec Format timestamps with millisecond precision instead of
@@ -165,7 +228,7 @@ class Trace {
      */
     void write_resource_trace(const std::string& filename,
                                num_nodes_t total_nodes,
-                               bool msec = false) const;
+                               bool msec = false);
 
   #if MARK_DAT_PERIOD
     std::ostream& print_DAT(std::ostream& os);
@@ -204,6 +267,26 @@ class Trace {
 
   protected:
     void process_events_until(const epoch_t& t_sub);
+
+    /// Resolve m_resource_history_capacity (0 -> sized from m_data) and
+    /// call m_ctx.m_resource_history.set_capacity() - once, the first time
+    /// any sample is recorded. A no-op on every call after the first.
+    void resolve_resource_history_capacity();
+
+    /// Write every entry currently in m_ctx.m_resource_history to
+    /// m_resource_trace_ofs (if open) in one batch, then clear the buffer.
+    /// Used both for incremental eviction-driven flushes during a run and
+    /// for the final flush in write_resource_trace().
+    void flush_resource_history();
+
+    /// Record one (time, allocated) resource-occupancy sample - the single
+    /// choke point process_events_until() and process_single_event() both
+    /// go through, so eviction-on-full only needs implementing once. If the
+    /// buffer is full, this flushes+clears it first (every entry is always
+    /// safe to evict here - see m_resource_history's own comment - so this
+    /// always succeeds, unlike a wait queue or job store, which may need an
+    /// abort/grow fallback when nothing is currently evictable).
+    void record_resource_sample(const epoch_t& time, num_nodes_t allocated);
 };
 
 /**@}*/

@@ -256,6 +256,29 @@ What to do if an insert would exceed `--job_store_capacity`. Only used when
     --job_store_capacity 500 --job_store_overflow abort
 ```
 
+### `-H, --resource_history_capacity SIZE`
+Initial capacity of the resource-history circular buffer (the
+`time,free_nodes,allocated_nodes` samples behind `--resource_trace`).
+Bounds memory for long-running/streaming sessions: once full, the whole
+buffer is flushed to the `--resource_trace` file (if one was given) and
+cleared, in one batch, rather than growing without limit.
+
+Unlike `--wait_queue_overflow`/`--job_store_overflow`, there's no overflow
+policy here to configure - every entry is a strictly time-ordered,
+already-finalized sample, so it's always immediately safe to evict; the
+abort/grow fallback those two need for entries that aren't safe to evict
+yet never applies here.
+
+**Default:** `0`, meaning the size of the job trace (large enough it never
+needs to evict purely to make room) - though never less than 4096, since
+the trace size may still be tiny (or 0, early in a streaming session) at
+the moment the very first sample is recorded.
+
+**Example:**
+```bash
+./build/simulator traces/jobs.csv --resource_trace resources.csv --resource_history_capacity 10000
+```
+
 ## Trace Format Options
 
 ### `-f, --trace_format FORMAT`

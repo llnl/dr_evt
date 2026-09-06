@@ -35,6 +35,7 @@ class Trace_Params {
     std::string get_subsumfile() const { return m_subsumfile; }
     std::string get_resource_trace() const { return m_resource_trace; }
     num_nodes_t get_total_nodes() const { return m_total_nodes; }
+    size_t get_resource_history_capacity() const { return m_resource_history_capacity; }
 
     num_jobs_t max_num_jobs() const { return m_max_jobs; }
     bool is_max_jobs_set() const { return m_is_jobs_set; }
@@ -48,6 +49,12 @@ class Trace_Params {
     std::string m_subfile; ///< Outfile name for Submission stats
     std::string m_subsumfile; ///< Outfile name for submission stat summary
     std::string m_resource_trace; ///< Optional outfile name for resource-occupancy trace
+
+    /// Initial capacity for the resource-history circular buffer (0 =
+    /// size of the job trace). No overflow policy: every entry here is
+    /// always immediately safe to evict, so eviction on capacity always
+    /// succeeds - see Trace::m_resource_history's own comment.
+    size_t m_resource_history_capacity;
 
     /// Pool size used only to derive free_nodes for the resource trace -
     /// the tracer itself does no scheduling and doesn't otherwise need this.

@@ -101,7 +101,7 @@ class Simulation {
     /**
      * Write resource state trace to file
      */
-    void write_resource_trace(const std::string& filename) const;
+    void write_resource_trace(const std::string& filename);
 
     /**
      * Submit a job to the scheduler's waiting queue (streaming mode)

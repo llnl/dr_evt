@@ -13,7 +13,9 @@
 namespace dr_evt {
 
 Trace::Trace(const std::string& fname)
-  : m_fname(fname), m_default_timezone("+00:00")
+  : m_fname(fname), m_default_timezone("+00:00"),
+    m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -22,7 +24,9 @@ Trace::Trace(const std::string& fname)
 }
 
 Trace::Trace(const std::string& fname, const std::string& format)
-  : m_fname(fname), m_dcols(format), m_default_timezone("+00:00")
+  : m_fname(fname), m_dcols(format), m_default_timezone("+00:00"),
+    m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -33,7 +37,9 @@ Trace::Trace(const std::string& fname, const std::string& format)
 Trace::Trace(const std::string& fname, const std::string& format,
              const std::string& timestamp_format, const std::string& timezone)
   : m_fname(fname), m_dcols(format, timestamp_format, timezone),
-    m_default_timezone("+00:00")  // Default to UTC
+    m_default_timezone("+00:00"),  // Default to UTC
+    m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -148,7 +154,7 @@ void Trace::process_events_until(const epoch_t& t_sub)
         }
         const epoch_t event_time = t; // copy: erase() below invalidates t
         m_ctx.m_evtq.erase(cur); // Remove processed event from the queue
-        m_ctx.m_resource_history.emplace_back(event_time, m_ctx.m_n_nodes_in_use);
+        record_resource_sample(event_time, m_ctx.m_n_nodes_in_use);
       #if MARK_DAT_PERIOD
         m_ctx.m_prev_job_q = job_q;
       #endif
@@ -181,6 +187,8 @@ void Trace::run_job_trace(const std::string& resource_trace_file, num_nodes_t to
             "first, and feed tracer *its* output - simulator's "
             "write_simulated_trace() - instead.");
     }
+
+    start_resource_trace(resource_trace_file, total_nodes);
 
     for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < m_data.size(); ++i) {
         const auto& job = m_data[i]; // A new job submission
@@ -285,51 +293,123 @@ bool Trace::process_single_event()
         // END event: free nodes (same logic as process_events_until)
         m_ctx.m_n_nodes_in_use -= job.get_num_nodes();
     }
-    m_ctx.m_resource_history.emplace_back(event.get_time(), m_ctx.m_n_nodes_in_use);
+    record_resource_sample(event.get_time(), m_ctx.m_n_nodes_in_use);
 
     return true;
 }
 
-void Trace::write_resource_trace(const std::string& filename,
-                                  num_nodes_t total_nodes, bool msec) const
+void Trace::start_resource_trace(const std::string& filename,
+                                  num_nodes_t total_nodes, bool msec)
 {
     if (filename.empty()) {
         return;
     }
-
-    std::ofstream ofs(filename);
-    if (!ofs) {
+    if (m_resource_trace_ofs.is_open()) {
+        // Already started - e.g. Simulation::run() started it for real
+        // with a real filename, and run_job_trace()'s own internal call
+        // (with empty defaults, in Simulation's replay-mode branch) must
+        // not clobber that. Ignore this call rather than reopening.
+        return;
+    }
+    m_resource_trace_ofs.open(filename);
+    if (!m_resource_trace_ofs) {
         std::cerr << "Failed to open resource trace file: " << filename << std::endl;
         return;
     }
+    m_resource_trace_total_nodes = total_nodes;
+    m_resource_trace_msec = msec;
 
-    // Batch lines into a block buffer before writing, matching
-    // job_io.cpp::print()'s pattern - far fewer I/O calls than one
-    // ofs << per entry, which matters once m_resource_history holds many
-    // thousands of samples.
+    std::string header = "time,free_nodes,allocated_nodes\n";
+    m_resource_trace_ofs << header;
+
+    // Baseline row: all nodes free at time 0, matching the convention
+    // used elsewhere for this file format.
+    std::string baseline = format_sim_time(0.0, msec) + "," +
+                            std::to_string(total_nodes) + ",0\n";
+    m_resource_trace_ofs << baseline;
+}
+
+void Trace::resolve_resource_history_capacity()
+{
+    if (m_resource_history_capacity_resolved) {
+        return;
+    }
+    size_t cap = m_resource_history_capacity;
+    if (cap == 0) {
+        // Auto-size: every job contributes at most 2 events (start,
+        // end), each producing one resource-history sample - large
+        // enough that eviction is never needed purely to make room,
+        // matching the "0 = size of job trace" convention the wait
+        // queue and job store both use.
+        // 4096 floor: m_data.size() may still be tiny (or 0, in a
+        // streaming session where jobs arrive one at a time) at the
+        // moment the very first sample is recorded, well before most
+        // jobs have actually arrived - sizing purely off what's loaded
+        // so far would cause needless eviction thrashing right from the
+        // start of a long-running session.
+        cap = std::max<size_t>(m_data.size() * 2, 4096ul);
+    }
+    m_ctx.m_resource_history.set_capacity(cap);
+    m_resource_history_capacity_resolved = true;
+}
+
+void Trace::flush_resource_history()
+{
+    if (!m_resource_trace_ofs.is_open() || m_ctx.m_resource_history.empty()) {
+        // No file open to receive these - discard. Bounded memory still
+        // applies either way; nobody asked for this output.
+        m_ctx.m_resource_history.clear();
+        return;
+    }
+
     const size_t blk_sz = 65536ul;
     std::string buf;
     buf.reserve(blk_sz + 4096);
 
-    buf += "time,free_nodes,allocated_nodes\n";
-
-    // Baseline row: all nodes free at time 0, matching Simulation's own
-    // convention of recording this before any event is processed.
-    buf += format_sim_time(0.0, msec) + "," + std::to_string(total_nodes) + ",0\n";
-
     for (const auto& [time, allocated] : m_ctx.m_resource_history) {
-        buf += format_sim_time(convert_epoch<sim_time_t>(time), msec) + "," +
-               std::to_string(total_nodes - allocated) + "," +
+        buf += format_sim_time(convert_epoch<sim_time_t>(time), m_resource_trace_msec) + "," +
+               std::to_string(m_resource_trace_total_nodes - allocated) + "," +
                std::to_string(allocated) + "\n";
         if (buf.size() >= blk_sz) {
-            ofs << buf;
+            m_resource_trace_ofs << buf;
             buf.clear();
         }
     }
-
     if (!buf.empty()) {
-        ofs << buf;
+        m_resource_trace_ofs << buf;
     }
+    m_ctx.m_resource_history.clear();
+}
+
+void Trace::record_resource_sample(const epoch_t& time, num_nodes_t allocated)
+{
+    resolve_resource_history_capacity();
+    if (m_ctx.m_resource_history.full()) {
+        // Every entry here is always safe to evict (see m_resource_history's
+        // own comment in trace.hpp) - flush the whole buffer to make room
+        // in one batch, rather than evicting one at a time.
+        flush_resource_history();
+    }
+    m_ctx.m_resource_history.push_back(std::make_pair(time, allocated));
+}
+
+void Trace::write_resource_trace(const std::string& filename,
+                                  num_nodes_t total_nodes, bool msec)
+{
+    if (filename.empty()) {
+        return;
+    }
+    if (!m_resource_trace_ofs.is_open()) {
+        // start_resource_trace() was never called (or was called with a
+        // different/empty filename) - open fresh here. Note: anything
+        // already evicted before this point (silently discarded, since no
+        // file was open yet to receive it) is already gone; callers that
+        // want everything preserved should call start_resource_trace()
+        // before any processing begins instead.
+        start_resource_trace(filename, total_nodes, msec);
+    }
+    flush_resource_history();
+    m_resource_trace_ofs.close();
 }
 
 std::ostream& Trace::print(std::ostream& os) const
