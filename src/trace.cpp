@@ -85,7 +85,13 @@ int main(int argc, char** argv)
 
     double t_start = dr_evt::get_time();
 
-    rc = process_trace(cfg);
+    try {
+        rc = process_trace(cfg);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        rc = EXIT_FAILURE;
+    }
 
     std::cout << "Wall clock time to process trace: "
               << dr_evt::get_time() - t_start << " (sec)" << std::endl;

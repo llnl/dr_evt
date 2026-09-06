@@ -161,6 +161,27 @@ void Trace::run_job_trace(const std::string& resource_trace_file, num_nodes_t to
         return;
     }
 
+    if (m_dcols.get_trace_mode() != TraceMode::REPLAY) {
+        // This function only replays begin_time/end_time that's already
+        // present in the input - it never schedules anything itself. If
+        // the header lacks those columns (simulation-format input:
+        // submit_time/time_limit only), every job's begin_time/end_time
+        // is still at Job_Record::unscheduled_sentinel() from load time
+        // (see job_record.cpp) - reject here, before any of it reaches
+        // the event queue or any output-generating code, rather than let
+        // an unresolvable state flow downstream. Mirrors submit_job()'s
+        // own upfront rejection in sim.cpp for the analogous case there
+        // (a job that can never be scheduled).
+        throw std::runtime_error(
+            "run_job_trace() requires replay-format input (begin_time/"
+            "end_time columns present) - this trace has neither, so "
+            "every job's begin_time/end_time would stay unresolved the "
+            "whole run. This looks like simulation-format input "
+            "(submit_time/time_limit only): run it through simulator "
+            "first, and feed tracer *its* output - simulator's "
+            "write_simulated_trace() - instead.");
+    }
+
     for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < m_data.size(); ++i) {
         const auto& job = m_data[i]; // A new job submission
         auto t_sub = job.get_submit_time();

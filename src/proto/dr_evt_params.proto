@@ -53,10 +53,20 @@ message DR_EVT_Params {
 
         // Initial capacity for circular queue implementation. 0 means
         // the size of the job trace (large enough it can never overflow).
-        uint64 circular_capacity = 20;  // (default: 0)
+        uint64 wait_queue_capacity = 20;  // (default: 0)
 
-        // What to do if a circular queue insert would exceed circular_capacity
-        string circular_overflow = 21;  // "abort" or "grow" (default: "grow")
+        // What to do if a circular queue insert would exceed wait_queue_capacity
+        string wait_queue_overflow = 21;  // "abort" or "grow" (default: "grow")
+
+        // Container implementation for the job-record store (Trace::m_data)
+        string job_store = 22;          // "vector" or "circular" (default: "vector")
+
+        // Initial capacity if job_store=circular. 0 means the size of the
+        // job trace (large enough it can never overflow).
+        uint64 job_store_capacity = 23; // (default: 0)
+
+        // What to do if a job_store=circular insert would exceed job_store_capacity
+        string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
     }
 
     message Tracing_Params {

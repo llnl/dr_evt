@@ -270,8 +270,8 @@ Jobs run for exactly their `time_limit`.
 -b, --backfill_policy POLICY   # Backfill: easy|conservative|none (default: easy)
 -p, --priority_policy POLICY   # Priority: fcfs|sjf|ljf (default: fcfs)
 -q, --queue_impl IMPL          # FCFS wait queue: circular|deque|multimap|block (default: circular)
--A, --circular_capacity SIZE   # Initial capacity for queue_impl=circular (default: 0 = size of trace)
--G, --circular_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
+-A, --wait_queue_capacity SIZE   # Initial capacity for queue_impl=circular (default: 0 = size of trace)
+-G, --wait_queue_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
 ```
 
 ### Run Time Options

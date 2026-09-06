@@ -189,22 +189,56 @@ static void set_sim_options(
 
     // Initial capacity for circular queue implementation (0 means use
     // default from Sim_Params constructor - size of the job trace)
-    if (cfg.circular_capacity() > 0) {
-        sp.m_circular_capacity = cfg.circular_capacity();
+    if (cfg.wait_queue_capacity() > 0) {
+        sp.m_wait_queue_capacity = cfg.wait_queue_capacity();
     }
 
     // Circular queue overflow policy (default: GROW)
-    if (!cfg.circular_overflow().empty()) {
-        std::string policy = cfg.circular_overflow();
+    if (!cfg.wait_queue_overflow().empty()) {
+        std::string policy = cfg.wait_queue_overflow();
         if (policy == "abort") {
-            sp.m_circular_overflow = CircularOverflowPolicy::ABORT;
+            sp.m_wait_queue_overflow = CircularOverflowPolicy::ABORT;
         } else if (policy == "grow") {
-            sp.m_circular_overflow = CircularOverflowPolicy::GROW;
+            sp.m_wait_queue_overflow = CircularOverflowPolicy::GROW;
         } else {
-            throw std::runtime_error("Unknown circular_overflow in protobuf: " + policy);
+            throw std::runtime_error("Unknown wait_queue_overflow in protobuf: " + policy);
         }
     } else {
-        sp.m_circular_overflow = CircularOverflowPolicy::GROW;
+        sp.m_wait_queue_overflow = CircularOverflowPolicy::GROW;
+    }
+
+    // Job-record store implementation (default: VECTOR)
+    if (!cfg.job_store().empty()) {
+        std::string impl = cfg.job_store();
+        if (impl == "vector") {
+            sp.m_job_store_impl = JobStoreImpl::VECTOR;
+        } else if (impl == "circular") {
+            sp.m_job_store_impl = JobStoreImpl::CIRCULAR;
+        } else {
+            throw std::runtime_error("Unknown job_store in protobuf: " + impl);
+        }
+    } else {
+        sp.m_job_store_impl = JobStoreImpl::VECTOR;
+    }
+
+    // Initial capacity if job_store=circular (0 means use default from
+    // Sim_Params constructor - size of the job trace)
+    if (cfg.job_store_capacity() > 0) {
+        sp.m_job_store_capacity = cfg.job_store_capacity();
+    }
+
+    // job_store=circular overflow policy (default: GROW)
+    if (!cfg.job_store_overflow().empty()) {
+        std::string policy = cfg.job_store_overflow();
+        if (policy == "abort") {
+            sp.m_job_store_overflow = CircularOverflowPolicy::ABORT;
+        } else if (policy == "grow") {
+            sp.m_job_store_overflow = CircularOverflowPolicy::GROW;
+        } else {
+            throw std::runtime_error("Unknown job_store_overflow in protobuf: " + policy);
+        }
+    } else {
+        sp.m_job_store_overflow = CircularOverflowPolicy::GROW;
     }
 
     // Handle defaults

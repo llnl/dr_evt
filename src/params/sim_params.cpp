@@ -20,7 +20,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:M"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MJ:K:W:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -33,8 +33,11 @@ static const struct option longopts[] = {
     {"priority_policy",       required_argument,  0, 'p'},
     {"queue_impl",            required_argument,  0, 'q'},
     {"block_size",            required_argument,  0, 'Q'},
-    {"circular_capacity",     required_argument,  0, 'A'},
-    {"circular_overflow",     required_argument,  0, 'G'},
+    {"wait_queue_capacity",     required_argument,  0, 'A'},
+    {"wait_queue_overflow",     required_argument,  0, 'G'},
+    {"job_store",             required_argument,  0, 'J'},
+    {"job_store_capacity",    required_argument,  0, 'K'},
+    {"job_store_overflow",    required_argument,  0, 'W'},
     {"trace_format",          required_argument,  0, 'f'},
     {"timestamp_format",      required_argument,  0, 'T'},
     {"timezone",              required_argument,  0, 'z'},
@@ -58,8 +61,11 @@ Sim_Params::Sim_Params()
     m_priority_policy(PriorityPolicy::FCFS),
     m_queue_impl(QueueImplementation::CIRCULAR),
     m_block_size(128),
-    m_circular_capacity(0),  // 0 = size of job trace (never overflows)
-    m_circular_overflow(CircularOverflowPolicy::GROW),
+    m_wait_queue_capacity(0),  // 0 = size of job trace (never overflows)
+    m_wait_queue_overflow(CircularOverflowPolicy::GROW),
+    m_job_store_impl(JobStoreImpl::VECTOR),  // Default: preserve current behavior
+    m_job_store_capacity(0),  // 0 = size of job trace (never overflows)
+    m_job_store_overflow(CircularOverflowPolicy::GROW),
     m_total_nodes(dr_evt::total_nodes),
     m_trace_format("simple"),  // Default to simple format
     m_timestamp_format("iso"),  // Default to ISO/human-readable timestamps
@@ -171,22 +177,57 @@ void Sim_Params::getopt(int& argc, char** &argv)
                     }
                 }
                 break;
-            case 'A': /* --circular_capacity */
+            case 'A': /* --wait_queue_capacity */
                 {
-                    m_circular_capacity = std::stoull(optarg);
+                    m_wait_queue_capacity = std::stoull(optarg);
                 }
                 break;
-            case 'G': /* --circular_overflow */
+            case 'G': /* --wait_queue_overflow */
                 {
                     std::string policy(optarg);
                     if (policy.empty()) {
-                        m_circular_overflow = CircularOverflowPolicy::GROW;
+                        m_wait_queue_overflow = CircularOverflowPolicy::GROW;
                     } else if (policy == "abort") {
-                        m_circular_overflow = CircularOverflowPolicy::ABORT;
+                        m_wait_queue_overflow = CircularOverflowPolicy::ABORT;
                     } else if (policy == "grow") {
-                        m_circular_overflow = CircularOverflowPolicy::GROW;
+                        m_wait_queue_overflow = CircularOverflowPolicy::GROW;
                     } else {
-                        std::cerr << "Unknown circular_overflow policy: " << policy << std::endl;
+                        std::cerr << "Unknown wait_queue_overflow policy: " << policy << std::endl;
+                        std::cerr << "Valid options: 'abort', 'grow' (default)" << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'J': /* --job_store */
+                {
+                    std::string impl(optarg);
+                    if (impl.empty() || impl == "vector") {
+                        m_job_store_impl = JobStoreImpl::VECTOR;
+                    } else if (impl == "circular") {
+                        m_job_store_impl = JobStoreImpl::CIRCULAR;
+                    } else {
+                        std::cerr << "Unknown job_store implementation: " << impl << std::endl;
+                        std::cerr << "Valid options: 'vector' (default), 'circular'" << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                }
+                break;
+            case 'K': /* --job_store_capacity */
+                {
+                    m_job_store_capacity = std::stoull(optarg);
+                }
+                break;
+            case 'W': /* --job_store_overflow */
+                {
+                    std::string policy(optarg);
+                    if (policy.empty()) {
+                        m_job_store_overflow = CircularOverflowPolicy::GROW;
+                    } else if (policy == "abort") {
+                        m_job_store_overflow = CircularOverflowPolicy::ABORT;
+                    } else if (policy == "grow") {
+                        m_job_store_overflow = CircularOverflowPolicy::GROW;
+                    } else {
+                        std::cerr << "Unknown job_store_overflow policy: " << policy << std::endl;
                         std::cerr << "Valid options: 'abort', 'grow' (default)" << std::endl;
                         print_usage(argv[0], 1);
                     }
@@ -365,17 +406,35 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        Only used when --queue_impl=block\n"
         "        Larger blocks reduce overhead but increase memory per block\n"
         "\n"
-        "    -A, --circular_capacity SIZE\n"
+        "    -A, --wait_queue_capacity SIZE\n"
         "        Initial capacity of the wait queue (default: 0, meaning the\n"
         "        size of the job trace - large enough it can never overflow).\n"
         "        Only used when --queue_impl=circular\n"
         "\n"
-        "    -G, --circular_overflow {abort|grow}\n"
-        "        What to do if an insert would exceed circular_capacity\n"
+        "    -G, --wait_queue_overflow {abort|grow}\n"
+        "        What to do if an insert would exceed wait_queue_capacity\n"
         "        (default: grow). abort: end the simulation with an error.\n"
         "        grow: reallocate to a larger capacity, copying existing\n"
         "        entries over.\n"
         "        Only used when --queue_impl=circular\n"
+        "\n"
+        "    -J, --job_store {vector|circular}\n"
+        "        Container implementation for the job-record store\n"
+        "        (default: vector). circular bounds memory via front-only\n"
+        "        eviction of jobs already safe to reclaim - capacity-driven,\n"
+        "        never on every insert.\n"
+        "\n"
+        "    -K, --job_store_capacity SIZE\n"
+        "        Initial capacity of the job store (default: 0, meaning the\n"
+        "        size of the job trace - large enough it can never overflow).\n"
+        "        Only used when --job_store=circular\n"
+        "\n"
+        "    -W, --job_store_overflow {abort|grow}\n"
+        "        What to do if an insert would exceed job_store_capacity\n"
+        "        (default: grow). abort: end the simulation with an error.\n"
+        "        grow: reallocate to a larger capacity, copying existing\n"
+        "        entries over.\n"
+        "        Only used when --job_store=circular\n"
         "\n"
         "    -f, --trace_format {simple|lassen}\n"
         "        Trace file format (default: simple).\n"

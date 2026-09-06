@@ -191,8 +191,8 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 |-----------|------|---------|---------|--------|
 | `queue_impl` | string | "circular" | Wait-queue data structure (circular/deque/multimap/block) | **Medium** - Can't select faster/alternate implementations |
 | `block_size` | uint32 | 128 | Block size when queue_impl="block" | **Low** - Can't tune block queue |
-| `circular_capacity` | uint64 | 0 (sized to trace) | Initial capacity when queue_impl="circular" | **Low** - Can't bound memory use |
-| `circular_overflow` | string | "grow" | abort/grow when circular_capacity exceeded | **Low** - Can't test overflow behavior |
+| `wait_queue_capacity` | uint64 | 0 (sized to trace) | Initial capacity when queue_impl="circular" | **Low** - Can't bound memory use |
+| `wait_queue_overflow` | string | "grow" | abort/grow when wait_queue_capacity exceeded | **Low** - Can't test overflow behavior |
 
 **Output Control:**
 
@@ -235,7 +235,7 @@ sim_setup {
   run_time_stddev: 0.1
   backfill_policy: "easy"
   queue_impl: "circular"
-  circular_capacity: 10000
+  wait_queue_capacity: 10000
   verbose: false
 }
 """
