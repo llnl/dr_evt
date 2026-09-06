@@ -228,6 +228,29 @@ class Trace {
     void insert_job(job_no_t job_idx, sim_time_t start_time);
 
     /**
+     * @brief Append a genuinely new job to m_data - the real streaming
+     * insertion point (unlike insert_job()/submit_job(), which both
+     * operate on a job already sitting in a preloaded m_data via
+     * job_at()). Follows the same order established for this in
+     * OUT_TRACE_STREAMING.md: check full(), try reclaim_front_jobs()
+     * first, and only fall back to growing if nothing was reclaimable.
+     * @param current_time Current simulated time, for the reclaim
+     *        attempt's is_front_reclaimable() check - not the new job's
+     *        own submit_time (see below), though the two are typically
+     *        equal for a genuinely live arrival.
+     * @param submit_time The new job's own submit_time attribute.
+     * @param num_nodes Number of nodes the job requests.
+     * @param queue Which queue the job was submitted to.
+     * @param limit_time User-estimated time limit.
+     * @return The new job's job_no - pass this to submit_job() next to
+     *         actually enqueue it with the scheduler; append_job() only
+     *         adds the record to the store, it doesn't submit it.
+     */
+    job_no_t append_job(sim_time_t current_time, const epoch_t& submit_time,
+                        num_nodes_t num_nodes, job_queue_t queue,
+                        timeout_t limit_time);
+
+    /**
      * NEW SIMULATION API: Run simulation until (but not including) target time
      * Processes all events with time < target_time
      * @param target_time Time to run until (exclusive)

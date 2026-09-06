@@ -73,6 +73,18 @@ class Job_Record {
     Job_Record& operator=(const Job_Record& rhs);
     Job_Record& operator=(Job_Record&& rhs) noexcept;
 
+    /**
+     * @brief Programmatic constructor for a job arriving via a live API
+     * (streaming append), rather than parsed from a trace file line.
+     * Matches the CSV constructor's simulation-mode field set and
+     * initialization exactly (see job_record.cpp): begin_time/end_time
+     * at unscheduled_sentinel(), m_is_simulated false, actual_run_time
+     * 0.0 (set later, same as determine_job_run_time() would for a
+     * loaded job) - a newly-arrived job hasn't run yet either.
+     */
+    Job_Record(const epoch_t& submit_time, num_nodes_t num_nodes,
+               job_queue_t queue, timeout_t limit_time);
+
     static void set_num_inputs(num_nodes_t n) { num_inputs = n; }
     epoch_t get_begin_time() const { return m_t_begin; }
     epoch_t get_end_time() const { return m_t_end; }

@@ -94,6 +94,30 @@ Job_Record& Job_Record::operator=(Job_Record&& o) noexcept
     return *this;
 }
 
+Job_Record::Job_Record(const epoch_t& submit_time, num_nodes_t num_nodes,
+                        job_queue_t queue, timeout_t limit_time)
+  :
+  #if MARK_DAT_PERIOD
+    m_dat(false),
+  #endif
+    m_busy_nodes(static_cast<num_nodes_t>(0u))
+{
+    // Same simulation-mode initialization the CSV constructor's
+    // else-branch uses - a newly-arrived job hasn't run yet either, so
+    // it needs the exact same "not yet scheduled" state.
+    m_t_begin = unscheduled_sentinel();
+    m_t_end = unscheduled_sentinel();
+    m_is_simulated = false;
+    m_t_submit = submit_time;
+    m_num_nodes = num_nodes;
+    m_q = queue;
+    m_t_limit = limit_time;
+    m_actual_run_time = 0.0;
+  #if SHOW_ORG_NO
+    m_org_no = 0; // no source-file line number for a live-arrived job
+  #endif
+}
+
 #if SHOW_ORG_NO
 Job_Record::Job_Record(job_no_t no, const std::vector<std::string>& str_vec)
   : m_org_no(no),

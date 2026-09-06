@@ -291,6 +291,35 @@ void Trace::run_job_trace(const std::string& resource_trace_file, num_nodes_t to
     write_resource_trace(resource_trace_file, total_nodes);
 }
 
+job_no_t Trace::append_job(sim_time_t current_time, const epoch_t& submit_time,
+                           num_nodes_t num_nodes, job_queue_t queue,
+                           timeout_t limit_time)
+{
+    // In case this is called before load_data() ever runs (genuine
+    // streaming, no batch preload at all) - resolve_job_store_capacity()
+    // is idempotent (guarded by m_job_store_capacity_resolved), so this
+    // is a no-op if load_data() already resolved it.
+    resolve_job_store_capacity(static_cast<num_jobs_t>(m_data.size()));
+
+    if (m_data.full()) {
+        // Point-of-need order established in OUT_TRACE_STREAMING.md:
+        // try reclaiming first, only grow if that wasn't enough.
+        reclaim_front_jobs(current_time);
+    }
+    if (m_data.full()) {
+        if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
+            throw std::runtime_error(
+                "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
+                ") exceeded and the front job isn't safe to reclaim yet; "
+                "use --job_store_overflow grow or a larger --job_store_capacity");
+        }
+        m_data.set_capacity(std::max<size_t>(m_data.capacity() * 2, 1));
+    }
+
+    m_data.push_back(Job_Record(submit_time, num_nodes, queue, limit_time));
+    return static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1);
+}
+
 void Trace::insert_job(job_no_t job_idx, sim_time_t start_time)
 {
     auto& job = job_at(job_idx);

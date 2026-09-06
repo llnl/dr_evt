@@ -104,6 +104,24 @@ class Simulation {
     void write_resource_trace(const std::string& filename);
 
     /**
+     * Append a genuinely new job - the streaming counterpart to
+     * load_data(), for a job the trace has never seen before (as
+     * opposed to submit_job() below, which only enqueues a job already
+     * present in m_data from a prior load_data() call). Adds the job to
+     * the store; does not submit it to the scheduler - call submit_job()
+     * with the returned job_no next for that.
+     *
+     * @param submit_time When the job is submitted (must be >= current_time,
+     *        same as submit_job() requires)
+     * @param num_nodes Number of nodes the job requests
+     * @param queue Which queue the job belongs to (e.g. "pbatch")
+     * @param limit_time User-estimated time limit, in seconds
+     * @return The new job's job_no, for a subsequent submit_job() call
+     */
+    job_no_t append_job(sim_time_t submit_time, num_nodes_t num_nodes,
+                         const std::string& queue, tdiff_t limit_time);
+
+    /**
      * Submit a job to the scheduler's waiting queue (streaming mode)
      * The internal scheduler will decide when to start the job based on
      * resources and backfilling policy.

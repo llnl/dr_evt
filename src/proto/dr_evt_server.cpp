@@ -131,6 +131,14 @@ public:
                         resp.mutable_submit_job();
                         break;
                     }
+                    case ClientMessage::kAppendJob: {
+                        require_init(sim);
+                        const AppendJobRequest& r = req.append_job();
+                        dr_evt::job_no_t job_idx = sim->append_job(
+                            r.submit_time(), r.num_nodes(), r.queue(), r.limit_time());
+                        resp.mutable_append_job()->set_job_idx(job_idx);
+                        break;
+                    }
                     case ClientMessage::kAdvanceTo: {
                         require_init(sim);
                         sim->advance_to(req.advance_to().target_time());

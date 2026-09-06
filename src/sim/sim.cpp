@@ -301,6 +301,26 @@ void Simulation::write_resource_trace(const std::string& filename)
 // Public API methods for online/streaming simulation mode
 // Allow external code (e.g., gRPC server) to feed jobs and control simulation
 
+job_no_t Simulation::append_job(sim_time_t submit_time, num_nodes_t num_nodes,
+                                 const std::string& queue, tdiff_t limit_time)
+{
+    if (submit_time < m_current_time) {
+        throw std::runtime_error("Cannot append job with submit_time < current_time. "
+                                "submit_time=" + std::to_string(submit_time) +
+                                " but current_time=" + std::to_string(m_current_time));
+    }
+
+    time_t sec = static_cast<time_t>(submit_time);
+    float frac = submit_time - sec;
+    epoch_t submit_epoch = {sec, frac};
+
+    job_queue_t q;
+    set_by(q, queue);
+
+    return m_trace.append_job(m_current_time, submit_epoch, num_nodes, q,
+                               static_cast<timeout_t>(limit_time));
+}
+
 void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
 {
     // Validate preconditions
@@ -311,12 +331,13 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
                                 std::to_string(m_current_time));
     }
 
-    if (job_idx >= m_trace.data().size()) {
-        throw std::runtime_error("Invalid job_idx: " + std::to_string(job_idx));
-    }
-
     // Submit to scheduler (scheduler maintains internal wait queue)
     // Scheduler uses time_limit as the best estimator for planning
+    // job_at() below throws its own clear, correctly-bounds-checked
+    // error if job_idx is invalid - accounting for m_num_reclaimed,
+    // unlike a manual "job_idx >= m_trace.data().size()" check would
+    // (data().size() is m_data's *current* physical count, not the
+    // total job count ever seen, once anything's been reclaimed).
     auto& job = m_trace.job_at(job_idx);
     tdiff_t run_time_estimate = job.get_limit_time();
     num_nodes_t nodes = job.get_num_nodes();

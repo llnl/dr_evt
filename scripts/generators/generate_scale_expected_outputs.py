@@ -74,6 +74,7 @@ TESTS = [
     "large_200jobs",
     "xlarge_500jobs",
     "huge_2000jobs",
+    "huge_10000jobs",
 ]
 
 
