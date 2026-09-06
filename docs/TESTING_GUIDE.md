@@ -301,6 +301,30 @@ cd build
 
 ---
 
+## Resource History Tests
+
+**Location:** `tests/run_resource_history_tests.sh`
+**Purpose:** Verify the resource-history circular buffer (`--resource_history_capacity`) produces identical output under forced eviction, and that invalid input is rejected cleanly
+
+**How it works:**
+1. Run each input twice: once with the default (auto-sized) capacity, once with a small forced capacity (5) that triggers eviction on nearly every insert
+2. Compare resource traces → must match exactly, for both `simulator` and `tracer`
+3. Separately, feed `tracer` simulation-format input directly (never valid for `run_job_trace()`, which only replays begin_time/end_time that's already set) → must fail cleanly with an actionable error, not crash
+
+**How to run:**
+```bash
+cd build
+../tests/run_resource_history_tests.sh
+```
+
+**Tests hardcoded in script:**
+- `comprehensive/05_multiple_backfills.csv` (simulator)
+- `comprehensive/21_sustained_high_load.csv` (simulator)
+- `scale/huge_2000jobs.csv` (tracer, via simulator's own replay-format output)
+- `scale/huge_2000jobs.csv` (tracer, fed directly - misuse-rejection check)
+
+---
+
 ## Streaming API Tests
 
 **Location:** `tests/`
