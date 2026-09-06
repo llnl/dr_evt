@@ -194,35 +194,12 @@ What to do if an insert would exceed `--wait_queue_capacity`. Only used when
     --wait_queue_capacity 500 --wait_queue_overflow abort
 ```
 
-### `-J, --job_store {vector|circular}`
-Container implementation for the job-record store (`Trace::m_data`) - a
-runtime choice specifically so vector and circular-buffer performance can
-be compared before deciding whether to keep both or replace `std::vector`
-permanently.
-
-**Not yet implemented:** this option is parsed and validated, but not yet
-wired to any actual container change - `circular` currently behaves
-identically to `vector`. See
+### `-K, --job_store_capacity SIZE`
+Initial capacity of the job-record store (`Trace::m_data`, a
+`boost::circular_buffer`, bounding memory via front-only eviction of job
+records already safe to reclaim). See
 [Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
 for the design.
-
-**Options:**
-- `vector` (default) - `std::vector`, unbounded, direct O(1) indexed access
-- `circular` - `boost::circular_buffer`, bounds memory via front-only
-  eviction of job records already safe to reclaim; see `--job_store_capacity`
-  and `--job_store_overflow` below
-
-**Default:** `vector`
-
-**Example:**
-```bash
-./build/simulator traces/jobs.csv --job_store circular --job_store_capacity 1000
-```
-
-### `-K, --job_store_capacity SIZE`
-Initial capacity of the job store. Only used when `--job_store circular`.
-
-**Not yet implemented** - see `--job_store` above.
 
 **Default:** `0`, meaning the size of the job trace - large enough that the
 store can never overflow, since at most one entry is inserted per job.
@@ -232,14 +209,11 @@ allocation; see `--job_store_overflow` for what happens if it's exceeded.
 
 **Example:**
 ```bash
-./build/simulator traces/jobs.csv --job_store circular --job_store_capacity 1000
+./build/simulator traces/jobs.csv --job_store_capacity 1000
 ```
 
 ### `-W, --job_store_overflow {abort|grow}`
-What to do if an insert would exceed `--job_store_capacity`. Only used when
-`--job_store circular`.
-
-**Not yet implemented** - see `--job_store` above.
+What to do if an insert would exceed `--job_store_capacity`.
 
 **Options:**
 - `abort` - end the simulation with a clean error (`std::runtime_error`,
@@ -252,7 +226,7 @@ What to do if an insert would exceed `--job_store_capacity`. Only used when
 **Example:**
 ```bash
 # Fail fast if the job store ever needs more than the pre-sized capacity
-./build/simulator traces/jobs.csv --job_store circular \
+./build/simulator traces/jobs.csv \
     --job_store_capacity 500 --job_store_overflow abort
 ```
 
@@ -439,7 +413,7 @@ Load parameters from a Protobuf `.textproto` configuration file.
 ```
 
 For the full `.textproto` schema, worked examples (including how to set
-`queue_impl`/`wait_queue_capacity`/`wait_queue_overflow`/`job_store` this way),
+`queue_impl`/`wait_queue_capacity`/`wait_queue_overflow`/`job_store_capacity` this way),
 and common configuration patterns, see
 [Protobuf Configuration](protobuf-config.md).
 

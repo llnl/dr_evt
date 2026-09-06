@@ -74,7 +74,7 @@ std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
             break;
         }
 
-        const auto& job = (*m_job_data_ptr)[head];
+        const auto& job = m_trace_ptr->job_at(head);
         num_nodes_t nodes_needed = job.get_num_nodes();
 
         if (nodes_needed <= available_nodes) {
@@ -111,7 +111,7 @@ std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
         return jobs_to_run;
     }
 
-    const auto& head_job = (*m_job_data_ptr)[fcfs_head];
+    const auto& head_job = m_trace_ptr->job_at(fcfs_head);
     num_nodes_t head_nodes = head_job.get_num_nodes();
 
     std::map<job_no_t, sim_time_t> effective_running_jobs = running_jobs;
@@ -132,7 +132,7 @@ std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
         }
 
         job_no_t bf_job = backfill_candidate.value();
-        const auto& bf_job_rec = (*m_job_data_ptr)[bf_job];
+        const auto& bf_job_rec = m_trace_ptr->job_at(bf_job);
         num_nodes_t bf_nodes = bf_job_rec.get_num_nodes();
 
         jobs_to_run.push_back(bf_job);

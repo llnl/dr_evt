@@ -11,7 +11,7 @@
 namespace dr_evt {
 
 LJFScheduler::LJFScheduler(num_nodes_t total_nodes,
-                           const std::vector<Job_Record>& job_data,
+                           const Trace& job_data,
                            BackfillPolicy backfill_policy)
     : SchedulerBase(total_nodes, job_data, backfill_policy),
       m_current_tracked_time(0.0)

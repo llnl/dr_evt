@@ -20,6 +20,7 @@
 #include "trace/data_columns.hpp"
 #include "trace/job_record.hpp"
 #include "trace/dr_event.hpp"
+#include "params/sim_params.hpp" // CircularOverflowPolicy
 
 namespace dr_evt {
 /** \addtogroup dr_evt_trace
@@ -27,13 +28,44 @@ namespace dr_evt {
 
 class Trace {
   public:
-    using trace_data_t = std::vector<Job_Record>;
+    /// Circular buffer, front-only eviction: a job's slot is reclaimed
+    /// once safe (see is_evictable()), same shape as m_ctx.m_resource_history
+    /// but with a real safety check instead of "always safe" - a job may
+    /// still be running when its slot would otherwise be evicted. No
+    /// compaction, no removed flag: out-of-order completions (backfilling)
+    /// just sit in place until every job ahead of them (by job_no) has
+    /// also been evicted - see OUT_TRACE_STREAMING.md.
+    using trace_data_t = boost::circular_buffer<Job_Record>;
     using reserved_t = std::vector<period_t>;
 
   protected:
     const std::string m_fname; ///< Name of the input datafile
     Data_Columns m_dcols; ///< Header info and column filter
     trace_data_t m_data; ///< Job trace data
+
+    /// job_no of the oldest job still physically present in m_data - the
+    /// whole translation layer between the permanent, ever-increasing
+    /// job_no identifiers callers use and m_data's own physical slots:
+    /// job_at(job_no) is just m_data[job_no - m_num_evicted]. Valid only
+    /// because eviction is front-only with no compaction - if it ever
+    /// removed from the middle, this single global offset couldn't
+    /// describe the shift (jobs before vs. after the removed one would
+    /// need different corrections). Advances only via evict_front_jobs().
+    size_t m_num_evicted;
+    size_t m_job_store_capacity; ///< 0 = auto-size to the job trace once loaded
+    bool m_job_store_capacity_resolved;
+    CircularOverflowPolicy m_job_store_overflow; ///< Fallback when the front isn't safe to evict and the buffer's full
+
+    /// Running totals over every is_scheduled() job written via
+    /// write_job_line() - accumulated there (the single choke point for
+    /// both eviction-time and final-flush writes) so an evicted job's
+    /// contribution isn't lost the way iterating m_data after the fact
+    /// would miss it. Sum+count, not the full per-job list - trivial to
+    /// maintain incrementally, same idea as record_resource_sample().
+    num_jobs_t m_completed_count;
+    tdiff_t m_wait_time_sum;
+    tdiff_t m_turnaround_time_sum;
+    sim_time_t m_makespan;
   #if MARK_DAT_PERIOD
     /// Period where resources were unavailable for batch jobs
     reserved_t m_reserved;
@@ -96,6 +128,14 @@ class Trace {
     num_nodes_t m_resource_trace_total_nodes;
     bool m_resource_trace_msec;
 
+    /// Set once start_simulated_trace() opens a real output file - lets
+    /// evict_front_jobs() write each job's line at eviction time, same
+    /// reasoning as m_resource_trace_ofs above: a job's slot may be
+    /// reused before write_simulated_trace()'s old one-pass-at-the-end
+    /// write would ever see it.
+    std::ofstream m_simulated_trace_ofs;
+    bool m_simulated_trace_msec;
+
   public:
     Trace(const std::string& fname);
     Trace(const std::string& fname, const std::string& format);
@@ -108,10 +148,52 @@ class Trace {
     /// Load job trace data from a file
     int load_data(num_jobs_t n_lines_to_read = static_cast<num_jobs_t>(0u));
 
-    /// Allow write access to the job trace data
+    /// Allow write access to the job trace data - for range-based
+    /// iteration only (write_simulated_trace(), print(), etc.). Indexing
+    /// this directly by job_no is wrong once anything's been evicted -
+    /// use job_at(job_no) instead, which translates correctly.
     trace_data_t& data() { return m_data; }
-    /// Allow read-only access to the job trace data
+    /// Allow read-only access to the job trace data - see data() above.
     const trace_data_t& data() const { return m_data; }
+
+    /**
+     * @brief Look up a job by its permanent job_no (not a raw physical
+     * index - those shift as eviction advances). The single choke point
+     * for every job_no-based lookup; throws clearly rather than reading
+     * garbage if job_no was already evicted or was never inserted.
+     */
+    Job_Record& job_at(job_no_t job_no);
+    const Job_Record& job_at(job_no_t job_no) const;
+
+    /// Jobs evicted so far - add to data().size() for the true total
+    /// ever loaded (data().size() alone undercounts once anything's
+    /// been evicted).
+    size_t num_evicted() const { return m_num_evicted; }
+
+    /// Running stats over every is_scheduled() job seen so far via
+    /// write_job_line() (both eviction-time and the final flush) -
+    /// correct even once some jobs have been evicted from m_data, unlike
+    /// re-deriving these by iterating data() directly.
+    num_jobs_t completed_count() const { return m_completed_count; }
+    tdiff_t wait_time_sum() const { return m_wait_time_sum; }
+    tdiff_t turnaround_time_sum() const { return m_turnaround_time_sum; }
+    sim_time_t makespan() const { return m_makespan; }
+
+    /**
+     * @brief Set the initial capacity for the job-record circular buffer.
+     * Call before any processing begins - a no-op once the first job has
+     * already been loaded (capacity is resolved lazily then, from the
+     * job count if this was never called or was called with 0).
+     */
+    void set_job_store_capacity(size_t capacity) {
+        m_job_store_capacity = capacity;
+    }
+
+    /// What to do if the buffer's full and the front job still isn't
+    /// safe to evict (still running) - same convention as the wait queue.
+    void set_job_store_overflow(CircularOverflowPolicy policy) {
+        m_job_store_overflow = policy;
+    }
 
     /**
      *  Run the trace from the begining to the end. i.e., run the simulation
@@ -230,6 +312,36 @@ class Trace {
                                num_nodes_t total_nodes,
                                bool msec = false);
 
+    /**
+     * @brief Open filename early so a job's line gets written the moment
+     * it's evicted from m_data, rather than only at the very end - same
+     * reasoning as start_resource_trace() above. Call once, before any
+     * processing begins.
+     * @param filename Output path; a no-op if empty - jobs evicted
+     *        before write_simulated_trace() is later called are then
+     *        simply discarded (lost), which defeats the whole point of
+     *        this call, so this should always be paired with it once
+     *        m_data can actually evict.
+     * @param msec Format timestamps with millisecond precision instead of
+     *        truncating to whole seconds (matches Sim_Params::m_msec_output)
+     */
+    void start_simulated_trace(const std::string& filename, bool msec = false);
+
+    /**
+     * @brief Write this Trace's job records to a CSV file (same format
+     * write_simulated_trace() always used). If start_simulated_trace()
+     * was already called with the same filename, this only writes
+     * whatever jobs are still currently in m_data and closes the file -
+     * everything evicted mid-run was already written at eviction time.
+     * If start_simulated_trace() was never called, opens filename fresh
+     * and writes m_data's current contents in one shot - the original,
+     * pre-streaming behavior.
+     * @param filename Output path; no-op if empty
+     * @param msec Format timestamps with millisecond precision instead of
+     *        truncating to whole seconds
+     */
+    void write_simulated_trace(const std::string& filename, bool msec = false);
+
   #if MARK_DAT_PERIOD
     std::ostream& print_DAT(std::ostream& os);
   #endif
@@ -287,6 +399,33 @@ class Trace {
     /// always succeeds, unlike a wait queue or job store, which may need an
     /// abort/grow fallback when nothing is currently evictable).
     void record_resource_sample(const epoch_t& time, num_nodes_t allocated);
+
+    /// Resolve m_job_store_capacity (0 -> sized from the job count) and
+    /// call m_data.set_capacity() - once, the first time load_data() or
+    /// insert_job() needs room. A no-op on every call after the first.
+    void resolve_job_store_capacity(num_jobs_t hint);
+
+    /// True if the front-most job's slot can be reclaimed right now:
+    /// rejected (submit_time == unscheduled_sentinel(), will never
+    /// resolve - skip immediately) or genuinely finished
+    /// (end_time <= current_time). False (still running or still
+    /// waiting) means the sweep must stop here - no compaction, so
+    /// nothing later in the buffer can be reclaimed either.
+    bool is_front_evictable(sim_time_t current_time) const;
+
+    /// Evict from the front while is_front_evictable() holds, advancing
+    /// m_num_evicted. Called before every insert (load_data(),
+    /// insert_job()) that might need room. If the buffer is still full
+    /// afterward (front not yet safe), applies m_job_store_overflow -
+    /// same fallback the wait queue already uses for the analogous case.
+    void evict_front_jobs(sim_time_t current_time);
+
+    /// Write one job's line to m_simulated_trace_ofs (if open and the
+    /// job is_scheduled() - unscheduled/rejected jobs were never written
+    /// by the original write_simulated_trace() either). The single
+    /// choke point both evict_front_jobs() and write_simulated_trace()
+    /// go through.
+    void write_job_line(const Job_Record& job);
 };
 
 /**@}*/

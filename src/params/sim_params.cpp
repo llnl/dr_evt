@@ -20,7 +20,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MJ:K:W:H:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -35,7 +35,6 @@ static const struct option longopts[] = {
     {"block_size",            required_argument,  0, 'Q'},
     {"wait_queue_capacity",     required_argument,  0, 'A'},
     {"wait_queue_overflow",     required_argument,  0, 'G'},
-    {"job_store",             required_argument,  0, 'J'},
     {"job_store_capacity",    required_argument,  0, 'K'},
     {"job_store_overflow",    required_argument,  0, 'W'},
     {"resource_history_capacity", required_argument, 0, 'H'},
@@ -64,7 +63,6 @@ Sim_Params::Sim_Params()
     m_block_size(128),
     m_wait_queue_capacity(0),  // 0 = size of job trace (never overflows)
     m_wait_queue_overflow(CircularOverflowPolicy::GROW),
-    m_job_store_impl(JobStoreImpl::VECTOR),  // Default: preserve current behavior
     m_job_store_capacity(0),  // 0 = size of job trace (never overflows)
     m_job_store_overflow(CircularOverflowPolicy::GROW),
     m_resource_history_capacity(0),
@@ -196,20 +194,6 @@ void Sim_Params::getopt(int& argc, char** &argv)
                     } else {
                         std::cerr << "Unknown wait_queue_overflow policy: " << policy << std::endl;
                         std::cerr << "Valid options: 'abort', 'grow' (default)" << std::endl;
-                        print_usage(argv[0], 1);
-                    }
-                }
-                break;
-            case 'J': /* --job_store */
-                {
-                    std::string impl(optarg);
-                    if (impl.empty() || impl == "vector") {
-                        m_job_store_impl = JobStoreImpl::VECTOR;
-                    } else if (impl == "circular") {
-                        m_job_store_impl = JobStoreImpl::CIRCULAR;
-                    } else {
-                        std::cerr << "Unknown job_store implementation: " << impl << std::endl;
-                        std::cerr << "Valid options: 'vector' (default), 'circular'" << std::endl;
                         print_usage(argv[0], 1);
                     }
                 }
@@ -425,23 +409,18 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        entries over.\n"
         "        Only used when --queue_impl=circular\n"
         "\n"
-        "    -J, --job_store {vector|circular}\n"
-        "        Container implementation for the job-record store\n"
-        "        (default: vector). circular bounds memory via front-only\n"
-        "        eviction of jobs already safe to reclaim - capacity-driven,\n"
-        "        never on every insert.\n"
-        "\n"
         "    -K, --job_store_capacity SIZE\n"
-        "        Initial capacity of the job store (default: 0, meaning the\n"
-        "        size of the job trace - large enough it can never overflow).\n"
-        "        Only used when --job_store=circular\n"
+        "        Initial capacity of the job-record store (Trace::m_data,\n"
+        "        a boost::circular_buffer). Bounds memory via front-only\n"
+        "        eviction of jobs already safe to reclaim - capacity-driven,\n"
+        "        never on every insert. Default: 0, meaning the size of the\n"
+        "        job trace - large enough it can never overflow.\n"
         "\n"
         "    -W, --job_store_overflow {abort|grow}\n"
         "        What to do if an insert would exceed job_store_capacity\n"
         "        (default: grow). abort: end the simulation with an error.\n"
         "        grow: reallocate to a larger capacity, copying existing\n"
         "        entries over.\n"
-        "        Only used when --job_store=circular\n"
         "\n"
         "    -H, --resource_history_capacity SIZE\n"
         "        Initial capacity of the resource-history circular buffer\n"

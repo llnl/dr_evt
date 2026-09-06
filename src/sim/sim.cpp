@@ -24,7 +24,7 @@ Simulation::Simulation(const Sim_Params& params)
             params.m_timestamp_format, params.m_timezone),
     m_scheduler(create_scheduler(
         params.m_total_nodes,
-        m_trace.data(),
+        m_trace,
         params.m_backfill_policy,
         params.m_priority_policy,
         params.m_queue_impl,
@@ -47,6 +47,13 @@ void Simulation::run()
         std::cout << "Starting simulation..." << std::endl;
     }
 
+    // Must happen before initialize_trace() (which calls load_data(),
+    // which resolves m_data's capacity from whatever's set here) -
+    // unlike resource-history's capacity, which is only needed once
+    // recording starts, well after load.
+    m_trace.set_job_store_capacity(m_params.m_job_store_capacity);
+    m_trace.set_job_store_overflow(m_params.m_job_store_overflow);
+
     // Initialize: load jobs and determine durations
     initialize_trace();
 
@@ -62,6 +69,11 @@ void Simulation::run()
     m_trace.start_resource_trace(m_params.get_resource_trace(), m_params.m_total_nodes,
                                   m_params.m_msec_output);
 
+    // Same reasoning, for job records: m_data can now evict too, so the
+    // output file needs to be open before that ever happens, not only
+    // at the very end.
+    m_trace.start_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
+
     if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
         // Replay-format input (begin_time/end_time present): don't consult
         // the scheduler at all - reuse the same bypass logic the standalone
@@ -73,7 +85,7 @@ void Simulation::run()
         // Batch mode: Submit all jobs upfront, then advance to infinity
         // This uses the streaming API internally
         for (num_jobs_t i = 0; i < m_trace.data().size(); ++i) {
-            const auto& job = m_trace.data()[i];
+            const auto& job = m_trace.job_at(i);
             sim_time_t submit_time = convert_epoch<sim_time_t>(job.get_submit_time());
             submit_job(i, submit_time);
         }
@@ -83,14 +95,11 @@ void Simulation::run()
         advance_to(std::numeric_limits<sim_time_t>::max());
     }
 
-    // Count actual completions from trace data
-    m_jobs_completed = 0;
-    for (const auto& job : m_trace.data()) {
-        if (job.is_scheduled()) {
-            m_jobs_completed++;
-        }
-    }
-
+    // m_jobs_completed is tracked incrementally during the run itself
+    // (see the event-processing loop above) - no need to recompute it
+    // here, and doing so by iterating m_trace.data() directly would
+    // now be wrong anyway, since evicted jobs are no longer there to
+    // recount.
     if (m_params.m_verbose) {
         std::cout << "Simulation complete\n" +
                      std::string("Jobs submitted: ") + std::to_string(m_jobs_submitted) + "\n" +
@@ -101,39 +110,23 @@ void Simulation::run()
 void Simulation::print_stats(std::ostream& os) const
 {
     os << "=== Simulation Statistics ===" << std::endl;
-    os << "Total jobs: " << m_trace.data().size() << std::endl;
+    os << "Total jobs: " << (m_trace.data().size() + m_trace.num_evicted()) << std::endl;
     os << "Jobs submitted: " << m_jobs_submitted << std::endl;
-    os << "Jobs completed: " << m_jobs_completed << std::endl;
+    // m_trace.completed_count() (populated via write_job_line(), called
+    // both at eviction time and by write_simulated_trace()'s final
+    // flush - already run by the time this is called, see sim.cpp's
+    // caller) counts every completed job regardless of whether it's
+    // since been evicted from m_data - m_jobs_completed only tracks
+    // in-flight completions during the run itself and isn't used here.
+    os << "Jobs completed: " << m_trace.completed_count() << std::endl;
     os << "Current time: " << format_sim_time(m_current_time, m_params.m_msec_output) << std::endl;
     os << "Total nodes: " << m_params.m_total_nodes << std::endl;
 
-    // Calculate metrics
-    if (m_jobs_completed > 0) {
-        tdiff_t total_wait = 0.0;
-        tdiff_t total_turnaround = 0.0;
-        sim_time_t makespan = 0.0;
-
-        for (const auto& job : m_trace.data()) {
-            // Job_Record::is_scheduled() (backed by a dedicated max-value
-            // sentinel, not end_time == 0) is the correct check here: a
-            // job legitimately starting at simulation time 0 previously
-            // got excluded by an end_time/begin_time == 0 check, since 0
-            // is also a real, valid timestamp - not a reliable "never
-            // ran" marker. This also keeps this loop's sum and
-            // m_jobs_completed (the denominator below) using the exact
-            // same criterion, since m_jobs_completed above is now also
-            // counted via is_scheduled().
-            if (!job.is_scheduled()) continue;  // Job never completed
-
-            tdiff_t wait = job.get_wait_time();
-            total_wait += wait;
-
-            tdiff_t turnaround = wait + job.get_actual_run_time();
-            total_turnaround += turnaround;
-
-            makespan = std::max(makespan,
-                convert_epoch<sim_time_t>(job.get_begin_time()) + job.get_actual_run_time());
-        }
+    // Calculate metrics - sum+count already accumulated incrementally in
+    // Trace as each job was written out (see write_job_line()), so this
+    // is correct even for jobs already evicted from m_data by now.
+    if (m_trace.completed_count() > 0) {
+        const auto completed = m_trace.completed_count();
 
         // Unlike Current time/Makespan above, these are computed averages
         // (division results), which commonly have a fractional part even
@@ -144,9 +137,9 @@ void Simulation::print_stats(std::ostream& os) const
         // format_sim_time (whose integer-truncation default is for
         // matching existing trace-output files' conventions, not for
         // these summary statistics).
-        os << "Average wait time: " << (total_wait / m_jobs_completed) << " sec" << std::endl;
-        os << "Average turnaround time: " << (total_turnaround / m_jobs_completed) << " sec" << std::endl;
-        os << "Makespan: " << format_sim_time(makespan, m_params.m_msec_output) << " sec" << std::endl;
+        os << "Average wait time: " << (m_trace.wait_time_sum() / completed) << " sec" << std::endl;
+        os << "Average turnaround time: " << (m_trace.turnaround_time_sum() / completed) << " sec" << std::endl;
+        os << "Makespan: " << format_sim_time(m_trace.makespan(), m_params.m_msec_output) << " sec" << std::endl;
     }
 
     // Queue length statistics
@@ -175,12 +168,9 @@ num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
                                m_params.m_max_jobs :
                                static_cast<num_jobs_t>(0u));
 
-    if (max_num_jobs == 0u) {
-        m_trace.data().reserve(1467542u);
-    } else {
-        m_trace.data().reserve(max_num_jobs);
-    }
-
+    // No .reserve() here anymore - load_data() sizes m_data's capacity
+    // itself (resolve_job_store_capacity()), same convention as the wait
+    // queue and resource-history.
     int rc = m_trace.load_data(max_num_jobs);
     if (rc != EXIT_SUCCESS) {
         throw std::runtime_error("Failed to load trace data");
@@ -284,60 +274,11 @@ tdiff_t Simulation::sample_run_time(
     }
 }
 
-void Simulation::write_simulated_trace() const
+void Simulation::write_simulated_trace()
 {
-    std::string outfile = m_params.get_outfile();
-    if (outfile.empty()) {
-        return;
-    }
-
-    std::ofstream ofs(outfile);
-    if (!ofs) {
-        std::cerr << "Failed to open output file: " << outfile << std::endl;
-        return;
-    }
-
-    // Batch lines into a block buffer before writing, matching
-    // job_io.cpp::print()'s pattern - far fewer I/O calls than one
-    // ofs << per job, which matters once the trace holds many thousands
-    // of jobs.
-    const size_t blk_sz = 65536ul;
-    std::string buf;
-    buf.reserve(blk_sz + 4096);
-
-    buf += "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
-
-    // Write job records - only for jobs that actually ran. A rejected-at-
-    // submit-time or otherwise never-scheduled job's begin_time/end_time
-    // is Job_Record::unscheduled_sentinel(), an internal marker never
-    // meant to be treated as a real timestamp or written out as one -
-    // job.is_scheduled() (backed by m_is_simulated, the flag the scheduler
-    // sets via set_begin_time() once it actually assigns this job a real
-    // start time) is the same check used elsewhere in this class to tell
-    // "ran" from "never ran".
-    for (const auto& job : m_trace.data()) {
-        if (!job.is_scheduled()) {
-            continue;
-        }
-        buf += format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_params.m_msec_output) + "," +
-               format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_params.m_msec_output) + "," +
-               format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_params.m_msec_output) + "," +
-               std::to_string(job.get_num_nodes()) + "," +
-               "0," +
-               dr_evt::to_string(job.get_queue()) + "," +
-               format_sim_time(job.get_limit_time(), m_params.m_msec_output) + "\n";
-        if (buf.size() >= blk_sz) {
-            ofs << buf;
-            buf.clear();
-        }
-    }
-
-    if (!buf.empty()) {
-        ofs << buf;
-    }
-
-    if (m_params.m_verbose) {
-        std::cout << "Simulated trace written to: " << outfile << std::endl;
+    m_trace.write_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
+    if (m_params.m_verbose && !m_params.get_outfile().empty()) {
+        std::cout << "Simulated trace written to: " << m_params.get_outfile() << std::endl;
     }
 }
 
@@ -376,7 +317,7 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
 
     // Submit to scheduler (scheduler maintains internal wait queue)
     // Scheduler uses time_limit as the best estimator for planning
-    const auto& job = m_trace.data()[job_idx];
+    auto& job = m_trace.job_at(job_idx);
     tdiff_t run_time_estimate = job.get_limit_time();
     num_nodes_t nodes = job.get_num_nodes();
 
@@ -389,6 +330,12 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         // begin_time/end_time would stay at unscheduled_sentinel()
         // forever - exactly the "reaches output still unresolved" state
         // that shouldn't be possible.
+        //
+        // Also mark submit_time as the sentinel: m_data's front-eviction
+        // sweep treats that as "skip immediately, will never resolve" -
+        // otherwise a rejected job at the front would stall the sweep
+        // forever, since end_time never resolves for it either.
+        job.set_submit_time(Job_Record::unscheduled_sentinel());
         std::cerr << "Job " << job_idx << " rejected: requests " << nodes
                   << " nodes, exceeds total_nodes (" << m_params.m_total_nodes
                   << "); this job can never be scheduled." << std::endl;

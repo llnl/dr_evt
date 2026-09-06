@@ -8,14 +8,20 @@
 #include <algorithm>
 #include <fstream>
 #include "trace/job_io.hpp"
+#include "trace/parse_utils.hpp" // to_string(job_queue_t) - used by write_job_line()
 #include "trace/trace.hpp"
 
 namespace dr_evt {
 
 Trace::Trace(const std::string& fname)
-  : m_fname(fname), m_default_timezone("+00:00"),
+  : m_fname(fname),
+    m_num_evicted(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
+    m_job_store_overflow(CircularOverflowPolicy::GROW),
+    m_completed_count(0), m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
+    m_default_timezone("+00:00"),
     m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
-    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false),
+    m_simulated_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -24,9 +30,14 @@ Trace::Trace(const std::string& fname)
 }
 
 Trace::Trace(const std::string& fname, const std::string& format)
-  : m_fname(fname), m_dcols(format), m_default_timezone("+00:00"),
+  : m_fname(fname), m_dcols(format),
+    m_num_evicted(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
+    m_job_store_overflow(CircularOverflowPolicy::GROW),
+    m_completed_count(0), m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
+    m_default_timezone("+00:00"),
     m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
-    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false),
+    m_simulated_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -37,9 +48,13 @@ Trace::Trace(const std::string& fname, const std::string& format)
 Trace::Trace(const std::string& fname, const std::string& format,
              const std::string& timestamp_format, const std::string& timezone)
   : m_fname(fname), m_dcols(format, timestamp_format, timezone),
+    m_num_evicted(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
+    m_job_store_overflow(CircularOverflowPolicy::GROW),
+    m_completed_count(0), m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
     m_default_timezone("+00:00"),  // Default to UTC
     m_resource_history_capacity(0), m_resource_history_capacity_resolved(false),
-    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false)
+    m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)), m_resource_trace_msec(false),
+    m_simulated_trace_msec(false)
 {
     if (!m_dcols.check_header(fname)) {
         std::string err = "Failed to initialize data columns";
@@ -47,19 +62,59 @@ Trace::Trace(const std::string& fname, const std::string& format,
     }
 }
 
+void Trace::resolve_job_store_capacity(num_jobs_t hint)
+{
+    if (m_job_store_capacity_resolved) {
+        return;
+    }
+    size_t cap = m_job_store_capacity;
+    if (cap == 0) {
+        // Auto-size: one slot per job, large enough that eviction is
+        // never needed purely to make room for a fully-preloaded batch
+        // run - matches the "0 = size of job trace" convention the wait
+        // queue and resource-history both use. Floored at 4096 for the
+        // same reason resource-history is: hint may still be small (or
+        // 0) early in a genuinely streaming session.
+        cap = std::max<size_t>(static_cast<size_t>(hint), 4096ul);
+    }
+    m_data.set_capacity(cap);
+    m_job_store_capacity_resolved = true;
+}
+
 int Trace::load_data(num_jobs_t n_lines_to_read)
 {
-    int rc = load(m_fname, m_dcols, m_data, n_lines_to_read);
+    // load() expects a std::vector - load into one, sort it (as before),
+    // then transfer into m_data (the circular buffer). Nothing's
+    // evictable yet at this point (no processing has happened), so if
+    // an explicit --job_store_capacity is smaller than the job count,
+    // m_job_store_overflow's abort/grow fallback applies here exactly
+    // as it would mid-run.
+    std::vector<Job_Record> loaded;
+    int rc = load(m_fname, m_dcols, loaded, n_lines_to_read);
 
   #if LIMIT_VS_EXEC_TIME_ONLY
-    print_limit_vs_exec_time(m_dcols.get_cols_to_read(), ctx.data());
+    print_limit_vs_exec_time(m_dcols.get_cols_to_read(), loaded);
     return rc;
   #endif
 
     // Order job records by the submit time
     // IMPORTANT: FCFS policy implementation in sim/scheduler.cpp depends on this
     // sorting to avoid re-sorting on every schedule() call
-    std::stable_sort(m_data.begin(), m_data.end());
+    std::stable_sort(loaded.begin(), loaded.end());
+
+    resolve_job_store_capacity(static_cast<num_jobs_t>(loaded.size()));
+    for (auto& job : loaded) {
+        if (m_data.full()) {
+            if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
+                throw std::runtime_error(
+                    "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
+                    ") exceeded while loading " + std::to_string(loaded.size()) +
+                    " jobs; use --job_store_overflow grow or a larger --job_store_capacity");
+            }
+            m_data.set_capacity(std::max<size_t>(m_data.capacity() * 2, 1));
+        }
+        m_data.push_back(std::move(job));
+    }
 
     return rc;
 }
@@ -103,7 +158,7 @@ void Trace::process_events_until(const epoch_t& t_sub)
             // Process events upto the current submission time
             break;
         }
-        const auto& job_of_evt = m_data[cur->get_job_idx()];
+        const auto& job_of_evt = job_at(cur->get_job_idx());
       #if MARK_DAT_PERIOD
         const auto job_q = job_of_evt.get_queue();
       #endif
@@ -122,7 +177,7 @@ void Trace::process_events_until(const epoch_t& t_sub)
                     m_ctx.m_dat_start = cur->get_time();
                     m_ctx.m_dat_span = 0.0;
                 }
-                m_data[cur->get_job_idx()].set_busy_nodes(total_nodes, true);
+                job_at(cur->get_job_idx()).set_busy_nodes(total_nodes, true);
                 m_ctx.m_pAll_cnt ++;
             } else {
                 m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
@@ -152,12 +207,20 @@ void Trace::process_events_until(const epoch_t& t_sub)
             m_ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
           #endif
         }
+        const bool was_departure = !cur->is_arrival();
         const epoch_t event_time = t; // copy: erase() below invalidates t
         m_ctx.m_evtq.erase(cur); // Remove processed event from the queue
         record_resource_sample(event_time, m_ctx.m_n_nodes_in_use);
       #if MARK_DAT_PERIOD
         m_ctx.m_prev_job_q = job_q;
       #endif
+        if (was_departure) {
+            // Same reasoning as process_single_event(): only a departure
+            // can newly unblock the front.
+            sim_time_t current_time = static_cast<sim_time_t>(event_time.first) +
+                                       event_time.second;
+            evict_front_jobs(current_time);
+        }
     }
 }
 
@@ -213,7 +276,7 @@ void Trace::run_job_trace(const std::string& resource_trace_file, num_nodes_t to
 
 void Trace::insert_job(job_no_t job_idx, sim_time_t start_time)
 {
-    auto& job = m_data[job_idx];
+    auto& job = job_at(job_idx);
 
     // Ensure job has actual_run_time set
     // In streaming mode, this would be determined here
@@ -240,8 +303,8 @@ void Trace::insert_job(job_no_t job_idx, sim_time_t start_time)
     m_ctx.m_evtq.emplace(job_idx, end_epoch, departure);
 
     // Update job record with computed times (for output)
-    m_data[job_idx].set_begin_time(start_epoch);
-    m_data[job_idx].compute_end_time();
+    job_at(job_idx).set_begin_time(start_epoch);
+    job_at(job_idx).compute_end_time();
 }
 
 void Trace::run_until_exclusive(sim_time_t target_time)
@@ -284,7 +347,7 @@ bool Trace::process_single_event()
     m_ctx.m_evtq.erase(it);
 
     // Process this event using replay engine's accounting logic
-    const auto& job = m_data[event.get_job_idx()];
+    const auto& job = job_at(event.get_job_idx());
 
     if (event.is_arrival()) {
         // START event: allocate nodes (same logic as process_events_until)
@@ -294,6 +357,15 @@ bool Trace::process_single_event()
         m_ctx.m_n_nodes_in_use -= job.get_num_nodes();
     }
     record_resource_sample(event.get_time(), m_ctx.m_n_nodes_in_use);
+
+    if (!event.is_arrival()) {
+        // A job just finished - its slot (or one ahead of it, by job_no)
+        // may now be safe to evict. Only departures can possibly unblock
+        // the front; checking on arrivals too would just be wasted work.
+        sim_time_t current_time = static_cast<sim_time_t>(event.get_time().first) +
+                                   event.get_time().second;
+        evict_front_jobs(current_time);
+    }
 
     return true;
 }
@@ -393,6 +465,137 @@ void Trace::record_resource_sample(const epoch_t& time, num_nodes_t allocated)
     m_ctx.m_resource_history.push_back(std::make_pair(time, allocated));
 }
 
+Job_Record& Trace::job_at(job_no_t job_no)
+{
+    if (job_no < m_num_evicted) {
+        throw std::runtime_error(
+            "Trace::job_at(): job_no=" + std::to_string(job_no) +
+            " was already evicted (m_num_evicted=" + std::to_string(m_num_evicted) + ")");
+    }
+    const size_t idx = static_cast<size_t>(job_no - m_num_evicted);
+    if (idx >= m_data.size()) {
+        throw std::runtime_error(
+            "Trace::job_at(): job_no=" + std::to_string(job_no) +
+            " does not exist yet (only " + std::to_string(m_data.size()) +
+            " jobs currently present)");
+    }
+    return m_data[idx];
+}
+
+const Job_Record& Trace::job_at(job_no_t job_no) const
+{
+    return const_cast<Trace*>(this)->job_at(job_no);
+}
+
+bool Trace::is_front_evictable(sim_time_t current_time) const
+{
+    if (m_data.empty()) {
+        return false;
+    }
+    const auto& job = m_data.front();
+    // Rejected (submit_time == unscheduled_sentinel()): will never
+    // resolve, skip immediately rather than block the sweep forever.
+    if (job.get_submit_time() == Job_Record::unscheduled_sentinel()) {
+        return true;
+    }
+    // Genuinely finished.
+    return convert_epoch<sim_time_t>(job.get_end_time()) <= current_time;
+}
+
+void Trace::evict_front_jobs(sim_time_t current_time)
+{
+    // Only reclaim when actually needed - not proactively the moment a
+    // job finishes. Same "only when full" gating as resource-history's
+    // record_resource_sample(); without it, every completion would
+    // evict immediately even with plenty of room left, discarding data
+    // (write_simulated_trace(), stats) that hasn't been read yet.
+    if (!m_data.full()) {
+        return;
+    }
+    while (m_data.full() && is_front_evictable(current_time)) {
+        write_job_line(m_data.front());
+        m_data.pop_front();
+        ++m_num_evicted;
+    }
+    // No compaction: if still full and the front isn't evictable, that's
+    // exactly the case m_job_store_overflow exists for - same fallback
+    // the wait queue already uses.
+    if (m_data.full()) {
+        if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
+            throw std::runtime_error(
+                "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
+                ") exceeded and the front job isn't safe to evict yet; "
+                "use --job_store_overflow grow or a larger --job_store_capacity");
+        }
+        m_data.set_capacity(std::max<size_t>(m_data.capacity() * 2, 1));
+    }
+}
+
+void Trace::write_job_line(const Job_Record& job)
+{
+    if (!job.is_scheduled()) {
+        // Rejected-at-submit-time or otherwise never-run: excluded from
+        // both the output file and every running stat below - same
+        // filter write_simulated_trace() always used.
+        return;
+    }
+    ++m_completed_count;
+    const tdiff_t wait = job.get_wait_time();
+    m_wait_time_sum += wait;
+    m_turnaround_time_sum += wait + job.get_actual_run_time();
+    m_makespan = std::max(m_makespan,
+        convert_epoch<sim_time_t>(job.get_begin_time()) + job.get_actual_run_time());
+
+    if (!m_simulated_trace_ofs.is_open()) {
+        return; // nobody asked for the output file, but stats above still count
+    }
+    std::string line =
+        format_sim_time(convert_epoch<sim_time_t>(job.get_submit_time()), m_simulated_trace_msec) + "," +
+        format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_simulated_trace_msec) + "," +
+        format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_simulated_trace_msec) + "," +
+        std::to_string(job.get_num_nodes()) + "," +
+        "0," +
+        dr_evt::to_string(job.get_queue()) + "," +
+        format_sim_time(job.get_limit_time(), m_simulated_trace_msec) + "\n";
+    m_simulated_trace_ofs << line;
+}
+
+void Trace::start_simulated_trace(const std::string& filename, bool msec)
+{
+    if (filename.empty()) {
+        return;
+    }
+    if (m_simulated_trace_ofs.is_open()) {
+        return; // already started - see start_resource_trace()'s own comment
+    }
+    m_simulated_trace_ofs.open(filename);
+    if (!m_simulated_trace_ofs) {
+        std::cerr << "Failed to open output file: " << filename << std::endl;
+        return;
+    }
+    m_simulated_trace_msec = msec;
+    std::string header = "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
+    m_simulated_trace_ofs << header;
+}
+
+void Trace::write_simulated_trace(const std::string& filename, bool msec)
+{
+    if (filename.empty()) {
+        return;
+    }
+    if (!m_simulated_trace_ofs.is_open()) {
+        // start_simulated_trace() was never called - open fresh here and
+        // write m_data's current contents in one shot (the original,
+        // pre-streaming behavior). Anything already evicted before this
+        // call is already gone.
+        start_simulated_trace(filename, msec);
+    }
+    for (const auto& job : m_data) {
+        write_job_line(job);
+    }
+    m_simulated_trace_ofs.close();
+}
+
 void Trace::write_resource_trace(const std::string& filename,
                                   num_nodes_t total_nodes, bool msec)
 {
@@ -428,8 +631,8 @@ std::ostream& Trace::print_span(std::ostream& os) const
     const auto t_last_submit = m_data.back().get_submit_time();
     auto t_last = t_last_submit; // the last end time of all the jobs
 
-    auto rit = m_data.crbegin();
-    const auto rit_end = m_data.crend();
+    auto rit = m_data.rbegin();
+    const auto rit_end = m_data.rend();
 
     // considering jobs that may start as much as three days later than the
     // submission. (i.e., waiting for a weekend DAT to finish)

@@ -37,7 +37,7 @@ sim_time_t SchedulerBase::calculate_fcfs_reservation(
     end_events.reserve(running_jobs.size());
 
     for (const auto& [job_idx, start_time] : running_jobs) {
-        const auto& job = (*m_job_data_ptr)[job_idx];
+        const auto& job = m_trace_ptr->job_at(job_idx);
         tdiff_t run_time = get_duration_estimate(job_idx);
         sim_time_t end_time = start_time + run_time;
         num_nodes_t nodes = job.get_num_nodes();
@@ -77,7 +77,7 @@ const char* queue_impl_name(QueueImplementation impl) {
 
 std::unique_ptr<SchedulerBase> create_scheduler(
     num_nodes_t total_nodes,
-    const std::vector<Job_Record>& job_data,
+    const Trace& job_data,
     BackfillPolicy backfill_policy,
     PriorityPolicy priority_policy,
     QueueImplementation queue_impl,

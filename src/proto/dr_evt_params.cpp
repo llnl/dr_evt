@@ -207,27 +207,13 @@ static void set_sim_options(
         sp.m_wait_queue_overflow = CircularOverflowPolicy::GROW;
     }
 
-    // Job-record store implementation (default: VECTOR)
-    if (!cfg.job_store().empty()) {
-        std::string impl = cfg.job_store();
-        if (impl == "vector") {
-            sp.m_job_store_impl = JobStoreImpl::VECTOR;
-        } else if (impl == "circular") {
-            sp.m_job_store_impl = JobStoreImpl::CIRCULAR;
-        } else {
-            throw std::runtime_error("Unknown job_store in protobuf: " + impl);
-        }
-    } else {
-        sp.m_job_store_impl = JobStoreImpl::VECTOR;
-    }
-
-    // Initial capacity if job_store=circular (0 means use default from
+    // Initial capacity for the job-record store (0 means use default from
     // Sim_Params constructor - size of the job trace)
     if (cfg.job_store_capacity() > 0) {
         sp.m_job_store_capacity = cfg.job_store_capacity();
     }
 
-    // job_store=circular overflow policy (default: GROW)
+    // Job-store overflow policy (default: GROW)
     if (!cfg.job_store_overflow().empty()) {
         std::string policy = cfg.job_store_overflow();
         if (policy == "abort") {

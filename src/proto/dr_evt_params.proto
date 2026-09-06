@@ -58,14 +58,19 @@ message DR_EVT_Params {
         // What to do if a circular queue insert would exceed wait_queue_capacity
         string wait_queue_overflow = 21;  // "abort" or "grow" (default: "grow")
 
-        // Container implementation for the job-record store (Trace::m_data)
-        string job_store = 22;          // "vector" or "circular" (default: "vector")
+        // Field 22 was "job_store" ("vector" or "circular"), a runtime
+        // choice for Trace::m_data's container - removed once m_data
+        // became unconditionally boost::circular_buffer, with no vector
+        // path left to choose between. Not reused for anything else.
+        reserved 22;
+        reserved "job_store";
 
-        // Initial capacity if job_store=circular. 0 means the size of the
-        // job trace (large enough it can never overflow).
+        // Initial capacity for the job-record store (Trace::m_data, a
+        // boost::circular_buffer). 0 means the size of the job trace
+        // (large enough it can never overflow).
         uint64 job_store_capacity = 23; // (default: 0)
 
-        // What to do if a job_store=circular insert would exceed job_store_capacity
+        // What to do if a job-store insert would exceed job_store_capacity
         string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
 
         // Initial capacity for the resource-history circular buffer. 0

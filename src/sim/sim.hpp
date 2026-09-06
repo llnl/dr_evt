@@ -96,7 +96,7 @@ class Simulation {
     /**
      * Write simulated job trace to CSV file
      */
-    void write_simulated_trace() const;
+    void write_simulated_trace();
 
     /**
      * Write resource state trace to file
