@@ -3,7 +3,7 @@
 #
 # Tests the dr_evt_server/dr_evt_client gRPC streaming interface:
 # - A basic, single-pair server/client session (no MPI) - dr_evt_client
-#   demonstrates genuine append: it reads job data from a file *only*
+#   demonstrates append: it reads job data from a file *only*
 #   client-side and sends each job to the server via AppendJobRequest,
 #   which has never loaded that file itself (no InitializeTraceRequest
 #   is sent at all - see dr_evt_client.cpp)

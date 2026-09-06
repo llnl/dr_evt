@@ -12,7 +12,7 @@ DR_EVT has tests organized by purpose:
 - **Replay (3, verified against more)** - Verify replay reproduces simulation
 - **Resource History (5)** - Resource-history circular buffer, flush overhead
 - **Job Store (6)** - Job-record circular buffer, capacity sizing correctness
-- **Append-Job (8)** - Genuine streaming insertion (append_job) + submit_job()/advance_to() correctness
+- **Append-Job (15)** - Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() correctness
 
 Note: "Correctness" below refers to matching the Python reference
 implementation's output, not independent mathematical verification - see
@@ -42,7 +42,7 @@ cd build && cmake .. && make -j4
 # Run job-store circular buffer tests
 ./tests/run_job_store_tests.sh
 
-# Run append-job (genuine streaming) tests
+# Run append-job (streaming) tests
 ./tests/run_append_job_tests.sh
 ```
 
@@ -203,17 +203,17 @@ See "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for h
 
 ---
 
-### 9. Append-Job (Genuine Streaming) Tests (8 tests)
+### 9. Append-Job Tests (15 tests)
 
-**Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` - the real streaming insertion point for a job the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()` rather than a preloaded file. Consolidates what used to be a separate `test_streaming_api.cpp` - its coverage never actually depended on jobs coming from a preloaded file, so it's achieved here with no file needed.
+**Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` (single-job) and `Trace::append_jobs()`/`Simulation::append_jobs()` (batch) - the real streaming insertion points for jobs the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()`/`append_jobs()` rather than a preloaded file. Consolidates what used to be a separate `test_streaming_api.cpp` - its coverage never actually depended on jobs coming from a preloaded file, so it's achieved here with no file needed.
 
 **Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_append_job_grpc.cpp` (gRPC, only built with `-DDR_EVT_ENABLE_GRPC=ON`)
 
 **Runner:** `./tests/run_append_job_tests.sh`
 
-**Status:** ✅ 8/8 passing (100%) - the gRPC sub-test skips gracefully (not a failure) if gRPC wasn't built
+**Status:** ✅ 13/13 passing (100%) - the gRPC sub-test skips gracefully (not a failure) if gRPC wasn't built
 
-See "Append-Job (Genuine Streaming) Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
+See "Append-Job Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
 
 ---
 
@@ -229,8 +229,8 @@ See "Append-Job (Genuine Streaming) Tests" in [docs/TESTING_GUIDE.md](../docs/TE
 | Replay | 3 (+4 more verified) | ✅ 3/3 | Determinism verification |
 | Resource History | 5 | ✅ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
-| Append-Job | 8 | ✅ 8/8 | Genuine streaming insertion + submit_job()/advance_to() |
-| **TOTAL** | **77** | **77/77** all passing | - |
+| Append-Job | 15 | ✅ 15/15 | Streaming insertion (single+batch) + submit_job()/advance_to() |
+| **TOTAL** | **84** | **84/84** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
@@ -398,7 +398,7 @@ run_feature_tests.sh       # feature/ tests
 run_replay_tests.sh        # replay methodology (hardcodes 3 comprehensive/ tests)
 run_configs_tests.sh       # protobuf config tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON)
 run_python_tests.sh        # python API tests (requires -DDR_EVT_BUILD_PYTHON=ON; not verified in this pass)
-run_append_job_tests.sh    # append_job() genuine-streaming tests (C++ + gRPC, if built with -DDR_EVT_ENABLE_GRPC=ON)
+run_append_job_tests.sh    # append_job() streaming tests (C++ + gRPC, if built with -DDR_EVT_ENABLE_GRPC=ON)
 run_grpc_tests.sh          # gRPC client/server tests (requires -DDR_EVT_ENABLE_GRPC=ON)
 test_all_dr_evt.sh         # comprehensive/ tests (see below)
 test_fcfs_comprehensive.sh # queue implementation differential testing (see below)
@@ -495,8 +495,8 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Scale | 7 | ✓ 7/7 | Large-scale tests |
 | Resource History | 5 | ✓ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
-| Append-Job | 8 | ✓ 8/8 | Genuine streaming insertion + submit_job()/advance_to() |
-| **Total** | **77** | **77/77** | All tests passing as of 2026-09-06 |
+| Append-Job | 15 | ✓ 15/15 | Streaming insertion (single+batch) + submit_job()/advance_to() |
+| **Total** | **84** | **84/84** | All tests passing as of 2026-09-06 |
 
 ## Prerequisites
 

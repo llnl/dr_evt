@@ -1,5 +1,5 @@
 #!/bin/bash
-# Append-Job (Genuine Streaming) Tests
+# Append-Job Tests
 #
 # Trace::append_job()/Simulation::append_job() is the real streaming
 # insertion point: a brand-new Job_Record for a job the trace has never
@@ -17,7 +17,7 @@
 #    section for why).
 # 3. (C++ API) append_job() enforces the same submit_time >=
 #    current_time precondition submit_job() already does.
-# 4. (gRPC, if built) The same genuine-append scenario as (1), but over
+# 4. (gRPC, if built) The same append scenario as (1), but over
 #    the actual network wire via AppendJobRequest, against a real
 #    running dr_evt_server.
 
@@ -29,7 +29,7 @@ REPO_ROOT="$SCRIPT_DIR/.."
 cd "$REPO_ROOT"
 
 echo "=========================================="
-echo "Append-Job (Genuine Streaming) Tests"
+echo "Append-Job Tests"
 echo "=========================================="
 echo ""
 

@@ -267,11 +267,11 @@ jobs:
           echo "========================================"
           ./tests/run_grpc_tests.sh
 
-      - name: Run Append-Job (Genuine Streaming) Tests
+      - name: Run Append-Job Tests
         id: append-job
         run: |
           echo "========================================"
-          echo "Running Append-Job Tests (8 C++ + gRPC)"
+          echo "Running Append-Job Tests (15 C++ + gRPC)"
           echo "========================================"
           ./tests/run_append_job_tests.sh
 
@@ -305,7 +305,7 @@ jobs:
           echo "  Resource History (4 tests): ${{ steps.resource-history.outcome }}"
           echo "  Config (4 tests): ${{ steps.config.outcome }}"
           echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
-          echo "  Streaming API (8 C++ + gRPC): ${{ steps.append-job.outcome }}"
+          echo "  Streaming API (15 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"
           echo ""

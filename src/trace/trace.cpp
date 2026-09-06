@@ -105,23 +105,6 @@ int Trace::load_data(num_jobs_t n_lines_to_read)
     resolve_job_store_capacity(static_cast<num_jobs_t>(loaded.size()));
     for (auto& job : loaded) {
         if (m_data.full()) {
-            // Reclaim at the point of need, as load_data() itself is
-            // loading: try the front first, grow only as a last resort.
-            // current_time=0 here, not sim_time_t::max() - every job's
-            // end_time is still the sentinel at load time (a large but
-            // finite value), and passing max() would make the sentinel
-            // itself satisfy "end_time <= current_time", incorrectly
-            // reclaiming jobs that haven't run yet. 0 is always earlier
-            // than any real end_time and never reaches the sentinel, so
-            // only the separate rejected-job (submit_time==sentinel)
-            // check could ever fire here - which is correct, since
-            // rejection is a simulation-time event via submit_job(),
-            // not a load-time one, so it never actually does yet either.
-            // Always a no-op today; keeps the pattern correct and ready
-            // for chunked loading, which will need it for real.
-            reclaim_front_jobs(0);
-        }
-        if (m_data.full()) {
             if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
                 throw std::runtime_error(
                     "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
@@ -301,11 +284,12 @@ job_no_t Trace::append_job(sim_time_t current_time, const epoch_t& submit_time,
     // is a no-op if load_data() already resolved it.
     resolve_job_store_capacity(static_cast<num_jobs_t>(m_data.size()));
 
-    if (m_data.full()) {
-        // Point-of-need order established in OUT_TRACE_STREAMING.md:
-        // try reclaiming first, only grow if that wasn't enough.
-        reclaim_front_jobs(current_time);
-    }
+    // Point-of-need order established in OUT_TRACE_STREAMING.md: try
+    // reclaiming first, only grow if that wasn't enough.
+    // reclaim_front_jobs() no-ops internally if there's already at
+    // least 1 free slot (its min_free default), so no external full()
+    // guard is needed here.
+    reclaim_front_jobs(current_time);
     if (m_data.full()) {
         if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
             throw std::runtime_error(
@@ -318,6 +302,69 @@ job_no_t Trace::append_job(sim_time_t current_time, const epoch_t& submit_time,
 
     m_data.push_back(Job_Record(submit_time, num_nodes, queue, limit_time));
     return static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1);
+}
+
+std::vector<job_no_t> Trace::append_jobs(sim_time_t current_time,
+                                          const std::vector<Job_Append_Request>& requests)
+{
+    // Input validation is all-or-nothing: check the whole batch's
+    // ordering before touching m_data at all.
+    for (size_t i = 1; i < requests.size(); ++i) {
+        if (requests[i].submit_time < requests[i - 1].submit_time) {
+            throw std::runtime_error(
+                "Trace::append_jobs(): requests must be sorted by submit_time "
+                "(non-decreasing) - request " + std::to_string(i) +
+                " has an earlier submit_time than request " + std::to_string(i - 1));
+        }
+    }
+
+    // Same idempotent, load_data()-optional resolution as append_job().
+    resolve_job_store_capacity(static_cast<num_jobs_t>(m_data.size()));
+
+    // Batch-aware capacity resolution: does the buffer already hold
+    // room for the *whole* batch? Point-of-need, generalized from
+    // append_job()'s full() (no room for even one more) to "no room for
+    // this many more" - reclaim_front_jobs() no-ops internally if
+    // there's already enough (its min_free parameter, passed here as
+    // the batch size instead of the default 1), so no external guard is
+    // needed before calling it. This also means the batch is either
+    // fully accommodated here before anything is added, or none of it
+    // is (see doc comment) - unlike a per-request check-full() loop,
+    // which can only discover exhaustion mid-loop, after some requests
+    // are already appended.
+    reclaim_front_jobs(current_time, static_cast<num_jobs_t>(requests.size()),
+                        /* handle_overflow= */ false);
+    size_t needed = m_data.size() + requests.size();
+    if (needed > m_data.capacity()) {
+        if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
+            throw std::runtime_error(
+                "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
+                ") can't fit this batch of " + std::to_string(requests.size()) +
+                " requests even after reclaiming; "
+                "use --job_store_overflow grow or a larger --job_store_capacity");
+        }
+        // Grow once, directly to a size that fits the whole batch -
+        // same doubling convention append_job()/load_data() use
+        // per-request, just resolved in one step instead of
+        // resizing (and copying/reallocating) the buffer once per
+        // request in a batch of possibly many.
+        size_t new_cap = m_data.capacity();
+        while (new_cap < needed) {
+            new_cap = std::max<size_t>(new_cap * 2, 1);
+        }
+        m_data.set_capacity(new_cap);
+    }
+
+    // Capacity is already sufficient for the whole batch at this point -
+    // copy every request in, with no further full()/reclaim/grow checks
+    // interleaved between them.
+    std::vector<job_no_t> job_nos;
+    job_nos.reserve(requests.size());
+    for (const auto& req : requests) {
+        m_data.push_back(Job_Record(req.submit_time, req.num_nodes, req.queue, req.limit_time));
+        job_nos.push_back(static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1));
+    }
+    return job_nos;
 }
 
 void Trace::insert_job(job_no_t job_idx, sim_time_t start_time)
@@ -548,26 +595,49 @@ bool Trace::is_front_reclaimable(sim_time_t current_time) const
     return convert_epoch<sim_time_t>(job.get_end_time()) <= current_time;
 }
 
-void Trace::reclaim_front_jobs(sim_time_t current_time)
+void Trace::reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free,
+                                bool handle_overflow)
 {
     // Lazy reclaim: only when actually needed, not proactively the
-    // moment a job finishes. Same "only when full" gating as
-    // resource-history's record_resource_sample(); without it, every
+    // moment a job finishes. Same "only when short of min_free" gating
+    // as resource-history's record_resource_sample(); without it, every
     // completion would reclaim immediately even with plenty of room
     // left, discarding data (write_simulated_trace(), stats) that
-    // hasn't been read yet.
-    if (!m_data.full()) {
+    // hasn't been read yet. min_free=1 (the default) reduces to the
+    // original "only when full" gate exactly.
+    //
+    // Written as capacity() < size() + min_free rather than
+    // capacity() - size() < min_free: both are equivalent given
+    // circular_buffer's own size() <= capacity() invariant (so the
+    // subtraction never actually underflows today), but comparing via
+    // addition never relies on that invariant holding to stay safe -
+    // unsigned subtraction that happens to not underflow is still worth
+    // avoiding on general principle.
+    if (m_data.capacity() >= m_data.size() + min_free) {
         return;
     }
-    while (m_data.full() && is_front_reclaimable(current_time)) {
+    while (m_data.capacity() < m_data.size() + min_free && is_front_reclaimable(current_time)) {
         write_job_line(m_data.front());
         m_data.pop_front();
         ++m_num_reclaimed;
     }
-    // No compaction: if still full and the front isn't reclaimable, that's
-    // exactly the case m_job_store_overflow exists for - same fallback
-    // the wait queue already uses.
-    if (m_data.full()) {
+    // No compaction: if still short of min_free and the front isn't
+    // reclaimable, that's exactly the case m_job_store_overflow exists
+    // for - same fallback the wait queue already uses.
+    //
+    // handle_overflow lets a batch caller (append_jobs(), min_free > 1)
+    // opt out of this fallback entirely and always decide grow-vs-abort
+    // itself instead - not because the condition here needs to differ
+    // (m_data.full() vs. comparing against min_free was tried and
+    // reverted: for a batch, some-but-not-enough reclaimed leaves
+    // m_data not full(), so full() alone already stays out of the way
+    // correctly in that case) but because full() alone still fires when
+    // reclaiming frees nothing at all (m_data stays exactly at
+    // capacity) - a case a batch can also hit, where only the caller
+    // knows the batch's true size and can produce an accurate message
+    // and a single correctly-sized grow, rather than this generic,
+    // single-job-shaped one firing first.
+    if (handle_overflow && m_data.full()) {
         if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
             throw std::runtime_error(
                 "Trace: job store capacity (" + std::to_string(m_data.capacity()) +

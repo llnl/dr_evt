@@ -8,9 +8,11 @@
 /**
  * Test the streaming/online simulation API: Trace::append_job()/
  * Simulation::append_job() (the real streaming insertion point, for a
- * job the trace has never seen before) together with submit_job()/
- * advance_to() (which append_job() doesn't replace - a job still has to
- * be submitted to the scheduler after being appended, same as before).
+ * job the trace has never seen before), Trace::append_jobs()/
+ * Simulation::append_jobs() (the batch counterpart - several such jobs
+ * in one call), together with submit_job()/advance_to() (which neither
+ * append_job() nor append_jobs() replace - a job still has to be
+ * submitted to the scheduler after being appended, same as before).
  *
  * This file used to be two: this one covered only append_job()'s own
  * insertion behavior (reclaim-before-grow, capacity, validation), while
@@ -167,11 +169,193 @@ void test_append_rejects_past_submit_time() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 4: basic append_job()+submit_job()+advance_to() sequencing -
+// Test 4: basic append_jobs() batch call - several genuinely new jobs
+// in one call, run to completion.
+void test_append_jobs_batch() {
+    std::cout << "\n=== Test 4: append_jobs() batch append ===" << std::endl;
+
+    Sim_Params params = make_params();
+    params.set_outfile("/tmp/test_append_jobs_batch_out.csv");
+
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+
+    std::vector<Simulation::Job_Append_Request> reqs = {
+        {0.0, 10, "pbatch", 100},
+        {5.0, 20, "pbatch", 200},
+        {10.0, 15, "pbatch", 150},
+    };
+    auto job_nos = sim.append_jobs(reqs);
+    assert(job_nos.size() == 3);
+    assert(job_nos[0] == 0 && job_nos[1] == 1 && job_nos[2] == 2);
+
+    for (size_t i = 0; i < job_nos.size(); ++i) {
+        sim.submit_job(job_nos[i], reqs[i].submit_time);
+    }
+    sim.advance_to(1000.0);
+    sim.write_simulated_trace();
+    assert(sim.get_trace().completed_count() == 3);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 5: append_jobs() rejects a batch that isn't sorted by
+// submit_time - and, being all-or-nothing on input validation, leaves
+// m_data completely untouched (not partially appended up to the bad
+// request).
+void test_append_jobs_rejects_unsorted_batch() {
+    std::cout << "\n=== Test 5: append_jobs() rejects unsorted batch ===" << std::endl;
+
+    Simulation sim(make_params());
+    sim.get_trace().load_data(0);
+
+    std::vector<Simulation::Job_Append_Request> bad_reqs = {
+        {10.0, 10, "pbatch", 100},
+        {5.0, 20, "pbatch", 200},  // out of order
+    };
+    bool threw = false;
+    try {
+        sim.append_jobs(bad_reqs);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    assert(threw);
+    assert(sim.get_trace().data().size() == 0);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 6: append_jobs() rejects a batch containing any submit_time <
+// current_time - and, same all-or-nothing input validation as test 5,
+// leaves m_data untouched (the one job already appended earlier stays,
+// nothing from the rejected batch is added).
+void test_append_jobs_rejects_past_submit_time() {
+    std::cout << "\n=== Test 6: append_jobs() rejects a batch with a past submit_time ===" << std::endl;
+
+    Simulation sim(make_params());
+    sim.get_trace().load_data(0);
+
+    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
+    sim.submit_job(j0, 0.0);
+    sim.advance_to(100.0);
+
+    std::vector<Simulation::Job_Append_Request> past_reqs = {
+        {150.0, 10, "pbatch", 50},
+        {50.0, 10, "pbatch", 50},  // 50 < current_time (100)
+    };
+    bool threw = false;
+    try {
+        sim.append_jobs(past_reqs);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    assert(threw);
+    assert(sim.get_trace().data().size() == 1);  // only j0 - batch rejected entirely
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 7: reclaim-before-grow (established for the single-job path in
+// test 2) holds the same way within a batch call - each request in the
+// batch goes through the same per-job check-full()-reclaim-grow order,
+// not a single capacity computation for the whole batch upfront.
+void test_append_jobs_reclaims_before_growing() {
+    std::cout << "\n=== Test 7: append_jobs() reclaims before growing, within a batch ===" << std::endl;
+
+    Sim_Params params = make_params();
+    params.set_outfile("/tmp/test_append_jobs_reclaim_out.csv");
+    params.m_job_store_capacity = 1;
+    params.m_job_store_overflow = CircularOverflowPolicy::GROW;
+
+    Simulation sim(params);
+    sim.get_trace().set_job_store_capacity(1);
+    sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::GROW);
+    sim.get_trace().load_data(0);
+
+    job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+    sim.submit_job(f0, 0.0);
+    sim.advance_to(60.0);  // f0 finishes at t=50 - its slot is now reclaimable
+    assert(sim.get_trace().data().capacity() == 1);
+
+    // First request in the batch reclaims f0's slot (capacity stays 1);
+    // the second can't be accommodated by reclaiming again (nothing
+    // else is finished yet), so it grows the buffer - same order as a
+    // lone append_job() call would follow, just executed twice in a
+    // row within one append_jobs() call.
+    std::vector<Simulation::Job_Append_Request> batch = {
+        {60.0, 10, "pbatch", 50},
+        {65.0, 10, "pbatch", 50},
+    };
+    auto job_nos = sim.append_jobs(batch);
+    assert(job_nos.size() == 2);
+    assert(sim.get_trace().num_reclaimed() == 1);
+    assert(sim.get_trace().data().capacity() == 2);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 8: append_jobs() with --job_store_overflow=abort is fully
+// atomic on capacity exhaustion too, not just input validation (tests
+// 5-6) - capacity for the whole batch is resolved before anything is
+// appended (see Trace::append_jobs()'s doc comment), so a batch that
+// can't fit even after reclaiming leaves m_data completely untouched,
+// not partially filled up to wherever the old buffer ran out.
+void test_append_jobs_abort_is_atomic() {
+    std::cout << "\n=== Test 8: append_jobs() abort-on-exhaustion leaves m_data untouched ===" << std::endl;
+
+    Sim_Params params = make_params();
+    params.m_job_store_capacity = 1;
+    params.m_job_store_overflow = CircularOverflowPolicy::ABORT;
+
+    Simulation sim(params);
+    sim.get_trace().set_job_store_capacity(1);
+    sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::ABORT);
+    sim.get_trace().load_data(0);
+
+    job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+    sim.submit_job(f0, 0.0);
+    // Still running (hasn't reached end_time=50 yet) - not reclaimable.
+    assert(sim.get_trace().data().size() == 1);
+
+    std::vector<Simulation::Job_Append_Request> batch = {
+        {10.0, 10, "pbatch", 50},
+        {20.0, 10, "pbatch", 50},
+    };
+    bool threw = false;
+    try {
+        sim.append_jobs(batch);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    assert(threw);
+    // f0 alone, untouched - nothing from the rejected batch was added.
+    assert(sim.get_trace().data().size() == 1);
+    assert(sim.get_trace().data().capacity() == 1);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 9: append_jobs() over an empty request vector is a valid no-op -
+// returns an empty vector, doesn't touch m_data or throw.
+void test_append_jobs_empty_batch() {
+    std::cout << "\n=== Test 9: append_jobs() with an empty request vector ===" << std::endl;
+
+    Simulation sim(make_params());
+    sim.get_trace().load_data(0);
+
+    std::vector<Simulation::Job_Append_Request> empty_reqs;
+    auto job_nos = sim.append_jobs(empty_reqs);
+    assert(job_nos.empty());
+    assert(sim.get_trace().data().size() == 0);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 10: basic append_job()+submit_job()+advance_to() sequencing -
 // two jobs, checking nodes-in-use at each stage of their overlapping
 // lifecycle.
 void test_basic_append_and_run() {
-    std::cout << "\n=== Test 4: Basic append_job() and run_until ===" << std::endl;
+    std::cout << "\n=== Test 10: Basic append_job() and run_until ===" << std::endl;
 
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
@@ -202,10 +386,10 @@ void test_basic_append_and_run() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 5: exclusive vs inclusive advance - run_until_exclusive() must
+// Test 11: exclusive vs inclusive advance - run_until_exclusive() must
 // not process an event exactly at its target time, advance_to() must.
 void test_exclusive_vs_inclusive() {
-    std::cout << "\n=== Test 5: Exclusive vs Inclusive run_until ===" << std::endl;
+    std::cout << "\n=== Test 11: Exclusive vs Inclusive run_until ===" << std::endl;
 
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
@@ -232,13 +416,13 @@ void test_exclusive_vs_inclusive() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 6: online scheduling loop - jobs genuinely appended as they
+// Test 12: online scheduling loop - jobs genuinely appended as they
 // "arrive" (rather than all known upfront), a free-node check before
 // each submission, and periodic polling to detect completions. This is
 // the shape a real streaming caller (e.g. the gRPC server, driven one
 // arrival at a time) actually takes.
 void test_online_scheduling() {
-    std::cout << "\n=== Test 6: Online Scheduling Simulation ===" << std::endl;
+    std::cout << "\n=== Test 12: Online Scheduling Simulation ===" << std::endl;
 
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
@@ -304,10 +488,10 @@ void test_online_scheduling() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 7: resource leak detection across many sequential append+submit
+// Test 13: resource leak detection across many sequential append+submit
 // cycles.
 void test_no_resource_leaks() {
-    std::cout << "\n=== Test 7: Resource Leak Detection ===" << std::endl;
+    std::cout << "\n=== Test 13: Resource Leak Detection ===" << std::endl;
 
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
@@ -329,14 +513,14 @@ void test_no_resource_leaks() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 8: advance_to() idle-gap postcondition (m_current_time ==
+// Test 14: advance_to() idle-gap postcondition (m_current_time ==
 // target_time even when nothing is left to process before target_time)
 // - exactly the situation a real streaming caller sits in while waiting
 // for the next arrival. Two jobs appended+submitted up front finish
 // early, then a long idle gap before a third job genuinely arrives
 // later (appended only once the loop reaches it, not known beforehand).
 void test_advance_to_idle_gap() {
-    std::cout << "\n=== Test 8: advance_to() Idle Gap Postcondition ===" << std::endl;
+    std::cout << "\n=== Test 14: advance_to() Idle Gap Postcondition ===" << std::endl;
 
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
@@ -376,9 +560,86 @@ void test_advance_to_idle_gap() {
     std::cout << "  PASSED" << std::endl;
 }
 
+// Test 15: append_jobs()'s own capacity/overflow handling must be the
+// only thing that decides grow-vs-abort for a batch - reclaim_front_jobs()
+// must not also weigh in with its own single-job-shaped fallback (see
+// its handle_overflow parameter). Uses a batch (5) bigger than
+// capacity's first doubling (1 -> 2) specifically because a smaller
+// batch can land both paths on the same final capacity by coincidence,
+// hiding the bug (this happened during development: an earlier,
+// incorrect fix to reclaim_front_jobs() passed every existing test
+// here, including test_append_jobs_reclaims_before_growing() above,
+// because that test's batch of 2 from a starting capacity of 1
+// happens to match reclaim_front_jobs()'s own doubling exactly).
+void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
+    std::cout << "\n=== Test 15: append_jobs() capacity handling isolated from "
+                 "reclaim_front_jobs()'s own fallback ===" << std::endl;
+
+    // GROW: must go straight from capacity 1 to 8 (1->2->4->8, doubling
+    // until >= needed=5) - not stop at an intermediate 2 that
+    // reclaim_front_jobs() might otherwise pick on its own.
+    {
+        Sim_Params params = make_params();
+        params.set_outfile("/tmp/test_append_jobs_isolated_grow_out.csv");
+        params.m_job_store_capacity = 1;
+        params.m_job_store_overflow = CircularOverflowPolicy::GROW;
+
+        Simulation sim(params);
+        sim.get_trace().set_job_store_capacity(1);
+        sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::GROW);
+        sim.get_trace().load_data(0);
+
+        job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+        sim.submit_job(f0, 0.0);
+        sim.advance_to(60.0);
+        assert(sim.get_trace().data().capacity() == 1);
+
+        std::vector<Simulation::Job_Append_Request> batch;
+        for (int i = 0; i < 5; ++i) batch.push_back({60.0 + i, 10, "pbatch", 50});
+        auto job_nos = sim.append_jobs(batch);
+        assert(job_nos.size() == 5);
+        assert(sim.get_trace().data().capacity() == 8);
+    }
+
+    // ABORT: must fail with append_jobs()'s own, batch-aware message,
+    // not reclaim_front_jobs()'s generic single-job one (which would be
+    // actively wrong here anyway, since the front WAS reclaimed - this
+    // batch fails on total size, not on an unreclaimable front).
+    {
+        Sim_Params params = make_params();
+        params.m_job_store_capacity = 1;
+        params.m_job_store_overflow = CircularOverflowPolicy::ABORT;
+
+        Simulation sim(params);
+        sim.get_trace().set_job_store_capacity(1);
+        sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::ABORT);
+        sim.get_trace().load_data(0);
+
+        job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+        sim.submit_job(f0, 0.0);
+        sim.advance_to(60.0);
+
+        std::vector<Simulation::Job_Append_Request> batch;
+        for (int i = 0; i < 5; ++i) batch.push_back({60.0 + i, 10, "pbatch", 50});
+
+        bool threw = false;
+        try {
+            sim.append_jobs(batch);
+        } catch (const std::runtime_error& e) {
+            threw = true;
+            std::string msg = e.what();
+            assert(msg.find("batch of 5 requests") != std::string::npos);
+            assert(msg.find("front job isn't safe to reclaim yet") == std::string::npos);
+        }
+        assert(threw);
+    }
+
+    std::cout << "  PASSED" << std::endl;
+}
+
 int main() {
     std::cout << "====================================" << std::endl;
-    std::cout << "Append-Job (Genuine Streaming) Test Suite" << std::endl;
+    std::cout << "Append-Job Test Suite" << std::endl;
     std::cout << "====================================" << std::endl;
 
     write_empty_trace_fixture();
@@ -387,6 +648,13 @@ int main() {
         test_append_with_empty_trace();
         test_append_reclaims_before_growing();
         test_append_rejects_past_submit_time();
+        test_append_jobs_batch();
+        test_append_jobs_rejects_unsorted_batch();
+        test_append_jobs_rejects_past_submit_time();
+        test_append_jobs_reclaims_before_growing();
+        test_append_jobs_abort_is_atomic();
+        test_append_jobs_empty_batch();
+        test_append_jobs_batch_capacity_isolated_from_single_job_fallback();
         test_basic_append_and_run();
         test_exclusive_vs_inclusive();
         test_online_scheduling();

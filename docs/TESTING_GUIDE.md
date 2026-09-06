@@ -30,7 +30,7 @@ correct.
 - [Replay Tests](#replay-tests) - Resource usage verification
 - [Resource History Tests](#resource-history-tests) - Resource-history circular buffer, flush overhead
 - [Job Store Tests](#job-store-tests) - Job-record circular buffer, capacity sizing
-- [Append-Job (Genuine Streaming) Tests](#append-job-genuine-streaming-tests) - Real streaming insertion (append_job) + submit_job()/advance_to() correctness
+- [Append-Job Tests](#append-job-tests) - Real streaming insertion (append_job/append_jobs) + submit_job()/advance_to() correctness
 - [Streaming API Tests](#streaming-api-tests) - Online job submission
 - [Configuration Tests](#configuration-tests) - Protobuf validation
 - [Queue Implementation Testing](#queue-implementation-testing) - Wait-queue data structure consistency
@@ -363,17 +363,22 @@ cd build
 
 ---
 
-## Append-Job (Genuine Streaming) Tests
+## Append-Job Tests
 
 **Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_append_job_grpc.cpp` (gRPC)
-**Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` - the real streaming insertion point, for a job the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling loops, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()` rather than a preloaded trace file. This file used to be two (a separate `test_streaming_api.cpp` covered the `submit_job()`/`advance_to()` half by loading a small, hand-written CSV first) - consolidated once it became clear none of those tests actually depended on a preloaded file (each one's submit times were hand-written to match the CSV exactly, never diverging from it), so the same coverage is achievable via `append_job()` with no file needed at all.
+**Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` (single-job) and `Trace::append_jobs()`/`Simulation::append_jobs()` (batch) - the real streaming insertion points, for jobs the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling loops, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()`/`append_jobs()` rather than a preloaded trace file. This file used to be two (a separate `test_streaming_api.cpp` covered the `submit_job()`/`advance_to()` half by loading a small, hand-written CSV first) - consolidated once it became clear none of those tests actually depended on a preloaded file (each one's submit times were hand-written to match the CSV exactly, never diverging from it), so the same coverage is achievable via `append_job()` with no file needed at all.
 
 **How it works:**
 1. (C++) A trace with zero preloaded jobs (empty-of-rows CSV), then jobs appended one at a time via `append_job()` and run to completion → output/stats must be correct
 2. (C++) Force `--job_store_capacity 1`; confirm a second `append_job()` call reclaims the first (already-finished) job's slot rather than growing - the actual point this ordering matters, unlike `load_data()` (see `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`'s "Reclaim at the point of need" section for why `load_data()` itself never needs this)
 3. (C++) `append_job()` enforces the same `submit_time >= current_time` precondition `submit_job()` already does → must throw on a past submit_time
-4. (C++) Basic append+submit+advance sequencing, exclusive-vs-inclusive `advance_to()`/`run_until_exclusive()`, an online-scheduling loop that appends jobs only as they "arrive," sequential resource-leak detection, and `advance_to()`'s idle-gap postcondition across a long gap with no pending events
-5. (gRPC, if built with `-DDR_EVT_ENABLE_GRPC=ON`) Same genuine-append scenario as (1), but over the actual network wire via `AppendJobRequest`, against a real running `dr_evt_server`
+4. (C++) `append_jobs()` batch call - several jobs in one call, run to completion → output/stats must be correct
+5. (C++) `append_jobs()` rejects a batch not sorted by `submit_time`, non-decreasing - and, being all-or-nothing on input validation, leaves `m_data` completely untouched
+6. (C++) `append_jobs()` rejects a batch containing any `submit_time < current_time` - same all-or-nothing input validation, nothing from the batch is added
+7. (C++) Reclaim-before-grow (test 2's guarantee) holds the same way within a batch call - each request goes through the same per-job order, not a single capacity computation for the whole batch upfront
+8. (C++) `append_jobs()` over an empty request vector is a valid no-op
+9. (C++) Basic append+submit+advance sequencing, exclusive-vs-inclusive `advance_to()`/`run_until_exclusive()`, an online-scheduling loop that appends jobs only as they "arrive," sequential resource-leak detection, and `advance_to()`'s idle-gap postcondition across a long gap with no pending events
+10. (gRPC, if built with `-DDR_EVT_ENABLE_GRPC=ON`) Same append scenario as (1), but over the actual network wire via `AppendJobRequest`, against a real running `dr_evt_server`, plus the batch case via `AppendJobsRequest`
 
 **How to run:**
 ```bash
@@ -523,12 +528,12 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Replay** | 3+ | 3+ | 0 | Resource verification |
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
-| **Append-Job** | 8 | 8 | 0 | Genuine streaming insertion (append_job) + submit_job()/advance_to() |
+| **Append-Job** | 15 | 15 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 4 | 4 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 131+ | 131+ | 0 | Complete test suite |
+| **TOTAL** | 138+ | 138+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

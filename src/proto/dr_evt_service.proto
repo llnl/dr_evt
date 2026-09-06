@@ -45,6 +45,7 @@ message ClientMessage {
         GetStatisticsRequest get_statistics = 12;
         GetTraceSizeRequest get_trace_size = 13;
         AppendJobRequest append_job = 14;
+        AppendJobsRequest append_jobs = 15;
     }
 }
 
@@ -91,7 +92,7 @@ message SubmitJobRequest {
     double submit_time = 2;
 }
 
-// The genuine streaming counterpart to SubmitJobRequest: a job the
+// The streaming counterpart to SubmitJobRequest: a job the
 // server has never seen before, rather than a reference by index into
 // an already-loaded trace. Adds the job to the store; does not submit
 // it to the scheduler - send a SubmitJobRequest with the returned
@@ -102,6 +103,27 @@ message AppendJobRequest {
     uint32 num_nodes = 2;
     string queue = 3;       // e.g. "pbatch"
     double limit_time = 4;  // user-estimated time limit, in seconds
+}
+
+// One job's data within an AppendJobsRequest - same fields as
+// AppendJobRequest, factored out so a batch can carry several.
+message JobAppendData {
+    double submit_time = 1;
+    uint32 num_nodes = 2;
+    string queue = 3;
+    double limit_time = 4;
+}
+
+// The batch counterpart to AppendJobRequest: several genuinely new jobs
+// in one round-trip instead of one per job. Requests must already be
+// sorted by submit_time, non-decreasing (same as
+// Trace::append_jobs()/Simulation::append_jobs() require) - the server
+// validates this, and every request's submit_time >= current_time,
+// before appending any of them; see those functions' own doc comments
+// for what "all-or-nothing" does and doesn't cover (capacity exhaustion
+// mid-batch is not pre-validated the same way).
+message AppendJobsRequest {
+    repeated JobAppendData requests = 1;
 }
 
 message AdvanceToRequest {
@@ -142,6 +164,7 @@ message ServerMessage {
         GetStatisticsResponse get_statistics = 13;
         GetTraceSizeResponse get_trace_size = 14;
         AppendJobResponse append_job = 15;
+        AppendJobsResponse append_jobs = 16;
     }
 }
 
@@ -165,6 +188,13 @@ message SubmitJobResponse {}
 
 message AppendJobResponse {
     uint32 job_idx = 1; // Pass to a subsequent SubmitJobRequest
+}
+
+message AppendJobsResponse {
+    // Each new job's job_idx, in the same order as the request's
+    // requests field - pass each to a subsequent SubmitJobRequest, same
+    // as AppendJobResponse.
+    repeated uint32 job_idx = 1;
 }
 
 message AdvanceToResponse {}

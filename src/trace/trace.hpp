@@ -26,6 +26,22 @@ namespace dr_evt {
 /** \addtogroup dr_evt_trace
  *  @{ */
 
+/**
+ * @brief One job's data for Trace::append_jobs() - the same fields
+ * Trace::append_job() takes individually, grouped so a caller can pass
+ * several new jobs (never before seen by this Trace) in a single call.
+ * Deliberately not a Job_Record itself: append_jobs() only needs a new
+ * job's externally-supplied attributes, not Job_Record's full internal
+ * state (scheduling sentinels, simulated-vs-real flags, etc.), which
+ * Job_Record's own constructor already initializes correctly.
+ */
+struct Job_Append_Request {
+    epoch_t submit_time;
+    num_nodes_t num_nodes;
+    job_queue_t queue;
+    timeout_t limit_time;
+};
+
 class Trace {
   public:
     /// Circular buffer, front-only reclaim: a job's slot becomes reusable
@@ -251,6 +267,58 @@ class Trace {
                         timeout_t limit_time);
 
     /**
+     * @brief Append several genuinely new jobs to m_data in one call -
+     * the batch counterpart to append_job(), for the same never-seen-
+     * before case (not a batch-preload; see load_data() for that).
+     * Designed to also serve a future chunked-loading reader (see
+     * OUT_TRACE_STREAMING.md's "Sketch of that future chunked-loading
+     * scheme"): reads a whole trace file's remaining rows a chunk at a
+     * time and would call this once per chunk, not once per job.
+     *
+     * Fully all-or-nothing: nothing in this batch is appended unless
+     * all of it can be. Two things are checked before m_data is
+     * touched at all:
+     *   - every request's ordering - requests must already be sorted
+     *     by submit_time, non-decreasing - m_data's own sort invariant
+     *     (see job_at()'s doc comment), otherwise silently and
+     *     implicitly assumed across separate append_job() calls; a
+     *     batch call is where this is easy to check explicitly, so it
+     *     is. (This function does not itself check submit_time >=
+     *     current_time - same as append_job(), that precondition is
+     *     enforced one level up, by
+     *     Simulation::append_job()/append_jobs().)
+     *   - capacity for the *whole* batch - unlike append_job()'s
+     *     per-job check-full()-then-reclaim-then-grow, which can only
+     *     discover exhaustion one job at a time, this resolves
+     *     reclaim_front_jobs()/growing against the batch's whole size
+     *     up front (see reclaim_front_jobs()'s min_free parameter).
+     *     A --job_store_overflow=abort failure is therefore also
+     *     atomic: it happens before the batch's first push_back(), not
+     *     mid-loop, so m_data is left exactly as it was, never
+     *     partially filled.
+     *
+     * Once both checks pass, every request is copied into m_data with
+     * no further capacity checks interleaved between them - the same
+     * batch-then-copy shape load_data() already uses for its own bulk
+     * insertion, just with reclaim resolved against the batch's size
+     * too (load_data() never needs that: nothing is ever reclaimable at
+     * load time). Deliberately not a per-request loop re-checking
+     * full()/reclaim/grow on every iteration - resizing (and
+     * reallocating/copying) the circular buffer once for the whole
+     * batch, rather than up to once per request, is the reason this
+     * exists as a batch call at all rather than a loop over
+     * append_job() the caller could already write themselves.
+     *
+     * @param current_time Current simulated time, for the batch-wide
+     *        reclaim attempt's is_front_reclaimable() check.
+     * @param requests The new jobs' own data, in submit_time order.
+     * @return Each new job's job_no, in the same order as requests -
+     *         pass each to submit_job() next, same as append_job().
+     */
+    std::vector<job_no_t> append_jobs(sim_time_t current_time,
+                                       const std::vector<Job_Append_Request>& requests);
+
+    /**
      * NEW SIMULATION API: Run simulation until (but not including) target time
      * Processes all events with time < target_time
      * @param target_time Time to run until (exclusive)
@@ -447,11 +515,29 @@ class Trace {
     bool is_front_reclaimable(sim_time_t current_time) const;
 
     /// Reclaim from the front while is_front_reclaimable() holds, advancing
-    /// m_num_reclaimed. Called before every insert (load_data(),
-    /// insert_job()) that might need room. If the buffer is still full
-    /// afterward (front not yet safe), applies m_job_store_overflow -
-    /// same fallback the wait queue already uses for the analogous case.
-    void reclaim_front_jobs(sim_time_t current_time);
+    /// m_num_reclaimed, until at least min_free slots are free (capacity()
+    /// - size() >= min_free) or nothing more is reclaimable. Guarded by
+    /// that same condition on entry (not proactive - lazy reclaim, same
+    /// as resource-history's record_resource_sample()): a no-op if
+    /// already enough room. min_free defaults to 1, matching every
+    /// existing single-job caller (append_job(), insert_job()) exactly;
+    /// append_jobs() passes the whole batch's size, since "enough room
+    /// for one more" isn't the right question when appending several at
+    /// once.
+    ///
+    /// handle_overflow (default true) controls whether *this function*
+    /// applies m_job_store_overflow (grow-or-abort) if still full()
+    /// afterward - same fallback the wait queue already uses for the
+    /// analogous case. append_job() (min_free=1) relies on this default,
+    /// since it has no capacity check of its own afterward. append_jobs()
+    /// passes false: it has its own batch-aware capacity check right
+    /// after calling this, comparing against the batch's actual size
+    /// rather than just m_data.full() - letting this function's fallback
+    /// fire too would risk an extra, unnecessarily-small intermediate
+    /// grow (or, for abort, a misleading single-job-shaped message) in a
+    /// case only the batch caller can size and word correctly.
+    void reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free = 1,
+                             bool handle_overflow = true);
 
     /// Write one job's line to m_simulated_trace_ofs (if open and the
     /// job is_scheduled() - unscheduled/rejected jobs were never written
