@@ -76,7 +76,7 @@ void test_append_with_empty_trace() {
     params.set_outfile("/tmp/test_append_empty_out.csv");
 
     Simulation sim(params);
-    int rc = sim.get_trace().load_data(0);
+    [[maybe_unused]] int rc = sim.get_trace().load_data(0);
     assert(rc == 0);
     assert(sim.get_trace().data().size() == 0);
 
@@ -90,8 +90,8 @@ void test_append_with_empty_trace() {
     sim.submit_job(j1, 5.0);
     sim.advance_to(1000.0);
 
-    const auto& job0 = sim.get_trace().job_at(0);
-    const auto& job1 = sim.get_trace().job_at(1);
+    [[maybe_unused]] const auto& job0 = sim.get_trace().job_at(0);
+    [[maybe_unused]] const auto& job1 = sim.get_trace().job_at(1);
     assert(job0.is_scheduled());
     assert(job1.is_scheduled());
     assert(job0.get_end_time().first == 100);   // 0 + limit_time 100
@@ -156,7 +156,7 @@ void test_append_rejects_past_submit_time() {
     sim.submit_job(j0, 0.0);
     sim.advance_to(100.0);
 
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.append_job(50.0, 10, "pbatch", 50);  // 50 < current_time (100)
     } catch (const std::runtime_error&) {
