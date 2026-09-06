@@ -29,8 +29,8 @@ protected:
     BackfillPolicy m_backfill_policy;
     /// Raw pointer to the owning Trace, not the job-record container
     /// directly: reading a job's data by job_no needs Trace::job_at()'s
-    /// translation (job_no - m_num_evicted), which only Trace can do -
-    /// m_data's own physical layout shifts as eviction advances.
+    /// translation (job_no - m_num_reclaimed), which only Trace can do -
+    /// m_data's own physical layout shifts as reclaiming advances.
     const Trace* m_trace_ptr;
     sim_time_t m_fcfs_reservation_time;
 

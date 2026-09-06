@@ -196,16 +196,18 @@ What to do if an insert would exceed `--wait_queue_capacity`. Only used when
 
 ### `-K, --job_store_capacity SIZE`
 Initial capacity of the job-record store (`Trace::m_data`, a
-`boost::circular_buffer`, bounding memory via front-only eviction of job
-records already safe to reclaim). See
+`boost::circular_buffer`). See
 [Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
-for the design.
+for what this actually buys you - in short: for a batch run (loading a
+whole trace file upfront, the only mode that exists today), capacity
+always grows to fit the whole trace during loading regardless of this
+setting, so a smaller value here does not reduce the final allocation
+and essentially never triggers reclaiming a slot mid-run. This option
+mainly exists for a future streaming mode, and to exercise
+`--job_store_overflow` deliberately.
 
 **Default:** `0`, meaning the size of the job trace - large enough that the
 store can never overflow, since at most one entry is inserted per job.
-
-A smaller, explicit value trades that guarantee for a smaller initial
-allocation; see `--job_store_overflow` for what happens if it's exceeded.
 
 **Example:**
 ```bash
@@ -239,12 +241,12 @@ cleared, in one batch, rather than growing without limit.
 
 Unlike `--wait_queue_overflow`/`--job_store_overflow`, there's no overflow
 policy here to configure - every entry is a strictly time-ordered,
-already-finalized sample, so it's always immediately safe to evict; the
-abort/grow fallback those two need for entries that aren't safe to evict
+already-finalized sample, so it's always immediately safe to reclaim; the
+abort/grow fallback those two need for entries that aren't safe to reclaim
 yet never applies here.
 
 **Default:** `0`, meaning the size of the job trace (large enough it never
-needs to evict purely to make room) - though never less than 4096, since
+needs to reclaim purely to make room) - though never less than 4096, since
 the trace size may still be tiny (or 0, early in a streaming session) at
 the moment the very first sample is recorded.
 

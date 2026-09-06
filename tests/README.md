@@ -10,6 +10,8 @@ DR_EVT has tests organized by purpose:
 - **Feature (3)** - Policy and mode comparisons
 - **Scale (7, 4 working)** - Larger job counts than comprehensive/'s ceiling (3 currently broken - see below)
 - **Replay (3, verified against more)** - Verify replay reproduces simulation
+- **Resource History (5)** - Resource-history circular buffer, flush overhead
+- **Job Store (6)** - Job-record circular buffer, capacity sizing correctness
 
 Note: "Correctness" below refers to matching the Python reference
 implementation's output, not independent mathematical verification - see
@@ -32,6 +34,12 @@ cd build && cmake .. && make -j4
 
 # Run replay tests
 ./tests/run_replay_tests.sh
+
+# Run resource-history circular buffer tests
+./tests/run_resource_history_tests.sh
+
+# Run job-store circular buffer tests
+./tests/run_job_store_tests.sh
 ```
 
 ## Test Categories
@@ -163,6 +171,32 @@ Note: Streaming API / MPI feeder tests (`test_streaming_api.cpp`, `test_batch_vs
 
 **Status:** ✅ 3/3 passing (100%)
 
+### 7. Resource History Tests (5 tests)
+
+**Purpose:** Verify the resource-history circular buffer (`--resource_history_capacity`) produces identical output under forced reclaiming, and that invalid input is rejected cleanly
+
+**Location:** `test_traces/feature/`
+
+**Runner:** `./tests/run_resource_history_tests.sh`
+
+**Status:** ✅ 4/4 passing (100%)
+
+See "Resource History Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
+
+### 8. Job Store Tests (6 tests)
+
+**Purpose:** Verify the job-record circular buffer (`Trace::m_data`, `--job_store_capacity`) produces identical output and stats regardless of the requested initial capacity, correctly excludes rejected jobs without stalling, aborts cleanly when capacity can't be satisfied, and measures the cost of a too-small initial capacity
+
+**Note:** in the batch mode that exists today, a too-small capacity forces reallocation *during loading*, not repeated reclaiming *during the run* - see "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for why, and [docs/dev/design-decisions/OUT_TRACE_STREAMING.md](../docs/dev/design-decisions/OUT_TRACE_STREAMING.md) for the full reasoning.
+
+**Location:** `test_traces/feature/`
+
+**Runner:** `./tests/run_job_store_tests.sh`
+
+**Status:** ✅ 6/6 passing (100%)
+
+See "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
+
 ---
 
 ## Total Test Suite
@@ -175,7 +209,9 @@ Note: Streaming API / MPI feeder tests (`test_streaming_api.cpp`, `test_batch_vs
 | Conservative | 2 | ✅ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Scale | 6 | ✅ 6/6 | Larger job counts (1 skipped - huge_10000jobs has no expected output) |
 | Replay | 3 (+4 more verified) | ✅ 3/3 | Determinism verification |
-| **TOTAL** | **57** | **57/57** all passing | - |
+| Resource History | 5 | ✅ 5/5 | Resource-history circular buffer, flush overhead |
+| Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
+| **TOTAL** | **68** | **68/68** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
@@ -408,6 +444,8 @@ cd build
 ../tests/run_unit_tests.sh
 ../tests/run_feature_tests.sh
 ../tests/run_replay_tests.sh
+../tests/run_resource_history_tests.sh
+../tests/run_job_store_tests.sh
 ```
 
 ### Run an individual comprehensive/ or scale/ test manually
@@ -435,7 +473,9 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Conservative | 2 | ✓ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Replay | 3 (+4 more verified) | ✓ 3/3 | Resource trace matching |
 | Scale | 6 | ✓ 6/6 | Large-scale tests (1 skipped - no expected output) |
-| **Total** | **57** | **57/57** | All tests passing as of 2026-09-03 |
+| Resource History | 5 | ✓ 5/5 | Resource-history circular buffer, flush overhead |
+| Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
+| **Total** | **68** | **68/68** | All tests passing as of 2026-09-06 |
 
 ## Prerequisites
 
@@ -546,12 +586,13 @@ When adding new features:
    scheduler's behavior changed intentionally (`generate_all_expected_outputs.py`,
    `generate_scale_expected_outputs.py`)
 4. Run `run_unit_tests.sh`, `run_feature_tests.sh`, `run_replay_tests.sh`,
-   plus manual comparison against `comprehensive/`/`scale/`'s expected
-   files (see "Running Tests" above - no single script covers those yet)
+   `run_resource_history_tests.sh`, `run_job_store_tests.sh`, plus manual
+   comparison against `comprehensive/`/`scale/`'s expected files (see
+   "Running Tests" above - no single script covers those yet)
 5. Update this README if adding a new test category
 
 ## License
 
 MIT License - See LICENSE file
 
-Last substantively verified: 2026-09-03 (all 57 tests confirmed passing)
+Last substantively verified: 2026-09-06 (all 66 tests confirmed passing)

@@ -76,9 +76,9 @@ class Sim_Params {
                                           // circular buffer (0 = size of job trace).
                                           // No overflow policy: unlike the wait queue
                                           // or job store, every entry here is always
-                                          // immediately safe to evict (a strictly
-                                          // time-ordered append log), so eviction on
-                                          // capacity never needs an abort/grow fallback.
+                                          // immediately safe to reclaim (a strictly
+                                          // time-ordered append log), so reclaiming
+                                          // when full never needs an abort/grow fallback.
     num_nodes_t m_total_nodes;
     std::string m_trace_format;  // "simple" or "lassen"
     std::string m_timestamp_format;  // "epoch" or "iso"

@@ -28,6 +28,8 @@ correct.
 - [Feature Tests (3)](#feature-tests) - Policy comparisons
 - [Scale Tests (7)](#scale-tests) - Large-scale performance
 - [Replay Tests](#replay-tests) - Resource usage verification
+- [Resource History Tests](#resource-history-tests) - Resource-history circular buffer, flush overhead
+- [Job Store Tests](#job-store-tests) - Job-record circular buffer, capacity sizing
 - [Streaming API Tests](#streaming-api-tests) - Online job submission
 - [Configuration Tests](#configuration-tests) - Protobuf validation
 - [Queue Implementation Testing](#queue-implementation-testing) - Wait-queue data structure consistency
@@ -304,12 +306,15 @@ cd build
 ## Resource History Tests
 
 **Location:** `tests/run_resource_history_tests.sh`
-**Purpose:** Verify the resource-history circular buffer (`--resource_history_capacity`) produces identical output under forced eviction, and that invalid input is rejected cleanly
+**Purpose:** Verify the resource-history circular buffer (`--resource_history_capacity`) produces identical output under forced reclaiming, that invalid input is rejected cleanly, and measure the wall-clock cost of repeated flushing at a too-small capacity
+
+**Note:** unlike job-store's `m_data`, resource-history genuinely accumulates incrementally during the run (not preloaded), and has no grow option - so a too-small capacity here causes real, repeated flush-and-discard for the whole run, not a one-time reallocation. Sufficient capacity is 2x the job count (each job contributes at most 2 events - start, end), not 1x.
 
 **How it works:**
-1. Run each input twice: once with the default (auto-sized) capacity, once with a small forced capacity (5) that triggers eviction on nearly every insert
+1. Run each input twice: once with the default (auto-sized) capacity, once with a small forced capacity (5) that triggers reclaiming on nearly every insert
 2. Compare resource traces → must match exactly, for both `simulator` and `tracer`
 3. Separately, feed `tracer` simulation-format input directly (never valid for `run_job_trace()`, which only replays begin_time/end_time that's already set) → must fail cleanly with an actionable error, not crash
+4. Benchmark (informational, not pass/fail): wall-clock time for a tiny (5) vs. sufficient (2x job count) capacity on a 10,000-job trace - confirms repeated flushing is cheap and output-identical
 
 **How to run:**
 ```bash
@@ -318,12 +323,45 @@ cd build
 ```
 
 **Tests hardcoded in script:**
-- `comprehensive/05_multiple_backfills.csv` (simulator)
-- `comprehensive/21_sustained_high_load.csv` (simulator)
-- `scale/huge_2000jobs.csv` (tracer, via simulator's own replay-format output)
-- `scale/huge_2000jobs.csv` (tracer, fed directly - misuse-rejection check)
+- `feature/05_multiple_backfills.csv` (simulator)
+- `feature/21_sustained_high_load.csv` (simulator)
+- `feature/huge_2000jobs.csv` (tracer, via simulator's own replay-format output)
+- `feature/huge_2000jobs.csv` (tracer, fed directly - misuse-rejection check)
+- `feature/huge_10000jobs.csv` (flush-overhead benchmark)
 
 ---
+
+## Job Store Tests
+
+**Location:** `tests/run_job_store_tests.sh`
+**Purpose:** Verify the job-store circular buffer (`Trace::m_data`, `--job_store_capacity`) produces identical output and stats regardless of the requested initial capacity, correctly excludes rejected jobs without stalling, aborts cleanly when capacity can't be satisfied, and measures the wall-clock cost of a too-small initial capacity
+
+**Batch mode note:** loading a whole trace file (the only mode that exists today) sizes capacity to fit the entire trace before the run starts - a too-small `--job_store_capacity` triggers repeated *reallocation* during loading (falling back to growing), not repeated *reclaiming* during the run, which essentially can't happen more than once in batch mode - see `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`.
+
+**How it works:**
+1. Run each input twice: once with the default (already-sufficient) capacity, once with a tiny requested capacity (2) that forces several grow reallocations during loading
+2. Compare job output and simulation stats → must match exactly
+3. Separately, run a small trace at default capacity → confirm no job is reclaimed prematurely (guards against a real bug found during development: an earlier version reclaimed unconditionally whenever a job finished, rather than only when the buffer was actually full)
+4. Feed a trace with one job that requests more nodes than exist → confirm it's rejected, excluded from output/stats, and doesn't stall completion of the jobs behind it
+5. Force `--job_store_overflow abort` with a capacity too small to hold the trace even during loading → must fail cleanly with an actionable error, not crash
+6. Benchmark (informational, not pass/fail): wall-clock time for a tiny vs. sufficient initial capacity on a 10,000-job trace - confirms grow-during-load is cheap and output-identical
+
+**How to run:**
+```bash
+cd build
+../tests/run_job_store_tests.sh
+```
+
+**Tests hardcoded in script:**
+- `feature/05_multiple_backfills.csv`
+- `feature/21_sustained_high_load.csv`
+- `feature/01_backfill_allowed.csv` (default-capacity and abort checks)
+- `feature/rejected_job.csv`
+- `feature/huge_10000jobs.csv` (grow-overhead benchmark)
+
+---
+
+
 
 ## Streaming API Tests
 
@@ -461,11 +499,13 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Conservative** | 2 | 2 | 0 | CONSERVATIVE backfilling |
 | **Scale** | 6 | 6 | 0 | Performance testing |
 | **Replay** | 3+ | 3+ | 0 | Resource verification |
+| **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
+| **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 4 | 4 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 111+ | 111+ | 0 | Complete test suite |
+| **TOTAL** | 122+ | 122+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

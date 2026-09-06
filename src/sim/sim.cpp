@@ -63,13 +63,13 @@ void Simulation::run()
     }
 
     // Open the resource-trace file early (if one was requested) so
-    // eviction from the now-bounded circular buffer can flush to it
+    // reclaiming from the now-bounded circular buffer can flush to it
     // incrementally during the run, rather than only at the very end.
     m_trace.set_resource_history_capacity(m_params.m_resource_history_capacity);
     m_trace.start_resource_trace(m_params.get_resource_trace(), m_params.m_total_nodes,
                                   m_params.m_msec_output);
 
-    // Same reasoning, for job records: m_data can now evict too, so the
+    // Same reasoning, for job records: m_data can now reclaim too, so the
     // output file needs to be open before that ever happens, not only
     // at the very end.
     m_trace.start_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
@@ -98,7 +98,7 @@ void Simulation::run()
     // m_jobs_completed is tracked incrementally during the run itself
     // (see the event-processing loop above) - no need to recompute it
     // here, and doing so by iterating m_trace.data() directly would
-    // now be wrong anyway, since evicted jobs are no longer there to
+    // now be wrong anyway, since reclaimed jobs are no longer there to
     // recount.
     if (m_params.m_verbose) {
         std::cout << "Simulation complete\n" +
@@ -110,13 +110,13 @@ void Simulation::run()
 void Simulation::print_stats(std::ostream& os) const
 {
     os << "=== Simulation Statistics ===" << std::endl;
-    os << "Total jobs: " << (m_trace.data().size() + m_trace.num_evicted()) << std::endl;
+    os << "Total jobs: " << (m_trace.data().size() + m_trace.num_reclaimed()) << std::endl;
     os << "Jobs submitted: " << m_jobs_submitted << std::endl;
     // m_trace.completed_count() (populated via write_job_line(), called
-    // both at eviction time and by write_simulated_trace()'s final
+    // both at reclaim time and by write_simulated_trace()'s final
     // flush - already run by the time this is called, see sim.cpp's
     // caller) counts every completed job regardless of whether it's
-    // since been evicted from m_data - m_jobs_completed only tracks
+    // since been reclaimed from m_data - m_jobs_completed only tracks
     // in-flight completions during the run itself and isn't used here.
     os << "Jobs completed: " << m_trace.completed_count() << std::endl;
     os << "Current time: " << format_sim_time(m_current_time, m_params.m_msec_output) << std::endl;
@@ -124,7 +124,7 @@ void Simulation::print_stats(std::ostream& os) const
 
     // Calculate metrics - sum+count already accumulated incrementally in
     // Trace as each job was written out (see write_job_line()), so this
-    // is correct even for jobs already evicted from m_data by now.
+    // is correct even for jobs already reclaimed from m_data by now.
     if (m_trace.completed_count() > 0) {
         const auto completed = m_trace.completed_count();
 
@@ -331,7 +331,7 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         // forever - exactly the "reaches output still unresolved" state
         // that shouldn't be possible.
         //
-        // Also mark submit_time as the sentinel: m_data's front-eviction
+        // Also mark submit_time as the sentinel: m_data's front-reclaim
         // sweep treats that as "skip immediately, will never resolve" -
         // otherwise a rejected job at the front would stall the sweep
         // forever, since end_time never resolves for it either.

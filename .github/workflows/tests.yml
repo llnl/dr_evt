@@ -234,6 +234,14 @@ jobs:
           echo "========================================"
           ./tests/run_resource_history_tests.sh
 
+      - name: Run Job Store Tests
+        id: job-store
+        run: |
+          echo "========================================"
+          echo "Running Job Store Tests (5 tests)"
+          echo "========================================"
+          ./tests/run_job_store_tests.sh
+
       - name: Run Config Tests
         id: config
         run: |

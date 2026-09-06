@@ -15,7 +15,7 @@ namespace dr_evt {
 
 Trace::Trace(const std::string& fname)
   : m_fname(fname),
-    m_num_evicted(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
+    m_num_reclaimed(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
     m_job_store_overflow(CircularOverflowPolicy::GROW),
     m_completed_count(0), m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
     m_default_timezone("+00:00"),
@@ -31,7 +31,7 @@ Trace::Trace(const std::string& fname)
 
 Trace::Trace(const std::string& fname, const std::string& format)
   : m_fname(fname), m_dcols(format),
-    m_num_evicted(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
+    m_num_reclaimed(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
     m_job_store_overflow(CircularOverflowPolicy::GROW),
     m_completed_count(0), m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
     m_default_timezone("+00:00"),
@@ -48,7 +48,7 @@ Trace::Trace(const std::string& fname, const std::string& format)
 Trace::Trace(const std::string& fname, const std::string& format,
              const std::string& timestamp_format, const std::string& timezone)
   : m_fname(fname), m_dcols(format, timestamp_format, timezone),
-    m_num_evicted(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
+    m_num_reclaimed(0), m_job_store_capacity(0), m_job_store_capacity_resolved(false),
     m_job_store_overflow(CircularOverflowPolicy::GROW),
     m_completed_count(0), m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
     m_default_timezone("+00:00"),  // Default to UTC
@@ -69,7 +69,7 @@ void Trace::resolve_job_store_capacity(num_jobs_t hint)
     }
     size_t cap = m_job_store_capacity;
     if (cap == 0) {
-        // Auto-size: one slot per job, large enough that eviction is
+        // Auto-size: one slot per job, large enough that reclaiming is
         // never needed purely to make room for a fully-preloaded batch
         // run - matches the "0 = size of job trace" convention the wait
         // queue and resource-history both use. Floored at 4096 for the
@@ -85,7 +85,7 @@ int Trace::load_data(num_jobs_t n_lines_to_read)
 {
     // load() expects a std::vector - load into one, sort it (as before),
     // then transfer into m_data (the circular buffer). Nothing's
-    // evictable yet at this point (no processing has happened), so if
+    // reclaimable yet at this point (no processing has happened), so if
     // an explicit --job_store_capacity is smaller than the job count,
     // m_job_store_overflow's abort/grow fallback applies here exactly
     // as it would mid-run.
@@ -104,6 +104,23 @@ int Trace::load_data(num_jobs_t n_lines_to_read)
 
     resolve_job_store_capacity(static_cast<num_jobs_t>(loaded.size()));
     for (auto& job : loaded) {
+        if (m_data.full()) {
+            // Reclaim at the point of need, as load_data() itself is
+            // loading: try the front first, grow only as a last resort.
+            // current_time=0 here, not sim_time_t::max() - every job's
+            // end_time is still the sentinel at load time (a large but
+            // finite value), and passing max() would make the sentinel
+            // itself satisfy "end_time <= current_time", incorrectly
+            // reclaiming jobs that haven't run yet. 0 is always earlier
+            // than any real end_time and never reaches the sentinel, so
+            // only the separate rejected-job (submit_time==sentinel)
+            // check could ever fire here - which is correct, since
+            // rejection is a simulation-time event via submit_job(),
+            // not a load-time one, so it never actually does yet either.
+            // Always a no-op today; keeps the pattern correct and ready
+            // for chunked loading, which will need it for real.
+            reclaim_front_jobs(0);
+        }
         if (m_data.full()) {
             if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
                 throw std::runtime_error(
@@ -219,7 +236,7 @@ void Trace::process_events_until(const epoch_t& t_sub)
             // can newly unblock the front.
             sim_time_t current_time = static_cast<sim_time_t>(event_time.first) +
                                        event_time.second;
-            evict_front_jobs(current_time);
+            reclaim_front_jobs(current_time);
         }
     }
 }
@@ -360,11 +377,11 @@ bool Trace::process_single_event()
 
     if (!event.is_arrival()) {
         // A job just finished - its slot (or one ahead of it, by job_no)
-        // may now be safe to evict. Only departures can possibly unblock
+        // may now be safe to reclaim. Only departures can possibly unblock
         // the front; checking on arrivals too would just be wasted work.
         sim_time_t current_time = static_cast<sim_time_t>(event.get_time().first) +
                                    event.get_time().second;
-        evict_front_jobs(current_time);
+        reclaim_front_jobs(current_time);
     }
 
     return true;
@@ -410,14 +427,14 @@ void Trace::resolve_resource_history_capacity()
     if (cap == 0) {
         // Auto-size: every job contributes at most 2 events (start,
         // end), each producing one resource-history sample - large
-        // enough that eviction is never needed purely to make room,
+        // enough that reclaiming is never needed purely to make room,
         // matching the "0 = size of job trace" convention the wait
         // queue and job store both use.
         // 4096 floor: m_data.size() may still be tiny (or 0, in a
         // streaming session where jobs arrive one at a time) at the
         // moment the very first sample is recorded, well before most
         // jobs have actually arrived - sizing purely off what's loaded
-        // so far would cause needless eviction thrashing right from the
+        // so far would cause needless reclaiming thrashing right from the
         // start of a long-running session.
         cap = std::max<size_t>(m_data.size() * 2, 4096ul);
     }
@@ -457,9 +474,9 @@ void Trace::record_resource_sample(const epoch_t& time, num_nodes_t allocated)
 {
     resolve_resource_history_capacity();
     if (m_ctx.m_resource_history.full()) {
-        // Every entry here is always safe to evict (see m_resource_history's
+        // Every entry here is always safe to reclaim (see m_resource_history's
         // own comment in trace.hpp) - flush the whole buffer to make room
-        // in one batch, rather than evicting one at a time.
+        // in one batch, rather than reclaiming one at a time.
         flush_resource_history();
     }
     m_ctx.m_resource_history.push_back(std::make_pair(time, allocated));
@@ -467,12 +484,12 @@ void Trace::record_resource_sample(const epoch_t& time, num_nodes_t allocated)
 
 Job_Record& Trace::job_at(job_no_t job_no)
 {
-    if (job_no < m_num_evicted) {
+    if (job_no < m_num_reclaimed) {
         throw std::runtime_error(
             "Trace::job_at(): job_no=" + std::to_string(job_no) +
-            " was already evicted (m_num_evicted=" + std::to_string(m_num_evicted) + ")");
+            " was already reclaimed (m_num_reclaimed=" + std::to_string(m_num_reclaimed) + ")");
     }
-    const size_t idx = static_cast<size_t>(job_no - m_num_evicted);
+    const size_t idx = static_cast<size_t>(job_no - m_num_reclaimed);
     if (idx >= m_data.size()) {
         throw std::runtime_error(
             "Trace::job_at(): job_no=" + std::to_string(job_no) +
@@ -487,7 +504,7 @@ const Job_Record& Trace::job_at(job_no_t job_no) const
     return const_cast<Trace*>(this)->job_at(job_no);
 }
 
-bool Trace::is_front_evictable(sim_time_t current_time) const
+bool Trace::is_front_reclaimable(sim_time_t current_time) const
 {
     if (m_data.empty()) {
         return false;
@@ -502,29 +519,30 @@ bool Trace::is_front_evictable(sim_time_t current_time) const
     return convert_epoch<sim_time_t>(job.get_end_time()) <= current_time;
 }
 
-void Trace::evict_front_jobs(sim_time_t current_time)
+void Trace::reclaim_front_jobs(sim_time_t current_time)
 {
-    // Only reclaim when actually needed - not proactively the moment a
-    // job finishes. Same "only when full" gating as resource-history's
-    // record_resource_sample(); without it, every completion would
-    // evict immediately even with plenty of room left, discarding data
-    // (write_simulated_trace(), stats) that hasn't been read yet.
+    // Lazy reclaim: only when actually needed, not proactively the
+    // moment a job finishes. Same "only when full" gating as
+    // resource-history's record_resource_sample(); without it, every
+    // completion would reclaim immediately even with plenty of room
+    // left, discarding data (write_simulated_trace(), stats) that
+    // hasn't been read yet.
     if (!m_data.full()) {
         return;
     }
-    while (m_data.full() && is_front_evictable(current_time)) {
+    while (m_data.full() && is_front_reclaimable(current_time)) {
         write_job_line(m_data.front());
         m_data.pop_front();
-        ++m_num_evicted;
+        ++m_num_reclaimed;
     }
-    // No compaction: if still full and the front isn't evictable, that's
+    // No compaction: if still full and the front isn't reclaimable, that's
     // exactly the case m_job_store_overflow exists for - same fallback
     // the wait queue already uses.
     if (m_data.full()) {
         if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
             throw std::runtime_error(
                 "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
-                ") exceeded and the front job isn't safe to evict yet; "
+                ") exceeded and the front job isn't safe to reclaim yet; "
                 "use --job_store_overflow grow or a larger --job_store_capacity");
         }
         m_data.set_capacity(std::max<size_t>(m_data.capacity() * 2, 1));
@@ -586,7 +604,7 @@ void Trace::write_simulated_trace(const std::string& filename, bool msec)
     if (!m_simulated_trace_ofs.is_open()) {
         // start_simulated_trace() was never called - open fresh here and
         // write m_data's current contents in one shot (the original,
-        // pre-streaming behavior). Anything already evicted before this
+        // pre-streaming behavior). Anything already reclaimed before this
         // call is already gone.
         start_simulated_trace(filename, msec);
     }
@@ -605,7 +623,7 @@ void Trace::write_resource_trace(const std::string& filename,
     if (!m_resource_trace_ofs.is_open()) {
         // start_resource_trace() was never called (or was called with a
         // different/empty filename) - open fresh here. Note: anything
-        // already evicted before this point (silently discarded, since no
+        // already reclaimed before this point (silently discarded, since no
         // file was open yet to receive it) is already gone; callers that
         // want everything preserved should call start_resource_trace()
         // before any processing begins instead.

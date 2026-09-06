@@ -52,7 +52,7 @@ class Trace_Params {
 
     /// Initial capacity for the resource-history circular buffer (0 =
     /// size of the job trace). No overflow policy: every entry here is
-    /// always immediately safe to evict, so eviction on capacity always
+    /// always immediately safe to reclaim, so reclaiming when full always
     /// succeeds - see Trace::m_resource_history's own comment.
     size_t m_resource_history_capacity;
 
