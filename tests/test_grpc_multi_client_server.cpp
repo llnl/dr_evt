@@ -34,11 +34,14 @@
  *
  * Usage:
  *   mpirun -np <2*N> ./test_grpc_multi_client_server \
- *       <server_binary_path> <base_port> <trace_file_1> [<trace_file_2> ...]
+ *       <server_binary_path> <base_port> <ordinary_trace_1>
+ *       <ordinary_trace_2> <composite_trace>
  *
  * Rank layout: ranks [0, N) are servers, ranks [N, 2N) are clients -
  * client rank N+i is paired with server rank i, both driven from
- * trace_file_i.
+ * ordinary_trace_i.  The composite trace has one row for each fragment of a
+ * cross-server job, and is used to exercise AppendJobsRequest at the exact
+ * logical-time boundaries documented below.
  */
 
 #include <mpi.h>
@@ -46,9 +49,12 @@
 
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 #include <vector>
 #include <string>
+#include <map>
+#include <algorithm>
 #include <limits>
 #include <cstring>
 #include <unistd.h>
@@ -85,27 +91,133 @@ std::string get_own_ip()
     return "127.0.0.1";
 }
 
-// Reads job_submit_time (column 0) from a simple-format trace CSV. Same
-// approach as dr_evt_client.cpp's own trace reading - the client, not the
-// server, is authoritative on arrival timing for the streaming API (see
-// dr_evt_client.cpp's own comment on this).
-std::vector<double> read_submit_times(const std::string& trace_file)
+struct Job {
+    double submit_time;
+    uint32_t num_nodes;
+    std::string queue;
+    double limit_time;
+};
+
+struct CompositeEvent {
+    double submit_time;
+    std::map<std::string, Job> fragments;
+};
+
+std::vector<std::string> split_csv(const std::string& line)
 {
-    std::vector<double> times;
+    std::vector<std::string> fields;
+    std::istringstream stream(line);
+    std::string field;
+    while (std::getline(stream, field, ',')) fields.push_back(field);
+    return fields;
+}
+
+std::vector<Job> read_jobs(const std::string& trace_file)
+{
+    std::vector<Job> jobs;
     std::ifstream ifs(trace_file);
     if (!ifs) {
         throw std::runtime_error("Failed to open trace file: " + trace_file);
     }
     std::string line;
-    std::getline(ifs, line);  // header
+    std::getline(ifs, line);
+    const auto header = split_csv(line);
+    if (header.size() < 4 || header[0] != "job_submit_time" ||
+        header[1] != "num_nodes" || header[2] != "queue" ||
+        header[3] != "time_limit") {
+        throw std::runtime_error("Expected simple job CSV header in " + trace_file);
+    }
     while (std::getline(ifs, line)) {
         if (line.empty()) continue;
-        std::istringstream iss(line);
-        std::string first_field;
-        std::getline(iss, first_field, ',');
-        times.push_back(std::stod(first_field));
+        const auto fields = split_csv(line);
+        if (fields.size() < 4) {
+            throw std::runtime_error("Malformed job row in " + trace_file);
+        }
+        jobs.push_back({std::stod(fields[0]), static_cast<uint32_t>(std::stoul(fields[1])),
+                        fields[2], std::stod(fields[3])});
     }
-    return times;
+    if (!std::is_sorted(jobs.begin(), jobs.end(),
+                        [](const Job& a, const Job& b) {
+                            return a.submit_time < b.submit_time;
+                        })) {
+        throw std::runtime_error("Job times must be non-decreasing in " + trace_file);
+    }
+    return jobs;
+}
+
+std::vector<CompositeEvent> read_composite_events(const std::string& trace_file)
+{
+    std::ifstream ifs(trace_file);
+    if (!ifs) throw std::runtime_error("Failed to open composite trace: " + trace_file);
+    std::string line;
+    std::getline(ifs, line);
+    const auto header = split_csv(line);
+    if (header.size() < 6 || header[0] != "composite_id" ||
+        header[1] != "submit_time" || header[2] != "system_id" ||
+        header[3] != "num_nodes" || header[4] != "queue" ||
+        header[5] != "time_limit") {
+        throw std::runtime_error("Expected composite-job CSV header in " + trace_file);
+    }
+
+    std::vector<CompositeEvent> events;
+    std::string current_id;
+    while (std::getline(ifs, line)) {
+        if (line.empty()) continue;
+        const auto fields = split_csv(line);
+        if (fields.size() < 6) throw std::runtime_error("Malformed composite row in " + trace_file);
+        const double submit_time = std::stod(fields[1]);
+        if (fields[0] != current_id) {
+            if (!events.empty() && submit_time <= events.back().submit_time) {
+                throw std::runtime_error("Composite events must be strictly time-ordered");
+            }
+            events.push_back({submit_time, {}});
+            current_id = fields[0];
+        } else if (submit_time != events.back().submit_time) {
+            throw std::runtime_error("Composite fragments in one event must share a submit time");
+        }
+        const auto inserted = events.back().fragments.emplace(
+            fields[2], Job{submit_time, static_cast<uint32_t>(std::stoul(fields[3])),
+                           fields[4], std::stod(fields[5])});
+        if (!inserted.second) throw std::runtime_error("Duplicate composite system_id: " + fields[2]);
+    }
+    return events;
+}
+
+std::string expected_fixture_path(const std::string& ordinary_trace,
+                                  const std::string& suffix)
+{
+    const auto extension = ordinary_trace.rfind(".csv");
+    if (extension == std::string::npos) {
+        throw std::runtime_error("Ordinary trace must have a .csv extension: " +
+                                 ordinary_trace);
+    }
+    return ordinary_trace.substr(0, extension) + suffix;
+}
+
+bool files_match(const std::string& expected_path, const std::string& actual_path,
+                 const std::string& description)
+{
+    std::ifstream expected(expected_path, std::ios::binary);
+    std::ifstream actual(actual_path, std::ios::binary);
+    if (!expected || !actual) {
+        std::cerr << "Unable to open " << description << " for comparison: expected="
+                  << expected_path << ", actual=" << actual_path << std::endl;
+        return false;
+    }
+
+    std::istreambuf_iterator<char> expected_it(expected);
+    std::istreambuf_iterator<char> actual_it(actual);
+    const std::istreambuf_iterator<char> end;
+    while (expected_it != end && actual_it != end && *expected_it == *actual_it) {
+        ++expected_it;
+        ++actual_it;
+    }
+    const bool matches = (expected_it == end && actual_it == end);
+    if (!matches) {
+        std::cerr << description << " differs from its offline expected fixture: expected="
+                  << expected_path << ", actual=" << actual_path << std::endl;
+    }
+    return matches;
 }
 
 } // namespace
@@ -213,9 +325,49 @@ int run_server_rank(int my_rank, int paired_client_rank,
     return 0;
 }
 
+void append_and_submit(SimulationClient& client, const std::vector<Job>& jobs,
+                       int my_rank, const std::string& phase)
+{
+    if (jobs.empty()) return;
+    ClientMessage append_req;
+    auto* append = append_req.mutable_append_jobs();
+    for (const auto& job : jobs) {
+        auto* request = append->add_requests();
+        request->set_submit_time(job.submit_time);
+        request->set_num_nodes(job.num_nodes);
+        request->set_queue(job.queue);
+        request->set_limit_time(job.limit_time);
+    }
+    const auto response = client.call(append_req);
+    const auto& job_idxs = response.append_jobs().job_idx();
+    if (job_idxs.size() != static_cast<int>(jobs.size())) {
+        throw std::runtime_error("AppendJobs returned the wrong number of job indexes");
+    }
+    for (size_t i = 0; i < jobs.size(); ++i) {
+        ClientMessage submit_req;
+        auto* submit = submit_req.mutable_submit_job();
+        submit->set_job_idx(job_idxs.Get(static_cast<int>(i)));
+        submit->set_submit_time(jobs[i].submit_time);
+        client.call(submit_req);
+    }
+    std::cout << "[client rank " << my_rank << "] append_jobs(" << phase
+              << ") appended and submitted " << jobs.size() << " jobs" << std::endl;
+}
+
+void advance_to(SimulationClient& client, double time, int my_rank,
+                const std::string& phase)
+{
+    ClientMessage request;
+    request.mutable_advance_to()->set_target_time(time);
+    client.call(request);
+    std::cout << "[client rank " << my_rank << "] advance_to(" << time
+              << ") for " << phase << std::endl;
+}
+
 int run_client_rank(int my_rank, int paired_server_rank,
-                     const std::string& trace_file, int total_nodes,
-                     MPI_Comm client_comm)
+                     const std::string& trace_file,
+                     const std::string& composite_trace, int pair_index,
+                     int total_nodes, MPI_Comm client_comm)
 {
     // Receive the paired server's actual, connectable address.
     char addr_buf[256] = {0};
@@ -274,75 +426,118 @@ int run_client_rank(int my_rank, int paired_server_rank,
     init->set_backfill_policy("easy");
     init->set_priority_policy("fcfs");
     init->set_run_time_mode("limit");
+    // The client, rather than InitializeTrace, owns all three input files.
+    // Keeping this source trace unloaded makes every ordinary and composite
+    // job pass through AppendJobsRequest.
     init->set_infile(trace_file);
+    init->set_session_name("multi-client-test");
     client.call(init_req);
 
-    ClientMessage trace_req;
-    trace_req.mutable_initialize_trace()->set_max_jobs(0);
-    auto trace_resp = client.call(trace_req);
-    uint64_t num_jobs = trace_resp.initialize_trace().num_jobs_loaded();
-
-    std::vector<double> submit_times = read_submit_times(trace_file);
-    if (submit_times.size() != num_jobs) {
-        throw std::runtime_error("Server loaded " + std::to_string(num_jobs) +
-            " jobs but client parsed " + std::to_string(submit_times.size()));
+    const std::vector<Job> ordinary_jobs = read_jobs(trace_file);
+    const std::vector<CompositeEvent> events = read_composite_events(composite_trace);
+    const std::string system_id = "server" + std::to_string(pair_index + 1);
+    if (events.size() < 2) {
+        throw std::runtime_error("Composite trace must contain at least two time-ordered events");
+    }
+    for (const auto& event : events) {
+        if (event.fragments.count(system_id) == 0) {
+            throw std::runtime_error("Composite event is missing a fragment for " + system_id);
+        }
     }
 
-    std::cout << "[client rank " << my_rank << "] loaded " << num_jobs
-              << " jobs, entering lockstep loop" << std::endl;
-
-    // Lockstep loop: every round, every client (across client_comm)
-    // reports the arrival time of its own next not-yet-submitted job (or
-    // +infinity once exhausted). The global minimum across all clients is
-    // the only time it's safe for anyone to advance to - no client can
-    // still have an unsubmitted job below that time once this round's
-    // Allreduce completes. Whoever's own next job matches the global
-    // minimum submits it (there may be ties - simultaneous arrivals
-    // across streams - each such client submits its own job this round).
-    size_t next_idx = 0;
-    const double INF = std::numeric_limits<double>::max();
-
-    while (true) {
-        double my_next_time = (next_idx < submit_times.size())
-                                 ? submit_times[next_idx] : INF;
-        double global_min_time = INF;
-        MPI_Allreduce(&my_next_time, &global_min_time, 1, MPI_DOUBLE,
-                       MPI_MIN, client_comm);
-
-        if (global_min_time == INF) {
-            break;  // every client has exhausted its jobs
-        }
-
-        if (my_next_time == global_min_time) {
-            ClientMessage submit_req;
-            auto* submit = submit_req.mutable_submit_job();
-            submit->set_job_idx(static_cast<uint32_t>(next_idx));
-            submit->set_submit_time(my_next_time);
-            client.call(submit_req);
-            ++next_idx;
-        }
-
-        ClientMessage advance_req;
-        advance_req.mutable_advance_to()->set_target_time(global_min_time);
-        client.call(advance_req);
+    // The first composite event tests equality: batch through t2, then
+    // advance_to(t1 == t2), then append its composite fragment at t3 == t2.
+    // Later events are a stream: before each one, append all newly-known
+    // ordinary jobs and advance to a point no later than their final time.
+    // The supplied fixture has an intervening ordinary job, giving t1 < t2 <
+    // t3, and a final ordinary job at t4 > t3.
+    std::vector<Job> first_batch;
+    for (const auto& job : ordinary_jobs) {
+        if (job.submit_time <= events[0].submit_time) first_batch.push_back(job);
+    }
+    if (first_batch.empty() || first_batch.back().submit_time != events[0].submit_time) {
+        throw std::runtime_error("Ordinary traces must end their initial batch at the first composite time");
     }
 
-    // Drain any jobs still running past the last submission.
-    ClientMessage final_advance;
-    final_advance.mutable_advance_to()->set_target_time(1e12);
-    client.call(final_advance);
+    append_and_submit(client, first_batch, my_rank, "ordinary through t2 (equal)");
+    advance_to(client, events[0].submit_time, my_rank, "t1 == t2");
+    MPI_Barrier(client_comm);
+    append_and_submit(client, {events[0].fragments.at(system_id)}, my_rank,
+                      "composite at t3 == t2");
+    MPI_Barrier(client_comm);
+    advance_to(client, events[0].submit_time, my_rank, "evaluate equal-time composite");
 
-    ClientMessage stats_req;
-    stats_req.mutable_get_statistics();
-    auto stats_resp = client.call(stats_req);
-    const auto& stats = stats_resp.get_statistics();
+    size_t next_ordinary = first_batch.size();
+    bool exercised_strict_boundary = false;
+    for (size_t event_index = 1; event_index < events.size(); ++event_index) {
+        const auto& event = events[event_index];
+        std::vector<Job> batch;
+        while (next_ordinary < ordinary_jobs.size() &&
+               ordinary_jobs[next_ordinary].submit_time < event.submit_time) {
+            batch.push_back(ordinary_jobs[next_ordinary++]);
+        }
+        if (!batch.empty()) {
+            append_and_submit(client, batch, my_rank, "ordinary through t2 before composite stream");
+            const double t2 = batch.back().submit_time;
+            const double previous_time = events[event_index - 1].submit_time;
+            const double t1 = (previous_time + t2) / 2.0;
+            if (t1 < t2) exercised_strict_boundary = true;
+            advance_to(client, t1, my_rank, "t1 < t2");
+        }
+        MPI_Barrier(client_comm);
+        append_and_submit(client, {event.fragments.at(system_id)}, my_rank,
+                          "composite at t3 after ordinary batch");
+        MPI_Barrier(client_comm);
+        advance_to(client, event.submit_time, my_rank, "evaluate composite stream event");
+    }
+    if (!exercised_strict_boundary) {
+        throw std::runtime_error("Composite stream needs an ordinary job strictly between two composite events");
+    }
+
+    std::vector<Job> final_batch(ordinary_jobs.begin() + next_ordinary, ordinary_jobs.end());
+    if (final_batch.empty() || final_batch.front().submit_time <= events.back().submit_time) {
+        throw std::runtime_error("Ordinary trace needs a final t4 strictly after the composite stream");
+    }
+    append_and_submit(client, final_batch, my_rank, "ordinary at t4 > final composite t3");
+
+    // FinishSimulation is the session-level completion API: it drains all
+    // submitted work, writes the session reports, returns final statistics,
+    // and releases the server-side Simulation before we close the stream.
+    ClientMessage finish_req;
+    finish_req.mutable_finish_simulation();
+    const auto finish_resp = client.call(finish_req);
+    const auto& finish = finish_resp.finish_simulation();
+    const auto& stats = finish.statistics();
 
     std::cout << "[client rank " << my_rank << "] final stats: "
               << "submitted=" << stats.jobs_submitted()
               << " completed=" << stats.jobs_completed()
-              << " makespan=" << stats.makespan() << std::endl;
+              << " makespan=" << stats.makespan()
+              << " (FinishSimulation)" << std::endl;
 
-    int completed_ok = (stats.jobs_completed() == num_jobs) ? 1 : 0;
+    const uint64_t expected_jobs = ordinary_jobs.size() + events.size();
+    int completed_ok = (stats.jobs_submitted() == expected_jobs &&
+                        stats.jobs_completed() == expected_jobs &&
+                        !finish.session_id().empty() &&
+                        !finish.simulated_trace_file().empty() &&
+                        !finish.resource_trace_file().empty() &&
+                        !finish.statistics_file().empty()) ? 1 : 0;
+
+    // The expected files are generated offline by treating each composite
+    // fragment as a normal job in its owning server's ordinary stream. This
+    // is an independent schedule/resource oracle for the gRPC session: MPI
+    // only coordinates when the fragments arrive; it does not share either
+    // scheduler's resources or state.
+    const std::string expected_schedule = expected_fixture_path(
+        trace_file, ".expected_output.csv");
+    const std::string expected_resources = expected_fixture_path(
+        trace_file, ".expected_resources.csv");
+    if (!files_match(expected_schedule, finish.simulated_trace_file(),
+                     "Simulated schedule") ||
+        !files_match(expected_resources, finish.resource_trace_file(),
+                     "Resource trace")) {
+        completed_ok = 0;
+    }
 
     client.finish();
 
@@ -372,12 +567,15 @@ int main(int argc, char** argv)
     }
     int num_pairs = world_size / 2;
 
-    // argv: [1]=server_binary [2]=base_port [3..]=trace files, one per pair
-    if (argc < 3 + num_pairs) {
+    // This is intentionally a two-server composite-job integration test.
+    // argv: [1]=server_binary [2]=base_port [3]=ordinary server1 trace
+    //       [4]=ordinary server2 trace [5]=shared composite trace
+    if (num_pairs != 2 || argc != 6) {
         if (world_rank == 0) {
             std::cerr << "Usage: mpirun -np " << world_size << " " << argv[0]
                       << " <server_binary> <base_port> "
-                      << "<trace_file_1> ... <trace_file_" << num_pairs << ">"
+                      << "<ordinary_trace_server1> <ordinary_trace_server2> "
+                      << "<composite_trace> (requires exactly four ranks)"
                       << std::endl;
         }
         MPI_Finalize();
@@ -406,9 +604,10 @@ int main(int argc, char** argv)
             rc = run_server_rank(world_rank, paired_rank, server_binary, port);
         } else {
             std::string trace_file = argv[3 + pair_index];
+            std::string composite_trace = argv[5];
             int total_nodes = 100;
-            rc = run_client_rank(world_rank, paired_rank, trace_file,
-                                   total_nodes, client_comm);
+            rc = run_client_rank(world_rank, paired_rank, trace_file, composite_trace,
+                                 pair_index, total_nodes, client_comm);
         }
     } catch (const std::exception& e) {
         std::cerr << "[rank " << world_rank << "] FATAL ERROR: " << e.what() << std::endl;

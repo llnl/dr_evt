@@ -108,7 +108,12 @@ The server binds `0.0.0.0` by default in the examples above so it's
 reachable from other machines - bind `127.0.0.1` instead if you only need
 same-machine access.
 
-## Multi-client/multi-server: the MPI test harness
+## Optional MPI test harness
+
+The normal client/server deployment is a directly managed bare-metal server or
+a containerized server, with clients connecting over gRPC. MPI is neither
+required nor recommended as the default deployment mechanism. The harness in
+this section exists to exercise coordinated multi-client test scenarios.
 
 A single client feeding a single server needs no special coordination.
 But when **multiple independent clients** are each feeding their own
@@ -120,30 +125,83 @@ cross-stream arrival ordering the two streams are meant to represent
 together.
 
 `tests/test_grpc_multi_client_server.cpp` (built as
-`test_grpc_multi_client_server`, requires MPI - see below) demonstrates
-and tests the fix: a conservative, lockstep synchronization scheme, in the
-same spirit as Chandy-Misra-Bryant parallel discrete-event simulation.
-Every round, every client reports the arrival time of its own next
-not-yet-submitted job (`MPI_Allreduce(MPI_MIN)` across a client-only MPI
-sub-communicator); the global minimum across all clients is the only time
-it's safe for *any* of them to advance to, since no client can still have
-an unsubmitted job below that time once the reduction completes. Whichever
-client's own next job matches that global minimum submits it this round
-(ties - simultaneous arrivals across streams - are both submitted in the
-same round); every client then advances its own server to the global
-minimum; repeat until every client has exhausted its trace.
+`test_grpc_multi_client_server`, requires MPI - see below) is a two-server
+composite-stream integration test. Its two client ranks load separate
+ordinary-job CSVs plus a shared composite-job CSV. Composite rows are grouped
+by `composite_id`; every event supplies one fragment per server and the
+clients synchronize with an MPI client-only barrier before issuing the two
+corresponding `AppendJobsRequest`s.
 
-Note what this coordination does and doesn't guarantee: since each
-client/server pair is otherwise fully independent (no shared nodes or
-state between the separate `Simulation` instances), the lockstep
-scheme doesn't change either individual simulation's own schedule - that's
-already guaranteed correct by `advance_to()`'s own precondition,
-regardless of pacing. What it provides is realistic, coordinated wall-clock
-pacing *across* the streams, for scenarios where that relative timing
-matters (e.g. future cross-stream interaction, or live/interactive
-multi-site demos).
+The first composite event tests the inclusive boundary
+`append_jobs(... <= t2)`, `advance_to(t1 == t2)`, then composite append at
+`t3 == t2`. Subsequent composite events form an ordered stream. The fixture
+also includes an ordinary batch with `t1 < t2 < t3`, followed by ordinary
+work at `t4 > t3`, so both equality and strict inequalities are tested over
+the network API.
 
-### Building and running
+### Composite-stream test timeline
+
+```{mermaid}
+sequenceDiagram
+    participant C1 as Client 1
+    participant S1 as Server 1
+    participant C2 as Client 2
+    participant S2 as Server 2
+
+    Note over C1,S2: Client inputs: ordinary-server1.csv, ordinary-server2.csv, composite_jobs.csv
+    par Initial ordinary batch, through t2 = 10
+        C1->>S1: AppendJobs([t=0, t=10]) + SubmitJob
+    and
+        C2->>S2: AppendJobs([t=0, t=10]) + SubmitJob
+    end
+    par Equality boundary: t1 = t2 = t3 = 10
+        C1->>S1: AdvanceTo(10)
+    and
+        C2->>S2: AdvanceTo(10)
+    end
+    Note over C1,C2: MPI barrier
+    par Composite event "equal_boundary"
+        C1->>S1: AppendJobs([composite fragment, t=10]) + SubmitJob
+    and
+        C2->>S2: AppendJobs([composite fragment, t=10]) + SubmitJob
+    end
+    par Evaluate equal-time arrivals
+        C1->>S1: AdvanceTo(10)
+    and
+        C2->>S2: AdvanceTo(10)
+    end
+
+    par Ordinary batch through t2 = 20
+        C1->>S1: AppendJobs([t=20]) + SubmitJob
+    and
+        C2->>S2: AppendJobs([t=20]) + SubmitJob
+    end
+    par Strict boundary: t1 = 15 < t2 = 20 < t3 = 25
+        C1->>S1: AdvanceTo(15)
+    and
+        C2->>S2: AdvanceTo(15)
+    end
+    Note over C1,C2: MPI barrier
+    par Composite event "strict_boundary"
+        C1->>S1: AppendJobs([composite fragment, t=25]) + SubmitJob
+    and
+        C2->>S2: AppendJobs([composite fragment, t=25]) + SubmitJob
+    end
+    par Evaluate composite event
+        C1->>S1: AdvanceTo(25)
+    and
+        C2->>S2: AdvanceTo(25)
+    end
+    par Final ordinary work: t4 = 30 > t3
+        C1->>S1: AppendJobs([t=30]) + SubmitJob
+        C1->>S1: FinishSimulation()
+    and
+        C2->>S2: AppendJobs([t=30]) + SubmitJob
+        C2->>S2: FinishSimulation()
+    end
+```
+
+### Building and running the test
 
 Requires MPI (`find_package(MPI)` in `CMakeLists.txt` - the target is
 silently skipped, not a build failure, if MPI isn't found):
@@ -152,22 +210,19 @@ silently skipped, not a build failure, if MPI isn't found):
 cmake .. -DDR_EVT_ENABLE_PROTOBUF=ON -DDR_EVT_ENABLE_GRPC=ON
 make test_grpc_multi_client_server-bin
 
-mpirun -np <2*N> ./build/test_grpc_multi_client_server \
+mpirun -np 4 ./build/test_grpc_multi_client_server \
     ./build/dr_evt_server <base_port> \
-    <trace_file_1> ... <trace_file_N>
+    tests/test_traces/grpc/composite_server1.csv \
+    tests/test_traces/grpc/composite_server2.csv \
+    tests/test_traces/grpc/composite_jobs.csv
 ```
 
-Rank layout: with `2*N` total ranks, ranks `[0, N)` are servers and ranks
-`[N, 2N)` are clients, paired 1:1 (client rank `N+i` drives server rank
-`i`, both using `trace_file_i`). Each server rank forks and execs its own
-`dr_evt_server` child process, listening on `<base_port> + i`, and sends
-its own real hostname (via `gethostname()`, not assumed shared loopback)
-to its paired client over MPI - so this places correctly across real,
-physically separate nodes via `mpirun`'s own host placement
-(`--host`/`--hostfile`), not just on a single machine. (Verified
-single-node only in development - no multi-node environment was available
-to confirm cross-machine placement directly, though nothing in the design
-assumes same-machine access.)
+Rank layout: ranks 0-1 are servers and ranks 2-3 are clients, paired 1:1.
+Each server rank forks and execs its own
+`dr_evt_server` child process, listening on `<base_port> + i`. The current
+test advertises `127.0.0.1` to its paired client, so it is a **single-node
+test**; use one allocated node for it. It is intentionally a testing aid, not
+a multi-node deployment recipe.
 
 ## Testing
 
@@ -179,13 +234,10 @@ built or `mpirun` isn't on `PATH`):
 ./tests/run_grpc_tests.sh
 ```
 
-It uses `tests/test_traces/grpc/trace_a.csv` and `trace_b.csv` - two small,
-independent traces with deliberately interleaved arrival times, chosen
-specifically to exercise the lockstep synchronization (rather than two
-traces that happen to never actually compete for the same round). Expected
-makespans (40 and 30 respectively) are hand-computed directly from each
-trace's own job list, not generated by any script - see the comments in
-`tests/run_grpc_tests.sh` for the arithmetic.
+It uses `composite_server1.csv`, `composite_server2.csv`, and
+`composite_jobs.csv`. The three files deliberately exercise the equal-time
+and strict-time `AppendJobsRequest`/`AdvanceToRequest` boundaries described
+above.
 
 This is a separate, dedicated test script (not folded into
 `run_feature_tests.sh` or another existing harness) because it needs its

@@ -141,6 +141,7 @@ int main(int argc, char** argv)
         init->set_run_time_mode("limit");  // append_job()'d jobs have no actual_run_time column to read
         init->set_infile(job_data_file);
         init->set_queue_impl("circular");
+        init->set_session_name("example-client");
         client.call(init_req);
         std::cout << "Session initialized. Server has not loaded any jobs yet.\n";
 
@@ -178,22 +179,13 @@ int main(int argc, char** argv)
         }
         std::cout << "Submitted " + std::to_string(jobs.size()) + " jobs.\n";
 
-        // 4. Advance the simulation far enough to complete all jobs.
-        // A real client would typically advance incrementally and check
-        // status between steps rather than jumping to a single large
-        // future time - see AppendJobRequest usage from a genuinely
-        // incremental driver in test_streaming_api.cpp's tests, which
-        // interleave append_job()/submit_job()/advance_to() rather than
-        // batching all of one before any of the next.
-        ClientMessage advance_req;
-        advance_req.mutable_advance_to()->set_target_time(1e9);
-        client.call(advance_req);
-
-        // 5. Query final statistics
-        ClientMessage stats_req;
-        stats_req.mutable_get_statistics();
-        auto stats_resp = client.call(stats_req);
-        const auto& stats = stats_resp.get_statistics();
+        // 4. Finish declares there will be no more arrivals. It drains all
+        // submitted work, writes session-scoped reports, and resets only
+        // this stream's simulation; dr_evt_server itself keeps running.
+        ClientMessage finish_req;
+        finish_req.mutable_finish_simulation();
+        auto finish_resp = client.call(finish_req).finish_simulation();
+        const auto& stats = finish_resp.statistics();
 
         std::cout << "\n=== Final Statistics ===\n"
                   << "Jobs submitted:  " << stats.jobs_submitted() << "\n"
@@ -201,8 +193,13 @@ int main(int argc, char** argv)
                   << "Current time:    " << stats.current_time() << "\n"
                   << "Utilization:     " << (stats.utilization() * 100.0) << "%\n"
                   << "Avg wait time:   " << stats.avg_wait_time() << "\n"
-                  << "Makespan:        " << stats.makespan() << "\n";
+                  << "Makespan:        " << stats.makespan() << "\n"
+                  << "Session ID:      " << finish_resp.session_id() << "\n"
+                  << "Statistics file: " << finish_resp.statistics_file() << "\n";
 
+        // To reuse this same bidirectional stream, send another InitRequest
+        // here and run its append/submit/finish sequence; call client.finish()
+        // only when no further simulations will use the stream.
     } catch (const std::exception& e) {
         std::cerr << "Client error: " << e.what() << std::endl;
         client.finish();

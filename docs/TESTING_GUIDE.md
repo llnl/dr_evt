@@ -397,6 +397,61 @@ cd build
 **Tests hardcoded in script:**
 - `feature/empty_trace.csv` (gRPC test - header-only, zero data rows)
 
+### MPI gRPC composite-stream integration test
+
+`tests/run_grpc_composite_mpi_test.sh` runs the MPI-aware
+`test_grpc_multi_client_server` harness against two local gRPC servers. The
+four ranks are two servers (0 and 1) and their paired clients (2 and 3). Each
+client submits its ordinary-job stream to its own server; at each composite
+event, the clients synchronize before submitting one fragment to each server.
+
+```{mermaid}
+sequenceDiagram
+    participant C1 as Client 1 / Server 1
+    participant C2 as Client 2 / Server 2
+
+    Note over C1,C2: Ordinary jobs through t2 = 10
+    par
+        C1->>C1: AppendJobs(t=0, 10); AdvanceTo(10)
+    and
+        C2->>C2: AppendJobs(t=0, 10); AdvanceTo(10)
+    end
+    Note over C1,C2: MPI barrier; equal-time composite: t3 = t2 = 10
+    par
+        C1->>C1: AppendJobs(composite fragment t=10); AdvanceTo(10)
+    and
+        C2->>C2: AppendJobs(composite fragment t=10); AdvanceTo(10)
+    end
+    Note over C1,C2: Ordinary batch at t=20; advance to t1 = 15
+    par
+        C1->>C1: AppendJobs(t=20); AdvanceTo(15)
+    and
+        C2->>C2: AppendJobs(t=20); AdvanceTo(15)
+    end
+    Note over C1,C2: MPI barrier; strict-time composite: t1 < t2 < t3 = 25
+    par
+        C1->>C1: AppendJobs(composite fragment t=25); AdvanceTo(25)
+    and
+        C2->>C2: AppendJobs(composite fragment t=25); AdvanceTo(25)
+    end
+    par Final ordinary work: t4 = 30 > t3
+        C1->>C1: AppendJobs(t=30); FinishSimulation()
+    and
+        C2->>C2: AppendJobs(t=30); FinishSimulation()
+    end
+```
+
+Run it inside a one-node Slurm allocation after installing a build with gRPC
+and MPI enabled:
+
+```bash
+./tests/run_grpc_composite_mpi_test.sh
+```
+
+The test covers the inclusive equal-time boundary (`t3 == t2`), a strict
+ordering (`t1 < t2 < t3`), and final ordinary work after the composite stream
+(`t4 > t3`).
+
 ---
 
 ## Progressive Loading Tests
@@ -571,12 +626,13 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
 | **Append-Job** | 17 | 17 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
+| **gRPC Composite Stream** | 1 | 1 | 0 | Two-server MPI integration: equal-time and ordered composite arrivals |
 | **Progressive Loading** | 14 | 14 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 7 | 7 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 158+ | 158+ | 0 | Complete test suite |
+| **TOTAL** | 159+ | 159+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

@@ -1,0 +1,31 @@
+services:
+  server:
+    build:
+      # The repository root is the build context; Dockerfiles are organized
+      # by role beneath this Compose file.
+      context: ../..
+      dockerfile: containers/docker/server/Dockerfile
+    image: dr-evt-server:local
+    ports:
+      - "${DR_EVT_PORT:-50051}:50051"
+    volumes:
+      # Simulation outputs written in /data persist in this host directory.
+      - type: bind
+        source: ${DR_EVT_RESULTS_DIR:-../../results}
+        target: /data
+
+  client:
+    build:
+      context: ../..
+      dockerfile: containers/docker/client/Dockerfile
+    image: dr-evt-client:local
+    depends_on:
+      - server
+    stdin_open: true
+    tty: true
+    working_dir: /data
+    volumes:
+      # Put trace CSVs and other client inputs in this host directory.
+      - type: bind
+        source: ${DR_EVT_DATA_DIR:-../../data}
+        target: /data

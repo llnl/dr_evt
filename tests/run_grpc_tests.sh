@@ -80,23 +80,26 @@ if [ ! -f "$MPI_TEST" ]; then
 elif ! command -v mpirun > /dev/null 2>&1; then
     echo "  ⚠ SKIP - mpirun not found on PATH"
 else
-    MPI_OUT=$(mpirun --allow-run-as-root --oversubscribe -np 4 \
+    if MPI_OUT=$(mpirun --allow-run-as-root --oversubscribe -np 4 \
         $MPI_TEST \
         $SERVER 53100 \
-        "$TRACE_DIR/trace_a.csv" "$TRACE_DIR/trace_b.csv" 2>&1) || true
+        "$TRACE_DIR/composite_server1.csv" "$TRACE_DIR/composite_server2.csv" \
+        "$TRACE_DIR/composite_jobs.csv" 2>&1); then
+        MPI_STATUS=0
+    else
+        MPI_STATUS=$?
+    fi
 
-    # Independently-verified expected makespans: trace_a=40, trace_b=30
-    # (same reasoning as test 1 above; trace_b: job 0 (5->15), job 1
-    # (15->25), job 2 (25->30)). The lockstep synchronization only
-    # affects the relative pacing of submit_job/advance_to calls across
-    # the two streams, not either individual simulation's own schedule -
-    # each pair is otherwise fully independent (no shared nodes/state
-    # between them), so these are the same values a standalone,
-    # unsynchronized run of each trace alone would also produce.
-    if echo "$MPI_OUT" | grep -q "makespan=40" && \
-       echo "$MPI_OUT" | grep -q "makespan=30" && \
-       echo "$MPI_OUT" | grep -q "submitted=3 completed=3 makespan=40" && \
-       echo "$MPI_OUT" | grep -q "submitted=3 completed=3 makespan=30"; then
+    # Each server receives four ordinary jobs and two composite fragments.
+    # The output also proves the equal (t1 == t2 == t3) and strict
+    # (t1 < t2 < t3 < t4) AppendJobs/AdvanceTo boundaries were reached.
+    if [ "$MPI_STATUS" -eq 0 ] && \
+       echo "$MPI_OUT" | grep -q "submitted=6 completed=6" && \
+       [ "$(echo "$MPI_OUT" | grep -c "submitted=6 completed=6")" -eq 2 ] && \
+       echo "$MPI_OUT" | grep -q "t1 == t2" && \
+       echo "$MPI_OUT" | grep -q "t1 < t2" && \
+       echo "$MPI_OUT" | grep -q "composite at t3 == t2" && \
+       echo "$MPI_OUT" | grep -q "composite at t3 after ordinary batch"; then
         echo "  ✓ PASS"
         PASS=$((PASS + 1))
     else

@@ -20,7 +20,8 @@ docs/
 │   ├── command-line.md            # All CLI options
 │   ├── trace-formats.md           # Input trace file formats
 │   ├── protobuf-config.md         # Protobuf config file format
-│   └── grpc-setup.md              # gRPC build/setup
+│   ├── grpc-setup.md              # Client/server build/setup
+│   └── client-server-use-cases.md # Client/server deployment examples
 ├── dev/                             # Developer documentation
 │   ├── README.md                  # Developer docs index
 │   ├── READTHEDOCS_SETUP.md       # ReadTheDocs configuration notes
@@ -53,6 +54,8 @@ docs/
 1. [User Guide](user-guide/overview.md) - Complete manual
 2. [Command-Line Options](user-guide/command-line.md) - All options
 3. [Trace Formats](user-guide/trace-formats.md) - Input files
+4. [Client/Server Setup](user-guide/grpc-setup.md) - Network client/server setup
+5. [Client/Server Use Cases](user-guide/client-server-use-cases.md) - Bare-metal, container, and multi-server deployment patterns
 
 ### For Researchers
 1. [Test Summary](TESTING_GUIDE.md#test-summary) - ✓ All tests pass

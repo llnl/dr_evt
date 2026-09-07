@@ -1,0 +1,47 @@
+# Rootless Podman image for the DR_EVT gRPC client.
+# It starts an interactive shell in the host-mounted /data directory.
+
+FROM ubuntu:24.04 AS build
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        build-essential \
+        cmake \
+        ninja-build \
+        pkg-config \
+        libboost-all-dev \
+        libgrpc++-dev \
+        libprotobuf-dev \
+        protobuf-compiler \
+        protobuf-compiler-grpc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN cmake -S . -B /build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/dr-evt \
+        -DDR_EVT_ENABLE_PROTOBUF=ON \
+        -DDR_EVT_ENABLE_GRPC=ON \
+    && cmake --build /build \
+    && cmake --install /build
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        libgrpc++-dev \
+        libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /opt/dr-evt /opt/dr-evt
+
+WORKDIR /data
+VOLUME ["/data"]
+
+ENTRYPOINT ["/bin/bash"]
