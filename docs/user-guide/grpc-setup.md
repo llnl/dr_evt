@@ -140,7 +140,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client localhost:50051 /path/to/trace.csv
 If the job data file is large enough that loading it client-side (or,
 separately, running the simulator in single-file batch mode) uses more
 memory than you'd like, see
-[`--infile_list`](command-line.md#-l---infile_list-filename) (progressive/
+[`--infile_list`](command-line.md) (progressive/
 multi-file loading) for the CLI/batch case - it's unrelated to the gRPC
 client/server specifically, but addresses the same underlying concern.
 

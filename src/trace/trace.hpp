@@ -81,6 +81,7 @@ class Trace {
     size_t m_job_store_capacity; ///< 0 = auto-size to the job trace once loaded
     bool m_job_store_capacity_resolved;
     CircularOverflowPolicy m_job_store_overflow; ///< Fallback when the front isn't safe to reclaim and the buffer's full
+    double m_memory_pressure_fraction = 0.0; ///< 0.0 = disabled; see set_memory_pressure_fraction()
 
     /// Tracks continuity across load_next_file() calls: the latest
     /// submit_time seen across every file loaded so far this way, so
@@ -229,6 +230,25 @@ class Trace {
     /// safe to reclaim (still running) - same convention as the wait queue.
     void set_job_store_overflow(CircularOverflowPolicy policy) {
         m_job_store_overflow = policy;
+    }
+
+    /// Enable/disable (and tune) the memory-pressure check that
+    /// ensure_batch_capacity() (used by both append_jobs() and
+    /// load_next_file()) runs before growing the job store for a new
+    /// batch - see check_memory_pressure()'s own doc comment for the
+    /// formula and rationale. fraction is the ceiling, as a fraction of
+    /// actual available system memory, that projected job-store usage
+    /// must stay under; 0.0 (the default) disables the check entirely.
+    /// Values are trusted as given - no range validation here, matching
+    /// set_job_store_overflow() above; the CLI (-m) and protobuf config
+    /// (memory_pressure_fraction) layers validate before calling this.
+    /// Off by default: unlike --job_store_capacity/--job_store_overflow
+    /// (which bound a buffer size the caller chose), this queries actual
+    /// system memory, which isn't something every caller wants tied to
+    /// (e.g. containerized or memory-cgroup'd environments where
+    /// /proc/meminfo may not reflect the effective limit).
+    void set_memory_pressure_fraction(double fraction) {
+        m_memory_pressure_fraction = fraction;
     }
 
     /**
@@ -610,7 +630,7 @@ class Trace {
     void reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free = 1,
                              bool handle_overflow = true);
 
-    /// Shared by append_jobs() and append_records_from_file(): ensures
+    /// Shared by append_jobs() and load_next_file(): ensures
     /// m_data has room for batch_size more entries, reclaiming first
     /// and growing (or aborting, per m_job_store_overflow) only if
     /// still short after that - extracted out of append_jobs() so both
@@ -618,6 +638,52 @@ class Trace {
     /// m_data's capacity only, never inserts anything itself - callers
     /// still do their own push_back()ing once this returns.
     void ensure_batch_capacity(sim_time_t current_time, size_t batch_size);
+
+    /// Called by ensure_batch_capacity() (after reclaiming, before
+    /// deciding whether to grow) when m_memory_pressure_fraction > 0.0.
+    /// Throws std::runtime_error if taking on batch_size more jobs
+    /// would push projected peak job-store memory past that fraction of
+    /// actual available system memory - a check against real memory
+    /// pressure, independent of whatever --job_store_capacity happens
+    /// to be set to (capacity bounds a buffer size the caller chose;
+    /// this bounds against the machine's actual, current constraint
+    /// instead).
+    ///
+    /// Formula, in units of sizeof(Job_Record): let old_cap =
+    /// m_data.capacity() and new_cap = the same doubling computation
+    /// ensure_batch_capacity()'s own grow step would use to reach
+    /// old_cap + batch_size - not a fixed multiplier guess, the exact
+    /// target capacity growing would actually allocate, however many
+    /// doublings that takes for a large batch_size. If new_cap >
+    /// old_cap (a grow would happen), projected usage is old_cap +
+    /// new_cap + batch_size: boost::circular_buffer::set_capacity()
+    /// allocates the new buffer and copies every existing entry into it
+    /// before freeing the old one, so both are resident simultaneously
+    /// mid-copy; the extra + batch_size accounts for load_next_file()'s
+    /// own temporary std::vector<Job_Record> (the whole file's rows,
+    /// read before this call, not yet moved into m_data) being resident
+    /// at the exact moment this check runs - append_jobs() has no such
+    /// vector (its Job_Append_Request is a different, smaller struct
+    /// until pushed), so counting it uniformly for both callers only
+    /// makes the check more conservative for append_jobs(), never less.
+    /// If no grow would happen (new_cap == old_cap), projected usage is
+    /// just old_cap + batch_size - the existing allocation, plus that
+    /// same temporary vector.
+    ///
+    /// This is compared against m_memory_pressure_fraction * (available
+    /// memory) / sizeof(Job_Record). The fraction leaves headroom for
+    /// everything else the process holds (the rest of the trace
+    /// machinery, the wait queue, resource history, and any headroom
+    /// the OS/other processes need) - job records aren't the only
+    /// consumer of memory here, just the one this check can reason
+    /// about.
+    ///
+    /// If available memory can't be determined at all (see
+    /// get_available_memory_bytes()'s own doc comment for when that
+    /// happens), this is a no-op: there's nothing to enforce against,
+    /// and refusing to proceed on missing information would be worse
+    /// than not checking at all.
+    void check_memory_pressure(size_t batch_size) const;
 
     /// Write one job's line to m_simulated_trace_ofs (if open and the
     /// job is_scheduled() - unscheduled/rejected jobs were never written

@@ -53,6 +53,7 @@ void Simulation::run()
     // starts, well after load.
     m_trace.set_job_store_capacity(m_params.m_job_store_capacity);
     m_trace.set_job_store_overflow(m_params.m_job_store_overflow);
+    m_trace.set_memory_pressure_fraction(m_params.m_memory_pressure_fraction);
 
     if (!m_params.m_infile_list.empty()) {
         // Progressive loading: REPLAY-format input isn't supported here

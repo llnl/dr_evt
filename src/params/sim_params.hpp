@@ -90,6 +90,7 @@ class Sim_Params {
     CircularOverflowPolicy m_wait_queue_overflow;  // What to do if circular queue capacity is exceeded
     size_t m_job_store_capacity;  // Initial capacity (0 = size of job trace)
     CircularOverflowPolicy m_job_store_overflow;  // What to do if job store capacity is exceeded
+    double m_memory_pressure_fraction;  // 0.0 = disabled; see Trace::set_memory_pressure_fraction()
     size_t m_resource_history_capacity;  // Initial capacity for the resource-history
                                           // circular buffer (0 = size of job trace).
                                           // No overflow policy: unlike the wait queue

@@ -80,6 +80,13 @@ message DR_EVT_Params {
 
         // What to do if a job-store insert would exceed job_store_capacity
         string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
+        // Before growing the job-record store for a new batch, refuse
+        // if doing so would push projected peak usage past this
+        // fraction of actual available system memory (Linux only; a
+        // no-op elsewhere). Must be > 0.0 and <= 1.0 (e.g. 0.8 for
+        // 80%); 0.0 (the default) disables the check entirely.
+        // Independent of job_store_overflow.
+        double memory_pressure_fraction = 27;
 
         // Initial capacity for the resource-history circular buffer. 0
         // means the size of the job trace. No overflow-policy field:

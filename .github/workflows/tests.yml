@@ -246,7 +246,7 @@ jobs:
         id: config
         run: |
           echo "========================================"
-          echo "Running Config Tests (5 tests)"
+          echo "Running Config Tests (6 tests)"
           echo "========================================"
           ./tests/run_configs_tests.sh
 
@@ -271,7 +271,7 @@ jobs:
         id: append-job
         run: |
           echo "========================================"
-          echo "Running Append-Job Tests (16 C++ + gRPC)"
+          echo "Running Append-Job Tests (17 C++ + gRPC)"
           echo "========================================"
           ./tests/run_append_job_tests.sh
 
@@ -279,7 +279,7 @@ jobs:
         id: progressive-load
         run: |
           echo "========================================"
-          echo "Running Progressive Loading Tests (6 C++ + 4 CLI)"
+          echo "Running Progressive Loading Tests (10 C++ + 4 CLI)"
           echo "========================================"
           ./tests/run_progressive_load_tests.sh
 
@@ -311,9 +311,10 @@ jobs:
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
           echo "  Replay (3 tests): ${{ steps.replay.outcome }}"
           echo "  Resource History (4 tests): ${{ steps.resource-history.outcome }}"
-          echo "  Config (5 tests): ${{ steps.config.outcome }}"
+          echo "  Config (6 tests): ${{ steps.config.outcome }}"
           echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
-          echo "  Streaming API (15 C++ + gRPC): ${{ steps.append-job.outcome }}"
+          echo "  Streaming API (17 C++ + gRPC): ${{ steps.append-job.outcome }}"
+          echo "  Progressive Loading (10 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"
           echo ""

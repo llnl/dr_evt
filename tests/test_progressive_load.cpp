@@ -17,7 +17,10 @@
  * Simulation::run_progressive() (the driving loop: load a file, submit
  * its jobs one at a time, advance_to() its last submit_time, repeat)
  * via the public Simulation::run() entry point, same as a real
- * --infile_list CLI invocation would use.
+ * --infile_list CLI invocation would use. Also covers the
+ * --check_memory_pressure option (Trace::check_memory_pressure()),
+ * which ensure_batch_capacity() - shared by load_next_file() and
+ * append_jobs() - runs before growing the job store for a new batch.
  */
 
 #define DR_EVT_HAS_CONFIG 1
@@ -27,6 +30,7 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 
 using namespace dr_evt;
 
@@ -243,6 +247,116 @@ void test_progressive_rejects_replay_format() {
     std::cout << "  PASSED" << std::endl;
 }
 
+// Test 7: --check_memory_pressure refuses to load the next file when
+// doing so would push projected job-store usage past the configured
+// fraction of actual available memory - forced deterministically here
+// via the DR_EVT_TEST_AVAILABLE_MEMORY_BYTES test seam (see
+// get_available_memory_bytes()'s doc comment in system_memory.hpp),
+// not by relying on the test machine actually being low on memory.
+void test_memory_pressure_refuses_when_forced_low() {
+    std::cout << "\n=== Test 7: --check_memory_pressure refuses under forced low memory ==="
+              << std::endl;
+
+    setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "10", 1);
+
+    auto params = make_progressive_params({PART1, PART2});
+    params.m_memory_pressure_fraction = 0.8;
+    Simulation sim(params);
+
+    bool threw = false;
+    try {
+        sim.run();
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    assert(threw);
+
+    unsetenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES");
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 8: the same forced-low-memory condition as Test 7 must NOT
+// affect a run that never enables --check_memory_pressure - the check
+// is opt-in, not a background limit.
+void test_memory_pressure_disabled_by_default() {
+    std::cout << "\n=== Test 8: --check_memory_pressure is off unless explicitly enabled ==="
+              << std::endl;
+
+    setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "10", 1);
+
+    auto params = make_progressive_params({PART1, PART2, PART3});
+    params.set_outfile("/tmp/test_progressive_mempress_disabled_out.csv");
+    Simulation sim(params);
+    // Deliberately not setting params.m_memory_pressure_fraction here.
+    sim.run();
+    sim.write_simulated_trace();
+
+    assert(sim.get_trace().completed_count() == 6);
+
+    unsetenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES");
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 9: with --check_memory_pressure enabled but no artificially low
+// memory forced (the real, actual available memory on the test
+// machine), a normal progressive-loading run must still succeed - not
+// a false positive against real, plentiful memory.
+void test_memory_pressure_no_false_positive() {
+    std::cout << "\n=== Test 9: --check_memory_pressure doesn't false-positive under real memory ==="
+              << std::endl;
+
+    auto params = make_progressive_params({PART1, PART2, PART3});
+    params.set_outfile("/tmp/test_progressive_mempress_no_fp_out.csv");
+    params.m_memory_pressure_fraction = 0.8;
+    Simulation sim(params);
+    sim.run();
+    sim.write_simulated_trace();
+
+    assert(sim.get_trace().completed_count() == 6);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 10: the fraction itself must actually be what's compared
+// against, not a fixed threshold - under the exact same forced
+// available-memory condition, a tight fraction must refuse while a
+// loose fraction succeeds. 512000 bytes / sizeof(Job_Record) (80)
+// straddles the job store's own default 4096-record capacity floor
+// (resolve_job_store_capacity() floors there regardless of how few
+// jobs are actually loaded): 0.5 * 512000 / 80 = 3200 (< 4096, must
+// refuse), 0.9 * 512000 / 80 = 5760 (> 4096, must succeed).
+void test_memory_pressure_fraction_is_configurable() {
+    std::cout << "\n=== Test 10: --check_memory_pressure's fraction is configurable ==="
+              << std::endl;
+
+    setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "512000", 1);
+
+    {
+        auto params = make_progressive_params({PART1, PART2, PART3});
+        params.m_memory_pressure_fraction = 0.5;
+        Simulation sim(params);
+        bool threw = false;
+        try {
+            sim.run();
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        assert(threw);
+    }
+    {
+        auto params = make_progressive_params({PART1, PART2, PART3});
+        params.set_outfile("/tmp/test_progressive_mempress_configurable_out.csv");
+        params.m_memory_pressure_fraction = 0.9;
+        Simulation sim(params);
+        sim.run();
+        sim.write_simulated_trace();
+        assert(sim.get_trace().completed_count() == 6);
+    }
+
+    unsetenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES");
+    std::cout << "  PASSED" << std::endl;
+}
+
 int main() {
     std::cout << "====================================" << std::endl;
     std::cout << "Progressive Loading (--infile_list) Test Suite" << std::endl;
@@ -255,6 +369,10 @@ int main() {
         test_progressive_empty_file_in_list();
         test_progressive_rejects_out_of_order_files();
         test_progressive_rejects_replay_format();
+        test_memory_pressure_refuses_when_forced_low();
+        test_memory_pressure_disabled_by_default();
+        test_memory_pressure_no_false_positive();
+        test_memory_pressure_fraction_is_configurable();
 
         std::cout << "\n====================================" << std::endl;
         std::cout << "ALL PROGRESSIVE LOADING TESTS PASSED" << std::endl;

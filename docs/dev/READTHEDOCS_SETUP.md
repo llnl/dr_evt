@@ -28,6 +28,7 @@ Sphinx configuration:
   - `sphinx.ext.napoleon` - Google/NumPy docstring support
   - `sphinx.ext.viewcode` - Source code links
   - `sphinx.ext.githubpages` - GitHub Pages support
+  - `sphinxcontrib.mermaid` - Mermaid diagram support
 - **Master document**: `docs/index.md`
 - **Supported formats**: Markdown (`.md`), reStructuredText (`.rst`)
 
@@ -38,6 +39,7 @@ Python dependencies for documentation builds:
 sphinx>=5.0
 sphinx-rtd-theme>=1.2.0
 myst-parser>=1.0.0
+sphinxcontrib-mermaid>=0.9.2
 ```
 
 ## Documentation Structure
@@ -48,7 +50,7 @@ docs/
 ├── conf.py                          # Sphinx configuration
 ├── requirements.txt                 # Python dependencies
 ├── Makefile                         # Local build commands
-├── _static/                         # Custom CSS/JS (tracked via .gitkeep)
+├── _static/                         # Custom CSS/JS
 ├── _build/                          # Build output (ignored in .gitignore)
 ├── getting-started/
 │   ├── quickstart.md
@@ -62,20 +64,25 @@ docs/
 │   └── grpc-setup.md              # gRPC build/setup
 ├── reference/
 │   └── terminology.md
-├── dev/                             # Special .gitignore handling (see below)
-│   ├── README.md                    # Tracked: Dev documentation index
-│   ├── design-decisions/            # Tracked: Architectural decisions
+├── api/
+│   ├── PYTHON_API.md               # Python bindings reference
+│   └── STREAMING_API.md            # Streaming/online API guide
+├── dev/
+│   ├── README.md                    # Dev documentation index
+│   ├── READTHEDOCS_SETUP.md         # This file
+│   ├── design-decisions/            # Architectural decisions
 │   │   ├── README.md
+│   │   ├── BLOCK_QUEUE.md
+│   │   ├── BLOCK_QUEUE_TESTING.md
+│   │   ├── CIRCULAR_QUEUE.md
+│   │   ├── OUT_TRACE_STREAMING.md
 │   │   ├── SIMULATION_VS_REPLAY_MODES.md
 │   │   └── TIMEZONE_SUPPORT.md
-│   └── session-notes/               # Ignored: Personal notes (local only)
-├── EASY_BACKFILLING_ALGORITHM.md
+│   └── wip-notes/                   # Ignored (.gitignore): work-in-progress notes, local only
+├── BACKFILLING_ALGORITHMS.md
+├── CLIENT_SERVER_GUIDE.md
 ├── TESTING_GUIDE.md
-├── STREAMING_API.md
-├── PYTHON_API.md
-├── CLI_OPTIONS.md
-├── DOCUMENTATION_ORGANIZATION.md
-└── READTHEDOCS_SETUP.md
+└── README.md
 ```
 
 ## Building Locally
@@ -179,6 +186,8 @@ In ReadTheDocs dashboard:
 
 ```python
 html_theme_options = {
+    'logo_only': False,
+    'style_nav_header_background': '#2c3e50',
     'navigation_depth': 4,        # How deep to show in sidebar
     'collapse_navigation': False,  # Keep navigation expanded
     'sticky_navigation': True,     # Sticky sidebar
