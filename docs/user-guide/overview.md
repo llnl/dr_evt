@@ -8,6 +8,38 @@ DR_EVT (Discrete Resource Event Modeling) is a high-performance HPC job schedule
 - Compare run time estimation strategies
 - Analyze HPC workload traces
 
+## One client, multiple servers
+
+For distributed or digital-twin deployments, one controller can open an
+independent gRPC session to each server. Scheduler state, nodes, and simulation
+results remain isolated on every server.
+
+```{mermaid}
+flowchart LR
+    Client([Client<br/>or digital-twin controller])
+
+    subgraph Fleet[Independent server fleet]
+        direction TB
+        ServerA[Server A] --> SimulationA[(Simulation A)]
+        ServerB[Server B] --> SimulationB[(Simulation B)]
+        ServerN[Server N] --> SimulationN[(Simulation N)]
+    end
+
+    Client -->|Session 1| ServerA
+    Client -->|Session 2| ServerB
+    Client -->|Session N| ServerN
+
+    classDef client fill:#1d4ed8,color:#fff,stroke:#1e3a8a,stroke-width:2px
+    classDef server fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    classDef simulation fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px
+    class Client client
+    class ServerA,ServerB,ServerN server
+    class SimulationA,SimulationB,SimulationN simulation
+```
+
+For setup and deployment examples, see [Client/Server Setup](grpc-setup.md)
+and [Client/Server Use Cases](client-server-use-cases.md).
+
 ## Quick Start
 
 ### Basic Usage
