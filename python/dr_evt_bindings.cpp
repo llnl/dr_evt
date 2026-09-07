@@ -78,6 +78,20 @@ PYBIND11_MODULE(dr_evt, m) {
                    std::to_string(s.utilization * 100) + "%)";
         });
 
+    // FCFS/EASY reservation snapshot for evaluating in-process backfill
+    // candidates.  This mirrors the gRPC response without requiring a server.
+    py::class_<Simulation::Backfill_Window::Resource_Release>(m, "ResourceRelease")
+        .def_readonly("time", &Simulation::Backfill_Window::Resource_Release::time)
+        .def_readonly("nodes_released",
+                      &Simulation::Backfill_Window::Resource_Release::nodes_released);
+
+    py::class_<Simulation::Backfill_Window>(m, "BackfillWindow")
+        .def_readonly("current_time", &Simulation::Backfill_Window::current_time)
+        .def_readonly("available_nodes", &Simulation::Backfill_Window::available_nodes)
+        .def_readonly("shadow_time", &Simulation::Backfill_Window::shadow_time,
+                      "Earliest FCFS-head start time, or -1 when no job is waiting")
+        .def_readonly("releases", &Simulation::Backfill_Window::releases);
+
     // Main Simulation class
     py::class_<Simulation>(m, "Simulation")
         .def(py::init<const Sim_Params&>())
@@ -116,6 +130,9 @@ PYBIND11_MODULE(dr_evt, m) {
 
         .def("get_fcfs_head_shadow_time", &Simulation::get_fcfs_head_shadow_time,
              "Get estimated start time for FCFS head (shadow time)")
+
+        .def("get_backfill_window", &Simulation::get_backfill_window,
+             "Get one FCFS/EASY reservation snapshot for in-process backfill probing")
 
         // Monitoring - Comprehensive statistics
         .def("get_statistics", &Simulation::get_statistics,

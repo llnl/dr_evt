@@ -1,4 +1,4 @@
-# Streaming API Documentation
+# C++ Streaming API Reference
 
 ## Overview
 
@@ -25,7 +25,19 @@ The streaming API provides two time advancement modes:
 1. **Inclusive** (`advance_to(t)`): Advances to time `t` and processes all events AT time `t`
 2. **Exclusive** (`run_until_exclusive(t)`): Advances to just before time `t`, excluding events at `t`
 
-## API Methods
+## C++ API Reference
+
+These are direct methods on `dr_evt::Simulation`; they do not require a
+server or gRPC. The gRPC service maps its request messages onto these methods
+where applicable; see the [Client/Server Guide](../CLIENT_SERVER_GUIDE.md) for
+the wire protocol.
+
+For live jobs, the C++ API intentionally separates storage from scheduling:
+call `append_job()` (or `append_jobs()`) to create a previously unseen job,
+then `submit_job()` to enqueue it. `submit_job()` is also useful by itself for
+a job loaded earlier with `initialize_trace()`.
+
+### API Methods
 
 ### `initialize_trace(max_jobs = 0)`
 
@@ -117,6 +129,7 @@ for (size_t i = 0; i < job_nos.size(); ++i) {
 }
 ```
 
+### `submit_job(job_idx, submit_time)`
 
 Submits a job to the scheduler's waiting queue.
 
@@ -212,6 +225,16 @@ num_nodes_t get_available_nodes() const;
 ```cpp
 size_t get_active_job_count() const;
 ```
+
+**Get an FCFS/EASY backfill reservation snapshot:**
+```cpp
+Simulation::Backfill_Window get_backfill_window() const;
+```
+
+The snapshot contains `current_time`, immediately `available_nodes`, the
+FCFS head's `shadow_time` (`-1` if the queue is empty), and chronologically
+ordered, time-limit-based resource `releases` through the reservation. This
+is an in-process API; it does not require the gRPC service.
 
 **Get scheduling statistics** (wait times, turnaround, utilization):
 ```cpp

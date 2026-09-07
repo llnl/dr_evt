@@ -262,6 +262,51 @@ def test_monitoring_api(result):
         os.unlink(trace_file.name)
 
 
+def test_backfill_window_api(result):
+    """The in-process Python API exposes the FCFS/EASY reservation snapshot."""
+    print("\n5b. Backfill Window API")
+
+    trace_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+    trace_file.close()
+
+    try:
+        # The 100-node queue head must wait for both running jobs.  Their
+        # time limits produce the same releases used for its EASY reservation.
+        create_test_trace(trace_file.name, [
+            (0, 40, 50),
+            (0, 60, 100),
+            (0, 100, 10),
+        ])
+
+        params = dr_evt.SimParams()
+        params.infile = trace_file.name
+        params.total_nodes = 100
+        params.trace_format = "simple"
+        params.timestamp_format = "epoch"
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
+        params.backfill_policy = dr_evt.BackfillPolicy.EASY
+        params.priority_policy = dr_evt.PriorityPolicy.FCFS
+
+        sim = dr_evt.Simulation(params)
+        assert sim.initialize_trace() == 3
+        for job_idx in range(3):
+            sim.submit_job(job_idx, 0.0)
+            sim.advance_to(0.0)
+
+        window = sim.get_backfill_window()
+        assert window.current_time == 0.0
+        assert window.available_nodes == 0
+        assert window.shadow_time == 100.0
+        assert [(release.time, release.nodes_released) for release in window.releases] == [
+            (50.0, 40), (100.0, 60)
+        ]
+        result.record_pass("Backfill window snapshot")
+    except Exception as e:
+        result.record_fail("Backfill window API", str(e))
+    finally:
+        os.unlink(trace_file.name)
+
+
 def test_statistics(result):
     """Test 6: Statistics"""
     print("\n6. Statistics API")
@@ -464,6 +509,7 @@ def main():
     test_sim_params(result)
     test_streaming_api(result)
     test_monitoring_api(result)
+    test_backfill_window_api(result)
     test_statistics(result)
     test_backfill_policies(result)
     test_priority_policies(result)

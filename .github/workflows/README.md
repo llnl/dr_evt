@@ -17,7 +17,7 @@ This directory contains GitHub Actions workflows for automated testing.
 - Feature tests (3)
 - Replay tests (3)
 - Config tests (4, skipped without `-DDR_EVT_ENABLE_PROTOBUF=ON`)
-- Python API tests (9, requires `-DDR_EVT_BUILD_PYTHON=ON` - not verified
+- Python API tests (16, requires `-DDR_EVT_BUILD_PYTHON=ON` - not verified
   as part of this documentation pass, since that build option wasn't set
   up in the environment used to check these workflows)
 - Streaming API tests (4, requires building the `test_streaming_api`
@@ -60,7 +60,7 @@ Total tests referenced by the full suite:
 | Feature | 6 | Yes - 6/6 pass |
 | Replay | 3 | Yes - 3/3 pass |
 | Config | 4 | No - requires protobuf build |
-| Python API | 9 | No - requires Python bindings build |
+| Python API | 16 | No - requires Python bindings build |
 | Streaming API | 4 | No - requires building `test_streaming_api` |
 | FCFS/EASY backfill-window gRPC | 1 | Yes - included in `tests.yml` |
 | Scale | 7 | Yes - 4/7 pass, 3 known-corrupted input |

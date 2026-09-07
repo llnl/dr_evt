@@ -154,6 +154,15 @@ sim.get_fcfs_head_shadow_time() -> float
 ```
 Get estimated start time for FCFS head of queue. Returns -1 if queue is empty.
 
+```python
+sim.get_backfill_window() -> BackfillWindow
+```
+Get one in-process FCFS/EASY reservation snapshot. Its `current_time`,
+`available_nodes`, and `shadow_time` fields describe the current capacity and
+head reservation; `releases` contains ordered `ResourceRelease(time,
+nodes_released)` projections through that reservation. No gRPC service is
+required.
+
 **Statistics API:**
 
 ```python

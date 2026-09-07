@@ -255,7 +255,7 @@ jobs:
         run: |
           source venv/bin/activate
           echo "========================================"
-          echo "Running Python API Tests (15 tests)"
+          echo "Running Python API Tests (16 tests)"
           echo "========================================"
           ./tests/run_python_tests.sh
 
@@ -321,7 +321,7 @@ jobs:
           echo "  Resource History (5 tests): ${{ steps.resource-history.outcome }}"
           echo "  Job Store (6 tests): ${{ steps.job-store.outcome }}"
           echo "  Config (7 tests): ${{ steps.config.outcome }}"
-          echo "  Python API (15 tests): ${{ steps.python-api.outcome }}"
+          echo "  Python API (16 tests): ${{ steps.python-api.outcome }}"
           echo "  Append-Job (18 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  Backfill Window gRPC (included in Append-Job count): ${{ steps.backfill-window.outcome }}"
           echo "  Progressive Loading (10 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
