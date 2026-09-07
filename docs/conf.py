@@ -55,7 +55,7 @@ exclude_patterns = [
     '_build',
     'Thumbs.db',
     '.DS_Store',
-    'dev/session-notes/*',  # Exclude development session notes
+    'dev/wip-notes/*',  # Exclude development session notes
 ]
 
 # Source file suffix
