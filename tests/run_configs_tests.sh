@@ -123,6 +123,30 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Test 5: infile_list via protobuf config (progressive loading) vs the
+# same via CLI --infile_list - no positional trace file here, unlike
+# the tests above: infile_list is mutually exclusive with one.
+echo "Test 5: infile_list config (progressive loading)"
+$SIMULATOR \
+    --infile_list tests/test_traces/progressive/file_list.txt \
+    --total_nodes 100 \
+    --trace_format simple \
+    --timestamp_format epoch \
+    --run_time_mode limit \
+    --outfile /tmp/cli_infile_list.csv
+
+$SIMULATOR \
+    --config tests/test_configs/infile_list_config.pb \
+    --outfile /tmp/pb_infile_list.csv
+
+if diff -q /tmp/cli_infile_list.csv /tmp/pb_infile_list.csv > /dev/null; then
+    echo "  ✓ infile_list config matches CLI"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ infile_list config differs from CLI"
+    FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "=========================================="
 echo "Results: $PASS passed, $FAIL failed"

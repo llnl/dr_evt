@@ -2,14 +2,15 @@
 
 ## Overview
 
-DR_EVT's [streaming API](api/STREAMING_API.md) (`submit_job()`, `advance_to()`,
-and the monitoring/statistics methods) lets external code feed jobs
-incrementally and control simulation time advancement, rather than loading
-a full trace and running it start-to-finish in one call. The gRPC
-client/server exposes that same streaming API over the network: a
-`dr_evt_server` process holds one `Simulation` instance per connected
-session, and any number of `dr_evt_client` processes (or your own gRPC
-client, in any language gRPC supports) can drive it remotely.
+DR_EVT's [streaming API](api/STREAMING_API.md) (`append_job()`/`append_jobs()`,
+`submit_job()`, `advance_to()`, and the monitoring/statistics methods) lets
+external code feed genuinely new jobs incrementally and control simulation
+time advancement, rather than loading a full trace and running it
+start-to-finish in one call. The gRPC client/server exposes that same
+streaming API over the network: a `dr_evt_server` process holds one
+`Simulation` instance per connected session, and any number of
+`dr_evt_client` processes (or your own gRPC client, in any language gRPC
+supports) can drive it remotely.
 
 This is separate from, and does not replace, the plain CLI `simulator`
 binary (batch mode) or the Python bindings (in-process streaming API). Use
@@ -67,7 +68,9 @@ in-process via the streaming API:
 |---|---|
 | `InitRequest` | Constructing a `Simulation` from a `Sim_Params`-equivalent config |
 | `InitializeTraceRequest` | `Simulation::initialize_trace()` |
-| `SubmitJobRequest` | `Simulation::submit_job()` |
+| `AppendJobRequest` | `Simulation::append_job()` - a genuinely new job the server has never seen before |
+| `AppendJobsRequest` | `Simulation::append_jobs()` - the batch counterpart, several new jobs in one call |
+| `SubmitJobRequest` | `Simulation::submit_job()` - enqueues a job already known to the server (via `InitializeTraceRequest` or a prior append) |
 | `AdvanceToRequest` | `Simulation::advance_to()` |
 | `RunUntilExclusiveRequest` | `Simulation::run_until_exclusive()` |
 | `GetStatisticsRequest`, `GetCurrentTimeRequest`, etc. | The monitoring/statistics methods |
@@ -92,14 +95,14 @@ or reinitialize a session in place; disconnect and reconnect for a new run.
 ./build/dr_evt_client <server_host>:50051 /path/to/trace.csv
 ```
 
-`dr_evt_client` is a minimal example client: it reads a trace file's own
-`job_submit_time` column directly (the client, not the server, is
-authoritative on arrival timing for the streaming API - see the source
-comments in `src/proto/dr_evt_client.cpp` for why), submits every job in
-the file using those real submit times, advances the simulation to
-completion, and prints final statistics. It's meant as a working reference
-for writing your own client against the same `.proto` service, not as a
-general-purpose tool.
+`dr_evt_client` is a minimal example client demonstrating genuine
+streaming: it reads job data (`submit_time`, `num_nodes`, `queue`,
+`time_limit`) from a file *only* client-side - the server never loads
+this file itself (no `InitializeTraceRequest` is sent at all) - and
+appends each job via `AppendJobRequest` to a server that has never seen
+any of it before, then submits each with `SubmitJobRequest` and its own
+`submit_time`. It's meant as a working reference for writing your own
+client against the same `.proto` service, not as a general-purpose tool.
 
 The server binds `0.0.0.0` by default in the examples above so it's
 reachable from other machines - bind `127.0.0.1` instead if you only need

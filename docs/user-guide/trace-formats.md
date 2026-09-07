@@ -10,9 +10,10 @@ DR_EVT now supports flexible trace file formats with command-line options for fo
 ```
 
 **simple** (default): Minimal CSV format for testing
-- Format: `[arrival_time, start_time, end_time, num_nodes, exit_status, queue, time_limit]`
-- First 4 columns required
-- Additional columns optional
+- The parser detects the mode from which columns are present - see [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md) for the full design
+- **Simulation mode** (no `begin_time`/`end_time` columns): `job_submit_time, num_nodes, queue, time_limit` required; `actual_run_time` optional (needed only for `--run_time_mode actual`)
+- **Replay mode** (`begin_time` and `end_time`, or `begin_time` and `duration`, present): `job_submit_time, begin_time, end_time, num_nodes, exit_status, queue, time_limit` required - times are historical actuals, replayed exactly, not computed by the scheduler
+- Column order doesn't matter - the parser reads the header row and looks up columns by name
 
 **lassen**: LLNL Lassen 33-column format
 - Full HPC trace format
@@ -75,51 +76,70 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
 
 ## Simple Format CSV Structure
 
-### With Epoch Timestamps
+### Simulation Mode (scheduler computes start/end times)
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,10,0,batch,100
-50,100,150,10,0,batch,50
-120,150,230,10,0,batch,80
+job_submit_time,num_nodes,queue,time_limit
+0,10,pbatch,100
+50,10,pbatch,50
+120,10,pbatch,80
 ```
 
-### With ISO Timestamps
+### Replay Mode, With Epoch Timestamps
 ```text
 job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,batch,100
-2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,0,batch,50
-2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,0,batch,80
+0,0,100,10,0,pbatch,100
+50,100,150,10,0,pbatch,50
+120,150,230,10,0,pbatch,80
+```
+
+### Replay Mode, With ISO Timestamps
+```text
+job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
+2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,pbatch,100
+2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,0,pbatch,50
+2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,0,pbatch,80
 ```
 
 ## Column Descriptions
 
 ### Simple Format Columns
 
-| Position | Name | Description | Required |
-|----------|------|-------------|----------|
-| 0 | job_submit_time | When job arrives/submits | Yes |
-| 1 | begin_time | Historical start time from trace | Yes |
-| 2 | end_time | Historical end time from trace | Yes |
-| 3 | num_nodes | Number of nodes requested | Yes |
-| 4 | exit_status | Job exit code | Optional |
-| 5 | queue | Queue name (e.g., "batch") | Optional |
-| 6 | time_limit | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Optional |
-| 7 | actual_run_time | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Optional |
+Columns are looked up by name in the header row, not by fixed position -
+any order works, and which of `begin_time`/`end_time` are present
+determines simulation vs replay mode (see below).
+
+| Name | Description | Required for |
+|------|-------------|--------------|
+| `job_submit_time` | When the job arrives/submits | Both modes |
+| `num_nodes` | Number of nodes requested | Both modes |
+| `queue` | Queue name - only `pbatch`/`pall` (and `pbatch0`-`pbatch3`) are accepted by default; see `SHOW_ALL_QUEUE` in `src/common.hpp` to change this | Both modes |
+| `time_limit` | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Both modes |
+| `begin_time` | Historical start time from trace | Replay mode only - presence of this column (together with `end_time` or `duration`) is what selects replay mode |
+| `end_time` | Historical end time from trace | Replay mode (or use `duration` instead) |
+| `duration` | Historical run time, as an alternative to `end_time` in replay mode | Replay mode (alternative to `end_time`) |
+| `exit_status` | Job exit code | Replay mode |
+| `actual_run_time` | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Simulation mode, only with `--run_time_mode actual` |
 
 **Column-name aliases**: `time_limit` and `actual_run_time` are each detected
 under several accepted header names (listed above), so an existing trace
 can be reused as-is without editing its header - slow to do by hand on a
 large file. Only one alias per column is expected to actually be present
 in a given file; if more than one is, the first match in the order listed
-wins. This applies to the "simple" format only; the aliases have no effect
-on the "lassen" format, which is defined by fixed column position rather
-than header name.
+wins. This applies to the "simple" format only; the "lassen" format is
+defined by fixed column position rather than header name (see below).
 
-**Note**: 
-- `begin_time` and `end_time` from trace are used to calculate job duration
-- For simulation, the scheduler **computes** actual start time
-- Jobs run for the historical duration: `duration = end_time - begin_time`
-- See [Replay Mode](command-line.md) (specifically "Replay Mode (Reproduce Historical Behavior)") for replay vs simulation distinction
+**Mode detection - simulation vs replay**:
+- No `begin_time`/`end_time` columns present → **simulation mode**: the
+  scheduler computes start times; how the job's actual run time is
+  determined is controlled separately by `--run_time_mode`
+- `begin_time` and (`end_time` or `duration`) present → **replay mode**:
+  times are historical actuals, replayed exactly - `duration = end_time -
+  begin_time` if `end_time` is given rather than `duration` directly
+- `begin_time` present without either `end_time` or `duration` (or vice
+  versa) is rejected as an ambiguous trace format
+
+See [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md)
+for the full design rationale.
 
 ### Lassen Format
 33-column format specific to LLNL HPC traces. Columns used:
@@ -130,47 +150,15 @@ than header name.
 - Column 30: `queue`
 - Column 32: `time_limit`
 
-## Implementation Status
-
-✅ **Complete**:
-- Command-line option parsing
-- Parameter passing through all layers
-- Data_Columns updated to store format/timestamp/timezone
-- Trace constructor accepts all parameters
-
-⚠️ **Remaining**:
-- Actual epoch time parsing in job_io.cpp
-- Currently, time parsing delegates to existing `convert_time()` function
-- Need to add epoch branch: if timestamp_format == "epoch", parse as integer
-
-## To Complete Epoch Support
-
-The remaining work is in [src/trace/job_io.cpp](https://github.com/llnl/dr_evt/blob/main/src/trace/job_io.cpp) or [src/trace/parse_utils.cpp](https://github.com/llnl/dr_evt/blob/main/src/trace/parse_utils.cpp):
-
-```cpp
-epoch_t parse_time(const std::string& time_str, const Data_Columns& dcols) {
-    if (dcols.get_timestamp_format() == "epoch") {
-        // Parse as Unix epoch seconds
-        long seconds = std::stol(time_str);
-        return {static_cast<time_t>(seconds), 0.0f};
-    } else {
-        // Parse as ISO/human-readable timestamp
-        return convert_time(time_str);  // Existing function
-    }
-}
-```
-
 ## Testing
-
-Once epoch parsing is implemented:
 
 ```bash
 # Create test trace
 cat > test.csv << EOF
 job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,10,0,batch,100
-50,100,150,10,0,batch,50
-120,150,230,10,0,batch,80
+0,0,100,10,0,pbatch,100
+50,100,150,10,0,pbatch,50
+120,150,230,10,0,pbatch,80
 EOF
 
 # Run test

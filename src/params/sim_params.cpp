@@ -9,6 +9,7 @@
 #include <limits>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <cstdlib>
 #include "utils/file.hpp"
 #include "params/sim_params.hpp"
@@ -20,10 +21,11 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
+    {"infile_list",           required_argument,  0, 'L'},
     {"max_jobs",              required_argument,  0, 'j'},
     {"total_nodes",           required_argument,  0, 'n'},
     {"outfile",               required_argument,  0, 'o'},
@@ -91,6 +93,9 @@ void Sim_Params::getopt(int& argc, char** &argv)
                 break;
             case 'i': /* --infile */
                 m_infile = std::string(optarg);
+                break;
+            case 'L': /* --infile_list */
+                m_infile_list = std::string(optarg);
                 break;
             case 'j': /* --max_jobs */
                 m_max_jobs = static_cast<dr_evt::num_jobs_t>(atoi(optarg));
@@ -326,11 +331,25 @@ void Sim_Params::getopt(int& argc, char** &argv)
         }
     }
 
-    if (optind != (argc - 1)) {
+    // --infile_list mode has no single positional trace file to require -
+    // the file it names lists several instead. Otherwise, unchanged:
+    // exactly one positional argument, which always wins over -i/--infile
+    // if both were somehow given.
+    if (m_infile_list.empty()) {
+        if (optind != (argc - 1)) {
+            print_usage (argv[0], 1);
+        }
+        m_infile = argv[optind];
+    } else if (optind != argc) {
         print_usage (argv[0], 1);
+    } else {
+        try {
+            set_infile_list(m_infile_list);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << std::endl;
+            print_usage(argv[0], 1);
+        }
     }
-
-    m_infile = argv[optind];
     set_outfile(m_outfile);
 
     if (!m_is_jobs_set && m_is_time_set) {
@@ -352,6 +371,18 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "\n"
         "    -i, --infile\n"
         "        Specify the input file name for simulation.\n"
+        "\n"
+        "    -L, --infile_list FILENAME\n"
+        "        Path to a file listing multiple trace files, one per line -\n"
+        "        progressive loading: each is loaded in turn as the simulation\n"
+        "        reaches it, so --job_store_capacity can actually bound memory\n"
+        "        (unlike single-file mode, which always grows to fit the whole\n"
+        "        trace). Files must already be sorted by submit_time, both\n"
+        "        within each file and across the sequence (each file's earliest\n"
+        "        submit_time >= the previous file's latest). Mutually exclusive\n"
+        "        with the positional trace-file argument and -i/--infile - do\n"
+        "        not provide both. See\n"
+        "        docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
         "\n"
         "    -j, --max_jobs\n"
         "        Specify the maximum number of jobs to run.\n"
@@ -411,10 +442,11 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "\n"
         "    -K, --job_store_capacity SIZE\n"
         "        Initial capacity of the job-record store (Trace::m_data, a\n"
-        "        boost::circular_buffer). For a batch run (loading a whole\n"
-        "        trace file - the only mode today), capacity is set to fit\n"
-        "        the whole trace during loading regardless of this setting;\n"
-        "        see docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
+        "        boost::circular_buffer). In single-file mode (the default),\n"
+        "        capacity is set to fit the whole trace during loading\n"
+        "        regardless of this setting - use --infile_list for a\n"
+        "        capacity that can actually bound memory; see\n"
+        "        docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
         "        Default: 0, meaning the size of the job trace - large\n"
         "        enough it never needs to grow.\n"
         "\n"
@@ -434,7 +466,12 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "\n"
         "    -f, --trace_format {simple|lassen}\n"
         "        Trace file format (default: simple).\n"
-        "        simple: CSV with [arrival_time,start_time,end_time,num_nodes,...]\n"
+        "        simple: CSV, columns looked up by name in the header row.\n"
+        "          Simulation mode (no begin_time/end_time columns): requires\n"
+        "          job_submit_time, num_nodes, queue, time_limit.\n"
+        "          Replay mode (begin_time and end_time/duration present):\n"
+        "          requires job_submit_time, begin_time, end_time, num_nodes,\n"
+        "          exit_status, queue, time_limit.\n"
         "        lassen: 33-column LLNL Lassen format\n"
         "\n"
         "    -T, --timestamp_format {epoch|iso}\n"
@@ -559,6 +596,42 @@ void Sim_Params::set_outfile(const std::string& ofname)
             m_outfile = "sim_out.txt";
         }
     }
+}
+
+void Sim_Params::set_infile_list(const std::string& list_path)
+{
+    m_infile_list = list_path;
+    m_infile_list_parsed.clear();
+
+    std::ifstream ifs(list_path);
+    if (!ifs) {
+        throw std::runtime_error("Failed to open --infile_list file: " + list_path);
+    }
+    std::string line;
+    while (std::getline(ifs, line)) {
+        // Strip trailing whitespace/carriage returns, same as load()'s
+        // own per-row handling - a list file edited on Windows
+        // shouldn't silently produce a bad path.
+        while (!line.empty() && (line.back() == ' ' || line.back() == '\t' ||
+                                  line.back() == '\r' || line.back() == '\n')) {
+            line.pop_back();
+        }
+        if (line.empty()) {
+            continue;
+        }
+        m_infile_list_parsed.push_back(line);
+    }
+    if (m_infile_list_parsed.empty()) {
+        throw std::runtime_error(
+            "--infile_list file '" + list_path + "' contains no file paths");
+    }
+    // m_infile needs its first entry right away, since Trace's own
+    // constructor (called from Simulation's constructor, before
+    // Simulation::run() ever executes) validates a file's header
+    // against whatever m_infile holds - list mode still needs a real
+    // file for that, same as single-file mode, and this is the only
+    // file known yet.
+    m_infile = m_infile_list_parsed.front();
 }
 
 std::string Sim_Params::get_outfile() const

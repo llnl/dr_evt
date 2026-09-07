@@ -11,9 +11,25 @@ streaming append operation is also now built -
 call, both exposed over gRPC (`AppendJobRequest`/`AppendJobsRequest`) -
 see "Batch vs streaming" below for what they do and
 `tests/test_append_job_api.cpp`/`tests/test_append_job_grpc.cpp` for their
-tests. Chunked loading (also mentioned below) is not - though
-`append_jobs()` was deliberately designed so a future chunked-loading
-reader could reuse it directly; see its own doc comment in `trace.hpp`.
+tests.
+
+Progressive/multi-file loading (`--infile_list`, discussed at length
+below under capacity sizing) is also now built -
+`Trace::load_next_file()`/`Simulation::run_progressive()` - see
+`tests/test_progressive_load.cpp`/`tests/run_progressive_load_tests.sh`
+for its tests. It does *not* go through `append_jobs()`/
+`Job_Append_Request` in the end, despite that being the original plan
+(see this doc's earlier draft, and `append_jobs()`'s own doc comment in
+`trace.hpp`, both predating this): `load()` (the free function
+`load_data()` already uses) produces fully-formed `Job_Record`s
+directly, including `actual_run_time` - routing those through
+`Job_Append_Request`'s narrower, network-facing 4-field shape and back
+would silently drop that column back to 0.0, wrong for
+`run_time_mode=actual`/`distribution`. `load_next_file()` takes
+`Job_Record`s directly instead; the batch-capacity logic itself
+(reclaim, then grow-or-abort) was pulled out of `append_jobs()` into a
+shared `Trace::ensure_batch_capacity()` helper so neither caller
+duplicates it.
 
 `Trace` owns all session state: job records (`m_data`) and simulation
 context (`m_ctx` - pending-completion event queue and resource-history,
@@ -70,24 +86,47 @@ capacity per-request instead, which could only discover exhaustion
 mid-loop; kept here as a note since it's an easy design to reach for
 by analogy with `append_job()`, and the wrong one for a batch call.)
 
-A third, distinct case - **chunked loading** (reading a known, whole
-trace file in pieces rather than all at once, purely to respect a
-memory limit) - is discussed below under capacity sizing; not yet
-built - `append_job()`/`append_jobs()` above solve streaming
-(jobs not known in advance at all), not this, though `append_jobs()`
-was designed with chunked loading in mind: a chunk is just a
-`std::vector<Job_Append_Request>` read from the next slice of a known
-file, appended the same way. Also future work, for whoever picks this
-up: today, `append_jobs()` always resolves capacity for the entire
-batch passed to it (growing if necessary) - it does not itself decide
-to accept only part of a batch under memory pressure. The eventual
-chunked-loading reader is where that decision belongs: read a smaller
-chunk than the remaining file in the first place (sized adaptively, per
-the sketch below) rather than ask `append_jobs()` to partially satisfy
-an oversized one. If a chunk still can't be appended in full because of
-memory pressure once read, the unaddressed remainder needs to be
-appended later, before simulated time reaches its earliest `submit_time`
-- not handled by anything built so far.
+A third, distinct case - **progressive/multi-file loading**
+(`--infile_list`, reading a known trace as several separate files
+instead of one, purely to respect a memory limit) - is now built,
+differently from how this section originally sketched it. The design
+that shipped is simpler than "chunked reading of one big file": the
+*user* pre-splits and pre-sorts their trace into several files
+themselves and hands `dr_evt` the sequence (a list file, one path per
+line, via `--infile_list`) - there's no adaptive chunk-sizing or
+memory-pressure estimation to get right, and no persistent, resumable
+file handle to manage; each file is opened, fully read via `load()`
+(the same free function `load_data()` already uses), and closed, same
+as `load_data()`'s own single-file read. `Trace::load_next_file()` is
+the per-file entry point; `Simulation::run_progressive()` is the
+driving loop (`Simulation::run()` calls it in place of the single-file
+batch path when `--infile_list` is given): load a file, submit its
+jobs one at a time in `submit_time` order, `advance_to()` to the last
+one's own `submit_time`, then load the next - not the single-file
+path's "submit everything upfront, one `advance_to(infinity)` at the
+end," which would leave every file's jobs already known to `m_data`
+before reclaiming ever got a chance to run even once. `advance_to()`
+itself needed no changes at all for this - it's called exactly the way
+it's always been, just with a real target instead of infinity, once
+per file instead of once for the whole run.
+
+Two validity checks, both all-or-nothing before `m_data` is touched at
+all (same shape `append_jobs()` already established): each file's own
+rows must already be sorted by `submit_time` (`load_data()` tolerates
+unsorted input by sorting everything it read in memory first -
+`load_next_file()` can't, since it never holds more than one file's
+rows at a time), and each file's earliest `submit_time` must be `>=`
+the previous file's latest (continuity across the sequence).
+
+Still deliberately deferred, for whoever picks it up next: **an actual
+memory-pressure estimate**, rather than today's simpler rule (grow to
+fit whatever's left unreclaimed plus the next file, unconditionally).
+The formula proposed for that: `(jobs unflushed in the job store) * 2 +
+(jobs in the next file)`, and this should stay under `0.8 * (total
+available memory) / (size of one job record)` - the reader would use
+this to decide how large a file it can safely take on next (or refuse/
+wait), rather than growing unconditionally as `load_next_file()` does
+today via the shared `ensure_batch_capacity()` helper.
 
 
 **Why a job's slot becomes reclaimable at `end_time`, not before:** a
@@ -187,7 +226,8 @@ loading finishes.
 
 This means `reclaim_front_jobs()`/`job_at()` exist for batch mode's
 correctness (a rejected job must not stall the sweep forever) and to
-prepare for both streaming and chunked loading - where reclaiming would
+prepare for both streaming and progressive/multi-file loading - where
+reclaiming would
 actually matter repeatedly: with no preload phase to size capacity
 against upfront, a newly-arriving job that finds the buffer full has to
 either reclaim a completed job's slot from the front, or grow. Batch

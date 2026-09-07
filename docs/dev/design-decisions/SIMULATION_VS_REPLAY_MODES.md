@@ -45,7 +45,7 @@ job_submit_time, begin_time, duration, num_nodes, exit_status, queue, time_limit
 
 **Required columns:**
 ```
-job_submit_time, num_nodes, exit_status, queue, time_limit
+job_submit_time, num_nodes, queue, time_limit
 ```
 
 **Optional column (for duration):**

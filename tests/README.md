@@ -13,6 +13,7 @@ DR_EVT has tests organized by purpose:
 - **Resource History (5)** - Resource-history circular buffer, flush overhead
 - **Job Store (6)** - Job-record circular buffer, capacity sizing correctness
 - **Append-Job (16)** - Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() correctness
+- **Progressive Loading (10)** - --infile_list, bounding job-store memory across a multi-file trace
 
 Note: "Correctness" below refers to matching the Python reference
 implementation's output, not independent mathematical verification - see
@@ -44,6 +45,9 @@ cd build && cmake .. && make -j4
 
 # Run append-job (streaming) tests
 ./tests/run_append_job_tests.sh
+
+# Run progressive loading (--infile_list) tests
+./tests/run_progressive_load_tests.sh
 ```
 
 ## Test Categories
@@ -211,9 +215,23 @@ See "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for h
 
 **Runner:** `./tests/run_append_job_tests.sh`
 
-**Status:** ✅ 13/13 passing (100%) - the gRPC sub-test skips gracefully (not a failure) if gRPC wasn't built
+**Status:** ✅ 16/16 passing (100%) - the gRPC sub-test skips gracefully (not a failure) if gRPC wasn't built
 
 See "Append-Job Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
+
+---
+
+### 10. Progressive Loading Tests (10 tests)
+
+**Purpose:** Verify `--infile_list`/`Trace::load_next_file()`/`Simulation::run_progressive()` - loading a trace as a sequence of separate, pre-sorted files instead of one big one, so `--job_store_capacity` can actually bound memory (single-file mode always grows to fit the whole trace regardless of this setting)
+
+**Location:** `tests/test_progressive_load.cpp` (C++), `tests/run_progressive_load_tests.sh` (wraps the C++ binary, plus CLI-level checks)
+
+**Runner:** `./tests/run_progressive_load_tests.sh`
+
+**Status:** ✅ 10/10 passing (100%)
+
+See "Progressive Loading Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
 
 ---
 
@@ -230,7 +248,8 @@ See "Append-Job Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for 
 | Resource History | 5 | ✅ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 16 | ✅ 16/16 | Streaming insertion (single+batch) + submit_job()/advance_to() |
-| **TOTAL** | **85** | **85/85** all passing | - |
+| Progressive Loading | 10 | ✅ 10/10 | --infile_list, bounding job-store memory |
+| **TOTAL** | **95** | **95/95** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
@@ -399,6 +418,7 @@ run_replay_tests.sh        # replay methodology (hardcodes 3 comprehensive/ test
 run_configs_tests.sh       # protobuf config tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON)
 run_python_tests.sh        # python API tests (requires -DDR_EVT_BUILD_PYTHON=ON; not verified in this pass)
 run_append_job_tests.sh    # append_job() streaming tests (C++ + gRPC, if built with -DDR_EVT_ENABLE_GRPC=ON)
+run_progressive_load_tests.sh # --infile_list progressive loading tests (C++ + CLI)
 run_grpc_tests.sh          # gRPC client/server tests (requires -DDR_EVT_ENABLE_GRPC=ON)
 test_all_dr_evt.sh         # comprehensive/ tests (see below)
 test_fcfs_comprehensive.sh # queue implementation differential testing (see below)
@@ -466,6 +486,7 @@ cd build
 ../tests/run_resource_history_tests.sh
 ../tests/run_job_store_tests.sh
 ../tests/run_append_job_tests.sh
+../tests/run_progressive_load_tests.sh
 ```
 
 ### Run an individual comprehensive/ or scale/ test manually
@@ -496,7 +517,8 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Resource History | 5 | ✓ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 16 | ✓ 16/16 | Streaming insertion (single+batch) + submit_job()/advance_to() |
-| **Total** | **85** | **85/85** | All tests passing as of 2026-09-06 |
+| Progressive Loading | 10 | ✓ 10/10 | --infile_list, bounding job-store memory |
+| **Total** | **95** | **95/95** | All tests passing as of 2026-09-06 |
 
 ## Prerequisites
 
@@ -608,7 +630,7 @@ When adding new features:
    `generate_scale_expected_outputs.py`)
 4. Run `run_unit_tests.sh`, `run_feature_tests.sh`, `run_replay_tests.sh`,
    `run_resource_history_tests.sh`, `run_job_store_tests.sh`,
-   `run_append_job_tests.sh`, plus manual comparison against
+   `run_append_job_tests.sh`, `run_progressive_load_tests.sh`, plus manual comparison against
    `comprehensive/`/`scale/`'s expected files (see "Running Tests" above -
    no single script covers those yet)
 5. Update this README if adding a new test category

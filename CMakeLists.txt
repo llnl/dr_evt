@@ -564,6 +564,22 @@ set_target_properties(test_append_job_api-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_append_job_api-bin)
 
+# Progressive/multi-file loading test (--infile_list) - see
+# tests/test_progressive_load.cpp
+add_executable( test_progressive_load-bin tests/test_progressive_load.cpp )
+
+target_include_directories(test_progressive_load-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+
+target_link_libraries(test_progressive_load-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_progressive_load-bin PROPERTIES OUTPUT_NAME test_progressive_load)
+set_target_properties(test_progressive_load-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_progressive_load-bin)
+
 
 # Batch vs Streaming equivalence test
 add_executable( test_batch_vs_streaming-bin tests/test_batch_vs_streaming.cpp )

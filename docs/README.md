@@ -23,10 +23,15 @@ docs/
 │   └── grpc-setup.md              # gRPC build/setup
 ├── dev/                             # Developer documentation
 │   ├── README.md                  # Developer docs index
+│   ├── READTHEDOCS_SETUP.md       # ReadTheDocs configuration notes
 │   └── design-decisions/          # Why we made choices
+│       ├── README.md
 │       ├── BLOCK_QUEUE.md
 │       ├── BLOCK_QUEUE_TESTING.md
-│       └── CIRCULAR_QUEUE.md
+│       ├── CIRCULAR_QUEUE.md
+│       ├── SIMULATION_VS_REPLAY_MODES.md
+│       ├── TIMEZONE_SUPPORT.md
+│       └── OUT_TRACE_STREAMING.md
 ├── reference/                      # Technical reference
 │   └── terminology.md             # Terms and definitions
 ├── api/                             # API documentation
@@ -64,6 +69,7 @@ docs/
 ### Prerequisites
 
 ```bash
+cd docs
 pip install -r requirements.txt
 ```
 

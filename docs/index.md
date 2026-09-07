@@ -9,7 +9,7 @@ DR_EVT simulates HPC job scheduling policies with EASY and CONSERVATIVE backfill
 implementations. Uniquely supports **online simulation via gRPC**, enabling coordinated
 multi-cluster simulations in a distributed fashion and digital-twin scheduler interacting in real-time.
 
-Scheduler behavior is verified against from-scratch Python reference implementations
+Scheduler behavior is verified against a from-scratch Python reference implementation
 (consistency check between implementations, not independently derived ground truth).
 
 ```{toctree}
@@ -111,21 +111,21 @@ For contributors and maintainers:
 
 **Scheduling Policies:**
 - **Backfill:** EASY and CONSERVATIVE (fully implemented)
-- **Priority:** FCFS, SJF, LJF
+- **Priority:** FCFS, an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF, LJF
 
 **APIs:**
-- **Streaming API:** Online/incremental simulation
+- **Streaming API:** Online/incremental simulation, including genuinely new jobs (`append_job()`/`append_jobs()`) not just ones already in a preloaded trace
 - **gRPC Service:** Network-exposed streaming API for multi-cluster coordination
-- **Python Bindings:** Full Python API support
+- **Python Bindings:** Batch mode and the core streaming/monitoring API; some `Sim_Params` fields and `Simulation` methods (including `append_job()`/`append_jobs()`) aren't bound yet - see [Python API](api/PYTHON_API.md#missing-parameters-in-python-bindings)
 
-**Test Suite:** 57 tests across comprehensive/unit/feature/conservative/scale/replay
-categories. All 57/57 passing as of 2026-09-03 (see [Testing Guide](TESTING_GUIDE.md)).
+**Test Suite:** 150+ tests across comprehensive/unit/feature/append-job/progressive-loading/config/gRPC/scale/replay
+categories (see [Testing Guide](TESTING_GUIDE.md) for the current breakdown and how to run them).
 
 ## About
 
 DR_EVT simulates discrete event-driven HPC job scheduling with:
 - **EASY and CONSERVATIVE backfilling** implementations, verified against
-  independent Python reference implementations (consistency checks, not
+  an independent Python reference implementation (consistency check, not
   mathematical ground truth - see Testing Guide)
 - **gRPC-based online simulation service** enabling coordinated multi-cluster
   simulations in a distributed fashion and digital-twin scheduler interacting in real-time

@@ -251,7 +251,8 @@ Jobs run for exactly their `time_limit`.
 ### Input/Output Options
 
 ```bash
--i, --infile FILE        # Input trace file (required)
+-i, --infile FILE        # Input trace file (required, unless --infile_list is used instead)
+-L, --infile_list FILE   # File listing multiple trace files, one per line - progressive loading (mutually exclusive with --infile)
 -o, --outfile FILE       # Output file (default: based on input name)
 -j, --max_jobs N         # Max jobs to simulate (default: all)
 ```
@@ -493,9 +494,12 @@ diff results_easy.txt results_conservative.txt
    - Faster parsing than Lassen format
    - Convert large traces to simple format first
 
-3. **Disable verbose output**:
-   - Comment out debug prints in scheduler.cpp
-   - Rebuild for production
+3. **Don't pass `-v`/`--verbose`**:
+   - Off by default; only enable it when you actually need the per-event trace it prints, since it's not free
+
+4. **Bound job-store memory with `--infile_list`**:
+   - Single-file mode (`--infile`) always grows its job-record store to fit the whole trace, regardless of `--job_store_capacity`
+   - For a trace too large to comfortably hold in memory at once, split it into several submit-time-sorted files and use `--infile_list` (progressive loading) instead - see [Command-Line Options](command-line.md#-l---infile_list-filename)
 
 ### Expected Performance
 

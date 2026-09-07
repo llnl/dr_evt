@@ -9,9 +9,11 @@
  + **Boost**: Components required: `regex`, `filesystem`, `system`, `program_options`, `serialization`, `container`, `multi_index`, `circular_buffer`
    - Tested with Boost 1.70+
    - Install: `apt-get install libboost-all-dev` (Ubuntu/Debian) or `brew install boost` (macOS)
- + [**Protocol Buffers**](https://developers.google.com/protocol-buffers): Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
 
 ### Optional (for full features)
+
+**[Protocol Buffers](https://developers.google.com/protocol-buffers)**: For `--config` files (`-DDR_EVT_ENABLE_PROTOBUF=ON`) - not needed for a plain build
+- Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
 
 **Python 3.7+**: For Python bindings (`-DDR_EVT_BUILD_PYTHON=ON`)
 - Python development headers required: `apt-get install python3-dev`
@@ -28,9 +30,9 @@
 ### Protocol Buffers & gRPC Details
 
 **Protobuf usage:** Configuration file parsing ([proto3 syntax](https://developers.google.com/protocol-buffers/docs/proto3))
-- Enabled by default (`-DDR_EVT_ENABLE_PROTOBUF=ON`)
+- Not built at all unless requested - pass `-DDR_EVT_ENABLE_PROTOBUF=ON` (or `-DDR_EVT_ENABLE_GRPC=ON`, which implies it) to enable
 - If gRPC is enabled, Protobuf comes bundled with gRPC (no separate install needed)
-- If gRPC is **not** enabled, standalone Protobuf is auto-downloaded via FetchContent if not found
+- If gRPC is **not** enabled but `-DDR_EVT_ENABLE_PROTOBUF=ON` is, standalone Protobuf is auto-downloaded via FetchContent if not found
 
 **Key relationship:**
 ```
@@ -56,7 +58,11 @@ make -j$(nproc)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 ```
 
-**Note**: First build downloads and compiles dependencies (~5-10 minutes if gRPC/Protobuf not installed). Subsequent builds are fast.
+**Note**: The plain build shown above only needs Boost - it does not build
+Protobuf or gRPC (both are opt-in, see below). If Boost isn't found on your
+system, the first build downloads and compiles it via FetchContent
+(~10-15 minutes); enabling Protobuf and/or gRPC adds their own download/build
+time on top of that if they aren't found either. Subsequent builds are fast.
 
 **CMake warnings**: You will see deprecation warnings from third-party dependencies (Boost, pybind11). These are harmless and come from their old cmake_minimum_required versions. To suppress them:
 ```bash
@@ -167,16 +173,21 @@ make install
 
 ## Python Environment
 
-For verification scripts and reference implementation:
+`scripts/python_reference_scheduler.py` - the reference EASY-backfilling
+implementation the C++ simulator's comprehensive test suite is checked
+against (see [Testing Guide](../TESTING_GUIDE.md)) - has no third-party
+dependencies at all; it only imports from the Python 3 standard library
+(`csv`, `dataclasses`, `heapq`, etc.). No virtualenv or `pip install` is
+needed to run it.
 
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+A separate `docs/requirements.txt` exists, but it's for building this
+Sphinx documentation site itself (`sphinx`, `myst-parser`, etc.) - unrelated
+to running or testing the simulator.
 
-# Install dependencies
-pip install -r requirements.txt
-```
+If you're building the optional [Python bindings](../api/PYTHON_API.md)
+(`-DDR_EVT_BUILD_PYTHON=ON`), that's a compiled extension module, not a
+pip package - see that page for how to make it importable
+(`PYTHONPATH`), not a `pip install` step.
 
 ## Verification
 

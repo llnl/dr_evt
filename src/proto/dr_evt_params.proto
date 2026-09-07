@@ -21,6 +21,14 @@ message DR_EVT_Params {
         double max_time = 3;
 
         string infile = 4;
+        // Path to a file listing multiple trace files, one per line -
+        // progressive loading (see docs/dev/design-decisions/
+        // OUT_TRACE_STREAMING.md): each is loaded in turn as the
+        // simulation reaches it, so job_store_capacity can actually
+        // bound memory. Mutually exclusive with infile - do not set
+        // both. Files must already be sorted by submit_time, both
+        // within each file and across the sequence.
+        string infile_list = 26;
         string outfile = 5;
         string resource_trace = 6;      // Optional resource usage trace output file
 

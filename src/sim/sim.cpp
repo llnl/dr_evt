@@ -47,12 +47,35 @@ void Simulation::run()
         std::cout << "Starting simulation..." << std::endl;
     }
 
-    // Must happen before initialize_trace() (which calls load_data(),
-    // which resolves m_data's capacity from whatever's set here) -
-    // unlike resource-history's capacity, which is only needed once
-    // recording starts, well after load.
+    // Must happen before initialize_trace()/run_progressive() (either
+    // resolves m_data's capacity from whatever's set here) - unlike
+    // resource-history's capacity, which is only needed once recording
+    // starts, well after load.
     m_trace.set_job_store_capacity(m_params.m_job_store_capacity);
     m_trace.set_job_store_overflow(m_params.m_job_store_overflow);
+
+    if (!m_params.m_infile_list.empty()) {
+        // Progressive loading: REPLAY-format input isn't supported here
+        // - REPLAY bypasses the scheduler entirely (begin_time/end_time
+        // already fixed in the trace), so there's no notion of "submit
+        // this job now" for it to plug into in the first place, and
+        // nothing to gain from bounding memory during a run that never
+        // makes scheduling decisions at all.
+        if (m_trace.dcols().get_trace_mode() == TraceMode::REPLAY) {
+            throw std::runtime_error(
+                "--infile_list does not support REPLAY-format input "
+                "(begin_time/end_time already present) - it only makes "
+                "sense for simulation-mode input, where the scheduler "
+                "actually decides when each job runs.");
+        }
+        run_progressive();
+        if (m_params.m_verbose) {
+            std::cout << "Simulation complete\n" +
+                         std::string("Jobs submitted: ") + std::to_string(m_jobs_submitted) + "\n" +
+                         std::string("Jobs completed: ") + std::to_string(m_jobs_completed) + "\n";
+        }
+        return;
+    }
 
     // Initialize: load jobs and determine durations
     initialize_trace();
@@ -191,39 +214,125 @@ num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs)
     return static_cast<num_jobs_t>(m_trace.data().size());
 }
 
+void Simulation::determine_one_job_run_time(Job_Record& job)
+{
+    // Scheduler uses time_limit as the best estimator for planning (realistic mode).
+    // run_time_mode controls how the job's actual execution length is determined.
+
+    tdiff_t run_time;
+
+    switch (m_params.m_run_time_mode) {
+        case RunTimeMode::ACTUAL:
+            // Read actual_run_time from trace (most realistic)
+            run_time = job.get_actual_run_time();
+            break;
+
+        case RunTimeMode::DISTRIBUTION:
+            // Sample from distribution (realistic with variation)
+            run_time = sample_run_time(
+                job.get_limit_time(),
+                m_params.m_run_time_distribution,
+                m_params.m_run_time_scale,
+                m_params.m_run_time_stddev
+            );
+            job.set_actual_run_time(run_time);
+            break;
+
+        case RunTimeMode::LIMIT:
+            // Use time_limit in place of run_time (unrealistic, for debugging/testing)
+            run_time = job.get_limit_time();
+            job.set_actual_run_time(run_time);
+            break;
+    }
+}
+
 void Simulation::determine_job_run_time()
 {
     for (auto& job : m_trace.data()) {
-        // Scheduler uses time_limit as the best estimator for planning (realistic mode).
-        // run_time_mode controls how the job's actual execution length is determined.
-
-        tdiff_t run_time;
-
-        switch (m_params.m_run_time_mode) {
-            case RunTimeMode::ACTUAL:
-                // Read actual_run_time from trace (most realistic)
-                run_time = job.get_actual_run_time();
-                break;
-
-            case RunTimeMode::DISTRIBUTION:
-                // Sample from distribution (realistic with variation)
-                run_time = sample_run_time(
-                    job.get_limit_time(),
-                    m_params.m_run_time_distribution,
-                    m_params.m_run_time_scale,
-                    m_params.m_run_time_stddev
-                );
-                job.set_actual_run_time(run_time);
-                break;
-
-            case RunTimeMode::LIMIT:
-                // Use time_limit in place of run_time (unrealistic, for debugging/testing)
-                run_time = job.get_limit_time();
-                job.set_actual_run_time(run_time);
-                break;
-        }
+        determine_one_job_run_time(job);
     }
 }
+
+void Simulation::determine_job_run_time(const std::vector<job_no_t>& job_nos)
+{
+    for (job_no_t job_no : job_nos) {
+        determine_one_job_run_time(m_trace.job_at(job_no));
+    }
+}
+
+void Simulation::run_progressive()
+{
+    // Minimal reset, equivalent to initialize_trace()'s own tail - no
+    // load_data() call here, since there's no single file to load
+    // upfront; each file gets loaded as the driving loop below reaches it.
+    m_trace.data().clear();
+    m_current_time = 0.0;
+    m_jobs_submitted = 0;
+    m_jobs_completed = 0;
+
+    // Same reasoning as run()'s single-file path: open output files
+    // early so reclaiming during the run (which starts happening
+    // between files here, unlike single-file batch mode) can flush to
+    // them incrementally, not only at the very end.
+    m_trace.set_resource_history_capacity(m_params.m_resource_history_capacity);
+    m_trace.start_resource_trace(m_params.get_resource_trace(), m_params.m_total_nodes,
+                                  m_params.m_msec_output);
+    m_trace.start_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
+
+    for (const std::string& fname : m_params.m_infile_list_parsed) {
+        if (m_params.m_verbose) {
+            std::cout << "Loading " + fname + "...\n";
+        }
+
+        // reclaim + grow-or-abort against (what's left unreclaimed) +
+        // (this file's job count) - Trace::ensure_batch_capacity(),
+        // shared with append_jobs(). Also checks this file's own rows
+        // are submit_time-sorted, and that its earliest submit_time
+        // isn't before the previous file's latest - see its own doc
+        // comment.
+        auto job_nos = m_trace.load_next_file(m_current_time, fname);
+        if (job_nos.empty()) {
+            continue;  // an empty file contributes nothing to submit
+        }
+
+        // Simulation-mode-only, same condition initialize_trace() uses
+        // for the single-file path - REPLAY is rejected before
+        // run_progressive() is ever called (see run()), so this is
+        // always true here, but kept explicit rather than assumed.
+        if (m_trace.dcols().get_trace_mode() == TraceMode::SIMULATION) {
+            determine_job_run_time(job_nos);
+        }
+
+        // Submit this file's jobs one at a time, in submit_time order
+        // (guaranteed by load_next_file(), since m_data stays
+        // submit-time sorted) - not all upfront the way single-file
+        // batch mode does, since nothing becomes reclaimable until
+        // advance_to() actually processes a completion, and upfront
+        // submission would mean every file's jobs are already known to
+        // m_data before that ever gets a chance to run once.
+        for (job_no_t job_no : job_nos) {
+            const auto& job = m_trace.job_at(job_no);
+            sim_time_t submit_time = convert_epoch<sim_time_t>(job.get_submit_time());
+            submit_job(job_no, submit_time);
+        }
+
+        // This file's last job was just added to the wait queue -
+        // nothing more from it to submit, so this is the point to let
+        // time (and reclaiming) actually progress before the next file
+        // loads. advance_to() itself is completely unmodified - called
+        // exactly as it always has been, just with this file's own
+        // last submit_time as the target instead of infinity.
+        sim_time_t last_submit_time = convert_epoch<sim_time_t>(
+            m_trace.job_at(job_nos.back()).get_submit_time());
+        advance_to(last_submit_time);
+    }
+
+    // Drain whatever's still running after the last file - same
+    // "advance to infinity, loop exits once wait_queue and event_queue
+    // are both empty" postcondition single-file batch mode relies on.
+    advance_to(std::numeric_limits<sim_time_t>::max());
+}
+
 
 tdiff_t Simulation::sample_run_time(
     tdiff_t time_limit,
