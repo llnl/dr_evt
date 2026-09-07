@@ -7,7 +7,7 @@ Comprehensive test suite for the DR_EVT HPC Job Scheduler Simulator.
 DR_EVT has tests organized by purpose:
 - **Comprehensive (34)** - Verify scheduler algorithm correctness with dual validation
 - **Unit (7)** - Basic I/O and format tests
-- **Feature (3)** - Policy and mode comparisons
+- **Feature (6)** - Policy, mode, output-format, and rejection tests
 - **Scale (7)** - Larger job counts than comprehensive's ceiling
 - **Replay (4)** - Verify replay reproduces simulation
 - **Resource History (5)** - Resource-history circular buffer, flush overhead
@@ -112,7 +112,7 @@ during load with no error, producing zero loaded jobs. This is exactly
 what broke `simple_2jobs.csv` and `timestamp_epoch_simple.csv` previously
 (since fixed).
 
-### 3. Feature Tests (5 tests)
+### 3. Feature Tests (6 tests)
 
 **Purpose:** Verify specific policy and mode comparisons
 
@@ -120,11 +120,10 @@ what broke `simple_2jobs.csv` and `timestamp_epoch_simple.csv` previously
 
 **Runner:** `./tests/run_feature_tests.sh`
 
-**Tests:**
-- Policy comparisons (Conservative vs EASY)
-- Mode tests (Replay vs Simulation)
+**Fixtures:** `conservative_backfill`, `msec_basic`, `msec_fractional`,
+`rejected_job`, `sustained_replay`, and `sustained_simulation`.
 
-**Status:** ✅ 5/5 passing
+**Status:** ✅ 6/6 passing
 
 Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_feeder.cpp`, `test_python_api.py`) are separate, hardcoded C++/Python programs, not covered by this count.
 
@@ -255,7 +254,7 @@ See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) f
 |----------|-------|--------|----------|
 | Comprehensive | 34 | ✅ 34/34 | Consistency with Python reference (dual validation) |
 | Unit | 7 | ✅ 7/7 | I/O, parsing, formats |
-| Feature | 5 | ✅ 5/5 | Policies, modes (1 skipped - no expected output yet) |
+| Feature | 6 | ✅ 6/6 | Policies, modes, millisecond output, and rejection handling |
 | Conservative | 2 | ✅ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Scale | 7 | ✅ 7/7 | Larger job counts |
 | Replay | 4 | ✅ 4/4 | Determinism verification |
@@ -264,7 +263,7 @@ See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) f
 | Append-Job | 17 | ✅ 17/17 | Streaming insertion (single+batch) + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✅ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
 | Config | 7 | ✅ 7/7 | Protobuf config parity with CLI, and the doc's own examples actually run |
-| **TOTAL** | **107** | **107/107** all passing | - |
+| **TOTAL** | **108** | **108/108** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
@@ -525,7 +524,7 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 |----------|-------|--------|-------|
 | Comprehensive | 34 | ✓ 34/34 | Matches Python reference (not independent ground truth) |
 | Unit | 7 | ✓ 7/7 | Basic I/O and format tests |
-| Feature | 5 | ✓ 5/5 | Policy comparisons and mode tests |
+| Feature | 6 | ✓ 6/6 | Policy comparisons, modes, millisecond output, and rejection handling |
 | Conservative | 2 | ✓ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Replay | 4 | ✓ 4/4 | Resource trace matching |
 | Scale | 7 | ✓ 7/7 | Large-scale tests |
@@ -534,7 +533,7 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Append-Job | 17 | ✓ 17/17 | Streaming insertion (single+batch) + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✓ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
 | Config | 7 | ✓ 7/7 | Protobuf config parity with CLI, and the doc's own examples actually run |
-| **Total** | **107** | **107/107** | All tests passing as of 2026-09-07 |
+| **Total** | **108** | **108/108** | All tests passing as of 2026-09-07 |
 
 ## Prerequisites
 

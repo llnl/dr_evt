@@ -224,7 +224,7 @@ cd build
 ## Feature Tests
 
 **Location:** `tests/test_traces/feature/`
-**Total:** 5 tests
+**Total:** 6 tests
 **Purpose:** Compare different scheduling policies and modes
 
 **How to run:**
@@ -236,13 +236,17 @@ cd build
 | Test | Description | Comparison | Status | Artifacts |
 |------|-------------|------------|--------|-----------|
 | `conservative_backfill.csv` | Conservative vs EASY | Backfill policies | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/conservative_backfill.csv) |
+| `msec_basic.csv` | Millisecond output | Whole-second timestamps | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/msec_basic.csv) |
+| `msec_fractional.csv` | Millisecond output | Fractional timestamps | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/msec_fractional.csv) |
+| `rejected_job.csv` | Oversized-job rejection | Rejected job is excluded from output | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/rejected_job.csv) |
 | `sustained_replay.csv` | Replay mode validation | Replay vs simulation | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/sustained_replay.csv) |
 | `sustained_simulation.csv` | Long-running simulation | Sustained load | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/sustained_simulation.csv) |
-| `easy_vs_conservative_test.csv` | Behavioral difference | EASY vs CONSERVATIVE | ✅ Passing | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/feature/easy_vs_conservative_test.csv) |
 
-**Status:** 5/5 passing
+**Status:** 6/6 passing
 
-Note: The `easy_vs_conservative_test.csv` test is used for differential comparison (EASY vs CONSERVATIVE algorithms) and validates against algorithm-specific expected outputs, not a single shared oracle.
+Note: `easy_vs_conservative_test.csv` is run separately by
+`tests/test_easy_vs_conservative_correctness.sh`; it validates against
+algorithm-specific expected outputs rather than a shared oracle.
 
 ---
 
@@ -560,7 +564,7 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 |----------|-------|---------|--------|---------|
 | **Comprehensive** | 34 | 34 | 0 | Scheduler correctness |
 | **Unit** | 7 | 7 | 0 | Basic I/O & formats |
-| **Feature** | 5 | 5 | 0 | Policy comparisons |
+| **Feature** | 6 | 6 | 0 | Policy comparisons, output formats, and rejection handling |
 | **Conservative** | 2 | 2 | 0 | CONSERVATIVE backfilling |
 | **Scale** | 7 | 7 | 0 | Performance testing |
 | **Replay** | 4 | 4 | 0 | Resource verification |
@@ -572,7 +576,7 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Config** | 7 | 7 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 157+ | 157+ | 0 | Complete test suite |
+| **TOTAL** | 158+ | 158+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 
