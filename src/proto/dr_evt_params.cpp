@@ -33,6 +33,14 @@ static void set_sim_options(
     sp.m_is_time_set = (sp.m_max_time > 0.0);
 
     sp.m_infile = cfg.infile();
+    if (!cfg.infile_list().empty()) {
+        // Mutually exclusive with infile - matches the CLI's own
+        // --infile_list vs -i/--infile exclusivity (see
+        // Sim_Params::getopt()). set_infile_list() overwrites m_infile
+        // with the list's first entry, so this must run after the
+        // plain assignment above, not before.
+        sp.set_infile_list(cfg.infile_list());
+    }
     sp.set_outfile(cfg.outfile());
 
     // Resource trace file (optional)

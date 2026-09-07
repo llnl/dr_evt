@@ -246,7 +246,7 @@ jobs:
         id: config
         run: |
           echo "========================================"
-          echo "Running Config Tests (4 tests)"
+          echo "Running Config Tests (5 tests)"
           echo "========================================"
           ./tests/run_configs_tests.sh
 
@@ -311,7 +311,7 @@ jobs:
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
           echo "  Replay (3 tests): ${{ steps.replay.outcome }}"
           echo "  Resource History (4 tests): ${{ steps.resource-history.outcome }}"
-          echo "  Config (4 tests): ${{ steps.config.outcome }}"
+          echo "  Config (5 tests): ${{ steps.config.outcome }}"
           echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
           echo "  Streaming API (15 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"

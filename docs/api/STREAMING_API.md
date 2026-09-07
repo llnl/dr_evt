@@ -14,7 +14,7 @@ The DR_EVT simulator provides a streaming API that allows external code (e.g., g
 - Simple but inflexible
 
 **Streaming Mode** (via API):
-- Jobs submitted incrementally via `submit_job()`
+- Genuinely new jobs (the trace has never seen before) added incrementally via `append_job()`/`append_jobs()`, then submitted via `submit_job()`
 - Caller controls time advancement via `advance_to()`/`run_until_exclusive()`
 - Enables interactive/online simulation scenarios
 
@@ -49,7 +49,72 @@ num_jobs_t num_jobs = sim.initialize_trace();
 std::cout << "Loaded " << num_jobs << " jobs\n";
 ```
 
-### `submit_job(job_idx, submit_time)`
+### `append_job(submit_time, num_nodes, queue, limit_time)`
+
+Adds a genuinely new job - one the trace has never seen before - to the
+job store. This is what makes streaming actually streaming: `submit_job()`
+alone can only enqueue a job already sitting in a preloaded trace (see
+`initialize_trace()` above); `append_job()` is how a job the caller
+learns about live (e.g. a real job-submission event arriving over the
+network) gets in at all. Does not submit the job to the scheduler -
+call `submit_job()` with the returned `job_no` next for that (same
+two-step shape as before: append, then submit).
+
+```cpp
+job_no_t append_job(sim_time_t submit_time, num_nodes_t num_nodes,
+                     const std::string& queue, tdiff_t limit_time);
+```
+
+**Parameters:**
+- `submit_time`: When the job is submitted (must be >= current_time)
+- `num_nodes`: Number of nodes the job requests
+- `queue`: Which queue the job belongs to (e.g. `"pbatch"`)
+- `limit_time`: User-estimated time limit, in seconds
+
+**Returns:** the new job's `job_no`, for the `submit_job()` call that follows
+
+**Example:**
+```cpp
+job_no_t j = sim.append_job(10.0, 20, "pbatch", 200.0);
+sim.submit_job(j, 10.0);
+sim.advance_to(10.0);
+```
+
+### `append_jobs(requests)`
+
+The batch counterpart to `append_job()` - several new jobs in one call,
+each as a `Job_Append_Request` (the same four fields `append_job()`
+takes, grouped). Resolves job-store capacity once for the whole batch
+rather than once per job, so it's the more efficient choice when several
+jobs are already known together (e.g. several arrivals collected in one
+polling interval), not just a loop over `append_job()`. All-or-nothing:
+requests must already be sorted by `submit_time` (non-decreasing), and
+either the whole batch is appended or, on any failure (unsorted input,
+or `--job_store_overflow=abort` with no room even after reclaiming),
+none of it is - `m_data` is never left partially filled.
+
+```cpp
+std::vector<job_no_t> append_jobs(const std::vector<Job_Append_Request>& requests);
+```
+
+**Parameters:**
+- `requests`: the new jobs' own data, in `submit_time` order
+
+**Returns:** each new job's `job_no`, in the same order as `requests` -
+pass each to `submit_job()` next, same as `append_job()`
+
+**Example:**
+```cpp
+std::vector<Simulation::Job_Append_Request> batch = {
+    {10.0, 20, "pbatch", 200.0},
+    {15.0, 10, "pbatch", 100.0},
+};
+auto job_nos = sim.append_jobs(batch);
+for (size_t i = 0; i < job_nos.size(); ++i) {
+    sim.submit_job(job_nos[i], batch[i].submit_time);
+}
+```
+
 
 Submits a job to the scheduler's waiting queue.
 
@@ -58,7 +123,7 @@ void submit_job(job_no_t job_idx, sim_time_t submit_time);
 ```
 
 **Parameters:**
-- `job_idx`: Index of job in the loaded trace (0-based)
+- `job_idx`: The job's `job_no` - either from the loaded trace (0-based) or returned by an earlier `append_job()`/`append_jobs()` call
 - `submit_time`: When the job is submitted (must be >= current_time)
 
 **Behavior:**
@@ -176,15 +241,19 @@ for (size_t i = 0; i < sim.get_trace().data().size(); i++) {
 sim.advance_to(MAX_TIME);
 ```
 
-### Pattern 2: Incremental Job Submission
+### Pattern 2: Incremental Job Submission (genuinely new jobs)
 
 ```cpp
-// External system feeds jobs over time
+// External system feeds genuinely new jobs over time - the trace
+// never knew about them in advance, so append_job() (not just
+// submit_job() on a preloaded index) is what makes this real streaming.
 while (external_system.has_more_jobs()) {
     Job job = external_system.get_next_job();
 
-    // Submit job
-    sim.submit_job(job.idx, job.submit_time);
+    // Append the job (the trace has never seen it before), then submit it
+    job_no_t job_no = sim.append_job(job.submit_time, job.num_nodes,
+                                      job.queue, job.limit_time);
+    sim.submit_job(job_no, job.submit_time);
 
     // Advance to job's submit time
     sim.advance_to(job.submit_time);
@@ -199,9 +268,10 @@ while (external_system.has_more_jobs()) {
 ```cpp
 // Advance in fixed time steps
 for (sim_time_t t = 0; t <= 1000.0; t += 10.0) {
-    // Submit any jobs arriving in this window
+    // Append and submit any genuinely new jobs arriving in this window
     for (auto& job : jobs_arriving_at(t)) {
-        sim.submit_job(job.idx, t);
+        job_no_t job_no = sim.append_job(t, job.num_nodes, job.queue, job.limit_time);
+        sim.submit_job(job_no, t);
     }
 
     // Advance to next time step
@@ -223,7 +293,9 @@ while (!event_queue.empty()) {
     event_queue.pop();
 
     if (evt.type == Event::JOB_ARRIVAL) {
-        sim.submit_job(evt.job_idx, evt.time);
+        job_no_t job_no = sim.append_job(evt.time, evt.num_nodes,
+                                          evt.queue, evt.limit_time);
+        sim.submit_job(job_no, evt.time);
         sim.advance_to(evt.time);
     } else if (evt.type == Event::CHECKPOINT) {
         sim.advance_to(evt.time);
@@ -322,15 +394,20 @@ This caused `advance_to(50)` to continue advancing to `t=150` and beyond. The fi
 
 Test programs verify the streaming API:
 
-### test_streaming_api
+### test_append_job_api
 
-Basic functional tests of the streaming API methods.
+Functional tests of the streaming API: `append_job()`/`append_jobs()`
+(genuine insertion of jobs the trace never saw before) together with
+`submit_job()`/`advance_to()`/`run_until_exclusive()`'s general
+correctness - consolidated into one file since the latter's coverage
+never actually depended on a preloaded trace.
 
 ```bash
-./build/test_streaming_api
+./build/test_append_job_api
 ```
 
 **Tests:**
+- `append_job()`/`append_jobs()`: basic insertion, batch validation (sorting, atomicity), reclaim-before-grow, `--job_store_overflow=abort`
 - Basic `submit_job()` and `advance_to()`/`run_until_exclusive()` operations
 - Exclusive vs inclusive time advancement semantics
 - Online scheduling simulation
@@ -384,14 +461,14 @@ anything - treat its output as unverified until that happens.
 
 ## Limitations
 
-1. **Jobs must be in trace**: All jobs must exist in the loaded trace before calling `submit_job()`
+1. **No job cancellation**: Once submitted, jobs cannot be cancelled
 2. **Time must advance forward**: Cannot go back in time
-3. **No job cancellation**: Once submitted, jobs cannot be cancelled
-4. **Single scheduler instance**: No support for multi-scheduler coordination in-process (the gRPC client/server's [MPI multi-client/multi-server harness](../CLIENT_SERVER_GUIDE.md) coordinates across separate, independent `Simulation` instances instead, each in its own process)
+3. **Single scheduler instance**: No support for multi-scheduler coordination in-process (the gRPC client/server's [MPI multi-client/multi-server harness](../CLIENT_SERVER_GUIDE.md) coordinates across separate, independent `Simulation` instances instead, each in its own process)
 
 ## See Also
 
 - `src/sim/sim.hpp` - API declarations
 - `src/sim/sim.cpp` - Implementation
-- `tests/test_streaming_api.cpp` - Usage examples
+- `tests/test_append_job_api.cpp` - Usage examples
 - [gRPC Client/Server Guide](../CLIENT_SERVER_GUIDE.md) - Network-exposed streaming API, MPI multi-client/multi-server harness
+- [Progressive/Multi-File Loading](../dev/design-decisions/OUT_TRACE_STREAMING.md) - `--infile_list`, a related but distinct capability: bounding job-store memory across a trace the caller already knows in full (split across files), rather than jobs arriving live

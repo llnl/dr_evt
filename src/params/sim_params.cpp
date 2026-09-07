@@ -343,37 +343,12 @@ void Sim_Params::getopt(int& argc, char** &argv)
     } else if (optind != argc) {
         print_usage (argv[0], 1);
     } else {
-        // Parse the list file now (not lazily in run()): m_infile needs
-        // its first entry right away, since Trace's own constructor
-        // (called from Simulation's constructor, before run() ever
-        // executes) validates a file's header against whatever m_infile
-        // holds - list mode still needs a real file for that, same as
-        // single-file mode, and this is the only file known yet.
-        std::ifstream ifs(m_infile_list);
-        if (!ifs) {
-            std::cerr << "Failed to open --infile_list file: " << m_infile_list << std::endl;
+        try {
+            set_infile_list(m_infile_list);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << std::endl;
             print_usage(argv[0], 1);
         }
-        std::string line;
-        while (std::getline(ifs, line)) {
-            // Strip trailing whitespace/carriage returns, same as
-            // load()'s own per-row handling - a list file edited on
-            // Windows shouldn't silently produce a bad path.
-            while (!line.empty() && (line.back() == ' ' || line.back() == '\t' ||
-                                      line.back() == '\r' || line.back() == '\n')) {
-                line.pop_back();
-            }
-            if (line.empty()) {
-                continue;
-            }
-            m_infile_list_parsed.push_back(line);
-        }
-        if (m_infile_list_parsed.empty()) {
-            std::cerr << "--infile_list file '" << m_infile_list
-                      << "' contains no file paths" << std::endl;
-            print_usage(argv[0], 1);
-        }
-        m_infile = m_infile_list_parsed.front();
     }
     set_outfile(m_outfile);
 
@@ -491,7 +466,12 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "\n"
         "    -f, --trace_format {simple|lassen}\n"
         "        Trace file format (default: simple).\n"
-        "        simple: CSV with [arrival_time,start_time,end_time,num_nodes,...]\n"
+        "        simple: CSV, columns looked up by name in the header row.\n"
+        "          Simulation mode (no begin_time/end_time columns): requires\n"
+        "          job_submit_time, num_nodes, queue, time_limit.\n"
+        "          Replay mode (begin_time and end_time/duration present):\n"
+        "          requires job_submit_time, begin_time, end_time, num_nodes,\n"
+        "          exit_status, queue, time_limit.\n"
         "        lassen: 33-column LLNL Lassen format\n"
         "\n"
         "    -T, --timestamp_format {epoch|iso}\n"
@@ -616,6 +596,42 @@ void Sim_Params::set_outfile(const std::string& ofname)
             m_outfile = "sim_out.txt";
         }
     }
+}
+
+void Sim_Params::set_infile_list(const std::string& list_path)
+{
+    m_infile_list = list_path;
+    m_infile_list_parsed.clear();
+
+    std::ifstream ifs(list_path);
+    if (!ifs) {
+        throw std::runtime_error("Failed to open --infile_list file: " + list_path);
+    }
+    std::string line;
+    while (std::getline(ifs, line)) {
+        // Strip trailing whitespace/carriage returns, same as load()'s
+        // own per-row handling - a list file edited on Windows
+        // shouldn't silently produce a bad path.
+        while (!line.empty() && (line.back() == ' ' || line.back() == '\t' ||
+                                  line.back() == '\r' || line.back() == '\n')) {
+            line.pop_back();
+        }
+        if (line.empty()) {
+            continue;
+        }
+        m_infile_list_parsed.push_back(line);
+    }
+    if (m_infile_list_parsed.empty()) {
+        throw std::runtime_error(
+            "--infile_list file '" + list_path + "' contains no file paths");
+    }
+    // m_infile needs its first entry right away, since Trace's own
+    // constructor (called from Simulation's constructor, before
+    // Simulation::run() ever executes) validates a file's header
+    // against whatever m_infile holds - list mode still needs a real
+    // file for that, same as single-file mode, and this is the only
+    // file known yet.
+    m_infile = m_infile_list_parsed.front();
 }
 
 std::string Sim_Params::get_outfile() const

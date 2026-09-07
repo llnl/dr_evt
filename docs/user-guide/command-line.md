@@ -23,6 +23,31 @@ Input job trace file. Can also be specified as the first positional argument.
 ./build/simulator --infile traces/jobs.csv
 ```
 
+### `-L, --infile_list FILENAME`
+Path to a file listing multiple trace files, one per line - progressive
+loading: each is loaded in turn as the simulation reaches it, so
+`--job_store_capacity` can actually bound memory (`--infile`/single-file
+mode always grows to fit the whole trace regardless of that setting).
+Mutually exclusive with `--infile`/the positional trace-file argument -
+do not provide both.
+
+**Requirements:** files must already be sorted by `submit_time`, both
+within each file and across the sequence (each file's earliest
+`submit_time` must be `>=` the previous file's latest).
+
+**Example:**
+```bash
+./build/simulator --infile_list traces/file_list.txt --job_store_capacity 1000
+```
+where `traces/file_list.txt` contains, one path per line:
+```
+traces/part1.csv
+traces/part2.csv
+traces/part3.csv
+```
+
+See [`docs/dev/design-decisions/OUT_TRACE_STREAMING.md`](../dev/design-decisions/OUT_TRACE_STREAMING.md) for the full design.
+
 ### `-o, --outfile FILENAME`
 Output file for simulated job trace.
 
@@ -198,13 +223,12 @@ What to do if an insert would exceed `--wait_queue_capacity`. Only used when
 Initial capacity of the job-record store (`Trace::m_data`, a
 `boost::circular_buffer`). See
 [Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
-for what this actually buys you - in short: for a batch run (loading a
-whole trace file upfront, the only mode that exists today), capacity
-always grows to fit the whole trace during loading regardless of this
-setting, so a smaller value here does not reduce the final allocation
-and essentially never triggers reclaiming a slot mid-run. This option
-mainly exists for a future streaming mode, and to exercise
-`--job_store_overflow` deliberately.
+for what this actually buys you - in short: with `--infile` (single-file
+mode, loading a whole trace file upfront), capacity always grows to fit
+the whole trace during loading regardless of this setting, so a smaller
+value here does not reduce the final allocation and essentially never
+triggers reclaiming a slot mid-run. Use `--infile_list` instead for a
+capacity that can actually bound memory across a trace.
 
 **Default:** `0`, meaning the size of the job trace - large enough that the
 store can never overflow, since at most one entry is inserted per job.

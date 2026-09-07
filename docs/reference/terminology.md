@@ -9,7 +9,9 @@ Some terms are ambiguous and should be avoided or used with clear context.
 ### 1. Reference Implementation
 **What it is:** Python implementation of EASY backfilling used to verify C++ implementation
 **Call it:** "Reference implementation" or "Python reference"
-**File naming:** `*_reference.csv` (output from reference implementation)
+**File naming:** none fixed - output is generated on demand during test
+development and diffed against the fixed `.expected_output.csv`/
+`.expected_resources.csv` files in `tests/test_traces/comprehensive/`
 **Script:** `scripts/python_reference_scheduler.py` (historical name, kept for now)
 
 ### 2. Run Time Mode
@@ -36,17 +38,24 @@ regardless of `run_time_mode`.
 
 ## File Naming Convention
 
-### Test Inputs
-```
-{test_name}_input.csv
-```
-Example: `easy_5jobs_input.csv`
+The comprehensive test suite (`tests/test_traces/comprehensive/`) names
+each test's files by a shared `{test_name}` stem, not the
+`_input`/`_reference` suffixes this document used to describe:
 
-### Reference Outputs (from Python)
 ```
-{test_name}_reference.csv
+{test_name}.csv                    # input trace
+{test_name}.expected_output.csv    # expected simulated-trace output (machine-comparable)
+{test_name}.expected_resources.csv # expected resource-usage trace (machine-comparable)
+{test_name}.answer.json            # expected schedule/statistics, structured
+{test_name}.construction.md        # human-readable description of the scenario and why it's expected to behave this way
 ```
-Example: `easy_5jobs_reference.csv`
+
+Example: `01_backfill_allowed.csv`, `01_backfill_allowed.expected_output.csv`, etc.
+
+`scripts/python_reference_scheduler.py` output being diffed against
+during test development doesn't have a fixed naming convention of its
+own - it's generated on demand and compared against whichever of the
+files above is relevant, not saved as a permanent fixture itself.
 
 ## Code/Script Names
 
@@ -81,15 +90,15 @@ diff reference.csv output.csv
 
 | Concept | Correct Term | File Suffix | CLI Flag |
 |---------|--------------|-------------|----------|
-| Python implementation | Reference implementation | `_reference.csv` | N/A |
+| Python implementation | Reference implementation | N/A (generated on demand, not a saved fixture) | N/A |
 | How the job's actual run time is determined | Run time mode | N/A | `-r, --run_time_mode {actual\|distribution\|limit}` |
-| Expected output | Reference output | `_reference.csv` | N/A |
-| Test input | Input trace | `_input.csv` | N/A |
+| Expected output | Reference output | `.expected_output.csv` / `.expected_resources.csv` | N/A |
+| Test input | Input trace | `.csv` | N/A |
 
 ## Migration Notes
 
 **Files to rename (optional):**
-- None currently - our current `*_reference.csv` naming is correct
+- None currently - our current `.expected_output.csv`/`.expected_resources.csv` naming is correct
 - Script names (`python_reference_scheduler.py`) are historical but acceptable
 
 **Documentation:**

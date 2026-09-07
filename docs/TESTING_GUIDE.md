@@ -452,6 +452,7 @@ make
 - `full_config.pb`
 - `distribution_config.pb`
 - `resource_trace_config.pb`
+- `infile_list_config.pb` (progressive loading via a protobuf config, not just the CLI)
 
 ---
 
@@ -560,10 +561,10 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Append-Job** | 16 | 16 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
 | **Progressive Loading** | 10 | 10 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
 | **Streaming** | 4 | 4 | 0 | Online API |
-| **Config** | 4 | 4 | 0 | Protobuf validation |
+| **Config** | 5 | 5 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 149+ | 149+ | 0 | Complete test suite |
+| **TOTAL** | 150+ | 150+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

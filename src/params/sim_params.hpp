@@ -49,6 +49,21 @@ class Sim_Params {
     void print_usage(const std::string exec, int code);
     void print() const;
     void set_outfile(const std::string& ofname);
+    /// Sets m_infile_list and parses it: reads list_path (one file path
+    /// per line, blank lines skipped, trailing whitespace/CR stripped),
+    /// populates m_infile_list_parsed, and sets m_infile to its first
+    /// entry - so Trace's own constructor (called from Simulation's
+    /// constructor, before Simulation::run() ever executes) always has
+    /// a real file to validate a header against, in progressive-loading
+    /// mode same as single-file mode. Shared by both ways to enable
+    /// progressive loading (--infile_list on the CLI, or a protobuf
+    /// config's infile_list field) so neither duplicates this parsing.
+    /// Throws std::runtime_error if list_path can't be opened or names
+    /// no files at all - callers decide how to surface that (getopt()
+    /// converts it to a usage error and exit(1); a protobuf config
+    /// error simply propagates, same as any other read_proto_params()
+    /// failure).
+    void set_infile_list(const std::string& list_path);
     std::string get_outfile() const;
     void set_resource_trace(const std::string& rfname);
     std::string get_resource_trace() const;

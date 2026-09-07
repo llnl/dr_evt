@@ -96,7 +96,8 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `infile` | string | Input trace file path (required) |
+| `infile` | string | Input trace file path (required, unless `infile_list` is set instead) |
+| `infile_list` | string | Path to a file listing multiple trace files, one per line - progressive loading, so `job_store_capacity` can actually bound memory (`infile` always grows to fit the whole trace regardless). Mutually exclusive with `infile` - do not set both. Files must already be sorted by `submit_time`, both within each file and across the sequence. See [`command-line.md`](command-line.md)'s `--infile_list` and `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`. |
 | `outfile` | string | Output schedule file path (default: `stdout`) |
 | `resource_trace` | string | Node availability trace (optional) |
 
@@ -117,7 +118,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 | `block_size` | uint32 | `128` | Power of 2; only used when `queue_impl="block"` |
 | `wait_queue_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
 | `wait_queue_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
-| `job_store_capacity` | uint64 | `0` | `0` = size of job trace |
+| `job_store_capacity` | uint64 | `0` | `0` = size of job trace; only actually bounds memory with `infile_list` - `infile` (single-file) always grows to fit the whole trace regardless |
 | `job_store_overflow` | string | `"grow"` | `"abort"`, `"grow"` |
 | `resource_history_capacity` | uint64 | `0` | `0` = size of job trace, floored at 4096 |
 
@@ -357,6 +358,12 @@ message Simulation_Params {
 
   // Input/Output
   string infile = 4;
+  // Path to a file listing multiple trace files, one per line -
+  // progressive loading (see docs/dev/design-decisions/
+  // OUT_TRACE_STREAMING.md): each is loaded in turn as the simulation
+  // reaches it, so job_store_capacity can actually bound memory.
+  // Mutually exclusive with infile - do not set both.
+  string infile_list = 26;
   string outfile = 5;
   string resource_trace = 6;
 
