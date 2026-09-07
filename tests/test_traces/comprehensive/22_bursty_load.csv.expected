@@ -1,7 +1,7 @@
-Bursty arrival pattern with idle periods
+Bursty arrival pattern with queueing between bursts
 
 EXPECTED PROPERTIES:
   - First burst: 10 jobs at t=0-20
-  - Idle period: t=~120 to t=200
+  - The queued tail of the first burst runs through t=206
   - Second burst: 10 jobs at t=200-220
   - Scheduler handles bursts correctly

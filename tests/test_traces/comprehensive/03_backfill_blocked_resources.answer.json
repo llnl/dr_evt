@@ -9,14 +9,19 @@
     [
       1,
       200,
+      500
+    ],
+    [
+      2,
+      200,
       250
     ]
   ],
   "constraints": [
     {
       "type": "no_backfill",
-      "job": 1,
-      "description": "Job 1 cannot backfill (resource constraint)"
+      "job": 2,
+      "description": "Job 2 cannot backfill (resource constraint)"
     },
     {
       "type": "fcfs_wait",

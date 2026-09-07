@@ -149,7 +149,7 @@ for i in range(len(easy_expected)):
     match = "✓" if exp_start == act_start else "✗"
     if exp_start != act_start:
         easy_pass = False
-    print(f"Job {i:<3} {exp_start:<15.1f} {act_start if act_start else 'None':<15} {match:<10}")
+    print(f"Job {i:<3} {exp_start:<15.1f} {act_start if act_start is not None else 'None':<15} {match:<10}")
 
 print("-" * 70)
 print()
@@ -166,7 +166,7 @@ for i in range(len(cons_expected)):
     match = "✓" if exp_start == act_start else "✗"
     if exp_start != act_start:
         cons_pass = False
-    print(f"Job {i:<3} {exp_start:<15.1f} {act_start if act_start else 'None':<15} {match:<10}")
+    print(f"Job {i:<3} {exp_start:<15.1f} {act_start if act_start is not None else 'None':<15} {match:<10}")
 
 print("-" * 70)
 print()

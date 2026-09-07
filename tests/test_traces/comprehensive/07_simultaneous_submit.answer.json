@@ -9,17 +9,17 @@
     [
       1,
       0,
-      100
+      101
     ],
     [
       2,
       0,
-      100
+      102
     ],
     [
       3,
       0,
-      100
+      103
     ]
   ],
   "constraints": [
@@ -34,14 +34,14 @@
       "time": 0
     },
     {
-      "type": "simultaneous_end",
+      "type": "per_job_end_times",
       "jobs": [
         0,
         1,
         2,
         3
       ],
-      "time": 100
+      "times": [100, 101, 102, 103]
     }
   ]
 }

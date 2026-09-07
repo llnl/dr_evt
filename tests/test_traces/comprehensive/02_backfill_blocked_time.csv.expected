@@ -2,6 +2,7 @@ Backfill blocked when job would finish after FCFS reservation
 
 EXPECTED PROPERTIES:
   - Job 0 starts at t=0, ends at t=100
-  - Job 1 cannot backfill (would end at t=160 > t=100)
-  - Job 1 waits until t=100
-  - Job 1 starts at t=100, ends at t=250
+  - Job 1 is the FCFS head and waits until t=100
+  - Job 2 cannot backfill (would end at t=170 > t=100)
+  - Job 1 starts at t=100, ends at t=300
+  - Job 2 starts at t=100, ends at t=250
