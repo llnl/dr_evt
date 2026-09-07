@@ -393,6 +393,20 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
         return;
     }
 
+    // Snapshot system occupancy at the moment of arrival - same
+    // statistic load_data()'s own submission loop records
+    // (Job_Record::m_busy_nodes, written out as the trace's
+    // "busy_nodes" column), which submit_job() would otherwise never
+    // populate for a streaming-arrived job (left at the constructor's
+    // default of 0, silently wrong rather than merely unset). Must run
+    // before insert_job() below, so it reflects other jobs' occupancy
+    // at this moment, not including this job's own allocation.
+  #if MARK_DAT_PERIOD
+    job.set_busy_nodes(get_nodes_in_use(), m_trace.in_dat_period());
+  #else
+    job.set_busy_nodes(get_nodes_in_use());
+  #endif
+
     m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);
 }
 

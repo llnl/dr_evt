@@ -528,12 +528,12 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Replay** | 3+ | 3+ | 0 | Resource verification |
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
-| **Append-Job** | 15 | 15 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
+| **Append-Job** | 16 | 16 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 4 | 4 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 138+ | 138+ | 0 | Complete test suite |
+| **TOTAL** | 139+ | 139+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 
