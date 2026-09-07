@@ -86,6 +86,11 @@ Scheduling policy:
   -A, --wait_queue_capacity <size>   Initial wait queue capacity when queue_impl=circular
   -G, --wait_queue_overflow <mode>   abort|grow when queue_impl=circular (default: grow)
 
+Job store:
+  -K, --job_store_capacity <size>      Initial job-record store capacity (default: 0 = size of trace)
+  -W, --job_store_overflow <mode>      abort|grow when job_store_capacity exceeded (default: grow)
+  -m, --check_memory_pressure <fraction>  Refuse to grow the job store past this fraction of available memory (0 < fraction <= 1; disabled unless given)
+
 Trace format:
   -f, --trace_format <fmt>     simple|lassen (default: simple)
   -T, --timestamp_format <fmt> epoch|iso (default: iso)

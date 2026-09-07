@@ -275,6 +275,21 @@ Jobs run for exactly their `time_limit`.
 -G, --wait_queue_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
 ```
 
+### Job Store Options
+
+```bash
+-K, --job_store_capacity SIZE     # Initial job-record store capacity (default: 0 = size of trace)
+-W, --job_store_overflow POLICY   # abort|grow if job_store_capacity exceeded (default: grow)
+-m, --check_memory_pressure FRACTION  # Refuse to grow the job store past FRACTION of available memory (0 < FRACTION <= 1; disabled unless given)
+```
+
+Only `--job_store_capacity` actually bounds memory when used with `--infile_list`
+(single-file mode always grows to fit the whole trace); `--check_memory_pressure`
+is a separate, independent check against real available memory - see
+[Command-Line Options](command-line.md) and
+[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
+for the full formula and rationale.
+
 ### Run Time Options
 
 ```bash
@@ -499,7 +514,8 @@ diff results_easy.txt results_conservative.txt
 
 4. **Bound job-store memory with `--infile_list`**:
    - Single-file mode (`--infile`) always grows its job-record store to fit the whole trace, regardless of `--job_store_capacity`
-   - For a trace too large to comfortably hold in memory at once, split it into several submit-time-sorted files and use `--infile_list` (progressive loading) instead - see [Command-Line Options](command-line.md#-l---infile_list-filename)
+   - For a trace too large to comfortably hold in memory at once, split it into several submit-time-sorted files and use `--infile_list` (progressive loading) instead - see [Command-Line Options](command-line.md)
+   - Add `--check_memory_pressure FRACTION` (e.g. `0.8`) to refuse outright rather than risk exhausting memory, if a batch would push usage past that fraction of what's actually available
 
 ### Expected Performance
 

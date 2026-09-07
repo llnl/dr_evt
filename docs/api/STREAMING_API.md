@@ -90,7 +90,9 @@ jobs are already known together (e.g. several arrivals collected in one
 polling interval), not just a loop over `append_job()`. All-or-nothing:
 requests must already be sorted by `submit_time` (non-decreasing), and
 either the whole batch is appended or, on any failure (unsorted input,
-or `--job_store_overflow=abort` with no room even after reclaiming),
+`--job_store_overflow=abort` with no room even after reclaiming, or
+`--check_memory_pressure` refusing the batch under real memory
+pressure - see [Command-Line Options](../user-guide/command-line.md)),
 none of it is - `m_data` is never left partially filled.
 
 ```cpp

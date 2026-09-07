@@ -166,7 +166,7 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 ✅ `priority_policy` - Priority policy (fcfs/sjf/ljf)  
 ✅ `verbose` - Verbose output flag  
 
-### Missing from Python Bindings (15 parameters)
+### Missing from Python Bindings (16 parameters)
 
 **Critical for Full Functionality:**
 
@@ -177,6 +177,7 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 | `max_time` | double | Unlimited | Stop at simulation time | **Medium** - Can't limit runtime |
 | `timezone` | string | "America/Los_Angeles" | Timezone for ISO timestamps | **Medium** - Can't parse non-Pacific times correctly |
 | `infile_list` | string | (none) | Path to a file listing multiple trace files - progressive loading, so job-store capacity can actually bound memory | **Medium** - Python can only drive single-file (batch) loading; no way to trigger progressive loading from Python |
+| `memory_pressure_fraction` | double | `0.0` (disabled) | Refuse to grow the job store past this fraction of available memory (must be `> 0.0` and `<= 1.0`) | **Low** - no way to enable this check from Python; not enforced by default anyway |
 
 **Run Time Simulation (only if run_time_mode=DISTRIBUTION):**
 
@@ -317,6 +318,7 @@ pip install --force-reinstall .
 | **Realistic run time variation** | `run_time_distribution`, `run_time_scale`, `run_time_stddev` | Set `run_time_mode=DISTRIBUTION` in config file |
 | **Genuine streaming (feeding jobs Python learned about live)** | `append_job()`/`append_jobs()` (methods, not `Sim_Params` fields) | None from pure Python today - use the [gRPC client/server](../user-guide/grpc-setup.md) instead, which does expose `AppendJobRequest`/`AppendJobsRequest`, or call the C++ API directly |
 | **Bounding job-store memory across a large trace** | `infile_list` | Use the CLI's `--infile_list` (see [Command-Line Options](../user-guide/command-line.md)) or a protobuf config file instead of the Python API |
+| **Refusing rather than risking memory exhaustion under load** | `memory_pressure_fraction` | Use the CLI's `--check_memory_pressure` or a protobuf config file instead of the Python API |
 
 ### Recommendation
 
