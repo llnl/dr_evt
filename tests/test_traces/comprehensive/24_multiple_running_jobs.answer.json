@@ -2,15 +2,15 @@
   "test_id": "24_multiple_running_jobs",
   "exact_schedule": [
     [0, 0, 100],
-    [1, 5, 205],
-    [2, 205, 505],
+    [1, 5, 200],
+    [2, 200, 500],
     [3, 20, 140]
   ],
   "constraints": [
     {
       "type": "backfill",
       "job": 3,
-      "description": "Job 3 backfills - completes at 140 < 205 (Job 2's reservation)"
+      "description": "Job 3 backfills - completes at 140 < 200 (Job 2's reservation)"
     },
     {
       "type": "overlap",

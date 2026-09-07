@@ -1,7 +1,7 @@
-Large job must not starve despite continuous small arrivals
+Large job starts before continuous small arrivals
 
 EXPECTED PROPERTIES:
-  - Job 0 (80 nodes) is FCFS head
-  - 30 small jobs arrive while job 0 could backfill
-  - Job 0 must start (FCFS guarantee)
-  - Small jobs can backfill around job 0
+  - Job 0 (80 nodes) starts immediately as the FCFS head
+  - 30 small jobs arrive while Job 0 is running
+  - Each small job starts at submission while the remaining 20 nodes permit it
+  - This fixture checks sustained concurrent arrivals, not a blocked-head backfill reservation

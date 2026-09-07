@@ -2,6 +2,6 @@ Backfill allowed when job finishes before FCFS reservation
 
 EXPECTED PROPERTIES:
   - Job 0 starts at t=0, runs until t=200
-  - Job 1 starts at t=10 (backfills)
-  - Job 1 ends at t=60 < t=200 (respects window)
-  - 40 nodes remain free (60 used by job 0)
+  - Job 1 is the blocked FCFS head and starts at t=200
+  - Job 2 starts at t=20, ends at t=70 < t=200, and backfills
+  - 30 nodes remain free (70 used by job 0)

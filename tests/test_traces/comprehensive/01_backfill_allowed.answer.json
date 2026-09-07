@@ -8,19 +8,24 @@
     ],
     [
       1,
-      10,
-      60
+      200,
+      500
+    ],
+    [
+      2,
+      20,
+      70
     ]
   ],
   "constraints": [
     {
       "type": "backfill",
-      "job": 1,
-      "description": "Job 1 must backfill (start at submit time)"
+      "job": 2,
+      "description": "Job 2 must backfill (start at submit time)"
     },
     {
       "type": "time_window",
-      "job": 1,
+      "job": 2,
       "end_before": 200,
       "description": "Job 1 ends before FCFS reservation"
     }
