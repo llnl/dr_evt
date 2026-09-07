@@ -78,7 +78,6 @@ docs/
 │   │   ├── OUT_TRACE_STREAMING.md
 │   │   ├── SIMULATION_VS_REPLAY_MODES.md
 │   │   └── TIMEZONE_SUPPORT.md
-│   └── wip-notes/                   # Ignored (.gitignore): work-in-progress notes, local only
 ├── BACKFILLING_ALGORITHMS.md
 ├── CLIENT_SERVER_GUIDE.md
 ├── TESTING_GUIDE.md
