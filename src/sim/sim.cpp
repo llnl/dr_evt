@@ -729,6 +729,38 @@ num_nodes_t Simulation::get_nodes_in_use() const
     return m_trace.get_nodes_in_use();
 }
 
+Simulation::Backfill_Window Simulation::get_backfill_window() const
+{
+    Backfill_Window window{
+        m_current_time,
+        get_available_nodes(),
+        get_fcfs_head_shadow_time(),
+        {}};
+
+    // A head that can start now has no future window to describe.  Likewise,
+    // without a waiting head there is no EASY reservation.
+    if (window.shadow_time <= m_current_time) {
+        return window;
+    }
+
+    // m_running_jobs stores the actual start time. The scheduler reserves
+    // against each job's limit time, so this deliberately does the same.
+    std::map<sim_time_t, num_nodes_t> releases_by_time;
+    for (const auto& [job_idx, start_time] : m_running_jobs) {
+        const auto& job = m_trace.job_at(job_idx);
+        const sim_time_t end_time = start_time + job.get_limit_time();
+        if (end_time > m_current_time && end_time <= window.shadow_time) {
+            releases_by_time[end_time] += job.get_num_nodes();
+        }
+    }
+
+    window.releases.reserve(releases_by_time.size());
+    for (const auto& [time, nodes] : releases_by_time) {
+        window.releases.push_back({time, nodes});
+    }
+    return window;
+}
+
 Simulation::Statistics Simulation::get_statistics() const
 {
     Statistics stats;

@@ -113,7 +113,7 @@ jobs:
           # docs/getting-started/installation.md's "Livermore Computing
           # (LC) HPC systems" section for the full explanation).
           # Build test binaries
-          make test_append_job_api-bin test_batch_vs_streaming-bin test_progressive_load-bin
+          make test_append_job_api-bin test_append_job_grpc-bin test_batch_vs_streaming-bin test_progressive_load-bin
           # gRPC client/server + MPI multi-client/server test harness
           # (already covered by `make -j$(nproc)` above since none of
           # these are EXCLUDE_FROM_ALL, but listed explicitly here too
@@ -271,9 +271,17 @@ jobs:
         id: append-job
         run: |
           echo "========================================"
-          echo "Running Append-Job Tests (17 C++ + gRPC)"
+          echo "Running Append-Job Tests (18 C++ + gRPC)"
           echo "========================================"
           ./tests/run_append_job_tests.sh
+
+      - name: Run FCFS/EASY Backfill-Window gRPC Test
+        id: backfill-window
+        run: |
+          echo "========================================"
+          echo "Running GetBackfillWindowRequest wire test"
+          echo "========================================"
+          ./tests/run_backfill_window_grpc_test.sh
 
       - name: Run Progressive Loading Tests
         id: progressive-load
@@ -314,7 +322,8 @@ jobs:
           echo "  Job Store (6 tests): ${{ steps.job-store.outcome }}"
           echo "  Config (7 tests): ${{ steps.config.outcome }}"
           echo "  Python API (15 tests): ${{ steps.python-api.outcome }}"
-          echo "  Append-Job (17 C++ + gRPC): ${{ steps.append-job.outcome }}"
+          echo "  Append-Job (18 C++ + gRPC): ${{ steps.append-job.outcome }}"
+          echo "  Backfill Window gRPC (included in Append-Job count): ${{ steps.backfill-window.outcome }}"
           echo "  Progressive Loading (10 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"

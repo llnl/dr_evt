@@ -17,6 +17,7 @@
  */
 
 #include <grpcpp/grpcpp.h>
+#include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <cassert>
@@ -270,6 +271,80 @@ bool test_batch_append(const std::string& server_address, const std::string& tra
     return true;
 }
 
+// Test 3: the single backfill-window query returns the same EASY reservation
+// projection as the scheduler: current free capacity plus releases through
+// the FCFS head's shadow time.
+bool test_backfill_window(const std::string& server_address, const std::string& trace_file)
+{
+    std::cout << "=== Test: GetBackfillWindowRequest ===\n";
+    SimulationClient client(
+        grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+
+    try {
+        connect_and_init(client, trace_file);
+
+        struct { uint32_t nodes; double limit; } jobs[] = {
+            {40, 50.0}, {60, 100.0}, {100, 200.0},
+        };
+        for (const auto& job : jobs) {
+            ClientMessage append;
+            auto* request = append.mutable_append_job();
+            request->set_submit_time(0.0);
+            request->set_num_nodes(job.nodes);
+            request->set_queue("pbatch");
+            request->set_limit_time(job.limit);
+            uint32_t job_idx = client.call(append).append_job().job_idx();
+
+            ClientMessage submit;
+            auto* submit_request = submit.mutable_submit_job();
+            submit_request->set_job_idx(job_idx);
+            submit_request->set_submit_time(0.0);
+            client.call(submit);
+        }
+
+        ClientMessage advance;
+        advance.mutable_advance_to()->set_target_time(0.0);
+        client.call(advance);
+
+        ClientMessage query;
+        query.mutable_get_backfill_window();
+        const auto query_response = client.call(query);
+        const auto& window = query_response.get_backfill_window();
+        std::cout << "  now=" << window.current_time()
+                  << " available=" << window.available_nodes()
+                  << " shadow=" << window.shadow_time()
+                  << " releases=" << window.releases_size() << "\n";
+
+        const bool expected_snapshot =
+            std::fabs(window.current_time()) < 1e-12 &&
+            window.available_nodes() == 0 &&
+            std::fabs(window.shadow_time() - 100.0) < 1e-12 &&
+            window.releases_size() == 2 &&
+            std::fabs(window.releases(0).time() - 50.0) < 1e-12 &&
+            window.releases(0).nodes_released() == 40 &&
+            std::fabs(window.releases(1).time() - 100.0) < 1e-12 &&
+            window.releases(1).nodes_released() == 60;
+        if (!expected_snapshot) {
+            std::cerr << "  FAIL: expected 0 free nodes, shadow=100, "
+                      << "releases [(50,40), (100,60)]\n";
+            client.finish();
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "  FAIL: " << e.what() << "\n";
+        client.finish();
+        return false;
+    }
+
+    grpc::Status status = client.finish();
+    if (!status.ok()) {
+        std::cerr << "  FAIL: RPC failed: " << status.error_message() << "\n";
+        return false;
+    }
+    std::cout << "  PASSED\n";
+    return true;
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 3) {
@@ -284,6 +359,7 @@ int main(int argc, char** argv)
     bool ok = true;
     ok &= test_single_append(server_address, trace_file);
     ok &= test_batch_append(server_address, trace_file);
+    ok &= test_backfill_window(server_address, trace_file);
 
     if (!ok) {
         std::cerr << "SOME TESTS FAILED\n";

@@ -32,13 +32,16 @@ interact in real-time.
 - **Protocol Buffer Configuration**: Structured configuration files for complex simulations
 
 ### Testing & Validation
-- **Comprehensive Test Suite**: 57 tests (57/57 passing as of 2026-09-03)
+- **Comprehensive Test Suite**: 110 tests (110/110 passing as of 2026-09-07)
   - 34 comprehensive tests (EASY backfilling correctness)
   - 7 unit tests (I/O and format validation)
-  - 5 feature tests (policy comparisons)
+  - 6 feature tests (policy comparisons)
   - 2 conservative tests (CONSERVATIVE vs EASY behavioral differences)
-  - 6 scale tests (10-2000 jobs)
-  - 3 replay tests (determinism verification)
+  - 7 scale tests (10-2000 jobs)
+  - 4 replay tests (determinism verification)
+  - 5 resource-history and 6 job-store tests
+  - 18 append-job/backfill-window tests and 14 progressive-loading tests
+  - 7 protobuf configuration tests
 - **Dual Validation**: C++ verified against independent Python reference implementations
   - EASY: scripts/python_reference_scheduler.py
   - CONSERVATIVE: scripts/python_conservative_scheduler.py
