@@ -235,6 +235,20 @@ static void set_sim_options(
         sp.m_job_store_overflow = CircularOverflowPolicy::GROW;
     }
 
+    // Memory-pressure check fraction (always set in proto3 double, use
+    // directly - 0.0, proto3's own zero-value, means disabled either
+    // way). Validate the same range the CLI (-m) enforces, rather than
+    // silently accepting an out-of-range value from a config file.
+    {
+        const double fraction = cfg.memory_pressure_fraction();
+        if (fraction != 0.0 && (!(fraction > 0.0) || fraction > 1.0)) {
+            throw std::runtime_error(
+                "Invalid memory_pressure_fraction in protobuf config: " +
+                std::to_string(fraction) + " (must be 0.0 to disable, or > 0.0 and <= 1.0)");
+        }
+        sp.m_memory_pressure_fraction = fraction;
+    }
+
     // Initial capacity for the resource-history circular buffer (0 means
     // use default from Sim_Params constructor - size of the job trace)
     if (cfg.resource_history_capacity() > 0) {

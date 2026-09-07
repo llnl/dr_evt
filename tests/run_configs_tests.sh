@@ -147,6 +147,29 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Test 6: check_memory_pressure via protobuf config - forced
+# deterministically via the DR_EVT_TEST_AVAILABLE_MEMORY_BYTES test
+# seam (see get_available_memory_bytes()'s doc comment in
+# src/utils/system_memory.hpp), not by relying on the test machine
+# actually being low on memory.
+echo "Test 6: check_memory_pressure config (forced low memory)"
+
+if DR_EVT_TEST_AVAILABLE_MEMORY_BYTES=10 $SIMULATOR \
+    --config tests/test_configs/memory_pressure_config.pb \
+    --outfile /tmp/pb_memory_pressure.csv > /tmp/pb_memory_pressure.log 2>&1; then
+    echo "  ✗ FAIL - expected nonzero exit under forced low memory with check_memory_pressure enabled"
+    FAIL=$((FAIL + 1))
+else
+    if grep -q "check_memory_pressure" /tmp/pb_memory_pressure.log; then
+        echo "  ✓ check_memory_pressure config correctly refused under forced low memory"
+        PASS=$((PASS + 1))
+    else
+        echo "  ✗ FAIL - wrong error message"
+        sed 's/^/     /' /tmp/pb_memory_pressure.log
+        FAIL=$((FAIL + 1))
+    fi
+fi
+
 echo ""
 echo "=========================================="
 echo "Results: $PASS passed, $FAIL failed"

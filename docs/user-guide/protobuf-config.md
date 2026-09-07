@@ -120,6 +120,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 | `wait_queue_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
 | `job_store_capacity` | uint64 | `0` | `0` = size of job trace; only actually bounds memory with `infile_list` - `infile` (single-file) always grows to fit the whole trace regardless |
 | `job_store_overflow` | string | `"grow"` | `"abort"`, `"grow"` |
+| `memory_pressure_fraction` | double | `0.0` (disabled) | Refuse to grow the job store past this fraction of available memory (Linux only; must be `> 0.0` and `<= 1.0`, e.g. `0.8`); independent of `job_store_overflow` |
 | `resource_history_capacity` | uint64 | `0` | `0` = size of job trace, floored at 4096 |
 
 **backfill_policy:**
@@ -398,6 +399,11 @@ message Simulation_Params {
   // choose between)
   uint64 job_store_capacity = 23; // 0 = size of job trace (default: 0)
   string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
+  // Refuse to grow the job store past this fraction of available
+  // memory (Linux only; a no-op elsewhere). Must be > 0.0 and <= 1.0
+  // (e.g. 0.8); 0.0 (default) disables the check. Independent of
+  // job_store_overflow.
+  double memory_pressure_fraction = 27; // default: 0.0 (disabled)
 
   // Resource-history circular buffer (bounds memory for --resource_trace)
   uint64 resource_history_capacity = 25; // 0 = size of job trace, floored at 4096 (default: 0)

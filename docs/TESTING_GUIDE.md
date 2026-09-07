@@ -380,6 +380,8 @@ cd build
 8. (C++) `append_jobs()` over an empty request vector is a valid no-op
 9. (C++) Basic append+submit+advance sequencing, exclusive-vs-inclusive `advance_to()`/`run_until_exclusive()`, an online-scheduling loop that appends jobs only as they "arrive," sequential resource-leak detection, and `advance_to()`'s idle-gap postcondition across a long gap with no pending events
 10. (gRPC, if built with `-DDR_EVT_ENABLE_GRPC=ON`) Same append scenario as (1), but over the actual network wire via `AppendJobRequest`, against a real running `dr_evt_server`, plus the batch case via `AppendJobsRequest`
+11. (C++) `submit_job()` records `busy_nodes` (other jobs' node occupancy at arrival) for a streaming-arrived job, same as `load_data()`'s own submission loop already does for a batch-loaded one
+12. (C++) `append_jobs()` honors `--check_memory_pressure` the same way `load_next_file()` (progressive loading) does, since both share `ensure_batch_capacity()` - forced deterministically via the `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES` test seam
 
 **How to run:**
 ```bash
@@ -404,10 +406,14 @@ cd build
 4. (C++) An empty file (header only) in the middle of the list must be skipped gracefully, not treated as an error
 5. (C++) A later file whose earliest `submit_time` precedes the previous file's latest must be rejected (cross-file continuity)
 6. (C++) REPLAY-format input must be rejected outright for `--infile_list` - there's no scheduling decision for progressive loading to plug into for replay at all
-7. (CLI) The same split-vs-combined comparison as (1), but through the actual `simulator --infile_list` invocation, exercising `Sim_Params::getopt()`'s real parsing path
-8. (CLI) The same small-capacity run as (2), confirmed to still produce the correct schedule end-to-end
-9. (CLI) An empty `--infile_list` file is rejected with a clear error
-10. (CLI) `--infile_list` together with a positional trace-file argument is rejected (mutually exclusive)
+7. (C++) `--check_memory_pressure` must refuse to load the next file when doing so would push projected job-store usage past the configured fraction of actual available memory - forced deterministically via the `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES` test seam, not by depending on the test machine's real memory state
+8. (C++) The same forced-low-memory condition must NOT affect a run that never enables `--check_memory_pressure` - the check is opt-in, not a background limit
+9. (C++) With `--check_memory_pressure` enabled but no artificially low memory forced, a normal run must still succeed - no false positive against real, plentiful memory
+10. (C++) The fraction itself is what's compared against, not a fixed threshold hiding behind a configurable-looking argument - under the exact same forced available-memory condition, a tight fraction must refuse while a loose fraction succeeds
+11. (CLI) The same split-vs-combined comparison as (1), but through the actual `simulator --infile_list` invocation, exercising `Sim_Params::getopt()`'s real parsing path
+12. (CLI) The same small-capacity run as (2), confirmed to still produce the correct schedule end-to-end
+13. (CLI) An empty `--infile_list` file is rejected with a clear error
+14. (CLI) `--infile_list` together with a positional trace-file argument is rejected (mutually exclusive)
 
 **How to run:**
 ```bash
@@ -453,6 +459,7 @@ make
 - `distribution_config.pb`
 - `resource_trace_config.pb`
 - `infile_list_config.pb` (progressive loading via a protobuf config, not just the CLI)
+- `memory_pressure_config.pb` (`memory_pressure_fraction` via a protobuf config, forced to trigger via the `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES` test seam)
 
 ---
 
@@ -558,13 +565,13 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Replay** | 3+ | 3+ | 0 | Resource verification |
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
-| **Append-Job** | 16 | 16 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
-| **Progressive Loading** | 10 | 10 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
+| **Append-Job** | 17 | 17 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
+| **Progressive Loading** | 14 | 14 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
 | **Streaming** | 4 | 4 | 0 | Online API |
-| **Config** | 5 | 5 | 0 | Protobuf validation |
+| **Config** | 6 | 6 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 150+ | 150+ | 0 | Complete test suite |
+| **TOTAL** | 156+ | 156+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

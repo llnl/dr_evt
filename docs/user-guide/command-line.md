@@ -256,6 +256,38 @@ What to do if an insert would exceed `--job_store_capacity`.
     --job_store_capacity 500 --job_store_overflow abort
 ```
 
+### `-m, --check_memory_pressure FRACTION`
+Before growing the job-record store for a new batch (`--infile_list`
+progressive loading, or a batch appended via the streaming API), refuse
+with a clean error if doing so would push projected peak usage past
+`FRACTION` of actual available system memory, rather than growing
+unconditionally. Independent of `--job_store_overflow` - applies
+regardless of whether that's set to `abort` or `grow`.
+
+`FRACTION` must be `> 0.0` and `<= 1.0` (e.g. `0.8` for 80%) - there's
+no baked-in default fraction, since what's safe headroom genuinely
+differs by environment: a bare-metal HPC node with nothing else running
+can tolerate a much looser fraction than a container or
+memory-cgroup'd process, where `/proc/meminfo` reports host-level
+availability rather than the effective cgroup limit (see below).
+
+Available memory is read from `/proc/meminfo`'s `MemAvailable` on
+Linux; a no-op on any other platform (nothing to check against), not a
+hard failure.
+
+**Default:** disabled - this option must be given a value to take
+effect at all; unlike `--job_store_capacity` (bounding a buffer size
+you explicitly chose), this queries the actual machine's memory, which
+not everyone wants tied to (e.g. containerized or memory-cgroup'd
+environments as noted above).
+
+**Example:**
+```bash
+./build/simulator --infile_list traces/file_list.txt --check_memory_pressure 0.8
+```
+
+See [`docs/dev/design-decisions/OUT_TRACE_STREAMING.md`](../dev/design-decisions/OUT_TRACE_STREAMING.md) for the exact formula (mirrors the actual grow-doubling logic, not a fixed multiplier) and rationale.
+
 ### `-H, --resource_history_capacity SIZE`
 Initial capacity of the resource-history circular buffer (the
 `time,free_nodes,allocated_nodes` samples behind `--resource_trace`).

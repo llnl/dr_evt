@@ -10,6 +10,7 @@
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp" // to_string(job_queue_t) - used by write_job_line()
 #include "trace/trace.hpp"
+#include "utils/system_memory.hpp" // get_available_memory_bytes() - check_memory_pressure()
 
 namespace dr_evt {
 
@@ -304,6 +305,61 @@ job_no_t Trace::append_job(sim_time_t current_time, const epoch_t& submit_time,
     return static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1);
 }
 
+void Trace::check_memory_pressure(size_t batch_size) const
+{
+    const size_t available = get_available_memory_bytes();
+    if (available == 0) {
+        // Unknown (non-Linux, or /proc/meminfo unreadable/lacks
+        // MemAvailable) - nothing to enforce against; see this
+        // function's own doc comment in trace.hpp.
+        return;
+    }
+
+    const size_t unflushed = m_data.size();
+    const size_t old_cap = m_data.capacity();
+    const size_t needed = unflushed + batch_size;
+
+    // Mirror ensure_batch_capacity()'s own doubling grow loop exactly -
+    // the actual target capacity growing would allocate, not a fixed
+    // multiplier guess, however many doublings a large batch_size needs.
+    size_t new_cap = old_cap;
+    while (new_cap < needed) {
+        new_cap = std::max<size_t>(new_cap * 2, 1);
+    }
+
+    // If a grow would happen, boost::circular_buffer::set_capacity()
+    // allocates the new buffer and copies every existing entry into it
+    // before freeing the old one - both are resident simultaneously
+    // mid-copy. Either way (grow or not), load_next_file()'s own
+    // temporary std::vector<Job_Record> (this batch's rows, read from
+    // file before this call, not yet moved into m_data) is resident at
+    // the exact moment this check runs - append_jobs() has no such
+    // vector, but counting it uniformly for both callers only makes
+    // the check more conservative for append_jobs(), never less.
+    const size_t buffer_peak = (new_cap > old_cap) ? (old_cap + new_cap) : old_cap;
+    const size_t projected_jobs = buffer_peak + batch_size;
+
+    const size_t limit_jobs = static_cast<size_t>(
+        m_memory_pressure_fraction * static_cast<double>(available) /
+        static_cast<double>(sizeof(Job_Record)));
+
+    if (projected_jobs > limit_jobs) {
+        throw std::runtime_error(
+            "Trace: refusing to load a batch of " + std::to_string(batch_size) +
+            " jobs under --check_memory_pressure - projected peak job-store usage (" +
+            std::to_string(buffer_peak) + " buffer" +
+            (new_cap > old_cap ? " (old " + std::to_string(old_cap) + " + new " +
+                                  std::to_string(new_cap) + " during grow)" : "") +
+            " + " + std::to_string(batch_size) + " in-flight = " +
+            std::to_string(projected_jobs) + " job records) exceeds " +
+            std::to_string(static_cast<int>(m_memory_pressure_fraction * 100)) + "% of " +
+            "available memory (" + std::to_string(available / (1024 * 1024)) +
+            " MB available, " + std::to_string(limit_jobs) + " job records' worth); "
+            "split the input into smaller files, free up memory, or raise/disable "
+            "--check_memory_pressure");
+    }
+}
+
 void Trace::ensure_batch_capacity(sim_time_t current_time, size_t batch_size)
 {
     // Same idempotent, load_data()-optional resolution as append_job().
@@ -322,6 +378,18 @@ void Trace::ensure_batch_capacity(sim_time_t current_time, size_t batch_size)
     // appended.
     reclaim_front_jobs(current_time, static_cast<num_jobs_t>(batch_size),
                         /* handle_overflow= */ false);
+
+    // Independent of --job_store_capacity/--job_store_overflow below:
+    // this checks against actual system memory, not a buffer size the
+    // caller chose, and applies (when enabled) regardless of which
+    // overflow policy is set - growing to fit a batch that would
+    // exceed real available memory is exactly what this exists to
+    // catch before it happens, not something --job_store_overflow=grow
+    // should be able to bypass.
+    if (m_memory_pressure_fraction > 0.0) {
+        check_memory_pressure(batch_size);
+    }
+
     size_t needed = m_data.size() + batch_size;
     if (needed > m_data.capacity()) {
         if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {

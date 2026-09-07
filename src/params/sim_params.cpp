@@ -21,7 +21,7 @@
 
 namespace dr_evt {
 
-#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:"
+#define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
 static const struct option longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
@@ -39,6 +39,7 @@ static const struct option longopts[] = {
     {"wait_queue_overflow",     required_argument,  0, 'G'},
     {"job_store_capacity",    required_argument,  0, 'K'},
     {"job_store_overflow",    required_argument,  0, 'W'},
+    {"check_memory_pressure", required_argument,  0, 'm'},
     {"resource_history_capacity", required_argument, 0, 'H'},
     {"trace_format",          required_argument,  0, 'f'},
     {"timestamp_format",      required_argument,  0, 'T'},
@@ -67,6 +68,7 @@ Sim_Params::Sim_Params()
     m_wait_queue_overflow(CircularOverflowPolicy::GROW),
     m_job_store_capacity(0),  // 0 = size of job trace (never overflows)
     m_job_store_overflow(CircularOverflowPolicy::GROW),
+    m_memory_pressure_fraction(0.0),
     m_resource_history_capacity(0),
     m_total_nodes(dr_evt::total_nodes),
     m_trace_format("simple"),  // Default to simple format
@@ -222,6 +224,24 @@ void Sim_Params::getopt(int& argc, char** &argv)
                         std::cerr << "Valid options: 'abort', 'grow' (default)" << std::endl;
                         print_usage(argv[0], 1);
                     }
+                }
+                break;
+            case 'm': /* --check_memory_pressure */
+                {
+                    double fraction = 0.0;
+                    try {
+                        fraction = std::stod(optarg);
+                    } catch (const std::exception&) {
+                        std::cerr << "Invalid --check_memory_pressure fraction: '"
+                                  << optarg << "' (not a number)" << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                    if (!(fraction > 0.0) || fraction > 1.0) {
+                        std::cerr << "Invalid --check_memory_pressure fraction: " << fraction
+                                  << " (must be > 0.0 and <= 1.0)" << std::endl;
+                        print_usage(argv[0], 1);
+                    }
+                    m_memory_pressure_fraction = fraction;
                 }
                 break;
             case 'H': /* --resource_history_capacity */
@@ -455,6 +475,20 @@ void Sim_Params::print_usage(const std::string exec, int code)
         "        (default: grow). abort: end the simulation with an error.\n"
         "        grow: reallocate to a larger capacity, copying existing\n"
         "        entries over.\n"
+        "\n"
+        "    -m, --check_memory_pressure FRACTION\n"
+        "        Before growing the job-record store for a new batch\n"
+        "        (--infile_list progressive loading, or a batch appended\n"
+        "        via the streaming API), refuse if doing so would push\n"
+        "        projected peak usage past FRACTION of actual available\n"
+        "        system memory (Linux only, via /proc/meminfo; a no-op\n"
+        "        elsewhere, since there's nothing to check against).\n"
+        "        FRACTION must be > 0.0 and <= 1.0 (e.g. 0.8 for 80%).\n"
+        "        Independent of --job_store_overflow: applies regardless\n"
+        "        of whether that is set to abort or grow. Disabled by\n"
+        "        default (no argument means disabled - this option must\n"
+        "        be given a value to take effect at all).\n"
+        "        See docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
         "\n"
         "    -H, --resource_history_capacity SIZE\n"
         "        Initial capacity of the resource-history circular buffer\n"

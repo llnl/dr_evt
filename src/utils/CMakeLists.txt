@@ -13,6 +13,7 @@ set_full_path(THIS_DIR_HEADERS
   streambuff_impl.hpp
   streamvec.hpp
   streamvec_impl.hpp
+  system_memory.hpp
   timer.hpp
   traits.hpp
 )
@@ -20,6 +21,7 @@ set_full_path(THIS_DIR_HEADERS
 set_full_path(THIS_DIR_SOURCES
   exception.cpp
   file.cpp
+  system_memory.cpp
 )
 
 # Add OpenMP diagnostics only if OpenMP is available

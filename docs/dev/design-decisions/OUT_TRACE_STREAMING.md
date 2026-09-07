@@ -31,6 +31,14 @@ would silently drop that column back to 0.0, wrong for
 shared `Trace::ensure_batch_capacity()` helper so neither caller
 duplicates it.
 
+An actual memory-pressure check (`--check_memory_pressure FRACTION`/
+`Trace::check_memory_pressure()`, discussed at length below under
+capacity sizing) is also now built - called from
+`ensure_batch_capacity()`, so it covers `append_jobs()` too, not just
+`load_next_file()`. Disabled unless given an explicit fraction; no
+baked-in default, since what's safe headroom genuinely differs by
+environment.
+
 `Trace` owns all session state: job records (`m_data`) and simulation
 context (`m_ctx` - pending-completion event queue and resource-history,
 today split out as `Simulation::m_replay_ctx`), both backed by
@@ -127,6 +135,60 @@ available memory) / (size of one job record)` - the reader would use
 this to decide how large a file it can safely take on next (or refuse/
 wait), rather than growing unconditionally as `load_next_file()` does
 today via the shared `ensure_batch_capacity()` helper.
+
+**Update: this is now built**, refined from the rough formula sketched
+above once it became clear a fixed multiplier can badly underestimate
+the real peak - `--check_memory_pressure FRACTION`/
+`Trace::check_memory_pressure()`, called from `ensure_batch_capacity()`
+(so it covers `append_jobs()` too, not just `load_next_file()`) right
+after reclaiming, before deciding whether to grow.
+
+Rather than a fixed multiplier on `m_data.size()`, the check mirrors
+`ensure_batch_capacity()`'s own doubling grow loop exactly to get the
+real target capacity - however many doublings a large batch needs, not
+an approximation that's only right for a single doubling. If
+`old_cap = m_data.capacity()` and `new_cap` (from that mirrored loop)
+exceeds it, a grow would happen: `boost::circular_buffer::set_capacity()`
+allocates the new buffer and copies every existing entry into it before
+freeing the old one, so both are resident simultaneously mid-copy -
+projected peak is `old_cap + new_cap + batch_size`, that last term for
+`load_next_file()`'s own temporary `std::vector<Job_Record>` (this
+batch's rows, read from file before this call, not yet moved into
+`m_data`) still being resident at the exact moment this check runs.
+(`append_jobs()` has no such vector - its `Job_Append_Request` is a
+different, smaller struct until pushed - but counting it uniformly for
+both callers only makes the check more conservative for `append_jobs()`,
+never less.) If no grow would happen, peak is just `old_cap + batch_size`.
+
+This is compared against `FRACTION * (available memory) /
+sizeof(Job_Record)` - `FRACTION` is a required, user-supplied argument
+(`0.0 < FRACTION <= 1.0`; there's no baked-in default, since what's
+"safe" headroom genuinely differs by environment - see below), not a
+bare on/off flag. "Refuse" is the only option implemented, not "wait":
+`dr_evt` is a batch/simulation tool, not a live process that could
+plausibly wait for memory to free up externally between calls - the
+only way memory frees up here is reclaiming already-completed jobs,
+which `ensure_batch_capacity()` already attempts before this check runs.
+Available memory is queried from `/proc/meminfo`'s `MemAvailable` on
+Linux (`src/utils/system_memory.hpp`'s `get_available_memory_bytes()`);
+0 (meaning "unknown, nothing to enforce against") on any other platform
+or if that file is unreadable/lacks the line - this is a no-op there,
+not a hard failure. Disabled unless given an explicit fraction: unlike
+`--job_store_capacity` (bounding a buffer size the caller explicitly
+chose), this queries the actual machine's memory, which not every
+caller wants tied to at all, and even those who do want it need a
+different threshold depending on environment - a containerized or
+memory-cgroup'd process, where `/proc/meminfo` reports host-level
+availability rather than the effective cgroup limit, needs a much
+tighter fraction (or none at all) than a dedicated bare-metal node
+would. See `tests/test_progressive_load.cpp`/`tests/test_append_job_api.cpp`
+for its tests, both using a `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES`
+environment-variable test seam to force deterministic low/plentiful-
+memory conditions rather than depending on the test machine's actual
+state - including a test confirming the fraction itself is what's
+compared against (the same forced memory refuses at a tight fraction
+but succeeds at a loose one), not a fixed threshold with a
+configurable-looking argument that doesn't actually change anything.
 
 
 **Why a job's slot becomes reclaimable at `end_time`, not before:** a

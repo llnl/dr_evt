@@ -38,6 +38,7 @@
 #include <stdexcept>
 #include <limits>
 #include <algorithm>
+#include <cstdlib>
 
 using namespace dr_evt;
 
@@ -670,6 +671,36 @@ void test_submit_job_records_busy_nodes() {
     std::cout << "  PASSED" << std::endl;
 }
 
+// Test 17: append_jobs() must honor --check_memory_pressure the same
+// way load_next_file() (progressive loading) does, since both share
+// ensure_batch_capacity() - forced deterministically via the
+// DR_EVT_TEST_AVAILABLE_MEMORY_BYTES test seam, not by relying on the
+// test machine actually being low on memory.
+void test_append_jobs_memory_pressure() {
+    std::cout << "\n=== Test 17: append_jobs() honors --check_memory_pressure ===" << std::endl;
+
+    setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "10", 1);
+
+    Simulation sim(make_params());
+    sim.get_trace().set_memory_pressure_fraction(0.8);
+    sim.get_trace().load_data(0);
+
+    std::vector<Simulation::Job_Append_Request> batch = {
+        {10.0, 20, "pbatch", 200.0},
+        {15.0, 10, "pbatch", 100.0},
+    };
+    [[maybe_unused]] bool threw = false;
+    try {
+        sim.append_jobs(batch);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    assert(threw);
+
+    unsetenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES");
+    std::cout << "  PASSED" << std::endl;
+}
+
 int main() {
     std::cout << "====================================" << std::endl;
     std::cout << "Append-Job Test Suite" << std::endl;
@@ -694,6 +725,7 @@ int main() {
         test_no_resource_leaks();
         test_advance_to_idle_gap();
         test_submit_job_records_busy_nodes();
+        test_append_jobs_memory_pressure();
 
         std::cout << "\n====================================" << std::endl;
         std::cout << "ALL APPEND_JOB TESTS PASSED" << std::endl;
