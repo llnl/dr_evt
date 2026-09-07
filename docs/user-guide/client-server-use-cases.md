@@ -27,13 +27,26 @@ the appropriate simulation. Scheduler state and nodes are not shared between
 servers.
 
 ```{mermaid}
-graph LR
-    Client[Client or digital-twin controller] -->|Session| ServerA[Server A]
-    Client -->|Session| ServerB[Server B]
-    Client -->|Session| ServerN[Server N]
-    ServerA --> SimulationA[Simulation A]
-    ServerB --> SimulationB[Simulation B]
-    ServerN --> SimulationN[Simulation N]
+flowchart LR
+    Client([Client<br/>or digital-twin controller])
+
+    subgraph Fleet[Independent server fleet]
+        direction TB
+        ServerA[Server A] --> SimulationA[(Simulation A)]
+        ServerB[Server B] --> SimulationB[(Simulation B)]
+        ServerN[Server N] --> SimulationN[(Simulation N)]
+    end
+
+    Client -->|Session 1| ServerA
+    Client -->|Session 2| ServerB
+    Client -->|Session N| ServerN
+
+    classDef client fill:#1d4ed8,color:#fff,stroke:#1e3a8a,stroke-width:2px
+    classDef server fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    classDef simulation fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px
+    class Client client
+    class ServerA,ServerB,ServerN server
+    class SimulationA,SimulationB,SimulationN simulation
 ```
 
 `python/grpc_multi_client.py` demonstrates this arrangement. It reads the

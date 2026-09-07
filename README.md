@@ -10,6 +10,89 @@ interact in real-time.
 
 **[📚 Read the Full Documentation on ReadTheDocs →](https://dr-evt.readthedocs.io/)**
 
+## Ecosystem Overview
+
+```mermaid
+flowchart LR
+    input["Job traces<br/>CSV / protobuf config"]
+    live["Live job feed<br/>workflow manager / scheduler"]
+
+    subgraph local["In-process use"]
+        cpp["C++ application\nSimulation API"]
+        py["Python application\ndr_evt bindings"]
+        core["DR_EVT Simulation\nqueueing • FCFS/EASY\nbackfill • statistics"]
+        cpp --> core
+        py --> core
+    end
+
+    subgraph batch["CLI and replay"]
+        sim["simulator\n(batch / streaming CLI)"]
+        tracer["tracer\n(replay / accounting)"]
+    end
+
+    subgraph remote["Networked streaming"]
+        clients["C++ client / any gRPC client\nincluding generated Python client"]
+        grpc["gRPC / Protobuf\nbidirectional Session stream"]
+        server["dr_evt_server\none Simulation per session"]
+        clients <-->|"Session stream"| grpc
+        grpc <-->|"Session stream"| server
+    end
+
+    input --> sim --> core
+    input --> tracer
+    live --> cpp
+    live --> py
+    live --> clients
+    live --> server
+    server --> core
+    core --> scheduled["Scheduled job trace"]
+    core --> resources["Resource trace / statistics"]
+    scheduled --> tracer
+    tracer --> replay["Replay outputs\nresource accounting"]
+
+    subgraph deploy["Deployment and coordination"]
+        containers["Docker / Podman\nclient and server images"]
+        mpi["Optional MPI harness\ncoordinates multiple clients/servers"]
+    end
+    containers -->|"packages"| clients
+    containers -->|"packages"| server
+    mpi -->|"coordinates"| clients
+```
+
+`Simulation` is the shared scheduling core. C++ and Python use it directly;
+the gRPC server hosts the same core remotely. `simulator` produces schedules,
+while `tracer` replays schedules for resource accounting. Containers package
+the remote client/server deployment, and MPI is optional test-harness
+coordination rather than a requirement for normal gRPC use.
+
+### One client, multiple servers
+
+One controller can keep independent gRPC sessions open to several servers.
+Each server owns its own scheduler state, nodes, and simulation.
+
+```mermaid
+flowchart LR
+    Client([Client<br/>or digital-twin controller])
+
+    subgraph Fleet[Independent server fleet]
+        direction TB
+        ServerA[Server A] --> SimulationA[(Simulation A)]
+        ServerB[Server B] --> SimulationB[(Simulation B)]
+        ServerN[Server N] --> SimulationN[(Simulation N)]
+    end
+
+    Client -->|Session 1| ServerA
+    Client -->|Session 2| ServerB
+    Client -->|Session N| ServerN
+
+    classDef client fill:#1d4ed8,color:#fff,stroke:#1e3a8a,stroke-width:2px
+    classDef server fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
+    classDef simulation fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px
+    class Client client
+    class ServerA,ServerB,ServerN server
+    class SimulationA,SimulationB,SimulationN simulation
+```
+
 ## Features
 
 ### Core Simulation
