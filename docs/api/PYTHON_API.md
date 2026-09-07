@@ -416,6 +416,22 @@ shadow_time = sim.get_fcfs_head_shadow_time()
 estimated_wait = shadow_time - sim.get_current_time()
 ```
 
+### Backfill Window
+
+For one consistent FCFS/EASY reservation snapshot, without running the gRPC
+service, use `get_backfill_window()`:
+
+```python
+window = sim.get_backfill_window()
+print(window.current_time, window.available_nodes, window.shadow_time)
+for release in window.releases:
+    print(release.time, release.nodes_released)
+```
+
+`shadow_time` is the reserved start time for the FCFS queue head, or `-1`
+when no job is waiting. `releases` contains time-limit-based resource releases
+through that reservation; jobs ending together are combined.
+
 ### Comprehensive Statistics
 
 ```python
@@ -612,7 +628,7 @@ Expected output:
   ✓ PriorityPolicy
   ✓ RunTimeMode
 ...
-Test Results: 14/14 passed
+Test Results: 16/16 passed
 ✅ ALL PYTHON API TESTS PASSED!
 ```
 
