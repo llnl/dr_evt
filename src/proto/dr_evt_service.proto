@@ -12,10 +12,14 @@ syntax = "proto3";
 
 package dr_evt_grpc;
 
-// Single bidirectional-streaming RPC exposing DR_EVT's existing streaming
-// API (submit_job, advance_to, run_until_exclusive, and the monitoring
-// queries) over the network. One call to Session() corresponds to one
-// server-side Simulation instance for the lifetime of the stream.
+// Single bidirectional-streaming RPC exposing DR_EVT's C++ streaming API
+// (append_job, submit_job, advance_to, run_until_exclusive, and the
+// monitoring queries) over the network. AppendJobRequest is the genuine
+// streaming case - a job the server has never seen before; SubmitJobRequest
+// still only enqueues a job already known to the server (via
+// InitializeTraceRequest's load or a prior AppendJobRequest). One call to
+// Session() corresponds to one server-side Simulation instance for the
+// lifetime of the stream.
 service SimulationService {
     rpc Session(stream ClientMessage) returns (stream ServerMessage);
 }
@@ -40,6 +44,8 @@ message ClientMessage {
         GetFCFSHeadShadowTimeRequest get_fcfs_head_shadow_time = 11;
         GetStatisticsRequest get_statistics = 12;
         GetTraceSizeRequest get_trace_size = 13;
+        AppendJobRequest append_job = 14;
+        AppendJobsRequest append_jobs = 15;
     }
 }
 
@@ -86,6 +92,40 @@ message SubmitJobRequest {
     double submit_time = 2;
 }
 
+// The streaming counterpart to SubmitJobRequest: a job the
+// server has never seen before, rather than a reference by index into
+// an already-loaded trace. Adds the job to the store; does not submit
+// it to the scheduler - send a SubmitJobRequest with the returned
+// job_idx next for that (same two-step shape as the C++
+// Trace::append_job()/Simulation::submit_job() pair).
+message AppendJobRequest {
+    double submit_time = 1;
+    uint32 num_nodes = 2;
+    string queue = 3;       // e.g. "pbatch"
+    double limit_time = 4;  // user-estimated time limit, in seconds
+}
+
+// One job's data within an AppendJobsRequest - same fields as
+// AppendJobRequest, factored out so a batch can carry several.
+message JobAppendData {
+    double submit_time = 1;
+    uint32 num_nodes = 2;
+    string queue = 3;
+    double limit_time = 4;
+}
+
+// The batch counterpart to AppendJobRequest: several genuinely new jobs
+// in one round-trip instead of one per job. Requests must already be
+// sorted by submit_time, non-decreasing (same as
+// Trace::append_jobs()/Simulation::append_jobs() require) - the server
+// validates this, and every request's submit_time >= current_time,
+// before appending any of them; see those functions' own doc comments
+// for what "all-or-nothing" does and doesn't cover (capacity exhaustion
+// mid-batch is not pre-validated the same way).
+message AppendJobsRequest {
+    repeated JobAppendData requests = 1;
+}
+
 message AdvanceToRequest {
     double target_time = 1;
 }
@@ -123,6 +163,8 @@ message ServerMessage {
         GetFCFSHeadShadowTimeResponse get_fcfs_head_shadow_time = 12;
         GetStatisticsResponse get_statistics = 13;
         GetTraceSizeResponse get_trace_size = 14;
+        AppendJobResponse append_job = 15;
+        AppendJobsResponse append_jobs = 16;
     }
 }
 
@@ -143,6 +185,17 @@ message InitializeTraceResponse {
 }
 
 message SubmitJobResponse {}
+
+message AppendJobResponse {
+    uint32 job_idx = 1; // Pass to a subsequent SubmitJobRequest
+}
+
+message AppendJobsResponse {
+    // Each new job's job_idx, in the same order as the request's
+    // requests field - pass each to a subsequent SubmitJobRequest, same
+    // as AppendJobResponse.
+    repeated uint32 job_idx = 1;
+}
 
 message AdvanceToResponse {}
 

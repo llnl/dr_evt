@@ -4,7 +4,16 @@
 (`m_ctx.m_resource_history`) - see `Trace::record_resource_sample()`/
 `resolve_resource_history_capacity()`/`flush_resource_history()`. Job
 records (`m_data`) - see `Trace::job_at()`/`resolve_job_store_capacity()`/
-`reclaim_front_jobs()`/`write_job_line()`, all in `trace.cpp`.
+`reclaim_front_jobs()`/`write_job_line()`, all in `trace.cpp`. The
+streaming append operation is also now built -
+`Trace::append_job()`/`Simulation::append_job()` for a single job,
+`Trace::append_jobs()`/`Simulation::append_jobs()` for several in one
+call, both exposed over gRPC (`AppendJobRequest`/`AppendJobsRequest`) -
+see "Batch vs streaming" below for what they do and
+`tests/test_append_job_api.cpp`/`tests/test_append_job_grpc.cpp` for their
+tests. Chunked loading (also mentioned below) is not - though
+`append_jobs()` was deliberately designed so a future chunked-loading
+reader could reuse it directly; see its own doc comment in `trace.hpp`.
 
 `Trace` owns all session state: job records (`m_data`) and simulation
 context (`m_ctx` - pending-completion event queue and resource-history,
@@ -18,17 +27,68 @@ not yet how the code is today.
 
 **Batch vs streaming** differ only in how jobs enter `m_data`: batch
 preloads the whole file via `load_data()` before processing starts;
-streaming appends one job at a time as it genuinely arrives, `m_data`
-starting empty. `submit_job(job_idx, ...)` as it exists today assumes the
-former - a fixed-size, already-loaded set, referenced by index. Streaming
-needs a real append operation instead, since there's currently no way to
-hand `Trace` a job it didn't already know about - **still not built**;
-this document's `m_data` conversion is the batch-mode case only.
+streaming appends one job (or several) at a time as they genuinely
+arrive, `m_data` starting empty (or already holding whatever batch
+preloaded, if any - the two aren't mutually exclusive). `submit_job(job_idx, ...)`
+assumes a job already exists in `m_data`, referenced by index - it never
+`push_back()`s. `Trace::append_job()` is the actual append operation
+that does: given a new job's own data (submit_time, num_nodes, queue,
+limit_time - not an index into anything preloaded), it constructs a new
+`Job_Record` and adds it to `m_data`, following the same
+check-`full()`-then-reclaim-then-grow order established below, and
+returns the new job's `job_no` for a subsequent `submit_job()` call.
+`Simulation::append_job()` is the public wrapper; `AppendJobRequest` is
+the gRPC-level one.
+
+`Trace::append_jobs()`/`Simulation::append_jobs()` are the batch
+counterpart - several new jobs (a `std::vector<Job_Append_Request>`) in
+one call, for the same never-seen-before case. Unlike `append_job()`'s
+per-job check-`full()`-then-reclaim-then-grow, this resolves capacity
+for the *whole* batch up front: `reclaim_front_jobs()` is asked for
+enough room for the entire batch in one call (its `min_free` parameter,
+generalized from the single-job callers' implicit "just 1" - see its
+own doc comment), then, only if that wasn't enough, the buffer grows
+once directly to a size that fits the batch (still by doubling, the
+same convention `append_job()`/`load_data()` use per-request, just
+resolved in one step) - not a per-request loop resizing the buffer
+once per job in a batch of possibly many. Only once capacity is
+confirmed sufficient does every request get copied in, with no further
+checks interleaved between them.
+
+This makes the whole call fully all-or-nothing, not just on input:
+*input validation* (every request's `submit_time >= current_time`, and
+the whole batch already sorted by `submit_time`, non-decreasing - an
+invariant silently and implicitly assumed across separate `append_job()`
+calls, checked explicitly here) happens first, before `m_data` is
+touched at all. *Capacity exhaustion*
+(`--job_store_overflow=abort`) is now equally atomic, as a direct
+consequence of resolving capacity for the whole batch up front rather
+than discovering it request-by-request: the abort fires before the
+batch's first `push_back()`, so `m_data` is left exactly as it was,
+never partially filled. (An earlier version of this design checked
+capacity per-request instead, which could only discover exhaustion
+mid-loop; kept here as a note since it's an easy design to reach for
+by analogy with `append_job()`, and the wrong one for a batch call.)
 
 A third, distinct case - **chunked loading** (reading a known, whole
 trace file in pieces rather than all at once, purely to respect a
-memory limit) - is discussed below under capacity sizing; also not
-built.
+memory limit) - is discussed below under capacity sizing; not yet
+built - `append_job()`/`append_jobs()` above solve streaming
+(jobs not known in advance at all), not this, though `append_jobs()`
+was designed with chunked loading in mind: a chunk is just a
+`std::vector<Job_Append_Request>` read from the next slice of a known
+file, appended the same way. Also future work, for whoever picks this
+up: today, `append_jobs()` always resolves capacity for the entire
+batch passed to it (growing if necessary) - it does not itself decide
+to accept only part of a batch under memory pressure. The eventual
+chunked-loading reader is where that decision belongs: read a smaller
+chunk than the remaining file in the first place (sized adaptively, per
+the sketch below) rather than ask `append_jobs()` to partially satisfy
+an oversized one. If a chunk still can't be appended in full because of
+memory pressure once read, the unaddressed remainder needs to be
+appended later, before simulated time reaches its earliest `submit_time`
+- not handled by anything built so far.
+
 
 **Why a job's slot becomes reclaimable at `end_time`, not before:** a
 job's record is only safe to discard once nothing will read it again.
@@ -65,6 +125,11 @@ memory pressure, not a constant. This is consistent with lazy reclaim
 and reclaim-before-grow (both above): the loader would check occupancy
 before each read, reclaim what it can, and read only as much new data
 as the resulting headroom (plus memory pressure) actually justifies.
+`append_jobs()` already does the "reclaim, then size capacity for this
+batch" half of this for whatever chunk it's handed - what it does not
+do is decide how large that chunk should be; that adaptive sizing
+decision, and what to do with any of a chunk that still doesn't fit
+(see "Batch vs streaming" above), are what's left for this future work.
 
 **Reclaim at the point of need, not proactively - including at
 insertion, not just at departure.** Lazy reclaim (above) means checking
@@ -75,20 +140,43 @@ reclaimable there regardless of order, and adding a
 `reclaim_front_jobs()` call there would just be dead code in a
 one-time, bulk-load function that will never exercise it.
 
-**Where this actually matters is the still-unbuilt streaming append
-operation** (see above - not `submit_job()`, which never inserts a new
-entry today; it only mutates a job already sitting in a preloaded
-`m_data`; and not `load_data()` either, for the reason just given -
-it's a fundamentally different, one-time bulk-load operation, not a
-repeated per-arrival insertion point). Once a real append operation
-exists, the required order at each new arrival is: check `full()`, then
-try `reclaim_front_jobs()`, and only fall back to growing if nothing was
-reclaimable - reclaiming a completed job's slot right at the insertion
-that needs it, not growing first and reclaiming never. This isn't
-established anywhere in the codebase yet, since there's no real
-insertion point to establish it at - it has to be built new, alongside
-the append operation itself, not retrofitted from an existing call
-site.
+**Where this actually matters is `Trace::append_job()`/`append_jobs()`**
+(not `submit_job()`, which never inserts a new entry; it only mutates a
+job already sitting in a preloaded `m_data`; and not `load_data()`
+either, for the reason just given - it's a fundamentally different,
+one-time bulk-load operation, not a repeated per-arrival insertion
+point). `append_job()` follows the order this section establishes:
+check `full()`, then try `reclaim_front_jobs()`, and only fall back to
+growing if nothing was reclaimable - reclaiming a completed job's slot
+right at the insertion that needs it, not growing first and reclaiming
+never. `append_jobs()` follows the same order, generalized from "is
+there room for one more" to "is there room for this whole batch" -
+`reclaim_front_jobs()` takes a `min_free` parameter for exactly this
+(defaulting to 1, matching every single-job caller unchanged; see its
+own doc comment), so a batch call can ask it to reclaim as much as the
+whole batch needs in one pass rather than one slot at a time.
+
+`reclaim_front_jobs()` also takes a `handle_overflow` parameter
+(default true) - whether *it* applies `m_job_store_overflow`
+(grow-or-abort) if still `full()` after reclaiming. `append_job()`
+relies on this default, having no capacity check of its own afterward.
+`append_jobs()` passes false: it already has its own batch-aware
+capacity check right after this call, sized against the batch's actual
+count rather than just "full or not" - letting `reclaim_front_jobs()`'s
+fallback fire too risked either an unnecessarily-small intermediate
+grow, or (for abort) a misleading single-job-shaped message, in the
+case where reclaiming frees some slots but not enough for the whole
+batch (caught only by testing directly with a batch bigger than the
+capacity's first doubling - the original tests happened to use numbers
+where both paths landed on the same final capacity, hiding the bug).
+
+Verified directly, not just by construction: forcing
+`--job_store_capacity 1` and appending a second job after the first
+finished reclaims the first's slot (`capacity` stays 1, `num_reclaimed`
+becomes 1) rather than growing - see
+`test_append_reclaims_before_growing()` (single-job) and
+`test_append_jobs_reclaims_before_growing()` (batch) in
+`tests/test_append_job_api.cpp`.
 
 Regardless of requested capacity, batch mode's actual reclaim behavior
 today is: at most one slot reclaimed for the whole run. Once `size()`

@@ -452,6 +452,18 @@ if (DR_EVT_HAS_GRPC)
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
   list(APPEND DR_EVT_EXEC_TARGETS dr_evt_client-bin)
 
+  # Permanent gRPC-level test for AppendJobRequest - see
+  # tests/test_append_job_grpc.cpp
+  add_executable( test_append_job_grpc-bin tests/test_append_job_grpc.cpp )
+  target_include_directories(test_append_job_grpc-bin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>)
+  target_link_libraries(test_append_job_grpc-bin PRIVATE dr_evt_service_proto)
+  set_target_properties(test_append_job_grpc-bin PROPERTIES OUTPUT_NAME test_append_job_grpc)
+  set_target_properties(test_append_job_grpc-bin PROPERTIES CMAKE_INSTALL_RPATH
+                        "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+  list(APPEND DR_EVT_EXEC_TARGETS test_append_job_grpc-bin)
+
   # MPI-aware multi-client/multi-server test harness (optional: only
   # built if MPI is actually available - unlike gRPC/Protobuf, this
   # project has no existing MPI dependency to build on, so this is the
@@ -534,20 +546,23 @@ set_target_properties(t_rngen-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS t_rngen-bin)
 
-# Streaming API test
-add_executable( test_streaming_api-bin tests/test_streaming_api.cpp )
+# Append-job (genuine streaming) API test - covers both append_job()'s
+# own insertion behavior (reclaim-before-grow, capacity, validation) and
+# submit_job()/advance_to()'s general correctness, driven via append_job()
+# rather than a preloaded trace file.
+add_executable( test_append_job_api-bin tests/test_append_job_api.cpp )
 
-target_include_directories(test_streaming_api-bin PUBLIC
+target_include_directories(test_append_job_api-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(test_streaming_api-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-set_target_properties(test_streaming_api-bin PROPERTIES OUTPUT_NAME test_streaming_api)
-set_target_properties(test_streaming_api-bin PROPERTIES CMAKE_INSTALL_RPATH
+target_link_libraries(test_append_job_api-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_append_job_api-bin PROPERTIES OUTPUT_NAME test_append_job_api)
+set_target_properties(test_append_job_api-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
-list(APPEND DR_EVT_UNIT_TEST_TARGETS test_streaming_api-bin)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_append_job_api-bin)
 
 
 # Batch vs Streaming equivalence test

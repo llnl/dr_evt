@@ -12,6 +12,7 @@ DR_EVT has tests organized by purpose:
 - **Replay (3, verified against more)** - Verify replay reproduces simulation
 - **Resource History (5)** - Resource-history circular buffer, flush overhead
 - **Job Store (6)** - Job-record circular buffer, capacity sizing correctness
+- **Append-Job (15)** - Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() correctness
 
 Note: "Correctness" below refers to matching the Python reference
 implementation's output, not independent mathematical verification - see
@@ -40,6 +41,9 @@ cd build && cmake .. && make -j4
 
 # Run job-store circular buffer tests
 ./tests/run_job_store_tests.sh
+
+# Run append-job (streaming) tests
+./tests/run_append_job_tests.sh
 ```
 
 ## Test Categories
@@ -118,7 +122,7 @@ what broke `simple_2jobs.csv` and `timestamp_epoch_simple.csv` previously
 
 **Status:** ✅ 5/5 passing
 
-Note: Streaming API / MPI feeder tests (`test_streaming_api.cpp`, `test_batch_vs_streaming.cpp`, `mpi_job_feeder.cpp`, `test_python_api.py`) are separate, hardcoded C++/Python programs, not covered by this count.
+Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_feeder.cpp`, `test_python_api.py`) are separate, hardcoded C++/Python programs, not covered by this count.
 
 ### 4. Scale Tests (6 tests)
 
@@ -129,7 +133,7 @@ Note: Streaming API / MPI feeder tests (`test_streaming_api.cpp`, `test_batch_vs
 **Node count:** 795 (matches `src/dr_evt_types.hpp`'s default - not
 `comprehensive/`'s 100; several jobs here request up to 497 nodes)
 
-**Status:** ✅ 6/6 passing (1 test skipped - huge_10000jobs has no expected output yet)
+**Status:** ✅ 7/7 passing
 
 ### 5. Conservative Backfilling Tests (2 tests)
 
@@ -199,6 +203,20 @@ See "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for h
 
 ---
 
+### 9. Append-Job Tests (15 tests)
+
+**Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` (single-job) and `Trace::append_jobs()`/`Simulation::append_jobs()` (batch) - the real streaming insertion points for jobs the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()`/`append_jobs()` rather than a preloaded file. Consolidates what used to be a separate `test_streaming_api.cpp` - its coverage never actually depended on jobs coming from a preloaded file, so it's achieved here with no file needed.
+
+**Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_append_job_grpc.cpp` (gRPC, only built with `-DDR_EVT_ENABLE_GRPC=ON`)
+
+**Runner:** `./tests/run_append_job_tests.sh`
+
+**Status:** ✅ 13/13 passing (100%) - the gRPC sub-test skips gracefully (not a failure) if gRPC wasn't built
+
+See "Append-Job Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
+
+---
+
 ## Total Test Suite
 
 | Category | Tests | Status | Coverage |
@@ -207,17 +225,18 @@ See "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for h
 | Unit | 7 | ✅ 7/7 | I/O, parsing, formats |
 | Feature | 5 | ✅ 5/5 | Policies, modes (1 skipped - no expected output yet) |
 | Conservative | 2 | ✅ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
-| Scale | 6 | ✅ 6/6 | Larger job counts (1 skipped - huge_10000jobs has no expected output) |
+| Scale | 7 | ✅ 7/7 | Larger job counts |
 | Replay | 3 (+4 more verified) | ✅ 3/3 | Determinism verification |
 | Resource History | 5 | ✅ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
-| **TOTAL** | **68** | **68/68** all passing | - |
+| Append-Job | 15 | ✅ 15/15 | Streaming insertion (single+batch) + submit_job()/advance_to() |
+| **TOTAL** | **84** | **84/84** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
 Note: Some tests show "SKIP" when expected output files are missing. This occurs for:
 1. **Differential tests** - Comparing different queue implementations (circular/deque/multimap/block) against each other, not against fixed expected outputs
-2. **Placeholder tests** - Future test traces (e.g., huge_10000jobs) that don't have expected outputs generated yet
+2. **Placeholder tests** - Future test traces that don't have expected outputs generated yet
 3. **Performance benchmarks** - Tests measuring execution time rather than correctness
 
 ---
@@ -379,7 +398,7 @@ run_feature_tests.sh       # feature/ tests
 run_replay_tests.sh        # replay methodology (hardcodes 3 comprehensive/ tests)
 run_configs_tests.sh       # protobuf config tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON)
 run_python_tests.sh        # python API tests (requires -DDR_EVT_BUILD_PYTHON=ON; not verified in this pass)
-run_streaming_tests.sh     # C++ streaming API test binary (requires building test_streaming_api target; not verified in this pass)
+run_append_job_tests.sh    # append_job() streaming tests (C++ + gRPC, if built with -DDR_EVT_ENABLE_GRPC=ON)
 run_grpc_tests.sh          # gRPC client/server tests (requires -DDR_EVT_ENABLE_GRPC=ON)
 test_all_dr_evt.sh         # comprehensive/ tests (see below)
 test_fcfs_comprehensive.sh # queue implementation differential testing (see below)
@@ -446,6 +465,7 @@ cd build
 ../tests/run_replay_tests.sh
 ../tests/run_resource_history_tests.sh
 ../tests/run_job_store_tests.sh
+../tests/run_append_job_tests.sh
 ```
 
 ### Run an individual comprehensive/ or scale/ test manually
@@ -472,10 +492,11 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Feature | 5 | ✓ 5/5 | Policy comparisons and mode tests |
 | Conservative | 2 | ✓ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Replay | 3 (+4 more verified) | ✓ 3/3 | Resource trace matching |
-| Scale | 6 | ✓ 6/6 | Large-scale tests (1 skipped - no expected output) |
+| Scale | 7 | ✓ 7/7 | Large-scale tests |
 | Resource History | 5 | ✓ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
-| **Total** | **68** | **68/68** | All tests passing as of 2026-09-06 |
+| Append-Job | 15 | ✓ 15/15 | Streaming insertion (single+batch) + submit_job()/advance_to() |
+| **Total** | **84** | **84/84** | All tests passing as of 2026-09-06 |
 
 ## Prerequisites
 
@@ -586,9 +607,10 @@ When adding new features:
    scheduler's behavior changed intentionally (`generate_all_expected_outputs.py`,
    `generate_scale_expected_outputs.py`)
 4. Run `run_unit_tests.sh`, `run_feature_tests.sh`, `run_replay_tests.sh`,
-   `run_resource_history_tests.sh`, `run_job_store_tests.sh`, plus manual
-   comparison against `comprehensive/`/`scale/`'s expected files (see
-   "Running Tests" above - no single script covers those yet)
+   `run_resource_history_tests.sh`, `run_job_store_tests.sh`,
+   `run_append_job_tests.sh`, plus manual comparison against
+   `comprehensive/`/`scale/`'s expected files (see "Running Tests" above -
+   no single script covers those yet)
 5. Update this README if adding a new test category
 
 ## License

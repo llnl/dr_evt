@@ -131,6 +131,30 @@ public:
                         resp.mutable_submit_job();
                         break;
                     }
+                    case ClientMessage::kAppendJob: {
+                        require_init(sim);
+                        const AppendJobRequest& r = req.append_job();
+                        dr_evt::job_no_t job_idx = sim->append_job(
+                            r.submit_time(), r.num_nodes(), r.queue(), r.limit_time());
+                        resp.mutable_append_job()->set_job_idx(job_idx);
+                        break;
+                    }
+                    case ClientMessage::kAppendJobs: {
+                        require_init(sim);
+                        const AppendJobsRequest& r = req.append_jobs();
+                        std::vector<dr_evt::Simulation::Job_Append_Request> reqs;
+                        reqs.reserve(r.requests_size());
+                        for (const auto& jd : r.requests()) {
+                            reqs.push_back(dr_evt::Simulation::Job_Append_Request{
+                                jd.submit_time(), jd.num_nodes(), jd.queue(), jd.limit_time()});
+                        }
+                        std::vector<dr_evt::job_no_t> job_idxs = sim->append_jobs(reqs);
+                        auto* out = resp.mutable_append_jobs();
+                        for (dr_evt::job_no_t idx : job_idxs) {
+                            out->add_job_idx(idx);
+                        }
+                        break;
+                    }
                     case ClientMessage::kAdvanceTo: {
                         require_init(sim);
                         sim->advance_to(req.advance_to().target_time());

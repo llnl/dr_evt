@@ -18,6 +18,7 @@
 #include <deque>
 #include <limits>
 #include <unordered_map>
+#include <vector>
 #include <memory> // unique_ptr
 #include <iostream>
 #include <random>
@@ -102,6 +103,56 @@ class Simulation {
      * Write resource state trace to file
      */
     void write_resource_trace(const std::string& filename);
+
+    /**
+     * One job's data for append_jobs() - the same fields append_job()
+     * takes individually (submit_time here using the same external,
+     * pre-epoch-conversion sim_time_t append_job() takes, not Trace's
+     * internal epoch_t), grouped so several new jobs can be passed in a
+     * single call.
+     */
+    struct Job_Append_Request {
+        sim_time_t submit_time;
+        num_nodes_t num_nodes;
+        std::string queue;
+        tdiff_t limit_time;
+    };
+
+    /**
+     * Append a genuinely new job - the streaming counterpart to
+     * load_data(), for a job the trace has never seen before (as
+     * opposed to submit_job() below, which only enqueues a job already
+     * present in m_data from a prior load_data() call). Adds the job to
+     * the store; does not submit it to the scheduler - call submit_job()
+     * with the returned job_no next for that.
+     *
+     * @param submit_time When the job is submitted (must be >= current_time,
+     *        same as submit_job() requires)
+     * @param num_nodes Number of nodes the job requests
+     * @param queue Which queue the job belongs to (e.g. "pbatch")
+     * @param limit_time User-estimated time limit, in seconds
+     * @return The new job's job_no, for a subsequent submit_job() call
+     */
+    job_no_t append_job(sim_time_t submit_time, num_nodes_t num_nodes,
+                         const std::string& queue, tdiff_t limit_time);
+
+    /**
+     * Append several genuinely new jobs in one call - the batch
+     * counterpart to append_job(), for the same never-seen-before case.
+     * Validates every request's submit_time >= current_time before any
+     * of them are appended (same precondition append_job() enforces per
+     * job) - combined with Trace::append_jobs()'s own validation
+     * (ordering, capacity for the whole batch), this call is fully
+     * all-or-nothing: nothing is appended unless the whole batch can be.
+     * See Trace::append_jobs()'s own doc comment for the rest.
+     *
+     * @param requests The new jobs' own data, in submit_time order (see
+     *        Trace::append_jobs() for why - this function forwards
+     *        requests as-is, so pass them there already sorted).
+     * @return Each new job's job_no, in the same order as requests -
+     *         pass each to submit_job() next, same as append_job().
+     */
+    std::vector<job_no_t> append_jobs(const std::vector<Job_Append_Request>& requests);
 
     /**
      * Submit a job to the scheduler's waiting queue (streaming mode)

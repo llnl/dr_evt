@@ -113,7 +113,7 @@ jobs:
           # docs/getting-started/installation.md's "Livermore Computing
           # (LC) HPC systems" section for the full explanation).
           # Build test binaries
-          make test_streaming_api-bin test_batch_vs_streaming-bin
+          make test_append_job_api-bin test_batch_vs_streaming-bin
           # gRPC client/server + MPI multi-client/server test harness
           # (already covered by `make -j$(nproc)` above since none of
           # these are EXCLUDE_FROM_ALL, but listed explicitly here too
@@ -259,14 +259,6 @@ jobs:
           echo "========================================"
           ./tests/run_python_tests.sh
 
-      - name: Run Streaming API Tests
-        id: streaming
-        run: |
-          echo "========================================"
-          echo "Running Streaming API Tests (4 tests)"
-          echo "========================================"
-          ./tests/run_streaming_tests.sh
-
       - name: Run gRPC Client/Server Tests
         id: grpc
         run: |
@@ -275,12 +267,20 @@ jobs:
           echo "========================================"
           ./tests/run_grpc_tests.sh
 
+      - name: Run Append-Job Tests
+        id: append-job
+        run: |
+          echo "========================================"
+          echo "Running Append-Job Tests (15 C++ + gRPC)"
+          echo "========================================"
+          ./tests/run_append_job_tests.sh
+
       - name: Run Scale Tests (Optional)
         id: scale
         continue-on-error: true
         run: |
           echo "========================================"
-          echo "Running Scale Tests (6 tests)"
+          echo "Running Scale Tests (7 tests)"
           echo "========================================"
           ./tests/run_scale_tests.sh
 
@@ -305,9 +305,9 @@ jobs:
           echo "  Resource History (4 tests): ${{ steps.resource-history.outcome }}"
           echo "  Config (4 tests): ${{ steps.config.outcome }}"
           echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
-          echo "  Streaming API (4 tests): ${{ steps.streaming.outcome }}"
+          echo "  Streaming API (15 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
-          echo "  Scale (6 tests, optional): ${{ steps.scale.outcome }}"
+          echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"
           echo ""
           echo "Outcome values: success | failure | skipped | cancelled"
           echo ""
