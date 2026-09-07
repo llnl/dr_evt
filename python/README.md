@@ -250,10 +250,11 @@ See `example_streaming.py` for a complete working example.
 
 ## Testing
 
-Run the example:
+Run the example from the repository root (after building/installing the
+bindings, or setting `PYTHONPATH` to their directory):
 
 ```bash
-python example_streaming.py
+python3 python/example_streaming.py
 ```
 
 ## Building from Source

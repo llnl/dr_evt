@@ -624,6 +624,8 @@ Complete working examples in `python/`:
 
 The full Python API test suite lives at `tests/test_python_api.py` (run via
 `tests/run_python_tests.sh` above, and in CI).
+It also executes `python/example_streaming.py` from the repository root, so
+the documented invocation remains covered.
 
 ## Troubleshooting
 

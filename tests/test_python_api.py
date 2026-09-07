@@ -22,6 +22,7 @@ run_time_mode is set to LIMIT so jobs run exactly their time_limit.
 
 import sys
 import os
+import subprocess
 import tempfile
 
 # Add build directory to Python path (for CI/testing without install)
@@ -86,6 +87,25 @@ def test_module_import(result):
         result.record_pass(f"Version: {dr_evt.__version__}")
     except Exception as e:
         result.record_fail("Module version", str(e))
+
+
+def test_streaming_example_from_repo_root(result):
+    """The documented invocation must not depend on the caller's cwd."""
+    print("\n1b. Streaming Example")
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    try:
+        completed = subprocess.run(
+            [sys.executable, 'python/example_streaming.py'],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, completed.stderr or completed.stdout
+        assert 'Final Statistics' in completed.stdout
+        result.record_pass("Streaming example from repository root")
+    except Exception as e:
+        result.record_fail("Streaming example from repository root", str(e))
 
 
 def test_enumerations(result):
@@ -439,6 +459,7 @@ def main():
 
     # Run all tests
     test_module_import(result)
+    test_streaming_example_from_repo_root(result)
     test_enumerations(result)
     test_sim_params(result)
     test_streaming_api(result)

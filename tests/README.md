@@ -6,10 +6,10 @@ Comprehensive test suite for the DR_EVT HPC Job Scheduler Simulator.
 
 DR_EVT has tests organized by purpose:
 - **Comprehensive (34)** - Verify scheduler algorithm correctness with dual validation
-- **Unit (7)** - Basic I/O and format tests (2 currently broken - see below)
+- **Unit (7)** - Basic I/O and format tests
 - **Feature (3)** - Policy and mode comparisons
-- **Scale (7, 4 working)** - Larger job counts than comprehensive/'s ceiling (3 currently broken - see below)
-- **Replay (3, verified against more)** - Verify replay reproduces simulation
+- **Scale (7)** - Larger job counts than comprehensive's ceiling
+- **Replay (4)** - Verify replay reproduces simulation
 - **Resource History (5)** - Resource-history circular buffer, flush overhead
 - **Job Store (6)** - Job-record circular buffer, capacity sizing correctness
 - **Append-Job (17)** - Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() correctness
@@ -128,7 +128,7 @@ what broke `simple_2jobs.csv` and `timestamp_epoch_simple.csv` previously
 
 Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_feeder.cpp`, `test_python_api.py`) are separate, hardcoded C++/Python programs, not covered by this count.
 
-### 4. Scale Tests (6 tests)
+### 4. Scale Tests (7 tests)
 
 **Purpose:** Larger job counts (10-2000) than `comprehensive/`'s 20-50 ceiling
 
@@ -164,7 +164,7 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 - CONSERVATIVE reduces utilization by 8.08 percentage points (87.13% vs 95.20%)
 - CONSERVATIVE increases makespan by 9.3% but provides fairness guarantee
 
-### 6. Replay Tests (3 tests)
+### 6. Replay Tests (4 tests)
 
 **Purpose:** Verify replay mode reproduces simulation resource usage
 
@@ -177,7 +177,7 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 2. Replay job trace → generates new resource trace
 3. Compare: must match exactly
 
-**Status:** ✅ 3/3 passing (100%)
+**Status:** ✅ 4/4 passing (100%)
 
 ### 7. Resource History Tests (5 tests)
 
@@ -187,7 +187,7 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 
 **Runner:** `./tests/run_resource_history_tests.sh`
 
-**Status:** ✅ 4/4 passing (100%)
+**Status:** ✅ 5/5 passing (100%)
 
 See "Resource History Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
 
@@ -258,7 +258,7 @@ See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) f
 | Feature | 5 | ✅ 5/5 | Policies, modes (1 skipped - no expected output yet) |
 | Conservative | 2 | ✅ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Scale | 7 | ✅ 7/7 | Larger job counts |
-| Replay | 3 (+4 more verified) | ✅ 3/3 | Determinism verification |
+| Replay | 4 | ✅ 4/4 | Determinism verification |
 | Resource History | 5 | ✅ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 17 | ✅ 17/17 | Streaming insertion (single+batch) + submit_job()/advance_to() |
@@ -527,7 +527,7 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Unit | 7 | ✓ 7/7 | Basic I/O and format tests |
 | Feature | 5 | ✓ 5/5 | Policy comparisons and mode tests |
 | Conservative | 2 | ✓ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
-| Replay | 3 (+4 more verified) | ✓ 3/3 | Resource trace matching |
+| Replay | 4 | ✓ 4/4 | Resource trace matching |
 | Scale | 7 | ✓ 7/7 | Large-scale tests |
 | Resource History | 5 | ✓ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
