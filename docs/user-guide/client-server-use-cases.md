@@ -113,6 +113,63 @@ and a long-form composite-job trace, streams ordinary jobs to their servers,
 advances all servers to each composite event time, then submits the composite
 fragments concurrently.
 
+```{mermaid}
+sequenceDiagram
+    participant C as Composite-job coordinator
+    participant A as Server A scheduler
+    participant B as Server B scheduler
+
+    C->>A: Init; AppendJobs + SubmitJob(ordinary arrivals through tn)
+    C->>B: Init; AppendJobs + SubmitJob(ordinary arrivals through tn)
+    Note over A,B: Each server has independent nodes and scheduler state
+
+    loop Each composite event at submit time tc
+        Note over C,B: Ordinary batch ends at tn <= tc; choose an advance watermark ta <= tc
+        par Synchronize simulated time
+            C->>A: AdvanceTo(ta): process arrivals through ta
+        and
+            C->>B: AdvanceTo(ta): process arrivals through ta
+        end
+        C->>A: Read pre-event statistics
+        C->>B: Read pre-event statistics
+        par Submit one fragment per system
+            C->>A: AppendJob(s) + SubmitJob (fragment A, submit_time=tc)
+        and
+            C->>B: AppendJob(s) + SubmitJob (fragment B, submit_time=tc)
+        end
+        par Evaluate newly appended fragments at the same time tc
+            C->>A: AdvanceTo(tc) + read post-event statistics
+        and
+            C->>B: AdvanceTo(tc) + read post-event statistics
+        end
+        Note over C: Record immediate, delayed, or partial start
+        opt Incremental ordinary-job stream
+            Note over C,B: Next AppendJobs batch starts at t0, where tc < t0
+            C->>A: AppendJobs + SubmitJob(each next ordinary arrival)
+            C->>B: AppendJobs + SubmitJob(each next ordinary arrival)
+        end
+    end
+    Note over C,B: This observes independent schedules; it makes no reservation or rollback
+```
+
+### Timing exercised by the MPI composite-stream fixture
+
+The two-server MPI integration fixture uses synchronized arrival timestamps;
+the streams differ in requested node counts, not in their ordinary-job timing.
+
+| Step | Server 1 timing | Server 2 timing | Composite timing | Relation exercised |
+| --- | --- | --- | --- | --- |
+| Initial ordinary batch | `tn_s1 = 10` | `tn_s2 = 10` | `ta = tc = 10` | `tn_s1 = tn_s2 = ta = tc` |
+| Next ordinary batch | `t0_s1 = 20` | `t0_s2 = 20` | Previous `tc = 10` | `tc < t0_s1` and `tc < t0_s2` |
+| Strict-boundary event | `tn_s1 = 20`, `ta_s1 = 15` | `tn_s2 = 20`, `ta_s2 = 15` | `tc = 25` | `ta < tn < tc`, hence `tn <= tc` and `ta <= tc` |
+| Final ordinary batch | `t0_s1 = 30` | `t0_s2 = 30` | Previous `tc = 25` | `tc < t0_s1` and `tc < t0_s2` |
+
+Thus the fixture covers the equal-time and strict forms of the per-system
+boundaries shown in the diagram. It does not cover every distributed timing
+permutation: both systems use the same timestamps, so a staggered case such as
+`tn_s1 < tc < t0_s2` is not exercised. The final `t0 = 30` batch is drained by
+`FinishSimulation()` rather than a separate explicit `AdvanceTo(...)`.
+
 ```bash
 # Start one server for each address in systems.csv.
 ./build/dr_evt_server 127.0.0.1:50061
@@ -129,6 +186,20 @@ Its trace is a controller-side arrival source, not a server-side workload.
 `composite_jobs.csv` contains one fragment per row with
 `composite_id,submit_time,system_id,num_nodes,queue,time_limit`; a composite
 ID must name at least two systems.
+
+The coordinator initially sends each system's ordinary trace with
+`AppendJobs`; their original submit times remain attached to the jobs. For a
+composite event at `tc`, an ordinary batch may end at `tn <= tc` and the
+coordinator may first call `AdvanceTo(ta)`, where `ta <= tc`. Each fragment is
+then appended with `submit_time=tc` and submitted, followed by
+`AdvanceTo(tc)`, which evaluates the newly arrived same-time work. The bundled
+coordinator selects `ta = tc`; a smaller `ta` is useful when deliberately
+testing a strict boundary before the composite event.
+`AppendJob` is used for the one-fragment-per-system example; `AppendJobs` can
+submit a chronologically ordered batch when a system has multiple arrivals. In
+an incremental stream, the following ordinary batch begins at `t0`, with
+`tc < t0`; the bundled example instead pre-submits its complete ordinary trace
+at initialization.
 
 The JSON Lines output records node counts before and after each fragment, and
 marks `partial_start` when only some fragments appear to start immediately.
