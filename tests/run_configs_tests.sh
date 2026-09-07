@@ -170,6 +170,26 @@ else
     fi
 fi
 
+# Test 7: every protobuf-config example in the actual documentation
+# (docs/user-guide/protobuf-config.md) must itself parse and run -
+# not just the hand-verified fixtures under tests/test_configs/ above,
+# which can never catch a bug in the documentation's own prose
+# examples (this test exists because exactly that happened: every
+# example wrapped its fields in a fictional "sim_setup { ... }" block,
+# and several "Run with" instructions omitted the required positional
+# trace-file argument - see tests/test_protobuf_config_doc_examples.py's
+# own docstring for the full story).
+echo "Test 7: protobuf-config.md's own documented examples"
+SIMULATOR="$SIMULATOR" python3 tests/test_protobuf_config_doc_examples.py > /tmp/doc_examples.log 2>&1
+if [ $? -eq 0 ]; then
+    echo "  ✓ all documented config examples parse and run correctly"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ FAIL - one or more documented config examples are broken"
+    sed 's/^/     /' /tmp/doc_examples.log
+    FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "=========================================="
 echo "Results: $PASS passed, $FAIL failed"

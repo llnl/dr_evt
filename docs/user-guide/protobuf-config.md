@@ -19,14 +19,12 @@ Configuration files use Protocol Buffer text format (`.textproto` extension).
 
 `sim_config.textproto`:
 ```text
-sim_setup {
-  infile: "trace.csv"
-  outfile: "results.csv"
-  total_nodes: 1000
-  
-  backfill_policy: "easy"
-  priority_policy: "fcfs"
-}
+infile: "trace.csv"
+outfile: "results.csv"
+total_nodes: 1000
+
+backfill_policy: "easy"
+priority_policy: "fcfs"
 ```
 
 Run with:
@@ -38,57 +36,62 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto trace.csv
 
 `advanced_config.textproto`:
 ```text
-sim_setup {
-  # Input/Output
-  infile: "workload.csv"
-  outfile: "schedule_output.csv"
-  resource_trace: "node_availability.csv"
-  
-  # System Configuration
-  total_nodes: 2000
-  seed: 42
-  
-  # Scheduling Policies
-  backfill_policy: "easy"        # Options: "easy", "conservative", "none"
-  priority_policy: "fcfs"         # Options: "fcfs", "sjf", "ljf"
-  
-  # Queue Implementation (FCFS scheduler only)
-  queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
-  wait_queue_capacity: 0            # 0 = size of job trace; only used when queue_impl="circular"
-  wait_queue_overflow: "grow"       # "abort" | "grow"; only used when queue_impl="circular"
+# Input/Output
+infile: "workload.csv"
+outfile: "schedule_output.csv"
+resource_trace: "node_availability.csv"
 
-  # Job-record store (Trace::m_data, a boost::circular_buffer bounding
-  # memory via front-only eviction - see
-  # docs/dev/design-decisions/OUT_TRACE_STREAMING.md for the design)
-  job_store_capacity: 0           # 0 = size of job trace
-  job_store_overflow: "grow"      # "abort" | "grow"
+# System Configuration
+total_nodes: 2000
+seed: 42
 
-  # Resource-history circular buffer (bounds memory for --resource_trace)
-  resource_history_capacity: 0    # 0 = size of job trace, floored at 4096
-  
-  # Trace Format
-  trace_format: "simple"          # Options: "simple", "lassen"
-  timestamp_format: "epoch"       # Options: "epoch", "iso"
-  
-  # Simulation Limits
-  max_jobs: 100000
-  max_time: 86400                 # Stop after 86400 seconds (24 hours)
-  
-  # Duration Simulation
-  run_time_mode: "distribution"   # Options: "actual", "distribution", "limit"
-  run_time_distribution: "normal" # Options: "normal", "lognormal", "uniform"
-  run_time_scale: 0.8             # Jobs run for 80% of time_limit on average
-  run_time_stddev: 0.1            # Standard deviation: 10%
-  
-  # Output Options
-  verbose: false
-}
+# Scheduling Policies
+backfill_policy: "easy"        # Options: "easy", "conservative", "none"
+priority_policy: "fcfs"         # Options: "fcfs", "sjf", "ljf"
+
+# Queue Implementation (FCFS scheduler only)
+queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
+wait_queue_capacity: 0            # 0 = size of job trace; only used when queue_impl="circular"
+wait_queue_overflow: "grow"       # "abort" | "grow"; only used when queue_impl="circular"
+
+# Job-record store (Trace::m_data, a boost::circular_buffer bounding
+# memory via front-only eviction - see
+# docs/dev/design-decisions/OUT_TRACE_STREAMING.md for the design)
+job_store_capacity: 0           # 0 = size of job trace
+job_store_overflow: "grow"      # "abort" | "grow"
+
+# Resource-history circular buffer (bounds memory for --resource_trace)
+resource_history_capacity: 0    # 0 = 2x loaded jobs, floored at 4096
+
+# Trace Format
+trace_format: "simple"          # Options: "simple", "lassen"
+timestamp_format: "epoch"       # Options: "epoch", "iso"
+
+# Simulation Limits
+max_jobs: 100000
+max_time: 86400                 # Stop after 86400 seconds (24 hours)
+
+# Duration Simulation
+run_time_mode: "distribution"   # Options: "actual", "distribution", "limit"
+run_time_distribution: "normal" # Options: "normal", "lognormal", "uniform"
+run_time_scale: 0.8             # Jobs run for 80% of time_limit on average
+run_time_stddev: 0.1            # Standard deviation: 10%
+
+# Output Options
+verbose: false
 ```
 
 Run with:
 ```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
+${CMAKE_INSTALL_PREFIX}/bin/simulator workload.csv --config advanced_config.textproto
 ```
+
+Note the positional trace-file argument is still required, matching
+`infile`'s own value inside the config - the positional argument always
+wins over whatever `infile` is set to (by `-i`/`--infile` or a config
+file), so it must be given on the command line even though the config
+already sets it. See [`--infile_list`](command-line.md) if you'd rather
+avoid a positional argument entirely (mutually exclusive with one).
 
 ## Configuration Options Reference
 
@@ -121,7 +124,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --config advanced_config.textproto
 | `job_store_capacity` | uint64 | `0` | `0` = size of job trace; only actually bounds memory with `infile_list` - `infile` (single-file) always grows to fit the whole trace regardless |
 | `job_store_overflow` | string | `"grow"` | `"abort"`, `"grow"` |
 | `memory_pressure_fraction` | double | `0.0` (disabled) | Refuse to grow the job store past this fraction of available memory (Linux only; must be `> 0.0` and `<= 1.0`, e.g. `0.8`); independent of `job_store_overflow` |
-| `resource_history_capacity` | uint64 | `0` | `0` = size of job trace, floored at 4096 |
+| `resource_history_capacity` | uint64 | `0` | `0` = 2x loaded jobs, floored at 4096 |
 
 **backfill_policy:**
 - `"easy"` - EASY backfilling (only first queued job gets reservation)
@@ -187,12 +190,10 @@ Control how a job's actual, observed execution length is determined in simulatio
 
 **Example: Realistic Run Time Variation**
 ```text
-sim_setup {
-  run_time_mode: "distribution"
-  run_time_distribution: "normal"
-  run_time_scale: 0.8          # Jobs run for 80% of time_limit on average
-  run_time_stddev: 0.1          # ±10% variation
-}
+run_time_mode: "distribution"
+run_time_distribution: "normal"
+run_time_scale: 0.8          # Jobs run for 80% of time_limit on average
+run_time_stddev: 0.1          # ±10% variation
 ```
 
 ### Output Options
@@ -207,7 +208,7 @@ Command-line arguments override protobuf config values:
 
 ```bash
 # Config file says total_nodes: 1000
-${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto --total_nodes 2000
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --config sim_config.textproto --total_nodes 2000
 
 # Result: Uses 2000 nodes (command-line wins)
 ```
@@ -225,20 +226,18 @@ Replay exactly what happened on a real system:
 
 `replay.textproto`:
 ```text
-sim_setup {
-  infile: "production_trace.csv"
-  outfile: "results.csv"
-  
-  total_nodes: 2048
-  run_time_mode: "actual"  # Use actual run times from trace
-  
-  backfill_policy: "easy"
-  priority_policy: "fcfs"
-  
-  trace_format: "lassen"
-  timestamp_format: "iso"
-  timezone: "America/Los_Angeles"
-}
+infile: "production_trace.csv"
+outfile: "results.csv"
+
+total_nodes: 2048
+run_time_mode: "actual"  # Use actual run times from trace
+
+backfill_policy: "easy"
+priority_policy: "fcfs"
+
+trace_format: "lassen"
+timestamp_format: "iso"
+timezone: "America/Los_Angeles"
 ```
 
 ### What-If Analysis
@@ -247,25 +246,23 @@ Simulate how system would behave with different policy:
 
 `what_if.textproto`:
 ```text
-sim_setup {
-  infile: "production_trace.csv"
-  outfile: "what_if_results.csv"
-  
-  total_nodes: 2048
-  
-  # Simulation mode with realistic variation
-  run_time_mode: "distribution"
-  run_time_distribution: "normal"
-  run_time_scale: 0.85
-  run_time_stddev: 0.15
-  
-  # Try conservative backfilling instead of EASY
-  backfill_policy: "conservative"
-  priority_policy: "fcfs"
-  
-  trace_format: "simple"
-  timestamp_format: "epoch"
-}
+infile: "production_trace.csv"
+outfile: "what_if_results.csv"
+
+total_nodes: 2048
+
+# Simulation mode with realistic variation
+run_time_mode: "distribution"
+run_time_distribution: "normal"
+run_time_scale: 0.85
+run_time_stddev: 0.15
+
+# Try conservative backfilling instead of EASY
+backfill_policy: "conservative"
+priority_policy: "fcfs"
+
+trace_format: "simple"
+timestamp_format: "epoch"
 ```
 
 ### Capacity Planning
@@ -274,23 +271,21 @@ Test if system can handle increased load:
 
 `capacity_test.textproto`:
 ```text
-sim_setup {
-  infile: "synthetic_high_load.csv"
-  outfile: "capacity_results.csv"
-  
-  # Test with fewer nodes
-  total_nodes: 1500
-  
-  run_time_mode: "limit"
-  
-  backfill_policy: "easy"
-  priority_policy: "fcfs"
-  
-  # Stop after 7 days simulation time
-  max_time: 604800
-  
-  verbose: true
-}
+infile: "synthetic_high_load.csv"
+outfile: "capacity_results.csv"
+
+# Test with fewer nodes
+total_nodes: 1500
+
+run_time_mode: "limit"
+
+backfill_policy: "easy"
+priority_policy: "fcfs"
+
+# Stop after 7 days simulation time
+max_time: 604800
+
+verbose: true
 ```
 
 ### Performance Testing
@@ -299,49 +294,45 @@ Benchmark different queue implementations:
 
 `circular_queue_test.textproto` (default, typically fastest):
 ```text
-sim_setup {
-  infile: "large_scale_10k_jobs.csv"
-  outfile: "circular_queue_results.csv"
-  
-  total_nodes: 1000
-  
-  backfill_policy: "easy"
-  priority_policy: "fcfs"
-  
-  # queue_impl defaults to "circular" - explicit here for clarity.
-  # wait_queue_capacity/wait_queue_overflow are optional; omitting them
-  # defaults to a capacity sized to the job trace, which can never
-  # overflow.
-  queue_impl: "circular"
-  
-  run_time_mode: "limit"
-  
-  trace_format: "simple"
-  timestamp_format: "epoch"
-}
+infile: "large_scale_10k_jobs.csv"
+outfile: "circular_queue_results.csv"
+
+total_nodes: 1000
+
+backfill_policy: "easy"
+priority_policy: "fcfs"
+
+# queue_impl defaults to "circular" - explicit here for clarity.
+# wait_queue_capacity/wait_queue_overflow are optional; omitting them
+# defaults to a capacity sized to the job trace, which can never
+# overflow.
+queue_impl: "circular"
+
+run_time_mode: "limit"
+
+trace_format: "simple"
+timestamp_format: "epoch"
 ```
 
 `block_queue_test.textproto` (reference implementation, not recommended
 for performance):
 ```text
-sim_setup {
-  infile: "large_scale_10k_jobs.csv"
-  outfile: "block_queue_results.csv"
-  
-  total_nodes: 1000
-  
-  backfill_policy: "easy"
-  priority_policy: "fcfs"
-  
-  # Use block queue with a 128-job block size
-  queue_impl: "block"
-  block_size: 128
-  
-  run_time_mode: "limit"
-  
-  trace_format: "simple"
-  timestamp_format: "epoch"
-}
+infile: "large_scale_10k_jobs.csv"
+outfile: "block_queue_results.csv"
+
+total_nodes: 1000
+
+backfill_policy: "easy"
+priority_policy: "fcfs"
+
+# Use block queue with a 128-job block size
+queue_impl: "block"
+block_size: 128
+
+run_time_mode: "limit"
+
+trace_format: "simple"
+timestamp_format: "epoch"
 ```
 
 ## Protocol Buffer Schema
@@ -406,7 +397,7 @@ message Simulation_Params {
   double memory_pressure_fraction = 27; // default: 0.0 (disabled)
 
   // Resource-history circular buffer (bounds memory for --resource_trace)
-  uint64 resource_history_capacity = 25; // 0 = size of job trace, floored at 4096 (default: 0)
+  uint64 resource_history_capacity = 25; // 0 = 2x loaded jobs, floored at 4096 (default: 0)
 }
 ```
 

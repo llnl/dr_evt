@@ -255,6 +255,9 @@ Jobs run for exactly their `time_limit`.
 -L, --infile_list FILE   # File listing multiple trace files, one per line - progressive loading (mutually exclusive with --infile)
 -o, --outfile FILE       # Output file (default: based on input name)
 -j, --max_jobs N         # Max jobs to simulate (default: all)
+-t, --max_time T         # Max simulation time to run (default: unlimited)
+-R, --resource_trace FILE       # Write resource usage trace to file
+-H, --resource_history_capacity SIZE  # Initial resource-history buffer capacity (default: 0 = 2x loaded jobs, floored at 4096)
 ```
 
 ### Trace Format Options
@@ -271,6 +274,7 @@ Jobs run for exactly their `time_limit`.
 -b, --backfill_policy POLICY   # Backfill: easy|conservative|none (default: easy)
 -p, --priority_policy POLICY   # Priority: fcfs|sjf|ljf (default: fcfs)
 -q, --queue_impl IMPL          # FCFS wait queue: circular|deque|multimap|block (default: circular)
+-Q, --block_size SIZE          # Block size when queue_impl=block, power of 2 (default: 128)
 -A, --wait_queue_capacity SIZE   # Initial capacity for queue_impl=circular (default: 0 = size of trace)
 -G, --wait_queue_overflow POLICY # abort|grow if circular capacity exceeded (default: grow)
 ```
@@ -296,6 +300,7 @@ for the full formula and rationale.
 -r, --run_time_mode MODE       # How jobs actually run: actual|distribution|limit (default: actual)
 -D, --run_time_distribution    # Distribution type: normal|lognormal|uniform (for mode=distribution)
 -S, --run_time_scale FACTOR    # Scale factor for run times (for mode=distribution)
+-V, --run_time_stddev FACTOR   # Standard deviation factor for run time sampling (for mode=distribution)
 ```
 
 ### Other Options
@@ -303,6 +308,9 @@ for the full formula and rationale.
 ```bash
 -h, --help              # Show help message
 -s, --seed N            # Random seed (default: 0)
+-c, --config FILE       # Load parameters from a protobuf config file (requires Protobuf support)
+-M, --msec_output       # Millisecond-precision timestamps in output (default: whole seconds)
+-v, --verbose           # Enable verbose output for debugging
 ```
 
 ## Usage Examples

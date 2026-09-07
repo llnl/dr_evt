@@ -166,7 +166,7 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 ✅ `priority_policy` - Priority policy (fcfs/sjf/ljf)  
 ✅ `verbose` - Verbose output flag  
 
-### Missing from Python Bindings (16 parameters)
+### Missing from Python Bindings (17 parameters)
 
 **Critical for Full Functionality:**
 
@@ -202,6 +202,7 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 |-----------|------|---------|---------|--------|
 | `outfile` | string | stdout | Output trace file | **High** - Can't set output file from Python |
 | `resource_trace` | string | None | Resource usage trace | **Low** - Can't capture resource timeline |
+| `resource_history_capacity` | uint64 | `0` (= 2x loaded jobs, floored at 4096) | Initial capacity of the resource-history circular buffer | **Low** - Can't tune memory use for long-running/streaming sessions from Python |
 | `msec_output` | bool | False | Millisecond-precision timestamps | **Low** - Can't get sub-second output resolution |
 
 ### Also Missing: Simulation Methods (not parameters)
@@ -248,8 +249,11 @@ verbose: false
 with open("sim_config.textproto", "w") as f:
     f.write(config)
 
-# Call C++ binary with config
-subprocess.run(["./simulator", "--config", "sim_config.textproto"])
+# Call C++ binary with config - the positional trace-file argument is
+# still required even though infile is set inside the config; it
+# always wins over whatever infile is set to, so it must be given on
+# the command line regardless (must match infile's own value here)
+subprocess.run(["./simulator", "jobs.csv", "--config", "sim_config.textproto"])
 ```
 
 **Option 2: Call C++ Binary from Python**

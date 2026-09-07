@@ -441,8 +441,8 @@ cd build
 
 ## Configuration Tests
 
-**Location:** `tests/test_configs/`
-**Purpose:** Verify protobuf config files match CLI options
+**Location:** `tests/test_configs/` (hand-crafted fixtures), `tests/test_protobuf_config_doc_examples.py` (documentation's own examples)
+**Purpose:** Verify protobuf config files match CLI options, and separately, that every example shown in `docs/user-guide/protobuf-config.md` actually parses and runs - not just the hand-verified fixtures below, which by construction can never expose a bug in the documentation's own prose (this caught two real ones: every doc example wrapping fields in a fictional `sim_setup { ... }` block, and several "Run with" instructions omitting the required positional trace-file argument - see the script's own docstring for the full story)
 
 **How to run:**
 ```bash
@@ -568,10 +568,10 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Append-Job** | 17 | 17 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
 | **Progressive Loading** | 14 | 14 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
 | **Streaming** | 4 | 4 | 0 | Online API |
-| **Config** | 6 | 6 | 0 | Protobuf validation |
+| **Config** | 7 | 7 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 156+ | 156+ | 0 | Complete test suite |
+| **TOTAL** | 157+ | 157+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

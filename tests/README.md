@@ -235,6 +235,20 @@ See "Progressive Loading Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE
 
 ---
 
+### 11. Config Tests (7 tests)
+
+**Purpose:** Verify protobuf config files behave identically to the equivalent CLI options (hand-crafted fixtures under `tests/test_configs/`), and separately, that every example shown in `docs/user-guide/protobuf-config.md` actually parses and runs - the hand-crafted fixtures above can never expose a bug in the documentation's own prose examples, since they're written to already avoid one; this test caught two real ones (a fictional `sim_setup { ... }` wrapping every doc example, and several "Run with" instructions missing the required positional trace-file argument)
+
+**Location:** `tests/test_configs/` (fixtures), `tests/test_protobuf_config_doc_examples.py` (extracts and runs the documentation's own examples)
+
+**Runner:** `./tests/run_configs_tests.sh`
+
+**Status:** ✅ 7/7 passing (100%)
+
+See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
+
+---
+
 ## Total Test Suite
 
 | Category | Tests | Status | Coverage |
@@ -249,7 +263,8 @@ See "Progressive Loading Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 17 | ✅ 17/17 | Streaming insertion (single+batch) + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✅ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
-| **TOTAL** | **100** | **100/100** all passing | - |
+| Config | 7 | ✅ 7/7 | Protobuf config parity with CLI, and the doc's own examples actually run |
+| **TOTAL** | **107** | **107/107** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
@@ -518,7 +533,8 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 17 | ✓ 17/17 | Streaming insertion (single+batch) + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✓ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
-| **Total** | **100** | **100/100** | All tests passing as of 2026-09-07 |
+| Config | 7 | ✓ 7/7 | Protobuf config parity with CLI, and the doc's own examples actually run |
+| **Total** | **107** | **107/107** | All tests passing as of 2026-09-07 |
 
 ## Prerequisites
 

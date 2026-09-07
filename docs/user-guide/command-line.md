@@ -184,6 +184,21 @@ is specified with SJF/LJF, a warning is printed and the default multimap is used
 diff output_deque.csv output_multimap.csv  # Should be identical
 ```
 
+### `-Q, --block_size SIZE`
+Block size for the `block` wait-queue implementation. Must be a power
+of 2: `32`, `64`, `128`, or `256`. Only used when `--queue_impl=block`.
+Larger blocks reduce per-block overhead but increase memory used per
+block - see `--queue_impl`'s own `block` entry above for why `deque`/
+`circular` are recommended over it for typical HPC workloads regardless
+of block size.
+
+**Default:** `128`
+
+**Example:**
+```bash
+./build/simulator traces/large_10k_jobs.csv --priority_policy fcfs --queue_impl block --block_size 64
+```
+
 ### `-A, --wait_queue_capacity SIZE`
 Initial capacity of the circular queue. Only used when `--queue_impl circular`.
 
@@ -301,10 +316,10 @@ already-finalized sample, so it's always immediately safe to reclaim; the
 abort/grow fallback those two need for entries that aren't safe to reclaim
 yet never applies here.
 
-**Default:** `0`, meaning the size of the job trace (large enough it never
-needs to reclaim purely to make room) - though never less than 4096, since
-the trace size may still be tiny (or 0, early in a streaming session) at
-the moment the very first sample is recorded.
+**Default:** `0`, meaning 2x the number of loaded jobs (large enough it
+never needs to reclaim purely to make room) - though never less than
+4096, since the loaded count may still be tiny (or 0, early in a
+streaming session) at the moment the very first sample is recorded.
 
 **Example:**
 ```bash

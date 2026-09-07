@@ -34,7 +34,10 @@ TRACE_DIR="tests/test_traces/progressive"
 # can't: the actual getopt() parsing path.
 echo "Testing: progressive_load_api (C++ level)"
 
-PROGRESSIVE_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_progressive_load"
+PROGRESSIVE_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_progressive_load"
+if [ ! -f "$PROGRESSIVE_API_BIN" ]; then
+    PROGRESSIVE_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_progressive_load"
+fi
 if [ ! -f "$PROGRESSIVE_API_BIN" ]; then
     PROGRESSIVE_API_BIN="./build/test_progressive_load"
 fi
