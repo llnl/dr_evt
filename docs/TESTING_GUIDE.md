@@ -385,13 +385,17 @@ cd build
 8. (C++) `append_jobs()` over an empty request vector is a valid no-op
 9. (C++) Basic append+submit+advance sequencing, exclusive-vs-inclusive `advance_to()`/`run_until_exclusive()`, an online-scheduling loop that appends jobs only as they "arrive," sequential resource-leak detection, and `advance_to()`'s idle-gap postcondition across a long gap with no pending events
 10. (gRPC, if built with `-DDR_EVT_ENABLE_GRPC=ON`) Same append scenario as (1), but over the actual network wire via `AppendJobRequest`, against a real running `dr_evt_server`, plus the batch case via `AppendJobsRequest`
-11. (C++) `submit_job()` records `busy_nodes` (other jobs' node occupancy at arrival) for a streaming-arrived job, same as `load_data()`'s own submission loop already does for a batch-loaded one
-12. (C++) `append_jobs()` honors `--check_memory_pressure` the same way `load_next_file()` (progressive loading) does, since both share `ensure_batch_capacity()` - forced deterministically via the `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES` test seam
+11. (gRPC, if built with `-DDR_EVT_ENABLE_GRPC=ON`) `GetBackfillWindowRequest` returns one FCFS/EASY snapshot with immediate capacity, the queue head's shadow time, and time-limit-based resource releases through that time
+12. (C++) `submit_job()` records `busy_nodes` (other jobs' node occupancy at arrival) for a streaming-arrived job, same as `load_data()`'s own submission loop already does for a batch-loaded one
+13. (C++) `append_jobs()` honors `--check_memory_pressure` the same way `load_next_file()` (progressive loading) does, since both share `ensure_batch_capacity()` - forced deterministically via the `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES` test seam
 
 **How to run:**
 ```bash
 cd build
 ../tests/run_append_job_tests.sh
+
+# Focused gRPC backfill-window test (starts a local server)
+../tests/run_backfill_window_grpc_test.sh
 ```
 
 **Tests hardcoded in script:**
@@ -625,14 +629,14 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Replay** | 4 | 4 | 0 | Resource verification |
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
-| **Append-Job** | 17 | 17 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
+| **Append-Job** | 18 | 18 | 0 | Streaming insertion (append_job/append_jobs), FCFS/EASY backfill-window query + submit_job()/advance_to() |
 | **gRPC Composite Stream** | 1 | 1 | 0 | Two-server MPI integration: equal-time and ordered composite arrivals |
 | **Progressive Loading** | 14 | 14 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 7 | 7 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 159+ | 159+ | 0 | Complete test suite |
+| **TOTAL** | 157+ | 157+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

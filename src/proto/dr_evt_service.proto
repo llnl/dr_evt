@@ -47,6 +47,7 @@ message ClientMessage {
         AppendJobRequest append_job = 14;
         AppendJobsRequest append_jobs = 15;
         FinishSimulationRequest finish_simulation = 16;
+        GetBackfillWindowRequest get_backfill_window = 17;
     }
 }
 
@@ -150,6 +151,10 @@ message GetNodesInUseRequest {}
 message GetAvailableNodesRequest {}
 message GetActiveJobCountRequest {}
 message GetFCFSHeadShadowTimeRequest {}
+// Returns the current FCFS/EASY backfill opportunity in one consistent
+// snapshot.  Release events are calculated with the jobs' time limits, the
+// same estimates used by the FCFS head reservation calculation.
+message GetBackfillWindowRequest {}
 message GetStatisticsRequest {}
 message GetTraceSizeRequest {}
 
@@ -177,6 +182,7 @@ message ServerMessage {
         AppendJobResponse append_job = 15;
         AppendJobsResponse append_jobs = 16;
         FinishSimulationResponse finish_simulation = 17;
+        GetBackfillWindowResponse get_backfill_window = 18;
     }
 }
 
@@ -235,6 +241,23 @@ message GetActiveJobCountResponse {
 
 message GetFCFSHeadShadowTimeResponse {
     double shadow_time = 1;
+}
+
+// Resources predicted to be released at one point in simulation time.
+// Multiple jobs ending together are represented by one, summed event.
+message ResourceRelease {
+    double time = 1;
+    uint32 nodes_released = 2;
+}
+
+message GetBackfillWindowResponse {
+    double current_time = 1;
+    uint32 available_nodes = 2;
+    // Earliest start of the FCFS queue head, or -1 when there is no head.
+    double shadow_time = 3;
+    // Ordered release events in (current_time, shadow_time]. Empty when
+    // there is no FCFS head or it can start immediately.
+    repeated ResourceRelease releases = 4;
 }
 
 message GetStatisticsResponse {

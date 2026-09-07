@@ -22,6 +22,8 @@ This directory contains GitHub Actions workflows for automated testing.
   up in the environment used to check these workflows)
 - Streaming API tests (4, requires building the `test_streaming_api`
   target - also not verified as part of this pass)
+- FCFS/EASY backfill-window gRPC test (1, starts a local server and verifies
+  the combined capacity/shadow/release response)
 - Scale tests (7, optional/`continue-on-error`; 4 working, 3 have
   known-corrupted input data - see `tests/README.md`)
 
@@ -60,6 +62,7 @@ Total tests referenced by the full suite:
 | Config | 4 | No - requires protobuf build |
 | Python API | 9 | No - requires Python bindings build |
 | Streaming API | 4 | No - requires building `test_streaming_api` |
+| FCFS/EASY backfill-window gRPC | 1 | Yes - included in `tests.yml` |
 | Scale | 7 | Yes - 4/7 pass, 3 known-corrupted input |
 
 This table reflects a single manual verification pass, not a
@@ -90,6 +93,7 @@ cd ..
 ./tests/run_configs_tests.sh     # config tests (requires protobuf build)
 ./tests/run_python_tests.sh      # Python API (requires -DDR_EVT_BUILD_PYTHON=ON)
 ./tests/run_streaming_tests.sh   # C++ streaming API (requires test_streaming_api target)
+./tests/run_backfill_window_grpc_test.sh # FCFS/EASY gRPC backfill-window query
 ```
 
 There is no `run_correctness_tests.sh` in this checkout - an earlier

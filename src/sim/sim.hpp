@@ -247,6 +247,25 @@ class Simulation {
     }
 
     /**
+     * A point-in-time FCFS/EASY reservation snapshot. Release events use the
+     * time-limit estimates used by SchedulerBase::calculate_fcfs_reservation,
+     * rather than actual runtimes, so the projection and shadow time agree.
+     */
+    struct Backfill_Window {
+        struct Resource_Release {
+            sim_time_t time;
+            num_nodes_t nodes_released;
+        };
+
+        sim_time_t current_time;
+        num_nodes_t available_nodes;
+        sim_time_t shadow_time;  // -1 when no FCFS head is waiting
+        std::vector<Resource_Release> releases;
+    };
+
+    Backfill_Window get_backfill_window() const;
+
+    /**
      * Get detailed scheduling statistics
      * @return Structure with wait times, turnaround, utilization
      */

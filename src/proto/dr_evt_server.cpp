@@ -292,6 +292,20 @@ public:
                         resp.mutable_get_fcfs_head_shadow_time()->set_shadow_time(sim->get_fcfs_head_shadow_time());
                         break;
                     }
+                    case ClientMessage::kGetBackfillWindow: {
+                        require_init(sim);
+                        const auto window = sim->get_backfill_window();
+                        auto* out = resp.mutable_get_backfill_window();
+                        out->set_current_time(window.current_time);
+                        out->set_available_nodes(window.available_nodes);
+                        out->set_shadow_time(window.shadow_time);
+                        for (const auto& release : window.releases) {
+                            auto* event = out->add_releases();
+                            event->set_time(release.time);
+                            event->set_nodes_released(release.nodes_released);
+                        }
+                        break;
+                    }
                     case ClientMessage::kGetStatistics: {
                         require_init(sim);
                         auto stats = sim->get_statistics();

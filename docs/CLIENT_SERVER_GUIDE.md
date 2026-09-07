@@ -73,6 +73,7 @@ in-process via the streaming API:
 | `SubmitJobRequest` | `Simulation::submit_job()` - enqueues a job already known to the server (via `InitializeTraceRequest` or a prior append) |
 | `AdvanceToRequest` | `Simulation::advance_to()` |
 | `RunUntilExclusiveRequest` | `Simulation::run_until_exclusive()` |
+| `GetBackfillWindowRequest` | One FCFS/EASY reservation snapshot: current capacity, shadow time, and projected releases |
 | `GetStatisticsRequest`, `GetCurrentTimeRequest`, etc. | The monitoring/statistics methods |
 
 Every `ClientMessage` carries a `request_id`, echoed back on the matching
@@ -80,6 +81,32 @@ Every `ClientMessage` carries a `request_id`, echoed back on the matching
 multiple in-flight requests (the provided `dr_evt_client` sends one at a
 time and waits for each response, but the protocol itself doesn't require
 that).
+
+### FCFS/EASY backfill-window query
+
+After submitting work and advancing the simulation to the desired point in
+time, send `GetBackfillWindowRequest`. Its matching
+`GetBackfillWindowResponse` is an atomic scheduling snapshot with:
+
+- `current_time`: the simulation time at which the snapshot was made.
+- `available_nodes`: nodes free immediately at `current_time`.
+- `shadow_time`: the earliest start time reserved for the FCFS queue head;
+  `-1` if no job is waiting.
+- `releases`: chronologically ordered `ResourceRelease` events between the
+  current time and the shadow time, inclusive. Each has its absolute
+  simulation `time` and `nodes_released`; jobs ending at the same time are
+  combined into one event.
+
+The projection deliberately uses each running job's `time_limit`, not its
+actual runtime. That is the same estimate used by the FCFS/EASY scheduler to
+calculate `shadow_time`, so clients can safely use the response to evaluate
+backfill candidates without seeing a conflicting reservation model. If there
+is no waiting head, or the head can run immediately, `releases` is empty.
+
+For example, with no free nodes, a 40-node job predicted to end at time 50,
+a 60-node job predicted to end at time 100, and a 100-node FCFS head, the
+response at time 0 has `shadow_time = 100` and releases `(50, 40)` and
+`(100, 60)`.
 
 One session (one call to `Session()`) corresponds to one server-side
 `Simulation` instance for the stream's lifetime - there's no way to reset
@@ -232,6 +259,13 @@ built or `mpirun` isn't on `PATH`):
 
 ```bash
 ./tests/run_grpc_tests.sh
+```
+
+The focused FCFS/EASY window test starts a local server and runs the wire
+test, including the example projection above:
+
+```bash
+./tests/run_backfill_window_grpc_test.sh
 ```
 
 It uses `composite_server1.csv`, `composite_server2.csv`, and
