@@ -16,12 +16,22 @@ Demonstrates how to:
 4. Get queue and scheduling statistics
 """
 
+import os
 import dr_evt
 
 def main():
     # Configure simulation
     params = dr_evt.SimParams()
-    params.infile = "examples/sample_trace.csv"
+    # Resolve relative to this script's own location, not the caller's
+    # cwd - a bare "examples/sample_trace.csv" only resolves correctly
+    # if invoked as `python example_streaming.py` from within python/
+    # itself; `python3 python/example_streaming.py` from the repo root
+    # (an equally natural way to run it - and how CI's own test now
+    # invokes it) would otherwise fail with "Failed to initialize data
+    # columns" since that path doesn't exist relative to the repo root.
+    params.infile = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "examples", "sample_trace.csv")
     params.total_nodes = 100
     params.trace_format = "simple"
     params.timestamp_format = "epoch"
