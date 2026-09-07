@@ -71,6 +71,7 @@ Input/Output:
   -L, --infile_list <file>     File listing multiple trace files - progressive loading (mutually exclusive with --infile)
   -o, --outfile <file>         Output file for results
   -R, --resource_trace <file>  Write resource usage trace to file
+  -H, --resource_history_capacity <size>  Initial resource-history buffer capacity (default: 0 = 2x loaded jobs, floored at 4096)
 
 Simulation setup:
   -n, --total_nodes <N>        Number of nodes in system (default: 795)

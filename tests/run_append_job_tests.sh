@@ -39,7 +39,14 @@ FAIL=0
 # --- Test: C++ API (test_append_job_api.cpp's own 3 sub-tests) ---
 echo "Testing: append_job_api (C++ level)"
 
-APPEND_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_api"
+# Test binaries are installed under bin/tests/ (see CMakeLists.txt's
+# separate install() rule for DR_EVT_UNIT_TEST_TARGETS), not directly
+# under bin/ like the main simulator/tracer/dr_evt_server/dr_evt_client
+# binaries - check there first.
+APPEND_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_append_job_api"
+if [ ! -f "$APPEND_API_BIN" ]; then
+    APPEND_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_api"
+fi
 if [ ! -f "$APPEND_API_BIN" ]; then
     APPEND_API_BIN="./build/test_append_job_api"
 fi
@@ -64,7 +71,10 @@ echo ""
 echo "Testing: append_job_grpc (over the actual gRPC wire)"
 
 SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
-GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_grpc"
+GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_append_job_grpc"
+if [ ! -f "$GRPC_TEST_BIN" ]; then
+    GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_grpc"
+fi
 if [ ! -f "$GRPC_TEST_BIN" ]; then
     GRPC_TEST_BIN="./build/test_append_job_grpc"
 fi
