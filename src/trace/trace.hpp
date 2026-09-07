@@ -347,6 +347,24 @@ class Trace {
         return m_ctx.m_n_nodes_in_use;
     }
 
+    /// True if a pAll (exclusive-access) job is currently running -
+    /// same condition load_data()'s own submission loop uses to decide
+    /// whether a newly-submitted job's set_busy_nodes() call should
+    /// record total_nodes (the whole machine, since a pAll job
+    /// monopolizes it) rather than get_nodes_in_use() (other jobs'
+    /// actual current occupancy). Exposed so submit_job() - which
+    /// submits one job at a time, outside load_data()'s own loop - can
+    /// apply the exact same rule. Always false if MARK_DAT_PERIOD is
+    /// off (m_pAll_cnt doesn't exist in that build - no DAT tracking
+    /// means never in a DAT period, by definition).
+    bool in_dat_period() const {
+      #if MARK_DAT_PERIOD
+        return m_ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u);
+      #else
+        return false;
+      #endif
+    }
+
     /// Read-only access to the pending-completion event queue, for a
     /// caller (Simulation) driving its own event loop against this Trace.
     const event_q_t& pending_events() const { return m_ctx.m_evtq; }

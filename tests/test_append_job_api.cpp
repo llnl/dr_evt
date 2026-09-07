@@ -637,6 +637,39 @@ void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
     std::cout << "  PASSED" << std::endl;
 }
 
+// Test 16: submit_job() must record m_busy_nodes (other jobs' node
+// occupancy at this job's own arrival, written out as the trace's
+// "busy_nodes" column) for a streaming-arrived job, same as
+// load_data()'s own submission loop already does for a batch-loaded
+// one. Without this, a streaming job's busy_nodes silently stays at
+// the constructor's default of 0 forever - wrong, not just unset,
+// whenever something else happens to be running when it arrives.
+void test_submit_job_records_busy_nodes() {
+    std::cout << "\n=== Test 16: submit_job() records busy_nodes for streaming jobs ==="
+              << std::endl;
+
+    Simulation sim(make_params());
+    sim.get_trace().load_data(0);
+
+    // job0 arrives alone - nothing else running yet, busy_nodes must be 0.
+    job_no_t j0 = sim.append_job(0.0, 30, "pbatch", 100);
+    sim.submit_job(j0, 0.0);
+    sim.advance_to(0.0);
+    assert(sim.get_nodes_in_use() == 30);
+
+    // job1 arrives at t=10, while job0's 30 nodes are still in use -
+    // busy_nodes for job1 must reflect that occupancy (30), not 0.
+    job_no_t j1 = sim.append_job(10.0, 20, "pbatch", 100);
+    sim.submit_job(j1, 10.0);
+
+    const auto& job0 = sim.get_trace().job_at(j0);
+    const auto& job1 = sim.get_trace().job_at(j1);
+    assert(job0.get_busy_nodes() == 0);
+    assert(job1.get_busy_nodes() == 30);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
 int main() {
     std::cout << "====================================" << std::endl;
     std::cout << "Append-Job Test Suite" << std::endl;
@@ -660,6 +693,7 @@ int main() {
         test_online_scheduling();
         test_no_resource_leaks();
         test_advance_to_idle_gap();
+        test_submit_job_records_busy_nodes();
 
         std::cout << "\n====================================" << std::endl;
         std::cout << "ALL APPEND_JOB TESTS PASSED" << std::endl;
