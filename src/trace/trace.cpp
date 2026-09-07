@@ -304,20 +304,8 @@ job_no_t Trace::append_job(sim_time_t current_time, const epoch_t& submit_time,
     return static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1);
 }
 
-std::vector<job_no_t> Trace::append_jobs(sim_time_t current_time,
-                                          const std::vector<Job_Append_Request>& requests)
+void Trace::ensure_batch_capacity(sim_time_t current_time, size_t batch_size)
 {
-    // Input validation is all-or-nothing: check the whole batch's
-    // ordering before touching m_data at all.
-    for (size_t i = 1; i < requests.size(); ++i) {
-        if (requests[i].submit_time < requests[i - 1].submit_time) {
-            throw std::runtime_error(
-                "Trace::append_jobs(): requests must be sorted by submit_time "
-                "(non-decreasing) - request " + std::to_string(i) +
-                " has an earlier submit_time than request " + std::to_string(i - 1));
-        }
-    }
-
     // Same idempotent, load_data()-optional resolution as append_job().
     resolve_job_store_capacity(static_cast<num_jobs_t>(m_data.size()));
 
@@ -329,17 +317,17 @@ std::vector<job_no_t> Trace::append_jobs(sim_time_t current_time,
     // the batch size instead of the default 1), so no external guard is
     // needed before calling it. This also means the batch is either
     // fully accommodated here before anything is added, or none of it
-    // is (see doc comment) - unlike a per-request check-full() loop,
-    // which can only discover exhaustion mid-loop, after some requests
-    // are already appended.
-    reclaim_front_jobs(current_time, static_cast<num_jobs_t>(requests.size()),
+    // is - unlike a per-request check-full() loop, which can only
+    // discover exhaustion mid-loop, after some requests are already
+    // appended.
+    reclaim_front_jobs(current_time, static_cast<num_jobs_t>(batch_size),
                         /* handle_overflow= */ false);
-    size_t needed = m_data.size() + requests.size();
+    size_t needed = m_data.size() + batch_size;
     if (needed > m_data.capacity()) {
         if (m_job_store_overflow == CircularOverflowPolicy::ABORT) {
             throw std::runtime_error(
                 "Trace: job store capacity (" + std::to_string(m_data.capacity()) +
-                ") can't fit this batch of " + std::to_string(requests.size()) +
+                ") can't fit this batch of " + std::to_string(batch_size) +
                 " requests even after reclaiming; "
                 "use --job_store_overflow grow or a larger --job_store_capacity");
         }
@@ -354,6 +342,23 @@ std::vector<job_no_t> Trace::append_jobs(sim_time_t current_time,
         }
         m_data.set_capacity(new_cap);
     }
+}
+
+std::vector<job_no_t> Trace::append_jobs(sim_time_t current_time,
+                                          const std::vector<Job_Append_Request>& requests)
+{
+    // Input validation is all-or-nothing: check the whole batch's
+    // ordering before touching m_data at all.
+    for (size_t i = 1; i < requests.size(); ++i) {
+        if (requests[i].submit_time < requests[i - 1].submit_time) {
+            throw std::runtime_error(
+                "Trace::append_jobs(): requests must be sorted by submit_time "
+                "(non-decreasing) - request " + std::to_string(i) +
+                " has an earlier submit_time than request " + std::to_string(i - 1));
+        }
+    }
+
+    ensure_batch_capacity(current_time, requests.size());
 
     // Capacity is already sufficient for the whole batch at this point -
     // copy every request in, with no further full()/reclaim/grow checks
@@ -364,6 +369,60 @@ std::vector<job_no_t> Trace::append_jobs(sim_time_t current_time,
         m_data.push_back(Job_Record(req.submit_time, req.num_nodes, req.queue, req.limit_time));
         job_nos.push_back(static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1));
     }
+    return job_nos;
+}
+
+std::vector<job_no_t> Trace::load_next_file(sim_time_t current_time, const std::string& fname)
+{
+    std::vector<Job_Record> loaded;
+    int rc = load(fname, m_dcols, loaded);
+    if (rc != EXIT_SUCCESS) {
+        throw std::runtime_error(
+            "Trace::load_next_file(): failed to load '" + fname + "'");
+    }
+    if (loaded.empty()) {
+        return {};
+    }
+
+    // This file's own rows must already be sorted by submit_time -
+    // load_data() tolerates unsorted input (it sorts everything it
+    // read in memory before inserting), but this can't do that: it
+    // never holds more than one file's rows at a time, so there's
+    // nothing broader to sort against. Same check append_jobs() makes
+    // on its own batch, applied here to load()'s output instead.
+    for (size_t i = 1; i < loaded.size(); ++i) {
+        if (loaded[i].get_submit_time() < loaded[i - 1].get_submit_time()) {
+            throw std::runtime_error(
+                "Trace::load_next_file(): '" + fname + "' is not sorted by "
+                "submit_time (non-decreasing) - row " + std::to_string(i) +
+                " has an earlier submit_time than row " + std::to_string(i - 1));
+        }
+    }
+
+    // Continuity across the file sequence: this file's earliest
+    // submit_time must be >= the previous file's latest - first call
+    // is exempt (m_has_loaded_a_file false), nothing to compare against
+    // yet.
+    if (m_has_loaded_a_file &&
+        loaded.front().get_submit_time() < m_last_loaded_submit_time) {
+        throw std::runtime_error(
+            "Trace::load_next_file(): '" + fname + "'s earliest submit_time "
+            "is earlier than the previously loaded file's latest submit_time "
+            "- files must be loaded in non-decreasing submit_time order");
+    }
+
+    ensure_batch_capacity(current_time, loaded.size());
+
+    std::vector<job_no_t> job_nos;
+    job_nos.reserve(loaded.size());
+    for (auto& job : loaded) {
+        m_data.push_back(std::move(job));
+        job_nos.push_back(static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1));
+    }
+
+    m_last_loaded_submit_time = loaded.back().get_submit_time();
+    m_has_loaded_a_file = true;
+
     return job_nos;
 }
 

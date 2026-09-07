@@ -31,6 +31,7 @@ correct.
 - [Resource History Tests](#resource-history-tests) - Resource-history circular buffer, flush overhead
 - [Job Store Tests](#job-store-tests) - Job-record circular buffer, capacity sizing
 - [Append-Job Tests](#append-job-tests) - Real streaming insertion (append_job/append_jobs) + submit_job()/advance_to() correctness
+- [Progressive Loading Tests](#progressive-loading-tests) - --infile_list, actually bounding job-store memory across a multi-file trace
 - [Streaming API Tests](#streaming-api-tests) - Online job submission
 - [Configuration Tests](#configuration-tests) - Protobuf validation
 - [Queue Implementation Testing](#queue-implementation-testing) - Wait-queue data structure consistency
@@ -391,6 +392,34 @@ cd build
 
 ---
 
+## Progressive Loading Tests
+
+**Location:** `tests/test_progressive_load.cpp` (C++), `tests/run_progressive_load_tests.sh` (both wraps the C++ binary and runs CLI-level checks)
+**Purpose:** Verify `--infile_list`/`Trace::load_next_file()`/`Simulation::run_progressive()` - loading a trace as a sequence of separate, pre-sorted files instead of one big one, so `--job_store_capacity` can actually bound memory (single-file mode always grows to fit the whole trace regardless of this setting; see `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`)
+
+**How it works:**
+1. (C++) The same 6 jobs split across 3 files vs. one combined file must produce byte-identical output - splitting the input shouldn't change the schedule
+2. (C++) With a small `--job_store_capacity` and job durations short enough that earlier jobs finish before later files load, progressive mode's peak `m_data` capacity must stay well below single-file mode's (confirmed as an honest baseline, not assumed - single-file mode always grows to fit the whole trace)
+3. (C++) `--job_store_overflow=abort` must throw cleanly, not crash, when a file's jobs can't fit even after reclaiming
+4. (C++) An empty file (header only) in the middle of the list must be skipped gracefully, not treated as an error
+5. (C++) A later file whose earliest `submit_time` precedes the previous file's latest must be rejected (cross-file continuity)
+6. (C++) REPLAY-format input must be rejected outright for `--infile_list` - there's no scheduling decision for progressive loading to plug into for replay at all
+7. (CLI) The same split-vs-combined comparison as (1), but through the actual `simulator --infile_list` invocation, exercising `Sim_Params::getopt()`'s real parsing path
+8. (CLI) The same small-capacity run as (2), confirmed to still produce the correct schedule end-to-end
+9. (CLI) An empty `--infile_list` file is rejected with a clear error
+10. (CLI) `--infile_list` together with a positional trace-file argument is rejected (mutually exclusive)
+
+**How to run:**
+```bash
+cd build
+../tests/run_progressive_load_tests.sh
+```
+
+**Tests hardcoded in script:**
+- `progressive/part1.csv`, `part2.csv`, `part3.csv`, `combined.csv`, `file_list.txt`
+
+---
+
 ## Streaming API Tests
 
 **Location:** `tests/`
@@ -529,11 +558,12 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
 | **Append-Job** | 16 | 16 | 0 | Streaming insertion (append_job/append_jobs) + submit_job()/advance_to() |
+| **Progressive Loading** | 10 | 10 | 0 | --infile_list, bounding job-store memory across a multi-file trace |
 | **Streaming** | 4 | 4 | 0 | Online API |
 | **Config** | 4 | 4 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 139+ | 139+ | 0 | Complete test suite |
+| **TOTAL** | 149+ | 149+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 

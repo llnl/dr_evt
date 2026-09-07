@@ -1,0 +1,3 @@
+tests/test_traces/progressive/part1.csv
+tests/test_traces/progressive/part2.csv
+tests/test_traces/progressive/part3.csv

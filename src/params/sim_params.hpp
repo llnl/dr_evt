@@ -15,6 +15,7 @@
 #endif
 
 #include <string>
+#include <vector>
 #include "dr_evt_types.hpp"
 #include "sim/scheduler_policies.hpp"
 
@@ -57,6 +58,8 @@ class Sim_Params {
     dr_evt::sim_time_t m_max_time;
 
     std::string m_infile;
+    std::string m_infile_list; ///< Path to a file listing multiple trace files, one per line, for progressive loading - empty means single-file mode via m_infile (unchanged)
+    std::vector<std::string> m_infile_list_parsed; ///< Populated from m_infile_list during getopt() (one path per line, blank lines skipped) - m_infile is set to this list's first entry, so Trace's own constructor (which validates a file's header before Simulation::run() ever executes) always has a real file to check regardless of mode
 
     bool m_is_jobs_set;
     bool m_is_time_set;

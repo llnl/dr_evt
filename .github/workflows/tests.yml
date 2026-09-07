@@ -113,7 +113,7 @@ jobs:
           # docs/getting-started/installation.md's "Livermore Computing
           # (LC) HPC systems" section for the full explanation).
           # Build test binaries
-          make test_append_job_api-bin test_batch_vs_streaming-bin
+          make test_append_job_api-bin test_batch_vs_streaming-bin test_progressive_load-bin
           # gRPC client/server + MPI multi-client/server test harness
           # (already covered by `make -j$(nproc)` above since none of
           # these are EXCLUDE_FROM_ALL, but listed explicitly here too
@@ -271,9 +271,17 @@ jobs:
         id: append-job
         run: |
           echo "========================================"
-          echo "Running Append-Job Tests (15 C++ + gRPC)"
+          echo "Running Append-Job Tests (16 C++ + gRPC)"
           echo "========================================"
           ./tests/run_append_job_tests.sh
+
+      - name: Run Progressive Loading Tests
+        id: progressive-load
+        run: |
+          echo "========================================"
+          echo "Running Progressive Loading Tests (6 C++ + 4 CLI)"
+          echo "========================================"
+          ./tests/run_progressive_load_tests.sh
 
       - name: Run Scale Tests (Optional)
         id: scale

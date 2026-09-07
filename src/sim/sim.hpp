@@ -365,6 +365,28 @@ class Simulation {
     void determine_job_run_time();
 
     /**
+     * Same as determine_job_run_time(), but only for the given jobs -
+     * for progressive loading, where each file's jobs need this done
+     * once they're loaded, not just once for the initial batch.
+     */
+    void determine_job_run_time(const std::vector<job_no_t>& job_nos);
+
+    /// Shared per-job logic both overloads above apply identically.
+    void determine_one_job_run_time(Job_Record& job);
+
+    /// The progressive-loading counterpart to run()'s single-file batch
+    /// path (m_params.m_infile_list non-empty instead of m_infile
+    /// alone): loads each listed file in turn (Trace::load_next_file()),
+    /// submits its jobs one at a time in submit_time order, then
+    /// advance_to()s to the last one's submit_time before loading the
+    /// next - letting time (and reclaiming) actually progress between
+    /// files, rather than every file's jobs being known to m_data at
+    /// once. A final advance_to(infinity) after the last file drains
+    /// whatever's still running. REPLAY-format input isn't supported
+    /// here (see doc comment on the call in run()).
+    void run_progressive();
+
+    /**
      * Sample job duration from distribution
      * @param time_limit User-provided time limit
      * @param dist Distribution type

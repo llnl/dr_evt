@@ -82,6 +82,16 @@ class Trace {
     bool m_job_store_capacity_resolved;
     CircularOverflowPolicy m_job_store_overflow; ///< Fallback when the front isn't safe to reclaim and the buffer's full
 
+    /// Tracks continuity across load_next_file() calls: the latest
+    /// submit_time seen across every file loaded so far this way, so
+    /// the next file's earliest submit_time can be checked against it
+    /// (>=). m_has_loaded_a_file distinguishes "no previous file yet"
+    /// (first call, nothing to check against) from a real value -
+    /// simpler and clearer than reserving a sentinel epoch_t for the
+    /// same purpose.
+    bool m_has_loaded_a_file = false;
+    epoch_t m_last_loaded_submit_time;
+
     /// Running totals over every is_scheduled() job written via
     /// write_job_line() - accumulated there (the single choke point for
     /// both reclaim-time and final-flush writes) so a reclaimed job's
@@ -270,10 +280,18 @@ class Trace {
      * @brief Append several genuinely new jobs to m_data in one call -
      * the batch counterpart to append_job(), for the same never-seen-
      * before case (not a batch-preload; see load_data() for that).
-     * Designed to also serve a future chunked-loading reader (see
-     * OUT_TRACE_STREAMING.md's "Sketch of that future chunked-loading
-     * scheme"): reads a whole trace file's remaining rows a chunk at a
-     * time and would call this once per chunk, not once per job.
+     *
+     * Originally designed with a future chunked-loading reader in mind
+     * (a chunk as a std::vector<Job_Append_Request>, appended here once
+     * per chunk) - that didn't end up how progressive/multi-file
+     * loading (--infile_list) was actually built: Job_Append_Request's
+     * narrower, network-facing 4 fields can't carry actual_run_time,
+     * which load()'s output (what a real file read produces) can -
+     * routing that through this struct would silently drop it. See
+     * Trace::load_next_file() instead, which takes Job_Record directly;
+     * see OUT_TRACE_STREAMING.md for the full reasoning. This function
+     * still exists for genuine streaming, where a Job_Record doesn't
+     * exist yet - only the caller's raw values do.
      *
      * Fully all-or-nothing: nothing in this batch is appended unless
      * all of it can be. Two things are checked before m_data is
@@ -317,6 +335,41 @@ class Trace {
      */
     std::vector<job_no_t> append_jobs(sim_time_t current_time,
                                        const std::vector<Job_Append_Request>& requests);
+
+    /**
+     * @brief Load one file's worth of jobs directly as Job_Record
+     * objects (via the same load() free function load_data() uses),
+     * for progressive/multi-file loading - a sequence of separate,
+     * pre-sorted, pre-split trace files instead of one big one, so a
+     * bounded --job_store_capacity can actually be honored (unlike
+     * load_data(), which always grows to fit its one file whole).
+     *
+     * Deliberately does not go through append_jobs()/Job_Append_Request:
+     * that struct only carries the 4 fields a genuine streaming caller
+     * (no Job_Record in hand yet) can supply - routing an
+     * already-parsed Job_Record through it would silently drop
+     * actual_run_time back to 0.0, wrong for run_time_mode=actual/
+     * distribution. This takes load()'s output directly instead,
+     * losing nothing.
+     *
+     * Two checks, both all-or-nothing before m_data is touched at all
+     * (same shape as append_jobs()): this file's own rows must already
+     * be sorted by submit_time (load_data() tolerates unsorted input by
+     * sorting it in memory - this can't, since it never holds more than
+     * one file's rows at a time), and its first job's submit_time must
+     * be >= the previous call's last job's submit_time (continuity
+     * across the file sequence - first call is exempt, nothing to
+     * compare against yet).
+     *
+     * @param current_time Current simulated time, for the batch-wide
+     *        reclaim attempt's is_front_reclaimable() check.
+     * @param fname Path to this file - same trace format as any other
+     *        input file (--infile), not the network-facing
+     *        Job_Append_Request shape.
+     * @return Each loaded job's job_no, in submit_time order - pass
+     *         each to submit_job() next, same as append_jobs().
+     */
+    std::vector<job_no_t> load_next_file(sim_time_t current_time, const std::string& fname);
 
     /**
      * NEW SIMULATION API: Run simulation until (but not including) target time
@@ -556,6 +609,15 @@ class Trace {
     /// case only the batch caller can size and word correctly.
     void reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free = 1,
                              bool handle_overflow = true);
+
+    /// Shared by append_jobs() and append_records_from_file(): ensures
+    /// m_data has room for batch_size more entries, reclaiming first
+    /// and growing (or aborting, per m_job_store_overflow) only if
+    /// still short after that - extracted out of append_jobs() so both
+    /// callers get this exact logic once, not duplicated. Mutates
+    /// m_data's capacity only, never inserts anything itself - callers
+    /// still do their own push_back()ing once this returns.
+    void ensure_batch_capacity(sim_time_t current_time, size_t batch_size);
 
     /// Write one job's line to m_simulated_trace_ofs (if open and the
     /// job is_scheduled() - unscheduled/rejected jobs were never written
