@@ -222,7 +222,7 @@ jobs:
         id: replay
         run: |
           echo "========================================"
-          echo "Running Replay Tests (3 tests)"
+          echo "Running Replay Tests (4 tests)"
           echo "========================================"
           ./tests/run_replay_tests.sh
 
@@ -230,7 +230,7 @@ jobs:
         id: resource-history
         run: |
           echo "========================================"
-          echo "Running Resource History Tests (4 tests)"
+          echo "Running Resource History Tests (5 tests)"
           echo "========================================"
           ./tests/run_resource_history_tests.sh
 
@@ -238,7 +238,7 @@ jobs:
         id: job-store
         run: |
           echo "========================================"
-          echo "Running Job Store Tests (5 tests)"
+          echo "Running Job Store Tests (6 tests)"
           echo "========================================"
           ./tests/run_job_store_tests.sh
 
@@ -255,7 +255,7 @@ jobs:
         run: |
           source venv/bin/activate
           echo "========================================"
-          echo "Running Python API Tests (14 tests)"
+          echo "Running Python API Tests (15 tests)"
           echo "========================================"
           ./tests/run_python_tests.sh
 
@@ -309,11 +309,12 @@ jobs:
           echo "  Unit (7 tests): ${{ steps.unit.outcome }}"
           echo "  Feature (5 tests): ${{ steps.feature.outcome }}"
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
-          echo "  Replay (3 tests): ${{ steps.replay.outcome }}"
-          echo "  Resource History (4 tests): ${{ steps.resource-history.outcome }}"
+          echo "  Replay (4 tests): ${{ steps.replay.outcome }}"
+          echo "  Resource History (5 tests): ${{ steps.resource-history.outcome }}"
+          echo "  Job Store (6 tests): ${{ steps.job-store.outcome }}"
           echo "  Config (7 tests): ${{ steps.config.outcome }}"
-          echo "  Python API (14 tests): ${{ steps.python-api.outcome }}"
-          echo "  Streaming API (17 C++ + gRPC): ${{ steps.append-job.outcome }}"
+          echo "  Python API (15 tests): ${{ steps.python-api.outcome }}"
+          echo "  Append-Job (17 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  Progressive Loading (10 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"
