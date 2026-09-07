@@ -511,6 +511,48 @@ ${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client --server localhost:50051 \
 
 See [Client/Server Guide](docs/CLIENT_SERVER_GUIDE.md) for details.
 
+### Containers
+
+Docker client/server files are organized under
+[`containers/docker/`](containers/docker/README.md). The server bind-mounts a
+host result directory at `/data`, while the interactive client shell
+bind-mounts a host input-data directory there.
+
+Rootless Podman files are in [`containers/podman/`](containers/podman/README.md).
+They do not need `sudo`; `--userns=keep-id` preserves your host UID/GID for
+bind-mounted files. Confirm rootless operation first:
+
+```bash
+podman info --format '{{.Host.Security.Rootless}}'
+```
+
+From the repository root, build and start the rootless Podman setup:
+
+```bash
+mkdir -p results data
+podman build -f containers/podman/server/Containerfile -t dr-evt-server:local .
+podman build -f containers/podman/client/Containerfile -t dr-evt-client:local .
+podman network exists dr-evt-net || podman network create dr-evt-net
+
+podman run --detach --rm --name dr-evt-server \
+  --network dr-evt-net --userns=keep-id --publish 50051:50051 \
+  --volume "$PWD/results:/data" dr-evt-server:local
+
+podman run --interactive --tty --rm \
+  --network dr-evt-net --userns=keep-id \
+  --volume "$PWD/data:/data" dr-evt-client:local
+```
+
+Inside the client shell, invoke:
+
+```bash
+/opt/dr-evt/bin/dr_evt_client dr-evt-server:50051 /data/my-trace.csv
+```
+
+Use `:Z` on bind mounts on SELinux-enforcing hosts, such as
+`--volume "$PWD/results:/data:Z"`. Stop the server with
+`podman stop dr-evt-server`.
+
 
 ## Authors:
   Many thanks go to DR_EVT's [contributors](https://github.com/llnl/dr_evt/graphs/contributors).

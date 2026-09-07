@@ -61,7 +61,8 @@ docs/
 │   ├── command-line.md            # All CLI options
 │   ├── trace-formats.md           # Input trace file formats
 │   ├── protobuf-config.md         # Protobuf config file format
-│   └── grpc-setup.md              # gRPC build/setup
+│   ├── grpc-setup.md              # Client/server build/setup
+│   └── client-server-use-cases.md # Client/server deployment examples
 ├── reference/
 │   └── terminology.md
 ├── api/

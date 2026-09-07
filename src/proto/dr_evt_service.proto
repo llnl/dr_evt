@@ -17,9 +17,9 @@ package dr_evt_grpc;
 // monitoring queries) over the network. AppendJobRequest is the genuine
 // streaming case - a job the server has never seen before; SubmitJobRequest
 // still only enqueues a job already known to the server (via
-// InitializeTraceRequest's load or a prior AppendJobRequest). One call to
-// Session() corresponds to one server-side Simulation instance for the
-// lifetime of the stream.
+// InitializeTraceRequest's load or a prior AppendJobRequest). A Session()
+// can host successive server-side Simulation instances: each InitRequest
+// creates one, and FinishSimulationRequest releases it.
 service SimulationService {
     rpc Session(stream ClientMessage) returns (stream ServerMessage);
 }
@@ -46,6 +46,7 @@ message ClientMessage {
         GetTraceSizeRequest get_trace_size = 13;
         AppendJobRequest append_job = 14;
         AppendJobsRequest append_jobs = 15;
+        FinishSimulationRequest finish_simulation = 16;
     }
 }
 
@@ -67,6 +68,11 @@ message InitRequest {
     // Sim_Params' own default (circular).
     string queue_impl = 10;        // "circular", "deque", "multimap", or "block"
 
+    // Required client-provided label for this simulation. The server validates
+    // it as a filename component and adds its own unique suffix when creating
+    // per-session output files.
+    string session_name = 11;
+
     // Block size for block queue implementation (must be power of 2).
     // Ignored unless queue_impl is "block". 0 keeps Sim_Params' own
     // default (128).
@@ -82,6 +88,11 @@ message InitRequest {
     // Empty string keeps Sim_Params' own default (grow).
     string wait_queue_overflow = 14; // "abort" or "grow"
 }
+
+// Declares this simulation complete. The server processes all remaining
+// submitted work, writes its reports, returns final statistics, then releases
+// the simulation so this same Session stream may be initialized again.
+message FinishSimulationRequest {}
 
 message InitializeTraceRequest {
     uint64 max_jobs = 1;           // 0 = no limit
@@ -165,6 +176,7 @@ message ServerMessage {
         GetTraceSizeResponse get_trace_size = 14;
         AppendJobResponse append_job = 15;
         AppendJobsResponse append_jobs = 16;
+        FinishSimulationResponse finish_simulation = 17;
     }
 }
 
@@ -178,6 +190,10 @@ message ErrorResponse {
 
 message InitResponse {
     bool ok = 1;
+    string session_id = 2;
+    string simulated_trace_file = 3;
+    string resource_trace_file = 4;
+    string statistics_file = 5;
 }
 
 message InitializeTraceResponse {
@@ -238,4 +254,12 @@ message GetStatisticsResponse {
 
 message GetTraceSizeResponse {
     uint64 trace_size = 1;
+}
+
+message FinishSimulationResponse {
+    GetStatisticsResponse statistics = 1;
+    string session_id = 2;
+    string simulated_trace_file = 3;
+    string resource_trace_file = 4;
+    string statistics_file = 5;
 }

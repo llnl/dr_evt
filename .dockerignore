@@ -1,0 +1,11 @@
+.git
+.agents
+.codex
+.venv*
+build
+build-*
+docs/_build
+__pycache__
+*.py[cod]
+*.core
+core

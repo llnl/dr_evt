@@ -47,7 +47,7 @@ Protobuf is only needed at all if you enable it explicitly (see below) -
 the plain build shown above does not require or fetch it.
 
 - **Boost**: `find_package` first; `FetchContent` fallback if not found
-- **Protobuf**: only relevant with `-DDR_EVT_ENABLE_PROTOBUF=ON` (needed for `--config` files and the gRPC client/server); `find_package` first, `FetchContent` fallback if not found - see [Protobuf Configuration](../user-guide/protobuf-config.md) and [gRPC Client/Server Setup](../user-guide/grpc-setup.md)
+- **Protobuf**: only relevant with `-DDR_EVT_ENABLE_PROTOBUF=ON` (needed for `--config` files and the gRPC client/server); `find_package` first, `FetchContent` fallback if not found - see [Protobuf Configuration](../user-guide/protobuf-config.md) and [Client/Server Setup](../user-guide/grpc-setup.md)
 
 ## Usage
 

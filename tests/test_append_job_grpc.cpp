@@ -17,6 +17,7 @@
  */
 
 #include <grpcpp/grpcpp.h>
+#include <cstdio>
 #include <iostream>
 #include <cassert>
 #include <memory>
@@ -83,6 +84,7 @@ void connect_and_init(SimulationClient& client, const std::string& trace_file)
     init->set_priority_policy("fcfs");
     init->set_run_time_mode("limit");
     init->set_infile(trace_file);
+    init->set_session_name("append-job-test");
     client.call(init_req);
 
     ClientMessage trace_req;
@@ -154,6 +156,27 @@ bool test_single_append(const std::string& server_address, const std::string& tr
             client.finish();
             return false;
         }
+
+        // Finish drains the session, writes uniquely-named reports, and
+        // permits a fresh Init on this same stream without stopping the
+        // server process.
+        ClientMessage finish_req;
+        finish_req.mutable_finish_simulation();
+        auto finish = client.call(finish_req).finish_simulation();
+        if (finish.statistics().jobs_completed() != 2 ||
+            finish.session_id().empty() ||
+            finish.simulated_trace_file().empty() ||
+            finish.resource_trace_file().empty() ||
+            finish.statistics_file().empty()) {
+            std::cerr << "  FAIL: finish response did not contain final reports\n";
+            client.finish();
+            return false;
+        }
+
+        connect_and_init(client, trace_file);
+        std::remove(finish.simulated_trace_file().c_str());
+        std::remove(finish.resource_trace_file().c_str());
+        std::remove(finish.statistics_file().c_str());
     } catch (const std::exception& e) {
         std::cerr << "  FAIL: " << e.what() << "\n";
         client.finish();

@@ -30,6 +30,7 @@ user-guide/command-line
 user-guide/trace-formats
 user-guide/protobuf-config
 user-guide/grpc-setup
+user-guide/client-server-use-cases
 ```
 
 ```{toctree}

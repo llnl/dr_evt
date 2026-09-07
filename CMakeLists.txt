@@ -462,7 +462,7 @@ if (DR_EVT_HAS_GRPC)
   set_target_properties(test_append_job_grpc-bin PROPERTIES OUTPUT_NAME test_append_job_grpc)
   set_target_properties(test_append_job_grpc-bin PROPERTIES CMAKE_INSTALL_RPATH
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-  list(APPEND DR_EVT_EXEC_TARGETS test_append_job_grpc-bin)
+  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_append_job_grpc-bin)
 
   # MPI-aware multi-client/multi-server test harness (optional: only
   # built if MPI is actually available - unlike gRPC/Protobuf, this

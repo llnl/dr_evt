@@ -1,0 +1,3 @@
+system_id,address,trace,server_infile,total_nodes
+alpha,127.0.0.1:50061,python/examples/sync_alpha_trace.csv,python/examples/sync_alpha_trace.csv,100
+beta,127.0.0.1:50062,python/examples/sync_beta_trace.csv,python/examples/sync_beta_trace.csv,100

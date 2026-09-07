@@ -1,29 +1,39 @@
-# gRPC Client/Server Setup
+# Client/Server Setup
 
 DR_EVT can run as a network service, enabling remote simulation control
-from any language that supports gRPC. This page is a quick-start
-summary; see the [gRPC Client/Server Guide](../CLIENT_SERVER_GUIDE.md)
-for the full picture (service definition, dependency resolution, the
-MPI multi-client/multi-server harness, testing).
+from any language that supports gRPC. This page covers building and connecting
+a client and server. See [Client/Server Use Cases](client-server-use-cases.md)
+for bare-metal, container, multi-server, and synchronized-system patterns;
+MPI is documented there only as an optional test harness. See also
+the [Client/Server Reference](../CLIENT_SERVER_GUIDE.md) for the service
+definition, dependency resolution, and testing.
 
-## Architecture
+## Client/server session
 
 ```{mermaid}
-graph LR
-    Client[dr_evt_client<br/>or your own gRPC client] -->|gRPC Stream| Server[dr_evt_server<br/>C++]
-    Server -->|Simulation| Engine[Scheduler<br/>Engine]
-    Client -->|AppendJobRequest| Server
-    Client -->|SubmitJobRequest| Server
-    Client -->|AdvanceToRequest| Server
-    Server -->|Events, statistics| Client
+sequenceDiagram
+    participant C as Client
+    participant S as dr_evt_server
+    C->>S: Session stream
+    C->>S: InitRequest(session_name, simulation settings)
+    S-->>C: InitResponse(session_id, report paths)
+    Note over S: Creates one Simulation for this session
+    loop Arrivals and simulation control
+        C->>S: AppendJob(s) / SubmitJob / AdvanceTo / queries
+        S-->>C: Matching response and statistics
+    end
+    C->>S: FinishSimulationRequest
+    Note over S: Drains work, writes reports, releases Simulation
+    S-->>C: FinishSimulationResponse(final statistics, report paths)
+    C->>S: Close stream or InitRequest for next session
 ```
 
-**Use cases:**
-- Run the simulator on an HPC cluster, control it from a laptop
-- Multi-language integration (a client in any language gRPC supports, talking to the C++ server)
-- Modeling multiple independent job-arrival streams that need to stay wall-clock coordinated (see the MPI harness in the full guide)
+The client sends arrivals and simulation-control requests through the session
+stream. The server owns the simulation state for that session and returns the
+corresponding responses. See [Client/Server Use Cases](client-server-use-cases.md)
+for multi-server and digital-twin deployments.
 
-## Building with gRPC Support
+## Building client/server support
 
 The gRPC client/server is optional and requires two CMake flags:
 
@@ -43,7 +53,7 @@ HPC/cluster environments). See the full guide's
 [Dependency resolution](../CLIENT_SERVER_GUIDE.md#dependency-resolution)
 section for exactly what's tried and in what order.
 
-## Running the Server
+## Starting a server
 
 ```bash
 ${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server 0.0.0.0:50051
@@ -60,35 +70,78 @@ DR_EVT simulation server listening on 0.0.0.0:50051
 
 and otherwise runs silently, one `Simulation` instance per connected
 session, until stopped (e.g. `Ctrl-C`, or however your process
-supervisor manages it).
+supervisor manages it). A server starts with no job samples and does not
+need, load, or have prior knowledge of the workload it will receive.
 
 Bind `0.0.0.0` (shown above) so the server is reachable from other
 machines; bind `127.0.0.1` instead if you only need same-machine access.
 
-## Running the Client
+## Connecting the example client
 
 ```bash
 ${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client <server_host>:50051 /path/to/trace.csv
 ```
 
-Both arguments are required (server address, then a job data file).
-There are no other command-line options. `dr_evt_client` is a minimal
-example client demonstrating genuine streaming: it reads job data
-(`submit_time`, `num_nodes`, `queue`, `time_limit`) from the file
-client-side only - the server never loads this file itself - appends
-each job to the server via `AppendJobRequest`, submits each with
-`SubmitJobRequest`, advances the simulation, and prints final
-statistics. It's a reference for writing your own client against the
-same `.proto` service, not a general-purpose tool with its own
-configuration surface. See the full guide for what each RPC
+Both arguments are required by this *example* program (server address,
+then a job data file). The file is simply a convenient way to give the
+client a set of job samples to send. It is read by the client only; it
+is not a requirement of the client API and is not an input the server is
+expected to load or know about.
+
+The API's core is the bidirectional session stream. A client initializes
+simulation settings, sends each arrival with `AppendJobRequest`, submits
+the returned job index with `SubmitJobRequest`, advances simulated time with
+`AdvanceToRequest`, and obtains events or statistics from the responses.
+An application can generate those messages from a live digital twin, a
+database, another simulator, or any other source--no input trace is
+needed. `dr_evt_client` merely demonstrates that sequence and prints
+final statistics; it is a reference for writing your own client against
+the same `.proto` service. See the full guide for what each RPC
 corresponds to in the in-process [streaming API](../api/STREAMING_API.md).
 
-There is no Python client or Python gRPC bindings shipped with this
-project today - the [Python API](../api/PYTHON_API.md) is a separate,
-in-process (no network) binding, unrelated to the gRPC service. Writing
-a Python gRPC client is possible (gRPC supports Python), but would mean
-generating your own stubs from `src/proto/dr_evt_service.proto` with
-`grpc_tools.protoc` - not something this project provides out of the box.
+## Session identity and completion
+
+Every initialization supplies a filename-safe `session_name`. The server adds
+its own unique suffix and returns the resulting session ID and report paths in
+`InitResponse`. This keeps output from concurrent simulations separate even
+when clients choose the same readable name.
+
+When a client has sent its final arrival, it sends `FinishSimulationRequest`.
+The server drains all submitted work, writes the session's simulated trace,
+resource trace, and statistics report, then returns their paths and final
+statistics in `FinishSimulationResponse`. It releases that session's
+`Simulation` but does not stop `dr_evt_server`; the client may initialize a
+new independent simulation on the same stream, or close the stream and open a
+new one.
+
+### Reusing or closing a session stream
+
+Finish a simulation before reusing its stream. The request/response order is:
+
+```text
+InitRequest(session_name="run-a")
+... AppendJob(s), SubmitJob, AdvanceTo, and optional queries ...
+FinishSimulationRequest
+FinishSimulationResponse
+InitRequest(session_name="run-b")   # optional: begin a new simulation on this stream
+```
+
+Each `InitRequest` after a successful finish creates a new independent
+server-side `Simulation`. Give it a new readable `session_name`; the server
+still adds a unique suffix, so names need not be globally unique. Do not send
+another `InitRequest` before finishing the active simulation: the server
+returns an error response for that request.
+
+To close permanently after `FinishSimulationResponse`, use normal gRPC
+bidirectional-stream shutdown: call `WritesDone()` to half-close the client
+side, then call `Finish()` and check that its returned `grpc::Status` is OK.
+Do not issue another request after `WritesDone()`. Closing a stream without
+`FinishSimulationRequest` also ends its RPC, but it does not request report
+generation or return the final simulation results; use it only to abandon a
+session or after handling an earlier error.
+
+For deployment patterns beyond one client and one server, see
+[Client/Server Use Cases](client-server-use-cases.md).
 
 ## Network Configuration
 
@@ -146,7 +199,8 @@ client/server specifically, but addresses the same underlying concern.
 
 ## See Also
 
-- [gRPC Client/Server Guide](../CLIENT_SERVER_GUIDE.md) - the full guide: service definition, dependency resolution, the MPI multi-client/multi-server harness, testing
+- [Client/Server Use Cases](client-server-use-cases.md) - bare-metal, container, multi-server, and synchronized-system patterns
+- [Client/Server Reference](../CLIENT_SERVER_GUIDE.md) - service definition, dependency resolution, and testing
 - [Streaming API](../api/STREAMING_API.md) - the in-process API the gRPC service wraps
 - [Command-Line Options](command-line.md) - CLI configuration options for the plain `simulator` binary
 - [Python API](../api/PYTHON_API.md) - Python bindings (in-process, no network - not the same thing as a Python gRPC client)

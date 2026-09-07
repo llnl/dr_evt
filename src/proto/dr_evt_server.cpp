@@ -9,7 +9,13 @@
  ******************************************************************************/
 
 #include <grpcpp/grpcpp.h>
+#include <atomic>
+#include <cctype>
+#include <chrono>
+#include <fstream>
+#include <limits>
 #include <memory>
+#include <random>
 #include <string>
 #include <iostream>
 
@@ -24,6 +30,79 @@ using grpc::ServerReaderWriter;
 using grpc::Status;
 
 namespace dr_evt_grpc {
+
+namespace {
+
+std::atomic<uint64_t> next_session_sequence{0};
+
+bool is_safe_session_name(const std::string& name)
+{
+    if (name.empty() || name.size() > 128) {
+        return false;
+    }
+    for (unsigned char character : name) {
+        if (!std::isalnum(character) && character != '-' &&
+            character != '_' && character != '.') {
+            return false;
+        }
+    }
+    return name != "." && name != "..";
+}
+
+std::string make_session_id(const std::string& session_name)
+{
+    const auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    const uint64_t sequence = next_session_sequence.fetch_add(1);
+    const uint32_t nonce = std::random_device{}();
+    return session_name + "-" + std::to_string(timestamp) + "-" +
+           std::to_string(sequence) + "-" + std::to_string(nonce);
+}
+
+void copy_statistics(const dr_evt::Simulation::Statistics& statistics,
+                     GetStatisticsResponse* response)
+{
+    response->set_jobs_submitted(statistics.jobs_submitted);
+    response->set_jobs_completed(statistics.jobs_completed);
+    response->set_jobs_running(statistics.jobs_running);
+    response->set_jobs_waiting(statistics.jobs_waiting);
+    response->set_current_time(statistics.current_time);
+    response->set_total_nodes(statistics.total_nodes);
+    response->set_nodes_in_use(statistics.nodes_in_use);
+    response->set_nodes_available(statistics.nodes_available);
+    response->set_utilization(statistics.utilization);
+    response->set_avg_wait_time(statistics.avg_wait_time);
+    response->set_avg_turnaround_time(statistics.avg_turnaround_time);
+    response->set_makespan(statistics.makespan);
+}
+
+void write_statistics_file(const std::string& filename,
+                           const dr_evt::Simulation::Statistics& statistics)
+{
+    std::ofstream output(filename);
+    if (!output) {
+        throw std::runtime_error("Failed to write statistics file: " + filename);
+    }
+    output << "{\n"
+           << "  \"jobs_submitted\": " << statistics.jobs_submitted << ",\n"
+           << "  \"jobs_completed\": " << statistics.jobs_completed << ",\n"
+           << "  \"jobs_running\": " << statistics.jobs_running << ",\n"
+           << "  \"jobs_waiting\": " << statistics.jobs_waiting << ",\n"
+           << "  \"current_time\": " << statistics.current_time << ",\n"
+           << "  \"total_nodes\": " << statistics.total_nodes << ",\n"
+           << "  \"nodes_in_use\": " << statistics.nodes_in_use << ",\n"
+           << "  \"nodes_available\": " << statistics.nodes_available << ",\n"
+           << "  \"utilization\": " << statistics.utilization << ",\n"
+           << "  \"avg_wait_time\": " << statistics.avg_wait_time << ",\n"
+           << "  \"avg_turnaround_time\": " << statistics.avg_turnaround_time << ",\n"
+           << "  \"makespan\": " << statistics.makespan << "\n"
+           << "}\n";
+    if (!output) {
+        throw std::runtime_error("Failed to finish statistics file: " + filename);
+    }
+}
+
+} // namespace
 
 class SimulationServiceImpl final : public SimulationService::Service {
 public:
@@ -44,6 +123,10 @@ public:
         // already gone out of scope by then.
         dr_evt::Sim_Params sim_params;
         std::unique_ptr<dr_evt::Simulation> sim;
+        std::string session_id;
+        std::string simulated_trace_file;
+        std::string resource_trace_file;
+        std::string statistics_file;
         ClientMessage req;
 
         while (stream->Read(&req)) {
@@ -57,6 +140,15 @@ public:
                             throw std::runtime_error("Init already called on this session");
                         }
                         const InitRequest& r = req.init();
+                        if (!is_safe_session_name(r.session_name())) {
+                            throw std::runtime_error(
+                                "session_name must be 1-128 filename-safe characters "
+                                "(letters, digits, '.', '_' or '-')");
+                        }
+                        session_id = make_session_id(r.session_name());
+                        simulated_trace_file = session_id + ".simulated.csv";
+                        resource_trace_file = session_id + ".resource.csv";
+                        statistics_file = session_id + ".statistics.json";
                         dr_evt::Sim_Params& sp = sim_params;
                         sp.m_total_nodes = r.total_nodes();
                         if (!r.trace_format().empty()) sp.m_trace_format = r.trace_format();
@@ -113,8 +205,16 @@ public:
                             throw std::runtime_error("Unknown wait_queue_overflow: " + r.wait_queue_overflow());
                         }
 
+                        sp.set_outfile(simulated_trace_file);
+                        sp.set_resource_trace(resource_trace_file);
+
                         sim = std::make_unique<dr_evt::Simulation>(sp);
-                        resp.mutable_init()->set_ok(true);
+                        auto* init_response = resp.mutable_init();
+                        init_response->set_ok(true);
+                        init_response->set_session_id(session_id);
+                        init_response->set_simulated_trace_file(simulated_trace_file);
+                        init_response->set_resource_trace_file(resource_trace_file);
+                        init_response->set_statistics_file(statistics_file);
                         break;
                     }
                     case ClientMessage::kInitializeTrace: {
@@ -195,24 +295,37 @@ public:
                     case ClientMessage::kGetStatistics: {
                         require_init(sim);
                         auto stats = sim->get_statistics();
-                        auto* out = resp.mutable_get_statistics();
-                        out->set_jobs_submitted(stats.jobs_submitted);
-                        out->set_jobs_completed(stats.jobs_completed);
-                        out->set_jobs_running(stats.jobs_running);
-                        out->set_jobs_waiting(stats.jobs_waiting);
-                        out->set_current_time(stats.current_time);
-                        out->set_total_nodes(stats.total_nodes);
-                        out->set_nodes_in_use(stats.nodes_in_use);
-                        out->set_nodes_available(stats.nodes_available);
-                        out->set_utilization(stats.utilization);
-                        out->set_avg_wait_time(stats.avg_wait_time);
-                        out->set_avg_turnaround_time(stats.avg_turnaround_time);
-                        out->set_makespan(stats.makespan);
+                        copy_statistics(stats, resp.mutable_get_statistics());
                         break;
                     }
                     case ClientMessage::kGetTraceSize: {
                         require_init(sim);
                         resp.mutable_get_trace_size()->set_trace_size(sim->get_trace().data().size());
+                        break;
+                    }
+                    case ClientMessage::kFinishSimulation: {
+                        require_init(sim);
+                        sim->advance_to(std::numeric_limits<dr_evt::sim_time_t>::max());
+                        sim->write_simulated_trace();
+                        sim->write_resource_trace(resource_trace_file);
+                        const auto stats = sim->get_statistics();
+                        write_statistics_file(statistics_file, stats);
+
+                        auto* out = resp.mutable_finish_simulation();
+                        copy_statistics(stats, out->mutable_statistics());
+                        out->set_session_id(session_id);
+                        out->set_simulated_trace_file(simulated_trace_file);
+                        out->set_resource_trace_file(resource_trace_file);
+                        out->set_statistics_file(statistics_file);
+
+                        // The process and stream stay alive. A later Init on
+                        // this stream creates a fresh, isolated simulation.
+                        sim.reset();
+                        sim_params = dr_evt::Sim_Params();
+                        session_id.clear();
+                        simulated_trace_file.clear();
+                        resource_trace_file.clear();
+                        statistics_file.clear();
                         break;
                     }
                     case ClientMessage::REQUEST_NOT_SET:

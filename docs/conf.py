@@ -53,6 +53,7 @@ templates_path = ['_templates']
 # List of patterns to ignore
 exclude_patterns = [
     '_build',
+    '_static/README.md',
     'Thumbs.db',
     '.DS_Store',
     'dev/wip-notes/*',  # Exclude development session notes
