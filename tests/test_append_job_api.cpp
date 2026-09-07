@@ -213,7 +213,7 @@ void test_append_jobs_rejects_unsorted_batch() {
         {10.0, 10, "pbatch", 100},
         {5.0, 20, "pbatch", 200},  // out of order
     };
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.append_jobs(bad_reqs);
     } catch (const std::runtime_error&) {
@@ -243,7 +243,7 @@ void test_append_jobs_rejects_past_submit_time() {
         {150.0, 10, "pbatch", 50},
         {50.0, 10, "pbatch", 50},  // 50 < current_time (100)
     };
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.append_jobs(past_reqs);
     } catch (const std::runtime_error&) {
@@ -321,7 +321,7 @@ void test_append_jobs_abort_is_atomic() {
         {10.0, 10, "pbatch", 50},
         {20.0, 10, "pbatch", 50},
     };
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.append_jobs(batch);
     } catch (const std::runtime_error&) {
@@ -622,7 +622,7 @@ void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
         std::vector<Simulation::Job_Append_Request> batch;
         for (int i = 0; i < 5; ++i) batch.push_back({60.0 + i, 10, "pbatch", 50});
 
-        bool threw = false;
+        [[maybe_unused]] bool threw = false;
         try {
             sim.append_jobs(batch);
         } catch (const std::runtime_error& e) {

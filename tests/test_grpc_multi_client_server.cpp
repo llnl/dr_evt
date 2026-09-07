@@ -9,37 +9,37 @@
  ******************************************************************************/
 
 /*
-   MPI-aware test harness: launches N independent (dr_evt_server,
-   dr_evt_client) pairs, each pair placed on its own MPI rank so mpirun's
-   own host-placement (-host/--hostfile) can distribute them across real,
-   physically separate nodes. Verified single-node only in this
-   environment (no second node available here), but designed to work
-   unmodified across nodes: servers bind 0.0.0.0 (not localhost) and
-   communicate their actual hostname to their paired client over MPI,
-   rather than assuming shared network-namespace loopback access.
-  
-   Synchronization: with a single client per server, no coordination is
-   needed at all - each pair is a fully independent simulation. This
-   harness's actual point is the multi-client case: when multiple,
-   independent clients are active at once, each feeding its own server,
-   they must be kept in lockstep on a shared, real-world notion of time -
-   otherwise one client could submit its jobs arbitrarily far ahead of
-   where the other client's own stream says "now" is, breaking the
-   intended cross-stream arrival ordering the two streams are supposed to
-   represent together. This is a conservative (Chandy-Misra-Bryant-style)
-   synchronization: every round, every client reports the arrival time of
-   its own next not-yet-submitted job; the global minimum across all
-   clients is the only time it's safe for anyone to advance to, since no
-   client can have a still-unsubmitted job below that time.
-  
-   Usage:
-     mpirun -np <2*N> ./test_grpc_multi_client_server \
-         <server_binary_path> <base_port> <trace_file_1> [<trace_file_2> ...]
-  
-   Rank layout: ranks [0, N) are servers, ranks [N, 2N) are clients -
-   client rank N+i is paired with server rank i, both driven from
-   trace_file_i.
-*/
+ * MPI-aware test harness: launches N independent (dr_evt_server,
+ * dr_evt_client) pairs, each pair placed on its own MPI rank so mpirun's
+ * own host-placement (-host/--hostfile) can distribute them across real,
+ * physically separate nodes. Verified single-node only in this
+ * environment (no second node available here), but designed to work
+ * unmodified across nodes: servers bind 0.0.0.0 (not localhost) and
+ * communicate their actual hostname to their paired client over MPI,
+ * rather than assuming shared network-namespace loopback access.
+ *
+ * Synchronization: with a single client per server, no coordination is
+ * needed at all - each pair is a fully independent simulation. This
+ * harness's actual point is the multi-client case: when multiple,
+ * independent clients are active at once, each feeding its own server,
+ * they must be kept in lockstep on a shared, real-world notion of time -
+ * otherwise one client could submit its jobs arbitrarily far ahead of
+ * where the other client's own stream says "now" is, breaking the
+ * intended cross-stream arrival ordering the two streams are supposed to
+ * represent together. This is a conservative (Chandy-Misra-Bryant-style)
+ * synchronization: every round, every client reports the arrival time of
+ * its own next not-yet-submitted job; the global minimum across all
+ * clients is the only time it's safe for anyone to advance to, since no
+ * client can have a still-unsubmitted job below that time.
+ *
+ * Usage:
+ *   mpirun -np <2*N> ./test_grpc_multi_client_server \
+ *       <server_binary_path> <base_port> <trace_file_1> [<trace_file_2> ...]
+ *
+ * Rank layout: ranks [0, N) are servers, ranks [N, 2N) are clients -
+ * client rank N+i is paired with server rank i, both driven from
+ * trace_file_i.
+ */
 
 #include <mpi.h>
 #include <grpcpp/grpcpp.h>

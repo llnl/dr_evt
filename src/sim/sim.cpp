@@ -321,6 +321,36 @@ job_no_t Simulation::append_job(sim_time_t submit_time, num_nodes_t num_nodes,
                                static_cast<timeout_t>(limit_time));
 }
 
+std::vector<job_no_t> Simulation::append_jobs(const std::vector<Job_Append_Request>& requests)
+{
+    // Validate every request's submit_time before appending any of them
+    // - same precondition append_job() enforces per-job, checked here
+    // for the whole batch up front (see this function's own doc
+    // comment for what "all-or-nothing" does and doesn't cover).
+    for (size_t i = 0; i < requests.size(); ++i) {
+        if (requests[i].submit_time < m_current_time) {
+            throw std::runtime_error(
+                "Cannot append job with submit_time < current_time. "
+                "request " + std::to_string(i) + " has submit_time=" +
+                std::to_string(requests[i].submit_time) + " but current_time=" +
+                std::to_string(m_current_time));
+        }
+    }
+
+    std::vector<dr_evt::Job_Append_Request> trace_reqs;
+    trace_reqs.reserve(requests.size());
+    for (const auto& r : requests) {
+        time_t sec = static_cast<time_t>(r.submit_time);
+        float frac = r.submit_time - sec;
+        job_queue_t q;
+        set_by(q, r.queue);
+        trace_reqs.push_back(dr_evt::Job_Append_Request{
+            epoch_t{sec, frac}, r.num_nodes, q, static_cast<timeout_t>(r.limit_time)});
+    }
+
+    return m_trace.append_jobs(m_current_time, trace_reqs);
+}
+
 void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time)
 {
     // Validate preconditions

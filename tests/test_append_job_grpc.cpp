@@ -6,12 +6,14 @@
  ******************************************************************************/
 
 /**
- * Verifies AppendJobRequest works correctly over the actual gRPC wire -
- * not just that Simulation::append_job() works in-process (already
- * covered by test_append_job_api.cpp). Connects to an already-running
- * dr_evt_server (see run_grpc_tests.sh for how it's started), loads a
- * trace file with zero jobs, appends two brand-new jobs the server has
- * never seen, submits and runs them, and checks the resulting stats.
+ * Verifies AppendJobRequest and AppendJobsRequest work correctly over
+ * the actual gRPC wire - not just that Simulation::append_job()/
+ * append_jobs() work in-process (already covered by
+ * test_append_job_api.cpp). Connects to an already-running dr_evt_server
+ * (see run_grpc_tests.sh for how it's started), loads a trace file with
+ * zero jobs, appends brand-new jobs the server has never seen (singly,
+ * then as a batch), submits and runs them, and checks the resulting
+ * stats.
  */
 
 #include <grpcpp/grpcpp.h>
@@ -67,44 +69,42 @@ private:
     uint64_t m_next_request_id;
 };
 
-int main(int argc, char** argv)
+// Sends Init (with infile only used for its header - no
+// InitializeTraceRequest is ever sent, so the server never loads any
+// job data of its own) on an already-constructed client.
+void connect_and_init(SimulationClient& client, const std::string& trace_file)
 {
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <server_address> <empty_trace_file>\n"
-                  << "  <empty_trace_file> must have a valid header and zero data rows -\n"
-                  << "  this test's whole point is appending jobs the server never loaded.\n";
-        return 1;
-    }
-    std::string server_address = argv[1];
-    std::string trace_file = argv[2];
+    ClientMessage init_req;
+    auto* init = init_req.mutable_init();
+    init->set_total_nodes(100);
+    init->set_trace_format("simple");
+    init->set_timestamp_format("epoch");
+    init->set_backfill_policy("easy");
+    init->set_priority_policy("fcfs");
+    init->set_run_time_mode("limit");
+    init->set_infile(trace_file);
+    client.call(init_req);
 
+    ClientMessage trace_req;
+    trace_req.mutable_initialize_trace()->set_max_jobs(0);
+    auto trace_resp = client.call(trace_req);
+    uint64_t num_jobs = trace_resp.initialize_trace().num_jobs_loaded();
+    if (num_jobs != 0) {
+        throw std::runtime_error("expected 0 jobs loaded from " + trace_file +
+            ", got " + std::to_string(num_jobs) + " - use an empty (header-only) trace file");
+    }
+}
+
+// Test 1: single-job AppendJobRequest, over the wire.
+bool test_single_append(const std::string& server_address, const std::string& trace_file)
+{
+    std::cout << "=== Test: single AppendJobRequest ===\n";
     SimulationClient client(
         grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
 
     try {
-        ClientMessage init_req;
-        auto* init = init_req.mutable_init();
-        init->set_total_nodes(100);
-        init->set_trace_format("simple");
-        init->set_timestamp_format("epoch");
-        init->set_backfill_policy("easy");
-        init->set_priority_policy("fcfs");
-        init->set_run_time_mode("limit");
-        init->set_infile(trace_file);
-        client.call(init_req);
+        connect_and_init(client, trace_file);
 
-        ClientMessage trace_req;
-        trace_req.mutable_initialize_trace()->set_max_jobs(0);
-        auto trace_resp = client.call(trace_req);
-        uint64_t num_jobs = trace_resp.initialize_trace().num_jobs_loaded();
-        if (num_jobs != 0) {
-            std::cerr << "FAIL: expected 0 jobs loaded from " << trace_file
-                      << ", got " << num_jobs << " - use an empty (header-only) trace file\n";
-            return 1;
-        }
-
-        // Genuine streaming append over the wire: jobs the server has
-        // never seen before, no prior knowledge from a loaded trace.
         ClientMessage append_req1;
         auto* a1 = append_req1.mutable_append_job();
         a1->set_submit_time(0.0);
@@ -144,26 +144,126 @@ int main(int argc, char** argv)
         auto stats_resp = client.call(stats_req);
         const auto& stats = stats_resp.get_statistics();
 
-        std::cout << "submitted=" << stats.jobs_submitted()
+        std::cout << "  submitted=" << stats.jobs_submitted()
                   << " completed=" << stats.jobs_completed()
                   << " makespan=" << stats.makespan() << "\n";
 
         if (stats.jobs_submitted() != 2 || stats.jobs_completed() != 2 ||
             stats.makespan() != 205.0) {
-            std::cerr << "FAIL: expected submitted=2 completed=2 makespan=205\n";
+            std::cerr << "  FAIL: expected submitted=2 completed=2 makespan=205\n";
             client.finish();
-            return 1;
+            return false;
         }
-
     } catch (const std::exception& e) {
-        std::cerr << "Client error: " << e.what() << std::endl;
+        std::cerr << "  FAIL: " << e.what() << "\n";
         client.finish();
-        return 1;
+        return false;
     }
 
     grpc::Status status = client.finish();
     if (!status.ok()) {
-        std::cerr << "RPC failed: " << status.error_message() << std::endl;
+        std::cerr << "  FAIL: RPC failed: " << status.error_message() << "\n";
+        return false;
+    }
+    std::cout << "  PASSED\n";
+    return true;
+}
+
+// Test 2: batch AppendJobsRequest (3 jobs in one round-trip), over the
+// wire - the server has never seen any of them, same as the single-job
+// case, just carried in one message instead of three.
+bool test_batch_append(const std::string& server_address, const std::string& trace_file)
+{
+    std::cout << "=== Test: batch AppendJobsRequest ===\n";
+    SimulationClient client(
+        grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+
+    try {
+        connect_and_init(client, trace_file);
+
+        ClientMessage batch_req;
+        auto* aj = batch_req.mutable_append_jobs();
+        struct { double submit_time; uint32_t num_nodes; double limit_time; } jobs[] = {
+            {0.0, 10, 100.0},
+            {5.0, 20, 200.0},
+            {10.0, 15, 150.0},
+        };
+        for (const auto& j : jobs) {
+            auto* r = aj->add_requests();
+            r->set_submit_time(j.submit_time);
+            r->set_num_nodes(j.num_nodes);
+            r->set_queue("pbatch");
+            r->set_limit_time(j.limit_time);
+        }
+
+        auto resp = client.call(batch_req);
+        const auto& job_idxs = resp.append_jobs().job_idx();
+        std::cout << "  appended " << job_idxs.size() << " jobs\n";
+        if (job_idxs.size() != 3 || job_idxs[0] != 0 || job_idxs[1] != 1 || job_idxs[2] != 2) {
+            std::cerr << "  FAIL: expected job_idxs [0, 1, 2]\n";
+            client.finish();
+            return false;
+        }
+
+        for (int i = 0; i < 3; ++i) {
+            ClientMessage submit_req;
+            auto* s = submit_req.mutable_submit_job();
+            s->set_job_idx(job_idxs[i]);
+            s->set_submit_time(jobs[i].submit_time);
+            client.call(submit_req);
+        }
+
+        ClientMessage advance_req;
+        advance_req.mutable_advance_to()->set_target_time(1e9);
+        client.call(advance_req);
+
+        ClientMessage stats_req;
+        stats_req.mutable_get_statistics();
+        auto stats_resp = client.call(stats_req);
+        const auto& stats = stats_resp.get_statistics();
+
+        std::cout << "  submitted=" << stats.jobs_submitted()
+                  << " completed=" << stats.jobs_completed()
+                  << " makespan=" << stats.makespan() << "\n";
+
+        if (stats.jobs_submitted() != 3 || stats.jobs_completed() != 3 ||
+            stats.makespan() != 205.0) {
+            std::cerr << "  FAIL: expected submitted=3 completed=3 makespan=205\n";
+            client.finish();
+            return false;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "  FAIL: " << e.what() << "\n";
+        client.finish();
+        return false;
+    }
+
+    grpc::Status status = client.finish();
+    if (!status.ok()) {
+        std::cerr << "  FAIL: RPC failed: " << status.error_message() << "\n";
+        return false;
+    }
+    std::cout << "  PASSED\n";
+    return true;
+}
+
+int main(int argc, char** argv)
+{
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0] << " <server_address> <empty_trace_file>\n"
+                  << "  <empty_trace_file> must have a valid header and zero data rows -\n"
+                  << "  this test's whole point is appending jobs the server never loaded.\n";
+        return 1;
+    }
+    std::string server_address = argv[1];
+    std::string trace_file = argv[2];
+
+    bool ok = true;
+    ok &= test_single_append(server_address, trace_file);
+    ok &= test_batch_append(server_address, trace_file);
+
+    if (!ok) {
+        std::cerr << "SOME TESTS FAILED\n";
         return 1;
     }
     std::cout << "PASSED\n";
