@@ -200,7 +200,7 @@ jobs:
         id: feature
         run: |
           echo "========================================"
-          echo "Running Feature Tests (5 tests)"
+          echo "Running Feature Tests (6 tests)"
           echo "========================================"
           ./tests/run_feature_tests.sh
 
@@ -307,7 +307,7 @@ jobs:
           echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"
           echo "  Run Time Mode (7 tests): ${{ steps.run-time-mode.outcome }}"
           echo "  Unit (7 tests): ${{ steps.unit.outcome }}"
-          echo "  Feature (5 tests): ${{ steps.feature.outcome }}"
+          echo "  Feature (6 tests): ${{ steps.feature.outcome }}"
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
           echo "  Replay (4 tests): ${{ steps.replay.outcome }}"
           echo "  Resource History (5 tests): ${{ steps.resource-history.outcome }}"

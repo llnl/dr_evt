@@ -77,7 +77,7 @@ trace with the wrong queue name loads zero jobs and produces an empty
 `expected_output.csv`, with no error printed. This is exactly how
 `simple_2jobs.csv` and `timestamp_epoch_simple.csv` broke previously.
 
-### Feature Tests (3 tests)
+### Feature Tests (6 tests)
 **Location:** `feature/`
 **Purpose:** Policy and mode comparisons
 

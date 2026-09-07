@@ -61,8 +61,6 @@ for test_file in "$TRACE_DIR"/*.csv; do
     SIM_OUT="/tmp/feature_${test_name}.csv"
     SIM_RESOURCES="/tmp/feature_${test_name}_resources.csv"
 
-    # file does either, so it stays at "limit" - meaning the
-    # --run_time_mode limit below is not a no-op, it's actually used.
     ./build/simulator "$test_file" \
         --total_nodes 100 \
         --trace_format simple \

@@ -55,7 +55,7 @@ Total tests referenced by the full suite:
 |----------|-------|------------------------------|
 | Comprehensive | 34 | Yes - 34/34 pass |
 | Unit | 7 | Yes - 5/7 pass, 2 known-broken |
-| Feature | 3 | Yes - 3/3 pass |
+| Feature | 6 | Yes - 6/6 pass |
 | Replay | 3 | Yes - 3/3 pass |
 | Config | 4 | No - requires protobuf build |
 | Python API | 9 | No - requires Python bindings build |
