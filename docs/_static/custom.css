@@ -1,0 +1,23 @@
+/* Keep the composite-stream timeline compact and centered in its guide. */
+.wy-nav-content #composite-stream-timeline {
+    display: block !important;
+    width: 80% !important;
+    max-width: 80% !important;
+    margin: 1rem auto !important;
+}
+
+.wy-nav-content #composite-stream-timeline > svg {
+    height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Mermaid sequence notes are the yellow boxes in this timeline. */
+#composite-stream-timeline > svg .note {
+    fill: #e2f3e7 !important;
+    stroke: #8ab99a !important;
+}
+
+#composite-stream-timeline > svg .noteText {
+    fill: #234d31 !important;
+}

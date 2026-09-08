@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Launch one DR_EVT gRPC client and one server on every other MPI rank.
 
-Run this program under ``mpirun``.  Rank 0 runs a Python client script;
-every non-root rank starts one ``dr_evt_server`` on its local host.  Each
+Run this program directly. It starts itself under ``mpirun`` when available,
+or under Slurm's ``srun`` otherwise. Rank 0 runs a Python client script;
+every non-root rank starts one ``dr_evt_server`` on its local host. Each
 server's hostname and port are collected over MPI and supplied to the client
-as repeated ``--server`` arguments.
+as repeated ``--server`` arguments. It can also be invoked by an existing MPI
+launcher without starting a nested MPI job.
 
 For example (four MPI ranks means three servers)::
 
-    mpirun -np 4 python3 python/grpc_mpi_launcher.py \
+    python3 python/grpc_mpi_launcher.py --mpi-ranks 4 \
         --server-binary ./build/dr_evt_server --base-port 50051 -- \
         --jobs /shared/jobs.csv --total-nodes 1000
 
@@ -18,7 +20,9 @@ launcher supplies the endpoints discovered from the server ranks.
 """
 
 import argparse
+import os
 import pathlib
+import shutil
 import socket
 import subprocess
 import sys
@@ -31,6 +35,9 @@ def parse_args():
                         help="path to the dr_evt_server executable")
     parser.add_argument("--base-port", type=int, default=50051,
                         help="server rank r listens on this port + r - 1")
+    parser.add_argument("--mpi-ranks", type=int, default=2,
+                        help="MPI ranks to launch when not already under MPI "
+                             "(default: 2, one client and one server)")
     parser.add_argument("--client-script", type=pathlib.Path,
                         help="Python controller script for rank 0 "
                              "(default: grpc_multi_server.py beside this file)")
@@ -43,7 +50,45 @@ def parse_args():
         parser.error("provide arguments for the client script after --")
     if not 1 <= args.base_port <= 65535:
         parser.error("--base-port must be in 1..65535")
+    if args.mpi_ranks < 2:
+        parser.error("--mpi-ranks must be at least 2")
     return args
+
+
+def is_mpi_rank():
+    """Return whether this process was started by a supported MPI launcher."""
+    return any(name in os.environ for name in (
+        "OMPI_COMM_WORLD_RANK",  # Open MPI
+        "PMI_RANK",              # MPICH, Intel MPI, and Slurm PMI
+        "PMIX_RANK",             # PMIx-based launchers
+        "SLURM_PROCID",          # Slurm srun
+    ))
+
+
+def launch_mpi_job(mpi_ranks):
+    """Replace this process with the available MPI launcher."""
+    mpirun = shutil.which("mpirun")
+    if mpirun:
+        version = subprocess.run(
+            [mpirun, "--version"], capture_output=True, text=True, check=False)
+        if "open mpi" in (version.stdout + version.stderr).lower():
+            command = [mpirun, "--oversubscribe", "-np", str(mpi_ranks)]
+        else:
+            command = [mpirun, "-np", str(mpi_ranks)]
+        launcher_name = "mpirun"
+    else:
+        srun = shutil.which("srun")
+        if not srun:
+            raise RuntimeError("requires mpirun or srun on PATH")
+        command = [srun, "--nodes=1", f"--ntasks={mpi_ranks}",
+                   "--kill-on-bad-exit=1"]
+        launcher_name = "srun"
+
+    command.extend((sys.executable, str(pathlib.Path(__file__).resolve()),
+                    *sys.argv[1:]))
+    print(f"Launching {mpi_ranks} MPI ranks with {launcher_name}",
+          file=sys.stderr)
+    os.execvp(command[0], command)
 
 
 def stop_server(process):
@@ -78,6 +123,9 @@ def wait_for_servers(addresses, timeout=15):
 
 def main():
     args = parse_args()
+    if not is_mpi_rank():
+        launch_mpi_job(args.mpi_ranks)
+
     try:
         from mpi4py import MPI
     except ImportError as error:
