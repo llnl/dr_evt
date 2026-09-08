@@ -15,8 +15,10 @@ build:
     python: "3.11"
   jobs:
     post_install:
-      # Build the generated C++ reference before Read the Docs invokes Sphinx.
-      - doxygen docs/Doxyfile
+      # Build the optional C++ reference before Read the Docs invokes Sphinx.
+      # Sphinx still publishes the hand-written documentation when Doxygen is
+      # not installed in the build image.
+      - if command -v doxygen >/dev/null 2>&1; then doxygen docs/Doxyfile; else echo "Doxygen is unavailable; skipping the C++ API reference."; fi
 
 # Python requirements
 python:
