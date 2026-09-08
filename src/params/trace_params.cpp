@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file trace_params.cpp
+ * @brief Trace-tool command-line configuration implementation.
+ */
+
 #include <getopt.h>
 #include <limits>
 #include <string>

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file dr_event.cpp
+ * @brief Discrete resource-event value operations and formatting.
+ */
+
 #include "trace/dr_event.hpp"
 
 namespace dr_evt {

@@ -5,6 +5,12 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file trace.cpp
+ * @brief Trace lifecycle, event processing, reclamation, and output implementation.
+ * @details Public Trace contracts are documented in trace.hpp; this file owns
+ * capacity resolution, event-driven resource state, and incremental flushing.
+ */
+
 #include <algorithm>
 #include <fstream>
 #include "trace/job_io.hpp"

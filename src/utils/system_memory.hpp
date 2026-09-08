@@ -13,25 +13,23 @@ namespace dr_evt {
 /** \addtogroup dr_evt_utils
  *  @{ */
 
-/// Returns the amount of memory (in bytes) currently available to new
-/// allocations without swapping, or 0 if it can't be determined on this
-/// platform. Backed by /proc/meminfo's `MemAvailable` on Linux (the
-/// kernel's own estimate, accounting for reclaimable caches/buffers -
-/// not just free pages, which understates what's actually available);
-/// no equivalent is implemented for other platforms yet, so this always
-/// returns 0 there today.
-///
-/// Callers that use this for a memory-pressure check should treat 0 as
-/// "unknown - nothing to enforce against", not as "no memory available":
-/// this happens on any non-Linux platform, or on Linux if /proc/meminfo
-/// is unreadable or lacks a MemAvailable line (kernels older than 3.14).
-///
-/// Test seam: if the environment variable
-/// DR_EVT_TEST_AVAILABLE_MEMORY_BYTES is set to a valid non-negative
-/// integer, its value is returned directly instead of querying the
-/// system - lets tests exercise memory-pressure behavior deterministically
-/// without needing an actual low-memory machine. Not intended for
-/// production use.
+/**
+ * @brief Return memory currently available for new allocations without swap.
+ * @details On Linux, reads `/proc/meminfo`'s `MemAvailable` value, which
+ * includes reclaimable cache and buffer pages rather than only free pages.
+ * Other platforms are not implemented yet. Callers performing a
+ * memory-pressure check must treat zero as "unknown; do not enforce", not as
+ * "no memory available". Zero is returned on non-Linux hosts and when the
+ * Linux value cannot be read or is unavailable (for example, pre-3.14
+ * kernels).
+ *
+ * For deterministic tests, the `DR_EVT_TEST_AVAILABLE_MEMORY_BYTES`
+ * environment variable may provide a non-negative integer byte count. A
+ * malformed value is ignored and the platform query proceeds normally. This
+ * environment variable is a test seam, not a production configuration API.
+ * @return Available-memory estimate in bytes as std::size_t, or zero when
+ *         the estimate is unknown.
+ */
 std::size_t get_available_memory_bytes();
 
 /**@}*/

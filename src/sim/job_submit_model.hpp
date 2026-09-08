@@ -17,17 +17,29 @@ namespace dr_evt {
 /** \addtogroup dr_evt_sim
  *  @{ */
 
+/**
+ * @brief Builds per-hour submission-rate bins from historical samples.
+ * @details Each hour-of-week sample list is sorted and converted to bin
+ * boundaries suitable for sampling or reporting arrival distributions.
+ */
 class Job_Submit_Model {
   protected:
-    /// Submission data samples
+    /// Per-hour historical samples, transformed into bin boundaries.
     submit_week_t m_samples;
 
-    /// Order the number of submissions in each hour-slot in ascending order
+    /** @brief Sort each hour slot and derive its sampling-bin boundaries. */
     void make_bins ();
 
   public:
+    /** @brief Construct a model by taking ownership of submission samples.
+     * @param[in] samples Per-hour samples to transform into bins. */
     Job_Submit_Model (submit_week_t&& samples);
+    /** @brief Construct a model by copying submission samples.
+     * @param[in] samples Per-hour samples to copy and transform into bins. */
     Job_Submit_Model (const submit_week_t& samples);
+    /** @brief Write bin boundaries for all hour slots.
+     * @param[in,out] os Destination stream.
+     * @return The same destination stream after writing. */
     std::ostream& show_bins (std::ostream& os) const;
 };
 

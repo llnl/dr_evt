@@ -30,6 +30,7 @@ enum class BackfillPolicy {
      */
     CONSERVATIVE,
 
+    /** Strict FCFS scheduling; no backfill job may bypass the queue head. */
     NONE
 };
 

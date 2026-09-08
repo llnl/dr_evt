@@ -29,6 +29,10 @@ struct Window {
     sim_time_t end;            ///< End time of the window
     num_nodes_t available_nodes; ///< Number of nodes available during this window
 
+    /** @brief Construct a resource-availability interval.
+     * @param[in] s Interval start time.
+     * @param[in] e Interval end time.
+     * @param[in] n Nodes available throughout the interval. */
     Window(sim_time_t s, sim_time_t e, num_nodes_t n)
       : start(s), end(e), available_nodes(n) {}
 };
@@ -44,8 +48,10 @@ struct Window {
  */
 class ScheduleWindows {
   protected:
-    num_nodes_t m_total_nodes;  ///< Total nodes in the system
-    std::vector<Window> m_windows;    ///< List of scheduling windows
+    /// Total nodes in the simulated system.
+    num_nodes_t m_total_nodes;
+    /// Current resource-availability intervals.
+    std::vector<Window> m_windows;
 
     /// Map of reserved jobs: job_idx -> start_time
     std::map<job_no_t, sim_time_t> m_reserved_jobs;
@@ -56,18 +62,18 @@ class ScheduleWindows {
   public:
     /**
      * @brief Constructor
-     * @param total_nodes Total number of nodes in the system
-     * @param job_data Reference to job trace data
+     * @param[in] total_nodes Total number of nodes in the system.
+     * @param[in] job_data Trace data used to obtain reservation requirements.
      */
     ScheduleWindows(num_nodes_t total_nodes,
                     const Trace::trace_data_t& job_data);
 
     /**
      * @brief Find all scheduling windows where a job can fit
-     * @param start_time Earliest time the job can start
-     * @param length Job's requested walltime
-     * @param nodes Number of nodes required
-     * @return Vector of windows where the job fits
+     * @param[in] start_time Earliest time the job can start.
+     * @param[in] length Job's requested walltime.
+     * @param[in] nodes Number of nodes required.
+     * @return Windows that satisfy the time and node requirements.
      */
     std::vector<Window> get_windows(sim_time_t start_time,
                                      tdiff_t length,
@@ -76,18 +82,18 @@ class ScheduleWindows {
     /**
      * Find the earliest time a job can fit at the end of the schedule
      * (after all currently reserved jobs)
-     * @param start_time Earliest time the job can start
-     * @param nodes Number of nodes required
-     * @return Earliest start time at the end of schedule
+     * @param[in] start_time Earliest time the job can start.
+     * @param[in] nodes Number of nodes required.
+     * @return Earliest feasible end-of-schedule start time as sim_time_t.
      */
     sim_time_t fit_at_the_end(sim_time_t start_time, num_nodes_t nodes) const;
 
     /**
      * Add a job reservation to the schedule
      * Updates gaps to reflect the resource usage
-     * @param job_idx Index of the job in trace data
-     * @param start_time When the job is scheduled to start
-     * @param request_walltime Requested/estimated walltime for the job
+     * @param[in] job_idx Trace job identifier.
+     * @param[in] start_time Scheduled start time.
+     * @param[in] request_walltime Requested or estimated job walltime.
      */
     void add_reservation(job_no_t job_idx, sim_time_t start_time,
                          tdiff_t request_walltime);
@@ -95,7 +101,7 @@ class ScheduleWindows {
     /**
      * Remove a job reservation from the schedule
      * Updates gaps to reflect freed resources
-     * @param job_idx Index of the job to remove
+     * @param[in] job_idx Trace job identifier to remove.
      */
     void remove_reservation(job_no_t job_idx);
 
@@ -106,32 +112,32 @@ class ScheduleWindows {
 
     /**
      * @brief Remove windows that end before the given time
-     * @param current_time Time threshold for trimming
+     * @param[in] current_time Time threshold for trimming.
      */
     void trim(sim_time_t current_time);
 
     /**
      * Check if a job is in the reservation table
-     * @param job_idx Job index to check
-     * @return True if job has a reservation
+     * @param[in] job_idx Trace job identifier to check.
+     * @return true if the job has a reservation.
      */
     bool has_reservation(job_no_t job_idx) const;
 
     /**
      * Get the reservation time for a job
-     * @param job_idx Job index
-     * @return Reservation start time (or -1 if not reserved)
+     * @param[in] job_idx Trace job identifier.
+     * @return Reservation start time as sim_time_t, or -1 when absent.
      */
     sim_time_t get_reservation_time(job_no_t job_idx) const;
 
   protected:
     /**
      * @brief Update windows when adding or removing a job
-     * @param job_idx Job being added/removed
-     * @param start_time Start time of the job
-     * @param end_time End time of the job
-     * @param nodes Number of nodes
-     * @param op Operation: -1 for add, +1 for remove
+     * @param[in] job_idx Job being added or removed.
+     * @param[in] start_time Start time of the job.
+     * @param[in] end_time End time of the job.
+     * @param[in] nodes Number of nodes.
+     * @param[in] op Operation: -1 for add, +1 for remove.
      */
     void update_windows(job_no_t job_idx, sim_time_t start_time,
                         sim_time_t end_time, num_nodes_t nodes, int op);
@@ -146,8 +152,8 @@ class ScheduleWindows {
 
     /**
      * @brief Get windows at the end of the current schedule
-     * @param start_time Minimum start time
-     * @return Windows at the end of the schedule
+     * @param[in] start_time Minimum start time.
+     * @return Windows at the end of the schedule.
      */
     std::vector<Window> get_ending_windows(sim_time_t start_time) const;
 };

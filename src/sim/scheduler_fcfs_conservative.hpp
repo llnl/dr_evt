@@ -32,10 +32,15 @@ namespace dr_evt {
 class FCFSConservativeScheduler : public SchedulerBase {
 private:
     struct JobEntry {
+        /// Stable identifier of the Trace job represented by this entry.
         job_no_t job_id;
+        /// Arrival time used to determine eligibility and FCFS order.
         sim_time_t submit_time;
+        /// Requested time limit used to preserve reservations.
         tdiff_t run_time_estimate;
+        /// Nodes requested when this job is started.
         num_nodes_t nodes_requested;
+        /// True once selected for execution but retained for lazy deletion.
         bool removed;
 
         JobEntry(job_no_t id, sim_time_t submit, tdiff_t run_time, num_nodes_t nodes)
@@ -43,12 +48,17 @@ private:
               nodes_requested(nodes), removed(false) {}
     };
 
+    /// Submit-time-ordered jobs, including lazily removed entries.
     std::deque<JobEntry> m_wait_queue;
-    size_t m_eligible_end_idx;  // Index of first job NOT eligible yet
+    /// First queue index with submit_time later than m_current_tracked_time.
+    size_t m_eligible_end_idx;
+    /// Latest time to which arrival eligibility has been synchronized.
     sim_time_t m_current_tracked_time;
-    size_t m_removed_count;  // Track garbage for collection
+    /// Removed entries inside the eligible prefix of m_wait_queue.
+    size_t m_removed_count;
 
 public:
+    /** @copydoc SchedulerBase::SchedulerBase */
     FCFSConservativeScheduler(num_nodes_t total_nodes,
                               const Trace& job_data,
                               BackfillPolicy bf_policy)
@@ -58,6 +68,7 @@ public:
         , m_removed_count(0)
     {}
 
+    /** @copydoc SchedulerBase::insert_job */
     void insert_job(job_no_t job_id, sim_time_t submit_time,
                    tdiff_t run_time_estimate, num_nodes_t nodes_requested) override {
         m_wait_queue.emplace_back(job_id, submit_time, run_time_estimate, nodes_requested);
@@ -67,17 +78,21 @@ public:
         }
     }
 
+    /** @copydoc SchedulerBase::schedule */
     std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,
         const std::map<job_no_t, sim_time_t>& running_jobs,
         sim_time_t current_time) override;
 
+    /** @copydoc SchedulerBase::sync_to */
     void sync_to(sim_time_t current_time) override;
 
+    /** @copydoc SchedulerBase::active_job_count */
     size_t active_job_count() override {
         return m_eligible_end_idx - m_removed_count;
     }
 
+    /** @copydoc SchedulerBase::get_next_arrival_time */
     sim_time_t get_next_arrival_time() override {
         for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
             if (!m_wait_queue[i].removed) {
@@ -87,21 +102,28 @@ public:
         return std::numeric_limits<sim_time_t>::max();
     }
 
+    /** @copydoc SchedulerBase::has_eligible_jobs */
     bool has_eligible_jobs() override {
         return active_job_count() > 0;
     }
 
 protected:
+    /** @copydoc SchedulerBase::wait_queue_size */
     size_t wait_queue_size() const override {
         return m_wait_queue.size();
     }
 
 private:
+    /** @brief Lazily mark a scheduled queue entry as removed. */
     void mark_removed(job_no_t job_id);
 
     /**
-     * Calculate conservative backfill window for a specific job.
-     * Returns the earliest reservation time among all waiting jobs ahead of it.
+     * @brief Calculate the reservation that a candidate must preserve.
+     * @param[in] job_index Candidate position in FCFS queue order.
+     * @param[in] available_nodes Nodes free at current_time.
+     * @param[in] running_jobs Active jobs and their start times.
+     * @param[in] current_time Projection time.
+     * @return Earliest preserved reservation as sim_time_t.
      */
     sim_time_t calculate_conservative_window(
         size_t job_index,

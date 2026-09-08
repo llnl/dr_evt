@@ -41,10 +41,15 @@ namespace dr_evt {
 class CircularBufferFCFSScheduler : public SchedulerBase {
 private:
     struct JobEntry {
+        /// Stable identifier of the Trace job represented by this entry.
         job_no_t job_id;
+        /// Arrival time used to determine eligibility and FCFS order.
         sim_time_t submit_time;
+        /// Requested time limit used for reservation and backfill projection.
         tdiff_t run_time_estimate;
+        /// Nodes requested when this job is started.
         num_nodes_t nodes_requested;
+        /// True once selected for execution but retained for lazy deletion.
         bool removed;
 
         JobEntry(job_no_t id, sim_time_t submit, tdiff_t run_time, num_nodes_t nodes)
@@ -52,13 +57,24 @@ private:
               nodes_requested(nodes), removed(false) {}
     };
 
+    /// Fixed-capacity FCFS queue, optionally enlarged on overflow.
     boost::circular_buffer<JobEntry> m_wait_queue;
+    /// Action to take when m_wait_queue reaches capacity.
     CircularOverflowPolicy m_overflow_policy;
-    size_t m_eligible_end_idx;  // Index of first job NOT eligible yet
+    /// First queue index with submit_time later than m_current_tracked_time.
+    size_t m_eligible_end_idx;
+    /// Latest time to which arrival eligibility has been synchronized.
     sim_time_t m_current_tracked_time;
-    size_t m_removed_count;  // Track garbage for collection
+    /// Removed entries inside the eligible prefix of m_wait_queue.
+    size_t m_removed_count;
 
 public:
+    /**
+     * @brief Construct an FCFS scheduler backed by a circular buffer.
+     * @param[in] initial_capacity Initial wait-queue capacity; zero derives one from the trace.
+     * @param[in] overflow_policy Action to take when that capacity is exhausted.
+     * @copydetails SchedulerBase::SchedulerBase
+     */
     CircularBufferFCFSScheduler(num_nodes_t total_nodes,
                                 const Trace& job_data,
                                 BackfillPolicy bf_policy,
@@ -72,6 +88,7 @@ public:
         , m_removed_count(0)
     {}
 
+    /** @copydoc SchedulerBase::insert_job */
     void insert_job(job_no_t job_id, sim_time_t submit_time,
                    tdiff_t run_time_estimate, num_nodes_t nodes_requested) override {
         if (m_wait_queue.full()) {
@@ -99,17 +116,21 @@ public:
         }
     }
 
+    /** @copydoc SchedulerBase::schedule */
     std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,
         const std::map<job_no_t, sim_time_t>& running_jobs,
         sim_time_t current_time) override;
 
+    /** @copydoc SchedulerBase::sync_to */
     void sync_to(sim_time_t current_time) override;
 
+    /** @copydoc SchedulerBase::active_job_count */
     size_t active_job_count() override {
         return m_eligible_end_idx - m_removed_count;
     }
 
+    /** @copydoc SchedulerBase::get_next_arrival_time */
     sim_time_t get_next_arrival_time() override {
         for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
             if (!m_wait_queue[i].removed) {
@@ -119,16 +140,19 @@ public:
         return std::numeric_limits<sim_time_t>::max();
     }
 
+    /** @copydoc SchedulerBase::has_eligible_jobs */
     bool has_eligible_jobs() override {
         return active_job_count() > 0;
     }
 
 protected:
+    /** @copydoc SchedulerBase::wait_queue_size */
     size_t wait_queue_size() const override {
         return m_wait_queue.size();
     }
 
 private:
+    /** @brief Lazily mark a selected queue entry as removed. */
     void mark_removed(job_no_t job_id);
 };
 

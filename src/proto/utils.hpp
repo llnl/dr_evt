@@ -62,6 +62,14 @@ private:
 #endif // DR_EVT_HAS_ABSL_LOG_SINK
 
 template<typename T>
+/**
+ * @brief Read a protobuf message from binary or text input.
+ * @tparam T Protobuf message type.
+ * @param[in] file_name Input filename.
+ * @param[in] is_binary true for protobuf binary encoding; false for prototext.
+ * @param[out] dr_evt_proto_params Destination message populated on success.
+ * @return true when the file was opened and parsed successfully.
+ */
 bool read_prototext(const std::string& file_name, const bool is_binary,
                     T& dr_evt_proto_params)
 {

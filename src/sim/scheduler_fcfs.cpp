@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_fcfs.cpp
+ * @brief Event-time synchronization and selection for the deque FCFS scheduler.
+ */
+
 #include "sim/scheduler_fcfs.hpp"
 #include <algorithm>
 

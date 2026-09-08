@@ -8,6 +8,10 @@
  *                                                                            *
  ******************************************************************************/
 
+/** @file dr_evt_client.cpp
+ * @brief Command-line client for the DR_EVT protobuf simulation service.
+ */
+
 #include <grpcpp/grpcpp.h>
 #include <iostream>
 #include <fstream>
@@ -27,18 +31,24 @@ using dr_evt_grpc::ServerMessage;
 
 class SimulationClient {
 public:
+    /** @brief Open a streaming session over an existing gRPC channel.
+     * @param[in] channel Connected channel used to create the service stub. */
     explicit SimulationClient(std::shared_ptr<Channel> channel)
       : m_stub(SimulationService::NewStub(channel)),
         m_stream(m_stub->Session(&m_context)),
         m_next_request_id(1)
     {}
 
-    // Sends req (with a freshly assigned request_id) and blocks for the
-    // matching response. Since this client issues one request at a time
-    // and waits for its response before sending the next, request/response
-    // ordering is trivially preserved - request_id is still set and
-    // checked as a sanity check, and to establish the pattern a more
-    // pipelined client would need.
+    /** @brief Send one request and wait for its matching response.
+     * @param[in] req Client request; its request ID is replaced by this client.
+     * @return Server response with the matching request ID.
+     * @throws std::runtime_error for transport, ordering, or server errors.
+     * @details Sends req (with a freshly assigned request_id) and blocks for
+     * the matching response. Since this client issues one request at a time
+     * and waits for its response before sending the next, request/response
+     * ordering is trivially preserved. The request ID is still set and
+     * checked as a sanity check, and to establish the pattern a more
+     * pipelined client would need. */
     ServerMessage call(ClientMessage req)
     {
         uint64_t id = m_next_request_id++;
@@ -62,6 +72,8 @@ public:
         return resp;
     }
 
+    /** @brief Finish the streaming RPC and obtain its final status.
+     * @return gRPC status returned by the server. */
     grpc::Status finish()
     {
         m_stream->WritesDone();
@@ -69,12 +81,20 @@ public:
     }
 
 private:
+    /// Generated client stub that opens the streaming RPC.
     std::unique_ptr<SimulationService::Stub> m_stub;
+    /// Per-RPC gRPC context.
     ClientContext m_context;
+    /// Active bidirectional request/response stream.
     std::unique_ptr<ClientReaderWriter<ClientMessage, ServerMessage>> m_stream;
+    /// Next monotonically increasing request correlation ID.
     uint64_t m_next_request_id;
 };
 
+/** @brief Run the example gRPC streaming client.
+ * @param[in] argc Command-line argument count.
+ * @param[in] argv Command-line argument vector.
+ * @return Process status: zero when the session completes successfully. */
 int main(int argc, char** argv)
 {
     if (argc < 3) {

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file data_columns.cpp
+ * @brief Trace-column format parsing and header validation implementation.
+ */
+
 #include <cstring>
 #include <cstdlib>
 #include <fstream>
@@ -322,7 +326,7 @@ bool Data_Columns::check_header(const std::string& fname)
     return true;
 }
 
-/**
+/*
  *  This function is data-specific.
  *  The Lassen trace file contains for example 'user_script' field, which is
  *  23rd. This field contains many characters that would make parsing difficult.

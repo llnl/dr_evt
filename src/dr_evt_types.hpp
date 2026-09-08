@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file dr_evt_types.hpp
+ * @brief Project-wide scalar types, limits, event constants, and queue enums.
+ */
+
 #ifndef DR_EVT_DR_EVT_TYPES_HPP
 #define DR_EVT_DR_EVT_TYPES_HPP
 #include <limits>  // std::numeric_limits
@@ -21,14 +25,19 @@ namespace dr_evt {
 /** \addtogroup dr_evt_global
  *  @{ */
 
+/// Latest supported textual timestamp.
 constexpr const char* const max_tstamp = "2118-12-31 23:59:59.0";
 
+/// Three-letter names indexed by day_of_week.
 constexpr const char* const week_day_str[] =
     {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
+/** @brief Day-of-week values used by calendar and submission statistics. */
 enum day_of_week {Sun=0, Mon=1, Tue=2, Wed=3, Thu=4, Fri=5, Sat=6};
 
+/// Duration in seconds.
 using tdiff_t = double;
+/// Simulation clock value in seconds.
 using sim_time_t = tdiff_t;
 using timeout_t = unsigned; ///< time limit in seconds
 using num_nodes_t = unsigned; ///< Number of compute nodes type
@@ -49,6 +58,7 @@ constexpr const unsigned total_nodes = 795u;
 /// Maximum timeout that can be set for a batch job in seconds
 constexpr const tdiff_t max_batch_job_time = static_cast<tdiff_t> (12*60*60);
 
+/// Largest practical simulation time, below floating-point maximum.
 constexpr const sim_time_t max_sim_time
     = std::numeric_limits<sim_time_t>::max()*0.9;
 
@@ -57,8 +67,8 @@ constexpr const bool arrival = true;
 /// Departure event
 constexpr const bool departure = false;
 
-/** Job queue types
- * parse_utils.cpp defines a mapping table betwen job_queue_t and std::string
+/** @brief Supported trace job queues.
+ * @details parse_utils.cpp defines the mapping between job_queue_t and text.
  */
 #if PBATCH_GROUP
 enum job_queue_t {pBatch, pAll, pDebug, pExempt, pExpedite,
@@ -73,7 +83,8 @@ enum job_queue_t {pBatch, pBatch0, pBatch1, pBatch2, pBatch3, pAll, pDebug,
                     || (_q) == pBatch2 || (_q) == pBatch3)
 #endif
 
-using substr_pos_t = std::pair<size_t, size_t>; ///< [pos_start, len]
+/// CSV substring range stored as [start position, length].
+using substr_pos_t = std::pair<size_t, size_t>;
 
 /**@}*/
 } // end of namespace dr_evt

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_fcfs_conservative.cpp
+ * @brief Conservative-reservation FCFS scheduling implementation.
+ */
+
 #include "sim/scheduler_fcfs_conservative.hpp"
 #include <algorithm>
 

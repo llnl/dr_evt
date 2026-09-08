@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file column_id.hpp
+ * @brief Trace-column identifiers and ordering helpers.
+ */
+
 #ifndef DR_EVT_TRACE_COLUMN_ID_HPP
 #define DR_EVT_TRACE_COLUMN_ID_HPP
 

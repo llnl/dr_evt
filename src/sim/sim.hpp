@@ -79,28 +79,36 @@ class Simulation {
   public:
     /**
      * Constructor
-     * @param params Simulation parameters
+     * @param[in] params Immutable simulation configuration.
      */
     Simulation(const Sim_Params& params);
 
     /**
-     * Run the simulation
-     * Processes all events in the trace
+     * @brief Run a complete batch simulation for the configured trace.
+     * @details
+     * Loads and prepares the input trace when necessary, submits every job,
+     * and drains the event queue. For externally fed work, use append_job()
+     * or append_jobs() followed by advance_to() instead.
      */
     void run();
 
     /**
-     * Print simulation statistics
+     * @brief Write a human-readable statistics report.
+     * @param[in,out] os Destination stream receiving the report.
      */
     void print_stats(std::ostream& os) const;
 
     /**
-     * Write simulated job trace to CSV file
+     * @brief Write the simulated job trace to the configured output file.
+     * @details
+     * The destination is Sim_Params::get_outfile(). This does not advance
+     * simulation time or otherwise change scheduling state.
      */
     void write_simulated_trace();
 
     /**
-     * Write resource state trace to file
+     * @brief Write resource-allocation history to a CSV file.
+     * @param[in] filename Destination CSV path.
      */
     void write_resource_trace(const std::string& filename);
 
@@ -127,11 +135,11 @@ class Simulation {
      * already present in m_data). Adds the job to the store and immediately
      * enqueues it for scheduling.
      *
-     * @param submit_time When the job is submitted (must be >= current_time)
-     * @param num_nodes Number of nodes the job requests
-     * @param queue Which queue the job belongs to (e.g. "pbatch")
-     * @param limit_time User-estimated time limit, in seconds
-     * @return The new job's job_no
+     * @param[in] submit_time Arrival time, which must be >= current time.
+     * @param[in] num_nodes Number of nodes the job requests.
+     * @param[in] queue Queue name (for example, "pbatch").
+     * @param[in] limit_time User-estimated time limit in seconds.
+     * @return New Trace job identifier as job_no_t.
      * @see submit_job()
      * @see SchedulerBase::insert_job()
      */
@@ -150,10 +158,10 @@ class Simulation {
      * all-or-nothing: nothing is appended unless the whole batch can be.
      * See Trace::append_jobs()'s own doc comment for the rest.
      *
-     * @param requests The new jobs' own data, in submit_time order (see
+     * @param[in] requests New jobs' data in submit_time order (see
      *        Trace::append_jobs() for why - this function forwards
      *        requests as-is, so pass them there already sorted).
-     * @return Each new job's job_no, in the same order as requests.
+     * @return New Trace job identifiers in the same order as requests.
      * @see append_job()
      * @see submit_job()
      */
@@ -169,8 +177,8 @@ class Simulation {
      * The internal scheduler will decide when to start the job based on
      * resources and backfilling policy.
      *
-     * @param job_idx Job index to submit
-     * @param submit_time When the job is submitted (must be >= current_time)
+     * @param[in] job_idx Existing Trace job identifier to submit.
+     * @param[in] submit_time Arrival time, which must be >= current time.
      *
      * This does not add a job record to Trace: job_idx must already identify
      * one. It validates the arrival, records arrival-time accounting, then
@@ -192,7 +200,7 @@ class Simulation {
      * Processes all events up to target_time and lets the scheduler make
      * decisions about which jobs to start.
      *
-     * @param target_time Time to advance to (must be >= current_time)
+     * @param[in] target_time Time to advance to, which must be >= current time.
      *
      * PRECONDITION: Caller guarantees no jobs will be submitted with
      * submit_time < target_time. This means either:
@@ -210,19 +218,19 @@ class Simulation {
 
     /**
      * Get number of nodes currently in use (for monitoring)
-     * @return Number of allocated nodes
+     * @return Allocated-node count as num_nodes_t.
      */
     num_nodes_t get_nodes_in_use() const;
 
     /**
      * Get current simulation time (for monitoring)
-     * @return Current simulation time
+     * @return Current simulation time as sim_time_t.
      */
     sim_time_t get_current_time() const { return m_current_time; }
 
     /**
      * Get trace data (for external access in streaming mode)
-     * @return Reference to trace object
+     * @return Mutable reference to the simulation Trace.
      */
     Trace& get_trace() { return m_trace; }
     const Trace& get_trace() const { return m_trace; }
@@ -233,7 +241,7 @@ class Simulation {
 
     /**
      * Get number of available (free) nodes
-     * @return Number of nodes not currently allocated
+     * @return Unallocated-node count as num_nodes_t.
      */
     num_nodes_t get_available_nodes() const {
         return m_params.m_total_nodes - get_nodes_in_use();
@@ -252,7 +260,7 @@ class Simulation {
      * m_current_time from the last completed advance_to() call (or from
      * construction, if none has run yet).
      *
-     * @return Number of jobs waiting to be scheduled
+     * @return Waiting-job count as size_t.
      */
     size_t get_active_job_count() const {
         return m_scheduler->active_job_count();
@@ -261,7 +269,7 @@ class Simulation {
     /**
      * Get estimated time for FCFS head to start
      * Returns the shadow time (earliest time head of queue can start)
-     * @return Estimated start time, or -1 if queue is empty
+     * @return Estimated start time as sim_time_t, or -1 when the queue is empty.
      */
     sim_time_t get_fcfs_head_shadow_time() const {
         if (m_scheduler->active_job_count() == 0) {
@@ -287,6 +295,14 @@ class Simulation {
         std::vector<Resource_Release> releases;
     };
 
+    /**
+     * @brief Return the current EASY-backfilling reservation projection.
+     * @details
+     * The result is a snapshot: available nodes and release times reflect
+     * current scheduler state, while release times are based on the same
+     * time-limit estimates used for the FCFS reservation.
+     * @return Backfill_Window value for the current simulation time.
+     */
     Backfill_Window get_backfill_window() const;
 
     /**
@@ -315,11 +331,15 @@ class Simulation {
         sim_time_t makespan;
     };
 
+    /**
+     * @brief Calculate aggregate and point-in-time simulation statistics.
+     * @return Statistics value derived from the trace and current scheduler state.
+     */
     Statistics get_statistics() const;
 
     /**
      * Run simulation until just before target_time, excluding events at target_time
-     * @param target_time Time to run until (exclusive)
+     * @param[in] target_time Exclusive upper time bound as sim_time_t.
      */
     void run_until_exclusive(sim_time_t target_time) {
         // Advance to just before target_time
@@ -354,50 +374,50 @@ class Simulation {
      * scheduling decisions and wrong avg_wait_time/avg_turnaround_time/
      * makespan statistics, with no error raised anywhere.
      *
-     * @param max_jobs Maximum number of jobs to load. 0 (the default)
+     * @param[in] max_jobs Maximum jobs to load. 0 (the default)
      *                 falls back to m_params.m_max_jobs if that was set,
      *                 or no limit otherwise - this is what run() relies on
      *                 for batch mode. Streaming callers should pass an
      *                 explicit value here instead of relying on Sim_Params.
-     * @return number of jobs actually loaded
+     * @return Number of jobs loaded as num_jobs_t.
      */
     num_jobs_t initialize_trace(num_jobs_t max_jobs = 0);
 
   protected:
     /**
-     * Process a job submission event
-     * @param job_idx Index of job being submitted
+     * @brief Process an arrival event for an existing trace job.
+     * @param[in] job_idx Identifier of the arriving job.
      */
     void process_submit_event(job_no_t job_idx);
 
     /**
-     * Process a job start event
-     * @param job_idx Index of job starting
+     * @brief Process a scheduler-selected job start event.
+     * @param[in] job_idx Identifier of the job to start.
      */
     void process_start_event(job_no_t job_idx);
 
     /**
-     * Process a job end event
-     * @param job_idx Index of job completing
+     * @brief Process a job completion event and release its resources.
+     * @param[in] job_idx Identifier of the completing job.
      */
     void process_end_event(job_no_t job_idx);
 
     /**
-     * Advance to the next event in the queue
-     * @return True if an event was processed, false if queue is empty
+     * @brief Process the chronologically next queued event.
+     * @return true when an event was processed; false when the queue is empty.
      */
     bool advance_to_next_event();
 
     /**
-     * Schedule start events for jobs that can run now
-     * @param jobs List of job indices that can start
+     * @brief Queue start events for jobs selected by the scheduler.
+     * @param[in] jobs Identifiers of jobs that can start at the current time.
      */
     void schedule_start_events(const std::vector<job_no_t>& jobs);
 
     /**
-     * Schedule end event for a job
-     * @param job_idx Job index
-     * @param start_time When the job started
+     * @brief Queue the completion event for a started job.
+     * @param[in] job_idx Identifier of the running job.
+     * @param[in] start_time Time at which the job started.
      */
     void schedule_end_event(job_no_t job_idx, sim_time_t start_time);
 
@@ -414,28 +434,28 @@ class Simulation {
      */
     void determine_job_run_time(const std::vector<job_no_t>& job_nos);
 
-    /// Shared per-job logic both overloads above apply identically.
+    /**
+     * @brief Determine the simulated duration of one job.
+     * @param[in,out] job Trace record whose simulated duration is updated.
+     */
     void determine_one_job_run_time(Job_Record& job);
 
-    /// The progressive-loading counterpart to run()'s single-file batch
-    /// path (m_params.m_infile_list non-empty instead of m_infile
-    /// alone): loads each listed file in turn (Trace::load_next_file()),
-    /// submits its jobs one at a time in submit_time order, then
-    /// advance_to()s to the last one's submit_time before loading the
-    /// next - letting time (and reclaiming) actually progress between
-    /// files, rather than every file's jobs being known to m_data at
-    /// once. A final advance_to(infinity) after the last file drains
-    /// whatever's still running. REPLAY-format input isn't supported
-    /// here (see doc comment on the call in run()).
+    /**
+     * @brief Run the configured sequence of trace files incrementally.
+     * @details
+     * Loads each file in turn, submits its jobs in submit-time order, then
+     * advances to its last arrival before loading the next file. A final
+     * advance drains outstanding work. REPLAY input is not supported.
+     */
     void run_progressive();
 
     /**
      * Sample job duration from distribution
-     * @param time_limit User-provided time limit
-     * @param dist Distribution type
-     * @param scale Scale factor
-     * @param stddev Standard deviation factor
-     * @return Sampled duration
+     * @param[in] time_limit User-provided time limit.
+     * @param[in] dist Distribution type.
+     * @param[in] scale Distribution scale factor.
+     * @param[in] stddev Distribution standard-deviation factor.
+     * @return Sampled duration as tdiff_t.
      */
     tdiff_t sample_run_time(tdiff_t time_limit,
                             DistributionType dist,

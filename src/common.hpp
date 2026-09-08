@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file common.hpp
+ * @brief Project-wide compile-time feature and trace-processing macros.
+ */
+
 #ifndef DR_EVT_COMMON_HPP
 #define DR_EVT_COMMON_HPP
 
@@ -22,15 +26,16 @@
 // The dedicated allocation time (DAT) requires an application in advance
 // to gain execlusive access to the entire compute resources of a cluster.
 
-/// Indicate to include DAT jobs that ran through pall queue
+/// Include DAT jobs that ran through the pAll queue.
 #define INCLUDE_DAT 1
 
+/// Track dedicated-allocation-time periods in trace processing.
 #define MARK_DAT_PERIOD 1
 
 // Includes jobs from all the queues rather than pbatch and pall
 //#define SHOW_ALL_QUEUE 1
 
-/// group all pbatch[0-3]* as pbatch
+/// Group all pbatch[0-3] queues into the canonical pBatch queue.
 #define PBATCH_GROUP 1
 
 /**
@@ -51,12 +56,14 @@
  * job begin time is earler than job end time. Jobs with such an error will be
  * ignored.
  */
+/// Reject trace records whose submit, begin, and end times are not ordered.
 #define EVENT_TIME_ORDER 1
 
 /**
  *  For PST timezone. This information is needed to handle daylight saving time.
  *  If this is not defined, UTC is assumed.
  */
+/// Default timezone for trace timestamps that do not contain an offset.
 #define DATA_TIMEZONE "PST8PDT"
 
 #if !defined (DATA_TIMEZONE)
@@ -71,6 +78,10 @@
 #endif
 
 
+/** @brief Compare two primary keys and use a tie-break expression on equality.
+ * @param _A Left primary key expression.
+ * @param _B Right primary key expression.
+ * @param _T Boolean tie-break expression evaluated when keys are equal. */
 #define LESS_OR(_A,_B,_T) (((_A) < (_B)) || (((_A) == (_B)) && (_T)))
 
 

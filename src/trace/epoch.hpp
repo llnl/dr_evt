@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file epoch.hpp
+ * @brief Timestamp, time-period, conversion, and calendar helpers.
+ */
+
 #ifndef DR_EVT_TRACE_EPOCH_HPP
 #define DR_EVT_TRACE_EPOCH_HPP
 
@@ -19,9 +23,10 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * <integral seconds, fractional second>
+ * @brief Timestamp stored as integral and fractional seconds since the epoch.
  */
 using epoch_t = std::pair<time_t, float>;
+/// Inclusive-start, exclusive-end time period.
 using period_t = std::pair<epoch_t, epoch_t>;
 
 /// range from 0 to 7*24-1 as day of week [0-7) and hour [0-24)
@@ -52,8 +57,10 @@ inline tdiff_t operator-(const epoch_t& t1, const epoch_t& t2)
     return std::difftime(t1.first, t2.first) + (t1.second - t2.second);
 }
 
+/** @brief Format an epoch timestamp. @param[in] t Timestamp to format. @return Text representation. */
 std::string to_string(const epoch_t& t);
 
+/** @brief Write an epoch timestamp. @param[in,out] os Destination stream. @param[in] t Timestamp. @return os. */
 std::ostream& operator<<(std::ostream& os, const epoch_t& t);
 
 /**
@@ -67,13 +74,16 @@ std::ostream& operator<<(std::ostream& os, const epoch_t& t);
 std::string format_sim_time(sim_time_t t, bool msec);
 
 /**
- *  Check if the give string is timestamp
+ * @brief Check whether text represents a valid timestamp.
+ * @param[in] time_str Candidate timestamp text.
+ * @return true when parsing succeeds.
  */
 bool is_timestamp(const std::string& time_str);
 
 /**
- *  Return seconds (epoch) converted from the time string given as well as the
- *  fractional second.
+ * @brief Convert timestamp text to epoch seconds and fraction.
+ * @param[in] time_str Input timestamp text.
+ * @return Parsed epoch_t value.
  */
 epoch_t convert_time(const std::string& time_str);
 
@@ -89,37 +99,41 @@ inline T convert_epoch(const epoch_t& e)
  * Parses timestamps like "2024-01-01T12:00:00-08:00" and converts to UTC.
  * Returns both the UTC epoch and the extracted timezone offset string.
  *
- * @param time_str ISO timestamp with timezone (e.g., "2024-01-01T12:00:00-08:00")
- * @return pair<epoch_t, string> UTC epoch and timezone offset (e.g., "-08:00")
+ * @param[in] time_str ISO timestamp with timezone (e.g., "2024-01-01T12:00:00-08:00").
+ * @return Pair of UTC epoch_t and timezone-offset string (e.g., "-08:00").
  */
 std::pair<epoch_t, std::string> parse_time_with_timezone(const std::string& time_str);
 
 /**
  * @brief Convert epoch_t to local time string with timezone offset
  *
- * @param t UTC epoch time
- * @param tz_offset Timezone offset string (e.g., "-08:00")
- * @return Local time string (e.g., "2024-01-01 12:00:00")
+ * @param[in] t UTC epoch time.
+ * @param[in] tz_offset Timezone offset string (e.g., "-08:00").
+ * @return Local-time string (e.g., "2024-01-01 12:00:00").
  */
 std::string to_local_time_string(const epoch_t& t, const std::string& tz_offset);
 
 /**
- *  Return the hour index of a given time, which is the number of hours passed
- *  since the beginning of the week.
+ * @brief Return the hour-of-week bin for a timestamp.
+ * @param[in] t Time in integral epoch seconds.
+ * @return Hour bin in [0, 167].
  */
 hour_bin_id_t get_hour_bin_id(const std::time_t t);
 
-/// Return the day of week of a given time
+/** @brief Return the day of week. @param[in] e Timestamp. @return day_of_week value. */
 day_of_week weekday(const epoch_t& e);
 
-/// Return the beginning time of next week based on a given time
+/** @brief Return next week boundary. @param[in] t Timestamp. @return Integral epoch seconds. */
 std::time_t get_time_of_next_week_start(const std::time_t t);
 std::time_t get_time_of_next_week_start(const epoch_t& t);
 
-/// Return the beginning time of current week based on a given time
+/** @brief Return current week boundary. @param[in] t Timestamp. @return Integral epoch seconds. */
 std::time_t get_time_of_cur_week_start(const std::time_t t);
 std::time_t get_time_of_cur_week_start(const epoch_t& t);
 
+/** @brief Fill all hour boundaries for the week containing a timestamp.
+ * @param[in] t Timestamp in the target week.
+ * @param[out] bo Array of 169 integral epoch boundaries. */
 void hour_boundaries_of_week(const std::time_t t,
                              std::array<std::time_t, 7*24+1>& bo);
 

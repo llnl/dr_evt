@@ -15,10 +15,10 @@ namespace dr_evt {
 /** \addtogroup dr_evt_sim
  *  @{ */
 
-/// Number of submissions in an hour-slot observed over N weeks
+/// Per-week submission counts for one hour-of-week slot.
 using submit_hour_t = std::vector<num_jobs_t>;
 
-/// Number of submissions in each hour-slot in a week observed over N weeks
+/// Samples for all 168 hour-of-week slots, indexed by day and hour.
 using submit_week_t = typename std::array<submit_hour_t, 7*24>;
 
 /**@}*/

@@ -28,23 +28,32 @@ namespace dr_evt {
 template<size_t BlockSize>
 class BlockQueueFCFSScheduler : public SchedulerBase {
 private:
-    BlockWaitQueue<BlockSize> m_wait_queue;  // Block-based queue
+    /// Block-indexed queue used for efficient candidate searches.
+    BlockWaitQueue<BlockSize> m_wait_queue;
 
     // Eligibility tracking (identical to FCFSScheduler)
     struct JobArrival {
+        /// Stable identifier of the Trace job represented by this arrival.
         job_no_t job_id;
+        /// Arrival time used to determine eligibility.
         sim_time_t submit_time;
+        /// True when this arrival has been scheduled and removed.
         bool removed;
 
         JobArrival(job_no_t id, sim_time_t submit)
             : job_id(id), submit_time(submit), removed(false) {}
     };
-    std::deque<JobArrival> m_job_order;  // FCFS arrival order for eligibility
-    size_t m_eligible_end_idx;  // Index of first job NOT eligible yet
+    /// Arrival records in FCFS order; separate from the block queue.
+    std::deque<JobArrival> m_job_order;
+    /// First arrival index with submit_time later than m_current_tracked_time.
+    size_t m_eligible_end_idx;
+    /// Latest time to which arrival eligibility has been synchronized.
     sim_time_t m_current_tracked_time;
-    size_t m_removed_count;  // Track garbage for collection
+    /// Removed entries inside the eligible prefix of m_job_order.
+    size_t m_removed_count;
 
 public:
+    /** @copydoc SchedulerBase::SchedulerBase */
     BlockQueueFCFSScheduler(num_nodes_t total_nodes,
                             const Trace& job_data,
                             BackfillPolicy bf_policy)
@@ -55,16 +64,23 @@ public:
         , m_removed_count(0)
     {}
 
+    /** @copydoc SchedulerBase::insert_job */
     void insert_job(job_no_t job_id, sim_time_t submit_time,
                    tdiff_t run_time_estimate, num_nodes_t nodes_requested) override;
 
+    /** @copydoc SchedulerBase::schedule */
     std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,
         const std::map<job_no_t, sim_time_t>& running_jobs,
         sim_time_t current_time) override;
 
+    /** @copydoc SchedulerBase::sync_to */
     void sync_to(sim_time_t current_time) override;
 
+    /**
+     * @brief Write block-queue search statistics to a stream.
+     * @param[in,out] os Destination stream receiving the statistics report.
+     */
     void print_block_stats(std::ostream& os) const {
         auto stats = m_wait_queue.get_stats();
         os << "Block Queue Statistics:" << std::endl;
@@ -83,17 +99,21 @@ public:
         }
     }
 
+    /** @copydoc SchedulerBase::active_job_count */
     size_t active_job_count() override {
         return m_eligible_end_idx - m_removed_count;
     }
 
+    /** @copydoc SchedulerBase::get_next_arrival_time */
     sim_time_t get_next_arrival_time() override;
 
+    /** @copydoc SchedulerBase::has_eligible_jobs */
     bool has_eligible_jobs() override {
         return active_job_count() > 0;
     }
 
 protected:
+    /** @copydoc SchedulerBase::wait_queue_size */
     size_t wait_queue_size() const override {
         return m_wait_queue.size();
     }

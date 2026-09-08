@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file schedule_windows.cpp
+ * @brief Resource-window reservation and backfill-fit implementation.
+ */
+
 #include <algorithm>
 #include <stdexcept>
 #include "sim/schedule_windows.hpp"

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file epoch.cpp
+ * @brief Timestamp parsing, formatting, and calendar calculations.
+ */
+
 #include <ctime>
 #include <cstring>
 #include <sstream>
@@ -56,7 +60,7 @@ std::ostream& operator<<(std::ostream& os, const epoch_t& t)
     return os;
 }
 
-/**
+/*
  *  Check if the give string is timestamp
  */
 bool is_timestamp(const std::string& time_str)
@@ -69,7 +73,7 @@ bool is_timestamp(const std::string& time_str)
     return !(iss.fail());
 }
 
-/**
+/*
  *  Return seconds (epoch) converted from the time string given as well as the
  *  fractional second.
  */
@@ -95,7 +99,7 @@ epoch_t convert_time(const std::string& time_str)
     return std::make_pair(std::mktime(&t), frac);
 }
 
-/**
+/*
  * Parse timezone offset string like "-08:00" or "+05:30"
  * Returns offset in seconds (negative for west, positive for east)
  */

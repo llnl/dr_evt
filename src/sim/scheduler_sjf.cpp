@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_sjf.cpp
+ * @brief Shortest-job-first scheduling implementation.
+ */
+
 #include "sim/scheduler_sjf.hpp"
 #include <algorithm>
 

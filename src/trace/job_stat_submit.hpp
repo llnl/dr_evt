@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file job_stat_submit.hpp
+ * @brief Submission-arrival statistics and weekly summaries.
+ */
+
 #ifndef DR_EVT_TRACE_JOB_STAT_SUBMIT_HPP
 #define DR_EVT_TRACE_JOB_STAT_SUBMIT_HPP
 #include <map>
