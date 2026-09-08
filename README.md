@@ -10,67 +10,16 @@ interact in real-time.
 
 **[📚 Read the Full Documentation on ReadTheDocs →](https://dr-evt.readthedocs.io/)**
 
-## Ecosystem Overview
-
-```mermaid
-flowchart LR
-    input["Job traces<br/>CSV / protobuf config"]
-    live["Live job feed<br/>workflow manager / scheduler"]
-
-    subgraph local["In-process use"]
-        cpp["C++ application\nSimulation API"]
-        py["Python application\ndr_evt bindings"]
-        core["DR_EVT Simulation\nqueueing • FCFS/EASY\nbackfill • statistics"]
-        cpp --> core
-        py --> core
-    end
-
-    subgraph batch["CLI and replay"]
-        sim["simulator\n(batch / streaming CLI)"]
-        tracer["tracer\n(replay / accounting)"]
-    end
-
-    subgraph remote["Networked streaming"]
-        clients["C++ client / any gRPC client\nincluding generated Python client"]
-        grpc["gRPC / Protobuf\nbidirectional Session stream"]
-        server["dr_evt_server\none Simulation per session"]
-        clients <-->|"Session stream"| grpc
-        grpc <-->|"Session stream"| server
-    end
-
-    input --> sim --> core
-    input --> tracer
-    live --> cpp
-    live --> py
-    live --> clients
-    live --> server
-    server --> core
-    core --> scheduled["Scheduled job trace"]
-    core --> resources["Resource trace / statistics"]
-    scheduled --> tracer
-    tracer --> replay["Replay outputs\nresource accounting"]
-
-    subgraph deploy["Deployment and coordination"]
-        containers["Docker / Podman\nclient and server images"]
-        mpi["Optional MPI harness\ncoordinates multiple clients/servers"]
-    end
-    containers -->|"packages"| clients
-    containers -->|"packages"| server
-    mpi -->|"coordinates"| clients
-```
-
-`Simulation` is the shared scheduling core. C++ and Python use it directly;
-the gRPC server hosts the same core remotely. `simulator` produces schedules,
-while `tracer` replays schedules for resource accounting. Containers package
-the remote client/server deployment, and MPI is optional test-harness
-coordination rather than a requirement for normal gRPC use.
-
 ### Distributed gRPC deployment
 
 Clients and digital-twin controllers can open independent gRPC sessions to any
 number of server processes. Each server creates an isolated simulation for
 every session; neither the number of clients nor the number of servers is
-fixed.
+fixed. A server can handle multiple concurrent sessions.
+Simulation` is the shared scheduling core. C++ and Python use it directly;
+the gRPC server hosts the same core remotely.
+Containerization option is offered for the remote client/server deployment.
+MPI can optionally serve as a coordination harness for gRPC client/server testing.
 
 ![Architecture: workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.](docs/_static/client-server-architecture.png)
 
