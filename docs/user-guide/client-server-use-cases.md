@@ -111,38 +111,40 @@ fragments concurrently.
 
 ```{mermaid}
 sequenceDiagram
-    participant C as Coordinator
-    participant A as Server A
-    participant B as Server B
+    participant C as Composite-job coordinator
+    participant A as Server A scheduler
+    participant B as Server B scheduler
 
-    C->>A: Initialize and submit ordinary jobs through tn
-    C->>B: Initialize and submit ordinary jobs through tn
+    C->>A: Init, then AppendJobs + SubmitJob(ordinary arrivals through tn)
+    C->>B: Init, then AppendJobs + SubmitJob(ordinary arrivals through tn)
     Note over A,B: Each server has independent nodes and scheduler state
 
-    loop Each composite event at tc
-        Note over C,B: Ordinary jobs end at or before tc. Pick ta at or before tc
+    loop Each composite event at submit time tc
+        Note over C,B: Ordinary batch ends at tn <= tc. Pick ta with tn <= ta <= tc
         par Synchronize simulated time
-            C->>A: Advance to ta and process arrivals
+            C->>A: AdvanceTo(ta) and process arrivals through ta
         and
-            C->>B: Advance to ta and process arrivals
+            C->>B: AdvanceTo(ta) and process arrivals through ta
         end
-        C->>A: Read statistics before the event
-        C->>B: Read statistics before the event
+        C->>A: Read pre-event statistics
+        C->>B: Read pre-event statistics
         par Submit one fragment per system
-            C->>A: Submit fragment A at tc
+            C->>A: AppendJob(s) + SubmitJob(fragment A at tc)
         and
-            C->>B: Submit fragment B at tc
+            C->>B: AppendJob(s) + SubmitJob(fragment B at tc)
         end
-        par Evaluate fragments at tc
-            C->>A: Advance to tc and read statistics
+        par Evaluate newly appended fragments at the same time tc
+            C->>A: AdvanceTo(tc) and read post-event statistics
         and
-            C->>B: Advance to tc and read statistics
+            C->>B: AdvanceTo(tc) and read post-event statistics
         end
         Note over C: Record immediate, delayed, or partial start
-        opt Incremental ordinary job stream
-            Note over C,B: Next ordinary batch starts after tc
-            C->>A: Submit each next ordinary arrival
-            C->>B: Submit each next ordinary arrival
+        opt Incremental ordinary-job stream
+            Note over C,B: After the composite AdvanceTo(tc), next batch starts at t0 >= tc
+            C->>A: AppendJobs + SubmitJob(each next ordinary arrival)
+            C->>B: AppendJobs + SubmitJob(each next ordinary arrival)
+            C->>A: AdvanceTo(t0) to evaluate newly queued arrivals
+            C->>B: AdvanceTo(t0) to evaluate newly queued arrivals
         end
     end
     Note over C,B: This observes independent schedules; it makes no reservation or rollback
@@ -156,8 +158,9 @@ the streams differ in requested node counts, not in their ordinary-job timing.
 | Step | Server 1 timing | Server 2 timing | Composite timing | Relation exercised |
 | --- | --- | --- | --- | --- |
 | Initial ordinary batch | `tn_s1 = 10` | `tn_s2 = 10` | `ta = tc = 10` | `tn_s1 = tn_s2 = ta = tc` |
-| Next ordinary batch | `t0_s1 = 20` | `t0_s2 = 20` | Previous `tc = 10` | `tc < t0_s1` and `tc < t0_s2` |
-| Strict-boundary event | `tn_s1 = 20`, `ta_s1 = 15` | `tn_s2 = 20`, `ta_s2 = 15` | `tc = 25` | `ta < tn < tc`, hence `tn <= tc` and `ta <= tc` |
+| Equal-time next batch | `t0_s1 = 10` | `t0_s2 = 10` | Previous `tc = 10` | `t0_s1 = t0_s2 = tc` |
+| Later ordinary arrival | `tn_s1 = 20` | `tn_s2 = 20` | Previous `tc = 10` | `tc < tn_s1` and `tc < tn_s2` |
+| Strict-boundary event | `tn_s1 = ta_s1 = 20` | `tn_s2 = ta_s2 = 20` | `tc = 25` | `tn <= ta < tc` |
 | Final ordinary batch | `t0_s1 = 30` | `t0_s2 = 30` | Previous `tc = 25` | `tc < t0_s1` and `tc < t0_s2` |
 
 Thus the fixture covers the equal-time and strict forms of the per-system
