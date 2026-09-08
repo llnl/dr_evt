@@ -2,7 +2,7 @@
 
 ## Overview
 
-The DR_EVT simulator provides a streaming API that allows external code (e.g., gRPC servers - see [gRPC Client/Server Guide](../CLIENT_SERVER_GUIDE.md), workflow managers) to feed jobs dynamically and control simulation time advancement. This enables online/incremental simulation where jobs arrive over time rather than all at once.
+The DR_EVT simulator provides a streaming API that allows external code (e.g., gRPC servers - see [gRPC Client/Server Guide and API](../CLIENT_SERVER_GUIDE.md), workflow managers) to feed jobs dynamically and control simulation time advancement. This enables online/incremental simulation where jobs arrive over time rather than all at once.
 
 ## Core Concepts
 
@@ -478,5 +478,5 @@ anything - treat its output as unverified until that happens.
 - `src/sim/sim.hpp` - API declarations
 - `src/sim/sim.cpp` - Implementation
 - `tests/test_append_job_api.cpp` - Usage examples
-- [gRPC Client/Server Guide](../CLIENT_SERVER_GUIDE.md) - Network-exposed streaming API, MPI multi-client/multi-server harness
+- [gRPC Client/Server Guide and API](../CLIENT_SERVER_GUIDE.md) - Network-exposed streaming API, MPI multi-client/multi-server harness
 - [Progressive/Multi-File Loading](../dev/design-decisions/OUT_TRACE_STREAMING.md) - `--infile_list`, a related but distinct capability: bounding job-store memory across a trace the caller already knows in full (split across files), rather than jobs arriving live

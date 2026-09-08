@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1030" height="440" viewBox="0 0 1030 440" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
   <title id="title">Scalable DR_EVT gRPC deployment</title>
   <desc id="description">Workload sources feed one or more client processes or digital-twin controllers. They use independent bidirectional gRPC sessions with one or more DR_EVT server processes. Each session owns an isolated simulation with its own scheduler state and nodes.</desc>
   <defs>
@@ -19,66 +19,65 @@
 
   <rect width="1280" height="420" fill="#ffffff"/>
   <text x="60" y="55" class="small">SCALABLE CLIENT / SERVER ARCHITECTURE</text>
-  <line x1="60" y1="72" x2="1220" y2="72" stroke="#e3e8eb" stroke-width="1"/>
+  <line x1="60" y1="72" x2="970" y2="72" stroke="#e3e8eb" stroke-width="1"/>
   <text x="60" y="105" class="body">Clients and servers scale independently; a server creates an isolated simulation for every session.</text>
 
   <!-- workload sources -->
   <g filter="url(#shadow)">
-    <rect x="60" y="151" width="190" height="118" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
+    <rect x="60" y="181" width="120" height="135" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
   </g>
-  <text x="78" y="185" class="small">INPUT</text>
-  <text x="78" y="216" class="title">Workload</text>
-  <text x="78" y="241" class="body">Traces or live arrivals</text>
+  <text x="78" y="215" class="small">INPUT</text>
+  <text x="78" y="246" class="title">Workload</text>
+  <text x="78" y="271" class="body"><tspan x="78" dy="0">- Trace</tspan><tspan x="78" dy="17">- Live feed</tspan></text>
 
   <!-- client processes: the offset cards indicate multiple concurrent clients -->
-  <rect x="316" y="133" width="255" height="130" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
-  <rect x="308" y="139" width="255" height="130" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
+  <rect x="236" y="163" width="170" height="150" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
+  <rect x="228" y="169" width="170" height="150" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
   <g filter="url(#shadow)">
-    <rect x="300" y="145" width="255" height="130" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
+    <rect x="220" y="175" width="170" height="150" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
   </g>
-  <text x="324" y="181" class="title">Client</text>
-  <text x="324" y="205" class="body"><tspan x="324" dy="0">C++ or Python</tspan><tspan x="324" dy="17">with gRPC</tspan></text>
-  <line x1="324" y1="234" x2="531" y2="234" stroke="#e1e7ea" stroke-width="1"/>
-  <text x="324" y="258" class="body">Read inputs and control time</text>
+  <text x="244" y="211" class="title">Client</text>
+  <text x="244" y="235" class="body"><tspan x="244" dy="0">C++ or Python</tspan><tspan x="244" dy="17">with gRPC</tspan></text>
+  <line x1="244" y1="264" x2="366" y2="264" stroke="#e1e7ea" stroke-width="1"/>
+  <text x="244" y="281" class="body"><tspan x="244" dy="0">- Read job inputs</tspan><tspan x="244" dy="17">- Control progress</tspan></text>
 
   <!-- server processes: the offset cards indicate multiple concurrent servers -->
-  <rect x="716" y="133" width="255" height="130" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
-  <rect x="708" y="139" width="255" height="130" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
+  <rect x="561" y="163" width="195" height="150" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
+  <rect x="553" y="169" width="195" height="150" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
   <g filter="url(#shadow)">
-    <rect x="700" y="145" width="255" height="130" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
+    <rect x="545" y="175" width="195" height="150" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
   </g>
-  <text x="724" y="181" class="title">Server</text>
-  <text x="724" y="205" class="body"><tspan x="724" dy="0">C++ process</tspan><tspan x="724" dy="17">with gRPC</tspan></text>
-  <line x1="724" y1="234" x2="931" y2="234" stroke="#e1e7ea" stroke-width="1"/>
-  <text x="724" y="258" class="body">Each exposes a gRPC endpoint</text>
+  <text x="569" y="211" class="title">Server</text>
+  <text x="569" y="235" class="body"><tspan x="569" dy="0">C++ process</tspan><tspan x="569" dy="17">with gRPC</tspan></text>
+  <line x1="569" y1="264" x2="716" y2="264" stroke="#e1e7ea" stroke-width="1"/>
+  <text x="569" y="281" class="body"><tspan x="569" dy="0">- Open gRPC endpoint</tspan></text>
 
   <!-- simulations: the stack shows one concurrent instance per session -->
-  <rect x="1046" y="167" width="190" height="118" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
-  <rect x="1038" y="159" width="190" height="118" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
+  <rect x="796" y="191" width="150" height="140" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
+  <rect x="788" y="183" width="150" height="140" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
   <g filter="url(#shadow)">
-    <rect x="1030" y="151" width="190" height="118" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
+    <rect x="780" y="175" width="150" height="140" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
   </g>
-  <text x="1054" y="185" class="small">PER SESSION</text>
-  <text x="1054" y="216" class="title">Simulation</text>
-  <text x="1054" y="232" class="body"><tspan x="1054" dy="0">C++</tspan><tspan x="1054" dy="17">Maintain states</tspan></text>
+  <text x="804" y="209" class="small">PER SESSION</text>
+  <text x="804" y="240" class="title">Simulation</text>
+  <text x="804" y="256" class="body"><tspan x="804" dy="0">C++</tspan><tspan x="804" dy="17">Maintain states</tspan></text>
 
-  <!-- direct in-process Python binding -->
+  <!-- direct Python binding -->
   <g filter="url(#shadow)">
-    <rect x="1030" y="82" width="190" height="58" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
+    <rect x="780" y="100" width="150" height="45" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
   </g>
-  <text x="1054" y="108" class="small">IN-PROCESS PATH</text>
-  <text x="1054" y="129" class="body" style="font-weight:600">Python API</text>
+  <text x="804" y="128" class="body" style="font-weight:600">Python API</text>
 
   <!-- connections, drawn last for crisp arrows -->
-  <line x1="250" y1="210" x2="297" y2="210" stroke="#7a8792" stroke-width="1.7" marker-end="url(#arrow)"/>
-  <line x1="555" y1="201" x2="697" y2="201" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
-  <line x1="555" y1="210" x2="697" y2="210" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
-  <line x1="555" y1="219" x2="697" y2="219" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
-  <text x="630" y="165" class="label" text-anchor="middle"><tspan x="630" dy="0">N independent</tspan><tspan x="630" dy="16">gRPC sessions</tspan></text>
-  <line x1="955" y1="201" x2="1027" y2="201" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
-  <line x1="955" y1="210" x2="1027" y2="210" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
-  <line x1="955" y1="219" x2="1027" y2="219" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
-  <line x1="1125" y1="140" x2="1125" y2="139" stroke="#7a8792" stroke-width="1.7"/>
-  <path d="M1118 139 L1125 148 L1132 139 Z" fill="#7a8792"/>
+  <line x1="180" y1="240" x2="217" y2="240" stroke="#7a8792" stroke-width="1.7" marker-end="url(#arrow)"/>
+  <line x1="390" y1="231" x2="542" y2="231" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="390" y1="240" x2="542" y2="240" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="390" y1="249" x2="542" y2="249" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <text x="468" y="195" class="label" text-anchor="middle"><tspan x="468" dy="0">N independent</tspan><tspan x="468" dy="16">gRPC sessions</tspan></text>
+  <line x1="740" y1="231" x2="777" y2="231" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="740" y1="240" x2="777" y2="240" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="740" y1="249" x2="777" y2="249" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="855" y1="145" x2="855" y2="163" stroke="#7a8792" stroke-width="1.7"/>
+  <path d="M848 163 L855 172 L862 163 Z" fill="#7a8792"/>
 
 </svg>

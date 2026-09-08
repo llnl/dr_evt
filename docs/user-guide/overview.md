@@ -1,4 +1,4 @@
-# DR_EVT User Guide
+# User Guide
 
 ## Introduction
 
@@ -14,7 +14,7 @@ For distributed or digital-twin deployments, client processes and controllers
 can open independent gRPC sessions to any number of server processes. Each
 session gets its own isolated simulation, scheduler state, and nodes.
 
-:::{figure} ../_static/client-server-architecture.png
+:::{figure} ../_static/client-server-architecture.svg
 :alt: Workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.
 :width: 100%
 :::

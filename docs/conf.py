@@ -49,7 +49,8 @@ mermaid.initialize({
     startOnLoad: true,
     theme: 'default',
     flowchart: { useMaxWidth: true },
-    gantt: { useMaxWidth: true }
+    gantt: { useMaxWidth: true },
+    sequence: { useMaxWidth: true }
 });
 """
 

@@ -1,4 +1,4 @@
-# Quick Start Guide - DR_EVT Backfilling Scheduler
+# Quick Start Guide - DR_EVT HPC Job Scheduler Simulator
 
 ## Overview
 

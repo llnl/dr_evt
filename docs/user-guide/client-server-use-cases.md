@@ -27,7 +27,7 @@ live arrivals to the appropriate simulation. It is only one topology: clients
 and servers may both be scaled independently. Scheduler state and nodes are
 not shared between sessions.
 
-:::{figure} ../_static/client-server-architecture.png
+:::{figure} ../_static/client-server-architecture.svg
 :alt: Workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.
 :width: 100%
 :::
