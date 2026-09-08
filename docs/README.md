@@ -93,10 +93,11 @@ make html
 ```
 
 `make html` builds the Sphinx site. When Doxygen is available, it also
-generates and links the C++ reference at `_build/html/cpp-api/`; otherwise it
-skips that optional reference. The Sphinx API navigation includes a link when
-the reference is generated. Run `make doxygen` when only the C++ API reference
-is needed.
+generates and copies the C++ reference to `_build/html/api/html/`; otherwise
+it skips that optional reference. The Sphinx API navigation includes a link
+when the reference is generated. Read the Docs runs Doxygen before Sphinx so
+the same reference is published there. Run `make doxygen` when only the C++
+API reference is needed.
 
 ### Build HTML Documentation
 

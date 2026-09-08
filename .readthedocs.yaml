@@ -15,8 +15,8 @@ build:
     python: "3.11"
   jobs:
     post_install:
-      # Install any additional system dependencies if needed
-      - echo "Build started"
+      # Build the generated C++ reference before Read the Docs invokes Sphinx.
+      - doxygen docs/Doxyfile
 
 # Python requirements
 python:

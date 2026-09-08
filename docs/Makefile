@@ -35,13 +35,6 @@ doxygen:
 # Build HTML documentation
 html: doxygen
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" $(SPHINXOPTS) $(O)
-	@if command -v $(DOXYGEN) >/dev/null 2>&1 && [ -d "$(DOXYGENDIR)" ]; then \
-		ln -sfn ../../$(DOXYGENDIR) "$(BUILDDIR)/html/cpp-api"; \
-		echo "C++ API reference is at $(BUILDDIR)/html/cpp-api/."; \
-	else \
-		rm -f "$(BUILDDIR)/html/cpp-api"; \
-		echo "C++ API reference was skipped (Doxygen is unavailable)."; \
-	fi
 	@echo
 	@echo "Build finished. Sphinx pages are in $(BUILDDIR)/html/."
 

@@ -51,7 +51,7 @@ CLIENT_SERVER_GUIDE
 ```
 
 ```{raw} html
-<p><a href="cpp-api/index.html">C++ API reference (Doxygen)</a></p>
+<p><a href="api/html/index.html">C++ API reference (Doxygen)</a></p>
 ```
 
 ```{toctree}

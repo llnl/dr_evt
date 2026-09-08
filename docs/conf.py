@@ -71,6 +71,11 @@ master_doc = 'index'
 # HTML output options
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+# Doxygen writes its standalone HTML reference here.  Include it as static
+# output so both local Sphinx builds and Read the Docs publish it at
+# ``api/html/``.  Leave it absent when Doxygen is unavailable locally.
+_doxygen_html = os.path.join(os.path.dirname(__file__), 'api', 'html')
+html_extra_path = ['api/html'] if os.path.isdir(_doxygen_html) else []
 html_logo = '_static/dr_evt_logo.svg'
 html_favicon = '_static/favicon.ico'
 
