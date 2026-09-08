@@ -7,7 +7,7 @@ DOXYGEN       ?= doxygen
 SOURCEDIR     = .
 BUILDDIR      = _build
 DOXYFILE      = Doxyfile
-DOXYGENDIR    = doxygen/cpp-api
+DOXYGENDIR    = doxygen
 
 # Put it first so that "make" without argument is like "make help"
 help:
@@ -23,8 +23,8 @@ install:
 clean:
 	rm -rf $(BUILDDIR) $(DOXYGENDIR)
 
-# Build C++ API reference from the project root. Doxyfile paths are rooted
-# there, while this Makefile is normally invoked from docs/.
+# Build Doxygen XML from the project root. Breathe renders that XML as part of
+# the Sphinx site, preserving the selected Sphinx theme.
 doxygen:
 	@if command -v $(DOXYGEN) >/dev/null 2>&1; then \
 		cd .. && $(DOXYGEN) docs/$(DOXYFILE); \

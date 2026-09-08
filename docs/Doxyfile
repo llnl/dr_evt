@@ -16,14 +16,7 @@ INPUT                  = src/ \
                          src/proto/ \
                          src/sim/ \
                          src/trace/ \
-                         src/utils/ \
-                         docs/ \
-                         docs/api/ \
-                         docs/dev/ \
-                         docs/dev/design-decisions/ \
-                         docs/getting-started/ \
-                         docs/reference/ \
-                         docs/user-guide/
+                         src/utils/
 FILE_PATTERNS          = *.hpp *.cpp *.md
 RECURSIVE              = NO
 # INPUT is deliberately limited to project directories above.  Do not list
@@ -33,10 +26,12 @@ EXCLUDE                =
 EXCLUDE_PATTERNS       =
 
 # Output formats
-GENERATE_HTML          = YES
+# Sphinx renders this XML through Breathe, so the C++ API uses the same theme
+# and navigation as the rest of the documentation site.
+GENERATE_HTML          = NO
 GENERATE_LATEX         = NO
-HTML_OUTPUT            = cpp-api
-HTML_FILE_EXTENSION    = .html
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
 
 # Documentation extraction
 EXTRACT_ALL            = YES
@@ -82,5 +77,5 @@ WARN_IF_UNDOCUMENTED   = YES
 WARN_IF_DOC_ERROR      = YES
 WARN_NO_PARAMDOC       = YES
 
-# Main page
-USE_MDFILE_AS_MAINPAGE = docs/USER_GUIDE.md
+# Sphinx owns the narrative documentation and Doxygen supplies its C++ API.
+USE_MDFILE_AS_MAINPAGE =

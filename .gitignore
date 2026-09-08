@@ -55,6 +55,10 @@ test_streaming*.csv
 .DS_Store
 docs/.DS_Store
 
+# Python bytecode and interpreter caches
+__pycache__/
+*.py[cod]
+
 # Session state notes (local only)
 SESSION_STATE.md
 VERIFICATION_COMPLETE.md
@@ -65,4 +69,5 @@ VERIFICATION_COMPLETE.md
 
 # Documentation build artifacts
 docs/_build/
+docs/doxygen/
 venv_docs/
