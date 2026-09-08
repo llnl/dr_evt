@@ -176,7 +176,7 @@ the network API.
 ```{mermaid}
 :name: composite-stream-timeline
 :align: center
-:config: {"theme":"base","themeVariables":{"primaryColor":"#ececff","primaryBorderColor":"#9370db","primaryTextColor":"#131300","secondaryColor":"#e2f3e7","secondaryBorderColor":"#8ab99a","secondaryTextColor":"#234d31"},"sequence":{"useMaxWidth":true,"diagramMarginX":0}}
+:config: {"sequence":{"useMaxWidth":true,"diagramMarginX":0}}
 
 sequenceDiagram
     participant C1 as Client 1
