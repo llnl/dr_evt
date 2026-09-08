@@ -121,7 +121,7 @@ Deque advantages:
 ### Comprehensive Testing
 ```bash
 # Correctness test (deque vs multimap vs block vs circular - see CIRCULAR_QUEUE.md)
-./tests/test_fcfs_queue_implementations.sh
+./tests/run_fcfs_queue_implementation_tests.sh
 
 # All 7 block sizes with custom trace
 ./tests/benchmark_block_sizes.sh path/to/trace.csv
@@ -276,7 +276,7 @@ available as a simple, well-tested fallback
 ### Tests
 - `tests/test_block_queue.cpp` - Unit tests (all block sizes)
 - `tests/benchmark_block_sizes.sh` - Performance comparison
-- `tests/test_fcfs_queue_implementations.sh` - Correctness verification
+- `tests/run_fcfs_queue_implementation_tests.sh` - Correctness verification
 - `tests/test_traces/scale/huge_10000jobs.csv` - 10K job test trace
 
 ### Documentation

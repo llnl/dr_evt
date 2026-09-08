@@ -22,7 +22,7 @@ The block queue implementation has been thoroughly tested for correctness and pe
 
 ### 2. Integration & Correctness Tests
 
-**`tests/test_fcfs_queue_implementations.sh`**
+**`tests/run_fcfs_queue_implementation_tests.sh`**
 - Differential correctness testing
 - Compares 4 FCFS implementations:
   - fcfs (deque-based, explicit `--queue_impl deque`)
@@ -36,13 +36,13 @@ The block queue implementation has been thoroughly tested for correctness and pe
 **To run:**
 ```bash
 # All tests (correctness + performance)
-./tests/test_fcfs_queue_implementations.sh
+./tests/run_fcfs_queue_implementation_tests.sh
 
 # Correctness only
-./tests/test_fcfs_queue_implementations.sh --correctness
+./tests/run_fcfs_queue_implementation_tests.sh --correctness
 
 # Performance only
-./tests/test_fcfs_queue_implementations.sh --performance
+./tests/run_fcfs_queue_implementation_tests.sh --performance
 ```
 
 ### 3. Block Size Performance Comparison
@@ -305,7 +305,7 @@ cmake --build build
 ./build/test_block_queue
 
 # 3. Integration test (correctness verification)
-./tests/test_fcfs_queue_implementations.sh --correctness
+./tests/run_fcfs_queue_implementation_tests.sh --correctness
 
 # 4. Performance comparison (all block sizes)
 ./tests/benchmark_block_sizes.sh
@@ -320,7 +320,7 @@ cd build && ctest
 pull request against them (gcc-11 and clang-14, in parallel).
 
 Its "Run Queue Implementation Differential Tests" step runs
-`tests/test_fcfs_queue_implementations.sh --correctness`, which exercises deque,
+`tests/run_fcfs_queue_implementation_tests.sh --correctness`, which exercises deque,
 multimap, block queue (size 128), and circular queue against the 34
 comprehensive test traces - the same script and traces described above.
 Other CI steps (the 34-trace comprehensive test against known-correct

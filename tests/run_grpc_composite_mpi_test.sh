@@ -24,6 +24,10 @@ else
 fi
 
 mkdir -p "$RUN_DIR"
+# MPI launchers may reset a rank's working directory. Resolve this before
+# launching so every rank (and each server child it forks) writes reports in
+# the selected run directory, even when a relative override was supplied.
+RUN_DIR=$(cd "$RUN_DIR" && pwd)
 
 for binary in "$SERVER" "$MPI_TEST"; do
     if [ ! -x "$binary" ]; then
@@ -34,14 +38,15 @@ for binary in "$SERVER" "$MPI_TEST"; do
 done
 
 echo "Running composite-stream test with $MPI_LAUNCHER_NAME in: $RUN_DIR"
-(
-    cd "$RUN_DIR"
-    "${MPI_LAUNCHER[@]}" "$MPI_TEST" \
-        "$SERVER" \
-        "$PORT" \
-        "$REPO_ROOT/tests/test_traces/grpc/composite_server1.csv" \
-        "$REPO_ROOT/tests/test_traces/grpc/composite_server2.csv" \
-        "$REPO_ROOT/tests/test_traces/grpc/composite_jobs.csv"
-)
+"${MPI_LAUNCHER[@]}" /bin/bash -c '
+    cd "$1"
+    shift
+    exec "$@"
+' run-composite-rank "$RUN_DIR" "$MPI_TEST" \
+    "$SERVER" \
+    "$PORT" \
+    "$REPO_ROOT/tests/test_traces/grpc/composite_server1.csv" \
+    "$REPO_ROOT/tests/test_traces/grpc/composite_server2.csv" \
+    "$REPO_ROOT/tests/test_traces/grpc/composite_jobs.csv"
 
 echo "PASS: composite-stream test completed. Session reports are in: $RUN_DIR"

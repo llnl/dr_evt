@@ -43,7 +43,7 @@ huge_2000jobs.csv have been rebuilt with fresh, complete input data
 with total_nodes=795) and are now included in TESTS below.
 xlarge_500jobs_v2.csv has been removed entirely - it was an unreferenced
 duplicate (nothing in the codebase or test scripts used it, only the
-plain xlarge_500jobs.csv is referenced, e.g. by test_fcfs_queue_implementations.sh),
+plain xlarge_500jobs.csv is referenced, e.g. by run_fcfs_queue_implementation_tests.sh),
 not a genuinely distinct second variant.
 """
 

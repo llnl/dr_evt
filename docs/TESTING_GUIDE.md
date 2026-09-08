@@ -69,12 +69,12 @@ ${CMAKE_INSTALL_PREFIX}/bin/tests/test_streaming_api
 ${CMAKE_INSTALL_PREFIX}/bin/tests/test_batch_vs_streaming
 
 # Run queue implementation differential tests (circular/deque/multimap/block)
-./test_fcfs_queue_implementations.sh --correctness
+./run_fcfs_queue_implementation_tests.sh --correctness
 
 # Run column alias tests (time_limit/actual_run_time accepted column-name variants)
-./test_column_aliases.sh
+./run_column_alias_tests.sh
 
-./test_run_time_modes.sh
+./run_time_mode_tests.sh
 ```
 
 ### Installed Test Binaries
@@ -245,7 +245,7 @@ cd build
 **Status:** 6/6 passing
 
 Note: `easy_vs_conservative_test.csv` is run separately by
-`tests/test_easy_vs_conservative_correctness.sh`; it validates against
+`tests/run_easy_vs_conservative_correctness_tests.sh`; it validates against
 algorithm-specific expected outputs rather than a shared oracle.
 
 ---
@@ -549,7 +549,7 @@ Python-reference comparison above wouldn't specifically localize.
 **How to run:**
 ```bash
 cd build
-../tests/test_fcfs_queue_implementations.sh --correctness
+../tests/run_fcfs_queue_implementation_tests.sh --correctness
 ```
 
 **Performance comparison** (not correctness - separate script):
@@ -568,7 +568,7 @@ for the block-based one.
 
 ## Column Alias Tests
 
-**Location:** `tests/test_column_aliases.sh` (generates its own small traces under `/tmp/`)
+**Location:** `tests/run_column_alias_tests.sh` (generates its own small traces under `/tmp/`)
 **Purpose:** Verify `time_limit` and `actual_run_time` are each recognized
 under multiple accepted column-name aliases, so an existing trace can be
 reused without editing its header - slow to do by hand on a large file.
@@ -584,7 +584,7 @@ rather than silently defaulting.
 **How to run:**
 ```bash
 cd build
-../tests/test_column_aliases.sh
+../tests/run_column_alias_tests.sh
 ```
 
 Runs in CI (`.github/workflows/tests.yml`, "Run Column Alias Tests"). See
@@ -595,7 +595,7 @@ for the full column reference.
 
 ## Run Time Mode Tests
 
-**Location:** `tests/test_run_time_modes.sh`
+**Location:** `tests/run_time_mode_tests.sh`
 **Purpose:** Verify two specific behavioral contracts not exercised by any
 other test suite:
 
@@ -610,7 +610,7 @@ other test suite:
 **How to run:**
 ```bash
 cd build
-../tests/test_run_time_modes.sh
+../tests/run_time_mode_tests.sh
 ```
 
 Runs in CI (`.github/workflows/tests.yml`, "Run Duration/Run Time Mode
@@ -822,7 +822,7 @@ DR_EVT implements both EASY and CONSERVATIVE backfilling algorithms. Conservativ
 ### Test 1: Behavioral Correctness (EASY vs CONSERVATIVE)
 
 **Purpose**: Demonstrates the key behavioral difference between algorithms
-**Script**: `tests/test_easy_vs_conservative_correctness.sh`
+**Script**: `tests/run_easy_vs_conservative_correctness_tests.sh`
 **Duration**: ~1 second
 **Jobs**: 6 jobs, 100 nodes
 
@@ -848,7 +848,7 @@ Job 4 could start immediately but is behind Jobs 2-3 in the queue. EASY ignores 
 
 **Run**:
 ```bash
-./tests/test_easy_vs_conservative_correctness.sh
+./tests/run_easy_vs_conservative_correctness_tests.sh
 ```
 
 **Success Criteria**:

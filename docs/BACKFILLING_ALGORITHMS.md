@@ -775,4 +775,4 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs_conservat
 - EASY: [scripts/python_reference_scheduler.py](https://github.com/llnl/dr_evt/blob/main/scripts/python_reference_scheduler.py)
 - CONSERVATIVE: [scripts/python_conservative_scheduler.py](https://github.com/llnl/dr_evt/blob/main/scripts/python_conservative_scheduler.py)
 
-**Tests**: See [tests/test_easy_vs_conservative_correctness.sh](https://github.com/llnl/dr_evt/blob/main/tests/test_easy_vs_conservative_correctness.sh) for behavioral demonstration.
+**Tests**: See [tests/run_easy_vs_conservative_correctness_tests.sh](https://github.com/llnl/dr_evt/blob/main/tests/run_easy_vs_conservative_correctness_tests.sh) for behavioral demonstration.

@@ -143,7 +143,7 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 **Purpose:** Verify CONSERVATIVE backfilling algorithm implementation and demonstrate behavioral differences from EASY
 
 **Scripts:**
-- `./tests/test_easy_vs_conservative_correctness.sh` - Behavioral correctness (6 jobs, ~1s)
+- `./tests/run_easy_vs_conservative_correctness_tests.sh` - Behavioral correctness (6 jobs, ~1s)
 - `./tests/compare_cpp_python_conservative.sh` - Implementation equivalence (2000 jobs, ~8m)
 
 **Status:** ✅ 2/2 passing (100%)
@@ -436,7 +436,7 @@ run_backfill_window_grpc_test.sh # FCFS/EASY backfill-window gRPC query (starts 
 run_progressive_load_tests.sh # --infile_list progressive loading tests (C++ + CLI)
 run_grpc_tests.sh          # gRPC client/server tests (requires -DDR_EVT_ENABLE_GRPC=ON)
 run_scheduler_correctness_tests.sh         # scheduler-correctness suite (see below)
-test_fcfs_queue_implementations.sh # queue implementation differential testing (see below)
+run_fcfs_queue_implementation_tests.sh # queue implementation differential testing (see below)
 benchmark_block_sizes.sh   # queue implementation performance comparison (see below)
 ```
 
@@ -458,7 +458,7 @@ There is no equivalent runner for `scale/` - that has been done manually
 during development. `compare_with_analytical.sh`, referenced elsewhere in
 older docs, does not exist in this checkout.
 
-`test_fcfs_queue_implementations.sh --correctness` checks something different from
+`run_fcfs_queue_implementation_tests.sh --correctness` checks something different from
 `run_scheduler_correctness_tests.sh`: not whether the C++ simulator matches the Python
 reference, but whether all four FCFS wait-queue implementations
 (`--queue_impl circular/deque/multimap/block`) produce byte-for-byte

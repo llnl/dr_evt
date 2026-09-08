@@ -125,7 +125,7 @@ python3 scripts/python_conservative_scheduler.py \
 
 **See also:**
 - [docs/BACKFILLING_ALGORITHMS.md](https://github.com/llnl/dr_evt/blob/main/docs/BACKFILLING_ALGORITHMS.md) - Full algorithm description
-- [tests/test_easy_vs_conservative_correctness.sh](https://github.com/llnl/dr_evt/blob/main/tests/test_easy_vs_conservative_correctness.sh) - Behavioral test
+- [tests/run_easy_vs_conservative_correctness_tests.sh](https://github.com/llnl/dr_evt/blob/main/tests/run_easy_vs_conservative_correctness_tests.sh) - Behavioral test
 
 ## Test Data Generation Scripts
 
