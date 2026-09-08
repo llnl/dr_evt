@@ -25,7 +25,7 @@ MPI can optionally serve as a coordination harness for gRPC client/server testin
 
 ### Simulation internals
 
-Each C++ `Simulation` owns a `Trace` and a scheduler. `Trace` retains the
+Each C++ `Simulation` owns a `Trace` and a `Scheduler`. `Trace` retains the
 job store, running-job event queue, and resource history, while the scheduler
 retains its wait queue. The simulation coordinates them and writes the job and
 resource traces.
