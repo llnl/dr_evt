@@ -32,6 +32,14 @@ server or gRPC. The gRPC service maps its request messages onto these methods
 where applicable; see the [Client/Server Guide](../CLIENT_SERVER_GUIDE.md) for
 the wire protocol.
 
+:::{only} doxygen
+<p><a href="html/index.html">Open the complete generated C++ API reference (Doxygen).</a></p>
+:::
+
+:::{only} not doxygen
+The complete generated C++ API reference is unavailable because Doxygen was not installed for this build.
+:::
+
 For live jobs, `append_job()` (or `append_jobs()`) creates a previously unseen
 job and enqueues it atomically for scheduling.
 
