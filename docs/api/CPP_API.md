@@ -3,7 +3,7 @@
 This reference is generated from the public C++ headers by Doxygen.
 
 :::{only} doxygen
-<p><a href="html/index.html">Open the generated C++ API reference.</a></p>
+<p><a href="../cpp-api/index.html">Open the generated C++ API reference.</a></p>
 :::
 
 :::{only} not doxygen

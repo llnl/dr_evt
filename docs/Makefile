@@ -7,7 +7,7 @@ DOXYGEN       ?= doxygen
 SOURCEDIR     = .
 BUILDDIR      = _build
 DOXYFILE      = Doxyfile
-DOXYGENDIR    = api/html
+DOXYGENDIR    = doxygen/cpp-api
 
 # Put it first so that "make" without argument is like "make help"
 help:

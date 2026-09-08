@@ -71,12 +71,12 @@ master_doc = 'index'
 # HTML output options
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
-# Doxygen writes its standalone HTML reference here.  Include it as static
-# output so both local Sphinx builds and Read the Docs publish it at
-# ``api/html/``.  Leave it absent when Doxygen is unavailable locally.
-_doxygen_html = os.path.join(os.path.dirname(__file__), 'api', 'html')
+# Doxygen writes its standalone HTML reference outside the Sphinx source
+# pages. Include its parent directory as static output so the generated site
+# is published at ``/cpp-api/``. Leave it absent when Doxygen is unavailable.
+_doxygen_html = os.path.join(os.path.dirname(__file__), 'doxygen', 'cpp-api')
 if os.path.isdir(_doxygen_html):
-    html_extra_path = ['api/html']
+    html_extra_path = ['doxygen']
     tags.add('doxygen')
 else:
     html_extra_path = []

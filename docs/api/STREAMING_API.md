@@ -33,7 +33,7 @@ where applicable; see the [Client/Server Guide](../CLIENT_SERVER_GUIDE.md) for
 the wire protocol.
 
 :::{only} doxygen
-<p><a href="html/index.html">Open the complete generated C++ API reference (Doxygen).</a></p>
+<p><a href="../cpp-api/index.html">Open the complete generated C++ API reference (Doxygen).</a></p>
 :::
 
 :::{only} not doxygen

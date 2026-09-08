@@ -56,6 +56,7 @@ CLIENT_SERVER_GUIDE
 :caption: Development
 
 dev/README
+dev/JOB_LIFECYCLE
 reference/terminology
 dev/design-decisions/BLOCK_QUEUE
 dev/design-decisions/BLOCK_QUEUE_TESTING
