@@ -118,6 +118,12 @@ pre-composite batch must satisfy `tn <= ta <= tc`. This covers both an
 equal-time event (`tn = ta = tc`) and a strict-boundary event
 (`tn <= ta < tc`).
 
+The `t0`, `t1`, ..., `tn` notation names ordinary-job arrival timestamps in
+arrival order; the subscripts are indices, not simulation-time values. Thus
+`tn` denotes the final ordinary arrival before the composite boundary, `t0`
+denotes the first one after it, and any `t1` through `t(n-1)` are intervening
+ordinary arrivals in their respective batches.
+
 For each composite event, the coordinator does the following in order:
 
 1. Append and submit each system's ordinary arrivals through `tn`.
@@ -147,8 +153,16 @@ node counts.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Initial ordinary batch | `tn_s1 = 10` | `tn_s2 = 10` | `ta = tc = 10` | `tn_s1 = tn_s2 = ta = tc` |
 | 2 | Equal-time next batch | `t0_s1 = 10` | `t0_s2 = 10` | Previous `tc = 10` | `t0_s1 = t0_s2 = tc`; a second `AdvanceTo(tc)` evaluates it |
-| 3 | Later ordinary arrival and strict-boundary event | `tn_s1 = ta_s1 = 20` | `tn_s2 = ta_s2 = 20` | `tc = 25` | `tn <= ta < tc` |
+| 3 | Later ordinary arrival and strict-boundary event | `tn_s1 = ta_s1 = 20` | `tn_s2 = ta_s2 = 20` | `tc = 25` | `tn = ta < tc` |
 | 4 | Final ordinary batch | `t0_s1 = 30` | `t0_s2 = 30` | Previous `tc = 25` | `tc < t0_s1` and `tc < t0_s2` |
+
+In short, the fixture guarantees these ordering cases:
+
+1. `tn = ta = tc` for the initial batch.
+2. `t0 = tc` after composite evaluation, followed by a second
+   `AdvanceTo(tc)`.
+3. `tn = ta < tc` for the strict-boundary composite event.
+4. `tc < t0` for the later ordinary batch.
 
 Thus the fixture covers the equal-time and strict forms of the per-system
 boundaries above. It does not yet cover the interior timing case
