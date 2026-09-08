@@ -83,9 +83,9 @@ void test_append_with_empty_trace() {
     assert(rc == 0);
     assert(sim.get_trace().data().size() == 0);
 
-    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 100);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 100);
     assert(j0 == 0);
-    job_no_t j1 = sim.append_job(5.0, 20, "pbatch", 200);
+    [[maybe_unused]] job_no_t j1 = sim.append_job(5.0, 20, "pbatch", 200);
     assert(j1 == 1);
     assert(sim.get_trace().data().size() == 2);
 

@@ -279,20 +279,34 @@ class Simulation {
     }
 
     /**
-     * A point-in-time FCFS/EASY reservation snapshot. Release events use the
-     * time-limit estimates used by SchedulerBase::calculate_fcfs_reservation,
-     * rather than actual runtimes, so the projection and shadow time agree.
+     * @brief Point-in-time FCFS/EASY reservation projection.
+     *
+     * @details Returned by get_backfill_window() for a caller evaluating
+     * whether a candidate can backfill without delaying the FCFS queue head.
+     * `current_time` and `available_nodes` describe capacity immediately;
+     * `releases` then describes projected capacity increases up to the head's
+     * `shadow_time`. Release events use the time-limit estimates used by
+     * SchedulerBase::calculate_fcfs_reservation, rather than actual runtimes,
+     * so the projection and reservation agree. `shadow_time` is -1 when no
+     * FCFS head is waiting.
      */
     struct Backfill_Window {
+        /**
+         * @brief One future capacity increase in a Backfill_Window.
+         *
+         * @details Entries in Backfill_Window::releases are sorted by time.
+         * Multiple job completions at the same time are combined into one
+         * record whose nodes_released is their total.
+         */
         struct Resource_Release {
-            sim_time_t time;
-            num_nodes_t nodes_released;
+            sim_time_t time;          ///< Absolute simulation time of the release.
+            num_nodes_t nodes_released; ///< Nodes becoming available at time.
         };
 
-        sim_time_t current_time;
-        num_nodes_t available_nodes;
-        sim_time_t shadow_time;  // -1 when no FCFS head is waiting
-        std::vector<Resource_Release> releases;
+        sim_time_t current_time;  ///< Time at which this snapshot was captured.
+        num_nodes_t available_nodes; ///< Nodes free immediately at current_time.
+        sim_time_t shadow_time;   ///< Reserved FCFS-head start time, or -1 if no head waits.
+        std::vector<Resource_Release> releases; ///< Capacity increases through shadow_time.
     };
 
     /**
