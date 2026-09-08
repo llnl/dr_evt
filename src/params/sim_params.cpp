@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file sim_params.cpp
+ * @brief Simulation command-line configuration implementation.
+ */
+
 #include <getopt.h>
 #include <limits>
 #include <string>

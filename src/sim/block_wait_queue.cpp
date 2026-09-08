@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file block_wait_queue.cpp
+ * @brief Explicit instantiations for supported block wait-queue sizes.
+ */
+
 #include "sim/block_wait_queue.hpp"
 
 namespace dr_evt {

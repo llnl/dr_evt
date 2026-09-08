@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_ljf.cpp
+ * @brief Longest-job-first scheduling implementation.
+ */
+
 #include "sim/scheduler_ljf.hpp"
 #include <algorithm>
 

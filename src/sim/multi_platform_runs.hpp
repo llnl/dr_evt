@@ -23,31 +23,44 @@ namespace dr_evt {
  *  @{ */
 
 /**
- *  Read the data file that contains the execution times of each benchmark
- *  runs on N number of platforms.
+ * @brief Store benchmark execution-time samples for N platforms.
+ * @details Reads a CSV whose first column is a sample label and whose next N
+ * columns are execution times. Platform names are read from the header.
+ * @tparam N Number of platform-time columns expected in the input.
  */
 template <size_t N>
 class Multi_Platform_Runs {
   public:
+    /// Execution-time value type.
     using texec_t = double;
+    /// One execution-time sample across every platform.
     using sample_t = typename std::array<texec_t, N>;
+    /// All execution-time samples.
     using data_t = typename std::vector<sample_t>;
+    /// Names of the N platform columns.
     using header_t = typename std::array<std::string, N>;
 
   protected:
-    /// Multi-platform execution times
+    /// Loaded execution-time samples.
     data_t m_data;
-    /// Platform names
+    /// Platform names parsed from the CSV header.
     header_t m_header;
 
   public:
-    /// Reserve the space of data vector
+    /** @brief Reserve storage for execution-time samples.
+     * @param[in] n Requested minimum sample capacity. */
     void reserve (const size_t n);
-    /// Load a data file
+    /** @brief Load platform execution times from CSV input.
+     * @param[in] ifname Input filename.
+     * @return true if the file was opened and parsed; false for an empty or unreadable filename.
+     * @throws std::out_of_range if a row has an unexpected column count. */
     bool load (const std::string& ifname);
-    /// Allow read-only access to the data
+    /** @brief Return loaded execution-time samples.
+     * @return Const reference to the data_t storage. */
     const data_t& get_data () const;
-    /// Print out the data
+    /** @brief Write the loaded data as CSV.
+     * @param[in,out] os Destination stream.
+     * @return The same destination stream after writing. */
     std::ostream& print (std::ostream& os) const;
 };
 

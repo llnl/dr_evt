@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file job_record.cpp
+ * @brief Job-record construction, serialization, and formatting.
+ */
+
 #include <iostream>
 #include <stdexcept>
 #include "trace/job_record.hpp"

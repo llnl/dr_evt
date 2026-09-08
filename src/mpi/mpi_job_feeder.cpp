@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file mpi_job_feeder.cpp
+ * @brief MPI rank-coordinated feeder for replaying a preloaded trace.
+ */
+
 /**
  * MPI Job Feeder - External job submission simulation
  *
@@ -42,7 +46,13 @@ class MpiFeederSimulation : public Simulation {
     using Simulation::submit_job;
 };
 
-// Partition jobs by rank (round-robin)
+/**
+ * @brief Assign permanent trace job identifiers to one MPI rank.
+ * @param[in] total_jobs Number of loaded jobs.
+ * @param[in] rank Calling MPI rank.
+ * @param[in] size Number of ranks in MPI_COMM_WORLD.
+ * @return Round-robin partition of job_no_t identifiers.
+ */
 std::vector<job_no_t> get_rank_jobs(size_t total_jobs, int rank, int size) {
     std::vector<job_no_t> my_jobs;
     for (size_t i = rank; i < total_jobs; i += size) {
@@ -51,6 +61,10 @@ std::vector<job_no_t> get_rank_jobs(size_t total_jobs, int rank, int size) {
     return my_jobs;
 }
 
+/** @brief Run the MPI trace-feeding executable.
+ * @param[in] argc Command-line argument count.
+ * @param[in] argv Command-line argument vector.
+ * @return Process status: zero on success. */
 int main(int argc, char** argv) {
     // Initialize MPI
     MPI_Init(&argc, &argv);

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file system_memory.cpp
+ * @brief Linux available-memory query and deterministic test override.
+ */
+
 #include "utils/system_memory.hpp"
 #include <cstdlib> // std::getenv
 #include <fstream>
@@ -17,9 +21,13 @@ namespace dr_evt {
 
 namespace {
 
-// Returns true and sets `out` if `str` is a valid non-negative integer;
-// false otherwise (leaves `out` untouched). Used for both the test-seam
-// environment variable and (indirectly) meminfo parsing.
+/**
+ * @brief Parse a complete non-negative integer string.
+ * @param[in] str Text to parse.
+ * @param[out] out Destination updated only on successful parsing.
+ * @return true if str contains only a representable non-negative integer;
+ *         false otherwise, leaving out unchanged.
+ */
 bool parse_nonneg(const std::string& str, std::size_t& out)
 {
     if (str.empty()) {

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_block_fcfs.cpp
+ * @brief Scheduling implementation for the block-based FCFS queue.
+ */
+
 #include "sim/scheduler_block_fcfs.hpp"
 #include <algorithm>
 

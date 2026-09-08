@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file parse_utils.cpp
+ * @brief Trace-field parsing and CSV preprocessing implementation.
+ */
+
 #include <algorithm>
 #include <stdexcept>
 #include <unordered_map>
@@ -153,7 +157,7 @@ std::string to_string(const job_queue_t q)
     return it->second;
 }
 
-/**
+/*
  * Removes leading and trailing spaces from a string
  */
 string trim(const string& str,
@@ -190,7 +194,7 @@ std::vector<substr_pos_t> comma_separate(const std::string& str)
     return ret;
 }
 
-/**
+/*
  *  Replace the comma, which is a delimiter, within a (double) quotation.
  *  Without this, parsing comma-sepated-value data may result in an error.
  *  Does not handle a case as "'...,..."' where quotation is done erroneously.
@@ -261,7 +265,7 @@ void replace_comma_within_quotation(string& line)
 }
 
 
-/**
+/*
  *  Case-insensitive substring search
  */
 bool search_ci(const string& str, const string& sub)

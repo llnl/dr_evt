@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_circular_fcfs.cpp
+ * @brief Scheduling implementation for the circular-buffer FCFS queue.
+ */
+
 #include "sim/scheduler_circular_fcfs.hpp"
 #include <algorithm>
 

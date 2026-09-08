@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_fcfs_alt.cpp
+ * @brief Differential-testing implementation of FCFS scheduling.
+ */
+
 #include "sim/scheduler_fcfs_alt.hpp"
 #include <algorithm>
 

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file dr_evt_params.cpp
+ * @brief Top-level setup-file command-line configuration implementation.
+ */
+
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <iterator>

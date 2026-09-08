@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file dr_evt_params.cpp
+ * @brief Protobuf configuration-to-parameter conversion implementation.
+ */
+
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -17,6 +21,11 @@
 
 namespace dr_evt {
 
+/** @brief Convert protobuf simulation fields into Sim_Params.
+ * @param[in] cfg Protobuf simulation configuration.
+ * @param[out] sp Destination simulator parameters.
+ * @param[in] verbose true to print selected settings.
+ * @throws std::runtime_error for unsupported configuration values. */
 static void set_sim_options(
     const dr_evt_proto::DR_EVT_Params::Simulation_Params& cfg,
     dr_evt::Sim_Params& sp, bool verbose = false)
@@ -268,6 +277,11 @@ static void set_sim_options(
     }
 }
 
+/** @brief Convert protobuf trace-tool fields into Trace_Params.
+ * @param[in] cfg Protobuf trace configuration.
+ * @param[out] tp Destination trace parameters.
+ * @param[in] verbose true to print selected settings.
+ * @throws std::runtime_error for unsupported configuration values. */
 static void set_trace_options(
     const dr_evt_proto::DR_EVT_Params::Tracing_Params& cfg,
     dr_evt::Trace_Params& tp, bool verbose = false)

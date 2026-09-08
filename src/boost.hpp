@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file boost.hpp
+ * @brief Boost graph selector traits used by DR_EVT graph abstractions.
+ */
+
 #ifndef DR_EVT_BOOST_HPP
 #define DR_EVT_BOOST_HPP
 
@@ -32,9 +36,17 @@ namespace dr_evt {
 /** \addtogroup dr_evt_global
  *  @{ */
 
+/**
+ * @brief Map a Boost graph selector to its canonical selector and ordering trait.
+ * @tparam S Boost vertex/container selector type.
+ * @details ordered is true for selectors with deterministic ordering and false
+ * for hash-based selectors.
+ */
 template<typename S = void>
 struct adjlist_selector_t {
+    /// Canonical Boost selector type.
     using type = ::boost::vecS;
+    /// Compile-time indication of deterministic ordering.
     using ordered = std::true_type;
 };
 

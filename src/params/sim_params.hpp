@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file sim_params.hpp
+ * @brief Simulation configuration types, command-line parsing, and defaults.
+ */
+
 #ifndef DR_EVT_PARAMS_SIM_PARAMS_HPP
 #define DR_EVT_PARAMS_SIM_PARAMS_HPP
 
@@ -24,13 +28,13 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * Queue implementation selection for FCFS scheduler
+ * @brief Wait-queue implementation selection for FCFS scheduling.
  */
 enum class QueueImplementation {
-    CIRCULAR,   // boost::circular_buffer based (FCFS default)
-    DEQUE,      // std::deque based (FCFS)
-    MULTIMAP,   // std::multimap based (FCFS alt, for differential testing)
-    BLOCK       // BlockWaitQueue based (optimized for large queues, FCFS only)
+    CIRCULAR,   ///< boost::circular_buffer implementation (default).
+    DEQUE,      ///< std::deque implementation.
+    MULTIMAP,   ///< Differential-testing multimap implementation.
+    BLOCK       ///< BlockWaitQueue implementation for large FCFS queues.
 };
 
 /**
@@ -38,87 +42,109 @@ enum class QueueImplementation {
  * wait queue's current capacity.
  */
 enum class CircularOverflowPolicy {
-    ABORT,  // Throw std::runtime_error, ending the simulation
-    GROW    // Reallocate to a larger capacity, copying existing entries over
+    ABORT,  ///< Throw std::runtime_error when capacity is exhausted.
+    GROW    ///< Reallocate a larger queue and retain existing entries.
 };
 
+/** @brief Complete configuration for a Simulation run or streaming session. */
 class Sim_Params {
  public:
+    /** @brief Construct parameters with project defaults. */
     Sim_Params();
+    /** @brief Parse and consume simulation command-line options.
+     * @param[in,out] argc Argument count, updated for consumed options.
+     * @param[in,out] argv Argument vector, updated for consumed options. */
     void getopt(int& argc, char** &argv);
+    /** @brief Print command-line usage and terminate with a status code.
+     * @param[in] exec Executable name.
+     * @param[in] code Process exit status. */
     void print_usage(const std::string exec, int code);
+    /** @brief Write the effective configuration to standard output. */
     void print() const;
+    /** @brief Set the simulated-trace output filename. @param[in] ofname Output path. */
     void set_outfile(const std::string& ofname);
-    /// Sets m_infile_list and parses it: reads list_path (one file path
-    /// per line, blank lines skipped, trailing whitespace/CR stripped),
-    /// populates m_infile_list_parsed, and sets m_infile to its first
-    /// entry - so Trace's own constructor (called from Simulation's
-    /// constructor, before Simulation::run() ever executes) always has
-    /// a real file to validate a header against, in progressive-loading
-    /// mode same as single-file mode. Shared by both ways to enable
-    /// progressive loading (--infile_list on the CLI, or a protobuf
-    /// config's infile_list field) so neither duplicates this parsing.
-    /// Throws std::runtime_error if list_path can't be opened or names
-    /// no files at all - callers decide how to surface that (getopt()
-    /// converts it to a usage error and exit(1); a protobuf config
-    /// error simply propagates, same as any other read_proto_params()
-    /// failure).
+    /**
+     * @brief Configure progressive loading from a file containing trace paths.
+     * @param[in] list_path File with one trace path per line.
+     * @details Skips blank lines, trims trailing whitespace and CR characters,
+     * populates m_infile_list_parsed, and assigns m_infile to its first entry
+     * so Trace construction can validate a real header before run(). Shared by
+     * the CLI and protobuf configuration paths.
+     * @throws std::runtime_error when list_path cannot be read or names no files.
+     */
     void set_infile_list(const std::string& list_path);
+    /** @brief Return the simulated-trace output filename. @return Output path. */
     std::string get_outfile() const;
+    /** @brief Set the resource-history output filename. @param[in] rfname Output path. */
     void set_resource_trace(const std::string& rfname);
+    /** @brief Return the resource-history output filename. @return Output path. */
     std::string get_resource_trace() const;
 
+    /// Random seed used for stochastic runtime sampling.
     unsigned m_seed;
+    /// Maximum jobs to load or simulate.
     dr_evt::num_jobs_t m_max_jobs;
+    /// Maximum simulation time horizon.
     dr_evt::sim_time_t m_max_time;
 
+    /// Primary input trace filename.
     std::string m_infile;
     std::string m_infile_list; ///< Path to a file listing multiple trace files, one per line, for progressive loading - empty means single-file mode via m_infile (unchanged)
     std::vector<std::string> m_infile_list_parsed; ///< Populated from m_infile_list during getopt() (one path per line, blank lines skipped) - m_infile is set to this list's first entry, so Trace's own constructor (which validates a file's header before Simulation::run() ever executes) always has a real file to check regardless of mode
 
+    /// Whether m_max_jobs was explicitly configured.
     bool m_is_jobs_set;
+    /// Whether m_max_time was explicitly configured.
     bool m_is_time_set;
 
-    // Scheduling parameters
+    /// Backfill behavior applied by the scheduler.
     BackfillPolicy m_backfill_policy;
+    /// Job priority/order policy applied by the scheduler.
     PriorityPolicy m_priority_policy;
-    // Scheduler uses time_limit as the best estimator for planning (realistic mode).
-    // m_run_time_mode below controls how jobs actually execute.
+    /// Wait-queue implementation used by FCFS scheduling.
     QueueImplementation m_queue_impl;
-    size_t m_block_size;  // Block size for block queue (must be power of 2)
-    size_t m_wait_queue_capacity;  // Initial capacity for circular queue (0 = size of job trace)
-    CircularOverflowPolicy m_wait_queue_overflow;  // What to do if circular queue capacity is exceeded
-    size_t m_job_store_capacity;  // Initial capacity (0 = size of job trace)
-    CircularOverflowPolicy m_job_store_overflow;  // What to do if job store capacity is exceeded
-    double m_memory_pressure_fraction;  // 0.0 = disabled; see Trace::set_memory_pressure_fraction()
-    size_t m_resource_history_capacity;  // Initial capacity for the resource-history
-                                          // circular buffer (0 = size of job trace).
-                                          // No overflow policy: unlike the wait queue
-                                          // or job store, every entry here is always
-                                          // immediately safe to reclaim (a strictly
-                                          // time-ordered append log), so reclaiming
-                                          // when full never needs an abort/grow fallback.
+    /// Block size for the block queue; must be a power of two.
+    size_t m_block_size;
+    /// Initial circular wait-queue capacity; zero selects trace size.
+    size_t m_wait_queue_capacity;
+    /// Overflow action for the circular wait queue.
+    CircularOverflowPolicy m_wait_queue_overflow;
+    /// Initial trace job-store capacity; zero selects trace size.
+    size_t m_job_store_capacity;
+    /// Overflow action for the trace job store.
+    CircularOverflowPolicy m_job_store_overflow;
+    /// Fraction of available system memory that triggers append rejection; zero disables it.
+    double m_memory_pressure_fraction;
+    /// Resource-history capacity; zero selects trace size. Entries are always reclaimable.
+    size_t m_resource_history_capacity;
+    /// Total nodes available to the simulated scheduler.
     num_nodes_t m_total_nodes;
-    std::string m_trace_format;  // "simple" or "lassen"
-    std::string m_timestamp_format;  // "epoch" or "iso"
-    std::string m_timezone;  // e.g., "UTC", "America/Los_Angeles", "America/New_York"
+    /// Input trace format name, such as "simple" or "lassen".
+    std::string m_trace_format;
+    /// Input timestamp format name, such as "epoch" or "iso".
+    std::string m_timestamp_format;
+    /// IANA timezone used for timestamps without an embedded offset.
+    std::string m_timezone;
 
-    // Run time determination (simulation mode) - how the job's actual,
-    // observed execution length is determined: actual (read from trace),
-    // distribution (sampled), or limit (use time_limit in place of run_time).
-    // Default is ACTUAL (most realistic).
+    /// Source of observed runtime: trace value, sampled distribution, or limit.
     RunTimeMode m_run_time_mode;
+    /// Distribution used when m_run_time_mode is DISTRIBUTION.
     DistributionType m_run_time_distribution;
-    double m_run_time_scale;    // Scale factor (e.g., 0.8 = jobs run 80% of estimate)
-    double m_run_time_stddev;   // Std deviation factor
+    /// Runtime scale, for example 0.8 for 80 percent of estimated limit.
+    double m_run_time_scale;
+    /// Runtime distribution standard-deviation factor.
+    double m_run_time_stddev;
 
-    // Output control
-    bool m_verbose;  // Enable verbose/debug output (default: false for production)
-    bool m_msec_output;  // Output timestamps with millisecond precision (default: false, integer seconds)
+    /// Enable verbose diagnostic output.
+    bool m_verbose;
+    /// Emit output timestamps with millisecond rather than integer-second precision.
+    bool m_msec_output;
 
  private:
+    /// Simulated-trace output filename.
     std::string m_outfile;
-    std::string m_resource_trace;  // Optional resource usage trace output
+    /// Optional resource-usage trace output filename.
+    std::string m_resource_trace;
 };
 
 /**@}*/

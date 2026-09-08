@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_base.cpp
+ * @brief Reservation projection and policy-to-scheduler factory implementation.
+ */
+
 #include "sim/scheduler_base.hpp"
 #include "sim/scheduler_fcfs.hpp"
 #include "sim/scheduler_fcfs_alt.hpp"

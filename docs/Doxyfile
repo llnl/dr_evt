@@ -8,10 +8,29 @@ OUTPUT_DIRECTORY       = docs/api
 CREATE_SUBDIRS         = NO
 
 # Input
-INPUT                  = src/ docs/
+# Keep this list explicit and non-recursive.  A recursive scan of ``src/`` can
+# follow generated build-directory links into third-party dependency sources.
+INPUT                  = src/ \
+                         src/mpi/ \
+                         src/params/ \
+                         src/proto/ \
+                         src/sim/ \
+                         src/trace/ \
+                         src/utils/ \
+                         docs/ \
+                         docs/api/ \
+                         docs/dev/ \
+                         docs/dev/design-decisions/ \
+                         docs/getting-started/ \
+                         docs/reference/ \
+                         docs/user-guide/
 FILE_PATTERNS          = *.hpp *.cpp *.md
-RECURSIVE              = YES
-EXCLUDE                = build/ tests/
+RECURSIVE              = NO
+# INPUT is deliberately limited to project directories above.  Do not list
+# excluded dependency/build trees here: Doxygen scans every EXCLUDE directory
+# while constructing its exclusion list.
+EXCLUDE                =
+EXCLUDE_PATTERNS       =
 
 # Output formats
 GENERATE_HTML          = YES

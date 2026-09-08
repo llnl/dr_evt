@@ -5,6 +5,12 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file sim.cpp
+ * @brief Discrete-event simulation orchestration implementation.
+ * @details Public Simulation contracts are documented in sim.hpp; this file
+ * contains event-loop sequencing, runtime sampling, and output mechanics.
+ */
+
 #include "sim/sim.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"

@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file job_stat_submit.cpp
+ * @brief Submission-arrival statistics implementation.
+ */
+
 #include <cmath>
 #include <cassert>
 #include "trace/job_stat_submit.hpp"

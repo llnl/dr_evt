@@ -32,19 +32,30 @@ template<size_t BlockSize>
 class BlockWaitQueue {
 public:
     /**
-     * Constructor
-     * Block size is compile-time constant (template parameter)
+     * @brief Construct an empty block-based wait queue.
+     * @details The block size is fixed by the BlockSize template parameter.
      */
     BlockWaitQueue();
 
+    /** @brief Return the compile-time number of jobs per block. @return Block capacity as size_t. */
     static constexpr size_t block_size() { return BlockSize; }
+
+    /** @brief Return log2(block_size()), used to map job IDs to blocks. @return Bit shift as size_t. */
     static constexpr size_t block_size_shift() {
         return compute_log2_constexpr(BlockSize);
     }
 
     /**
-     * Insert a job into the queue
-     * Complexity: O(1) amortized
+     * @brief Insert a waiting job in FCFS order.
+     * @details
+     * Appends to the current fixed-size block, creating a block when the
+     * current one is full. Job identifiers are expected to be monotonically
+     * increasing so remove() can locate their block by offset.
+     * @param[in] job_id Trace job identifier.
+     * @param[in] submit_time Job arrival time.
+     * @param[in] run_time_estimate Time-limit estimate used for backfill fitting.
+     * @param[in] nodes_requested Nodes requested by the job.
+     * @note Amortized complexity is O(1).
      */
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,
@@ -52,13 +63,22 @@ public:
                     num_nodes_t nodes_requested);
 
     /**
-     * Remove a job from the queue (immediate deletion)
-     * Complexity: O(log n) where n = jobs in the block (multi_index erase)
+     * @brief Remove a job immediately if it remains in the queue.
+     * @details
+     * A missing or already removed identifier is a no-op. Removing an entry
+     * updates both per-block and queue-wide active counts.
+     * @param[in] job_id Trace job identifier.
+     * @note Complexity is O(log n), where n is jobs in the affected block.
      */
     void remove(job_no_t job_id);
 
     /**
-     * Find AND REMOVE a backfill candidate job (combined operation - no double search!)
+     * @brief Find and remove the first FCFS-ordered job that can backfill.
+     * @details
+     * Blocks are first rejected using their minimum estimated runtime and
+     * node request. Remaining blocks are searched in FCFS order; the first
+     * arrived job that fits available nodes and finishes strictly before the
+     * FCFS reservation is removed and returned.
      *
      * Pre-filters blocks by:
      * 1. Time constraint: block.min_run_time must fit in window
@@ -67,10 +87,10 @@ public:
      * Then scans qualifying blocks in FCFS (sequential) order.
      * When found, IMMEDIATELY removes the job (we have the iterator already).
      *
-     * @param available_nodes Resources currently available
-     * @param current_time Current simulation time
-     * @param reservation_time FCFS head reservation time
-     * @return job_id if found and removed, nullopt otherwise
+     * @param[in] available_nodes Resources currently available.
+     * @param[in] current_time Current simulation time.
+     * @param[in] reservation_time FCFS head reservation time.
+     * @return Optional job_no_t: selected-and-removed job ID, or std::nullopt.
      *
      * Complexity: O(B × S) where B = blocks scanned, S = jobs scanned per block
      *             Typically B = 1-2, S = 10-50 due to pre-filtering
@@ -81,46 +101,54 @@ public:
         sim_time_t reservation_time);
 
     /**
-     * Iterate over all jobs in FCFS order
-     * Used for FCFS head selection and general queue operations
+     * @brief Invoke a callable for every active job in FCFS order.
+     * @details
+     * Iteration visits each nonempty block in insertion order and then each
+     * block's sequenced index. The callable receives only a Trace job ID.
+     * @tparam Func Callable accepting a job_no_t.
+     * @param[in] func Callable to invoke.
      */
     template<typename Func>
     void for_each_active(Func&& func) const;
 
-    /**
-     * Get total number of jobs (including removed)
-     */
+    /** @brief Return jobs ever inserted, including jobs later removed. @return Count as size_t. */
     size_t size() const { return m_total_jobs; }
 
-    /**
-     * Get number of active (non-removed) jobs
-     */
+    /** @brief Return jobs currently waiting in the queue. @return Active-job count as size_t. */
     size_t active_count() const { return m_active_count; }
 
-    /**
-     * Check if queue is empty (no active jobs)
-     */
+    /** @brief Report whether no active jobs remain. @return true when active_count() is zero. */
     bool empty() const { return m_active_count == 0; }
 
-    /**
-     * Get statistics for tuning/debugging
-     */
+    /** @brief Return accumulated backfill-search instrumentation. @return Stats value snapshot. */
     struct Stats {
+        /// Number of blocks currently allocated.
         size_t num_blocks;
-        size_t blocks_skipped_empty;      // active_count == 0
+        /// Blocks skipped because their active count is zero.
+        size_t blocks_skipped_empty;
+        /// Nonempty blocks inspected during a candidate search.
         size_t blocks_checked;
+        /// Blocks skipped because no job can finish before the reservation.
         size_t blocks_skipped_time;
+        /// Blocks skipped because no job can fit current resources.
         size_t blocks_skipped_resource;
+        /// Individual jobs examined after block-level filtering.
         size_t jobs_scanned;
     };
+    /** @brief Return accumulated backfill-search instrumentation. */
     Stats get_stats() const { return m_stats; }
+    /** @brief Clear accumulated backfill-search instrumentation. */
     void reset_stats() { m_stats = {}; }
 
 private:
     struct JobEntry {
+        /// Stable identifier of the Trace job represented by this entry.
         job_no_t job_id;
+        /// Arrival time used to reject future jobs during a search.
         sim_time_t submit_time;
+        /// Requested time limit used to test whether a job fits a reservation.
         tdiff_t run_time_estimate;
+        /// Nodes requested by the job.
         num_nodes_t nodes_requested;
     };
 
@@ -149,7 +177,9 @@ private:
     >;
 
     struct BlockInfo {
+        /// Multi-index container for this block's active jobs.
         JobBlock block;
+        /// Number of active entries currently held in block.
         size_t active_count;
 
         BlockInfo() : active_count(0) {}
@@ -172,14 +202,20 @@ private:
         return (value <= 1) ? 0 : 1 + compute_log2_constexpr(value >> 1);
     }
 
-    std::deque<BlockInfo> m_blocks;                   // All blocks in FCFS order (never sort!)
-    size_t m_current_block_idx;                       // Block being filled
-    job_no_t m_first_job_id;                          // First job ID for offset calc
+    /// Blocks in FCFS order; they are never reordered.
+    std::deque<BlockInfo> m_blocks;
+    /// Index of the block currently receiving newly inserted jobs.
+    size_t m_current_block_idx;
+    /// First inserted job ID, used to compute a block offset.
+    job_no_t m_first_job_id;
 
-    size_t m_total_jobs;                              // Including removed
-    size_t m_active_count;                            // Non-removed only
+    /// Jobs ever inserted, including entries subsequently removed.
+    size_t m_total_jobs;
+    /// Jobs currently active across all blocks.
+    size_t m_active_count;
 
-    mutable Stats m_stats;                            // Performance stats
+    /// Mutable instrumentation updated during const read/query operations.
+    mutable Stats m_stats;
 };
 
 // Template implementation - moved to header for template instantiation

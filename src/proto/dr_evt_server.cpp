@@ -8,6 +8,10 @@
  *                                                                            *
  ******************************************************************************/
 
+/** @file dr_evt_server.cpp
+ * @brief gRPC server exposing streaming simulation operations.
+ */
+
 #include <grpcpp/grpcpp.h>
 #include <atomic>
 #include <cctype>
@@ -35,6 +39,9 @@ namespace {
 
 std::atomic<uint64_t> next_session_sequence{0};
 
+/** @brief Validate a client-provided filename-safe session name.
+ * @param[in] name Candidate session name.
+ * @return true for a 1-128 character alphanumeric, dot, dash, or underscore name. */
 bool is_safe_session_name(const std::string& name)
 {
     if (name.empty() || name.size() > 128) {
@@ -49,6 +56,9 @@ bool is_safe_session_name(const std::string& name)
     return name != "." && name != "..";
 }
 
+/** @brief Generate a collision-resistant server-side session identifier.
+ * @param[in] session_name Validated client session name.
+ * @return Identifier combining name, timestamp, sequence, and random nonce. */
 std::string make_session_id(const std::string& session_name)
 {
     const auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -59,6 +69,9 @@ std::string make_session_id(const std::string& session_name)
            std::to_string(sequence) + "-" + std::to_string(nonce);
 }
 
+/** @brief Copy simulator statistics into a protobuf response.
+ * @param[in] statistics Source statistics snapshot.
+ * @param[out] response Destination protobuf response. */
 void copy_statistics(const dr_evt::Simulation::Statistics& statistics,
                      GetStatisticsResponse* response)
 {
@@ -76,6 +89,10 @@ void copy_statistics(const dr_evt::Simulation::Statistics& statistics,
     response->set_makespan(statistics.makespan);
 }
 
+/** @brief Write one statistics snapshot as JSON.
+ * @param[in] filename Destination JSON filename.
+ * @param[in] statistics Statistics snapshot to serialize.
+ * @throws std::runtime_error when the file cannot be written. */
 void write_statistics_file(const std::string& filename,
                            const dr_evt::Simulation::Statistics& statistics)
 {
@@ -106,6 +123,14 @@ void write_statistics_file(const std::string& filename,
 
 class SimulationServiceImpl final : public SimulationService::Service {
 public:
+    /**
+     * @brief Serve one bidirectional streaming simulation session.
+     * @param[in] context gRPC server context for cancellation and metadata.
+     * @param[in,out] stream Bidirectional client-request/server-response stream.
+     * @return gRPC OK on normal completion, otherwise an RPC status error.
+     * @details The session initializes one Simulation and then processes
+     * append, advance, query, and output requests serially.
+     */
     Status Session(ServerContext* context,
                     ServerReaderWriter<ServerMessage, ClientMessage>* stream) override
     {
@@ -352,6 +377,9 @@ public:
     }
 
 private:
+    /** @brief Ensure a session has processed Init before subsequent requests.
+     * @param[in] sim Session simulation pointer.
+     * @throws std::runtime_error when initialization has not occurred. */
     static void require_init(const std::unique_ptr<dr_evt::Simulation>& sim)
     {
         if (!sim) {
@@ -362,6 +390,8 @@ private:
 
 } // namespace dr_evt_grpc
 
+/** @brief Start the DR_EVT gRPC server and wait for shutdown.
+ * @param[in] address Listen address in host:port form. */
 void RunServer(const std::string& address)
 {
     dr_evt_grpc::SimulationServiceImpl service;
@@ -375,6 +405,10 @@ void RunServer(const std::string& address)
     server->Wait();
 }
 
+/** @brief Run the gRPC server executable.
+ * @param[in] argc Command-line argument count.
+ * @param[in] argv Command-line argument vector.
+ * @return Process status: zero on normal server shutdown. */
 int main(int argc, char** argv)
 {
     std::string address = "0.0.0.0:50051";

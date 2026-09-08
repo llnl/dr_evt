@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file job_stat_texec.hpp
+ * @brief Execution-time statistics across job records.
+ */
+
 #ifndef DR_EVT_TRACE_JOB_STAT_TEXEC
 #define DR_EVT_TRACE_JOB_STAT_TEXEC
 #include <map>
@@ -21,7 +25,8 @@ namespace dr_evt {
  *  @{ */
 
 /**
- *  Statistics on job run time given timeout limit.
+ * @brief Accumulate actual-runtime distributions grouped by requested limit.
+ * @tparam N Number of equal timeout-fraction bins.
  */
 template <size_t N>
 class Job_Stat_Texec {
@@ -43,7 +48,9 @@ class Job_Stat_Texec {
     using tbins_by_nnodes_t = typename std::map<num_nodes_t, tbins_t>;
 
     struct timeout_slot {
+        /// Jobs accumulated for this requested-time-limit slot.
         num_jobs_t m_num_jobs;
+        /// Per-node-count runtime-fraction histograms.
         tbins_by_nnodes_t m_bins;
 
         timeout_slot() : m_num_jobs(static_cast<num_jobs_t>(0u)) {};
@@ -52,11 +59,16 @@ class Job_Stat_Texec {
     using tjob_t = std::map<timeout_t, timeout_slot>;
 
   protected:
+    /// Histograms indexed by requested job time limit.
     tjob_t m_tjob;
 
   public:
+    /** @brief Construct an empty runtime-statistics accumulator.
+     * @throws std::invalid_argument when N is zero. */
     Job_Stat_Texec();
 
+    /** @brief Add one job's actual-runtime observation.
+     * @param[in] j Job record supplying limit, actual runtime, and node count. */
     void add_stat(const Job_Record& j);
 };
 

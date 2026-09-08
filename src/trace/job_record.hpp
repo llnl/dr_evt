@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file job_record.hpp
+ * @brief One trace job's scheduling, timing, and resource fields.
+ */
+
 #ifndef DR_EVT_TRACE_JOB_RECORD_HPP
 #define DR_EVT_TRACE_JOB_RECORD_HPP
 

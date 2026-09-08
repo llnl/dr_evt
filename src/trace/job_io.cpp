@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file job_io.cpp
+ * @brief Job-trace input and diagnostic output implementation.
+ */
+
 #include <fstream>
 #include <sstream>
 #include <stdexcept>

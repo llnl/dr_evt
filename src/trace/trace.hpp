@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file trace.hpp
+ * @brief Trace storage, event processing, streaming append, and output APIs.
+ */
+
 #ifndef DR_EVT_TRACE_TRACE_HPP
 #define DR_EVT_TRACE_TRACE_HPP
 

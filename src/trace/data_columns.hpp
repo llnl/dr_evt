@@ -5,6 +5,10 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file data_columns.hpp
+ * @brief Trace-format column selection and header validation.
+ */
+
 #ifndef DR_EVT_TRACE_DATA_COLUMNS_HPP
 #define DR_EVT_TRACE_DATA_COLUMNS_HPP
 
@@ -19,6 +23,11 @@ namespace dr_evt {
 /** \addtogroup dr_evt_trace
  *  @{ */
 
+/**
+ * @brief Describes which fields to read from a supported trace format.
+ * @details Validates the source header, maps logical names to raw column
+ * positions, and extracts only the substrings needed to build Job_Record data.
+ */
 class Data_Columns {
   public:
     using data_columns_t = std::vector<column_id_t>;
@@ -58,8 +67,15 @@ class Data_Columns {
     col_no_t m_col_to_avoid_idx;
 
   public:
+    /** @brief Construct the default trace-column mapping. */
     Data_Columns();
-    Data_Columns(const std::string& format);  // "simple" or "lassen"
+    /** @brief Construct a mapping for a named trace format.
+     * @param[in] format Supported format name, such as "simple" or "lassen". */
+    Data_Columns(const std::string& format);
+    /** @brief Construct a mapping with timestamp and timezone controls.
+     * @param[in] format Supported trace format name.
+     * @param[in] timestamp_format Timestamp encoding name.
+     * @param[in] timezone Timezone used for timestamps without offsets. */
     Data_Columns(const std::string& format, const std::string& timestamp_format, const std::string& timezone);
     virtual ~Data_Columns();
 
@@ -74,17 +90,32 @@ class Data_Columns {
      *  Check if the column filter is consistent with the header of data file.
      *  It also detects the total number of columns.
      */
+    /** @brief Validate a trace header against this mapping.
+     * @param[in] fname Input trace filename.
+     * @return true when the header is compatible and column positions were resolved. */
     bool check_header(const std::string& fname);
 
     /// Return the number of columns
     num_cols_t size() const { return static_cast<num_cols_t>(m_cols_to_read.size()); }
 
     /// Select the substring ranges that matches the columns of interest
+    /** @brief Extract ranges for the configured fields from one input row.
+     * @param[in] str Raw trace row.
+     * @return Substring positions corresponding to selected columns.
+     * @details The Lassen format may contain a user-script field with
+     * difficult-to-parse content; the configured filter deliberately avoids
+     * that raw column before CSV ranges are selected. */
     virtual std::vector<substr_pos_t> pick_values(const std::string& str) const;
 
     /// Return the index of the column in raw data by name
+    /** @brief Return a logical column's index in the raw input row.
+     * @param[in] col_name Logical column name.
+     * @return Raw column index as col_no_t. */
     col_no_t column_idx_raw(const std::string& col_name) const;
 
+    /** @brief Return a logical column's index in the filtered field list.
+     * @param[in] col_name Logical column name.
+     * @return Filtered column index as col_no_t. */
     col_no_t column_idx(const std::string& col_name) const;
 
     col_no_t get_queue_idx() const { return m_queue_idx; }

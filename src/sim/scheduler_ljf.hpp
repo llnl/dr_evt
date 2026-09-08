@@ -22,28 +22,34 @@ namespace dr_evt {
  */
 class LJFScheduler : public SchedulerBase {
 public:
+    /** @copydoc SchedulerBase::SchedulerBase */
     LJFScheduler(num_nodes_t total_nodes,
                  const Trace& job_data,
                  BackfillPolicy backfill_policy);
 
+    /** @copydoc SchedulerBase::insert_job */
     void insert_job(job_no_t job_id,
                     sim_time_t submit_time,
                     tdiff_t run_time,
                     num_nodes_t nodes) override;
 
+    /** @copydoc SchedulerBase::schedule */
     std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,
         const std::map<job_no_t, sim_time_t>& running_jobs,
         sim_time_t current_time) override;
 
+    /** @copydoc SchedulerBase::sync_to */
     void sync_to(sim_time_t current_time) override {
         update_eligible_jobs(current_time);
     }
 
+    /** @copydoc SchedulerBase::active_job_count */
     size_t active_job_count() override {
         return m_eligible_jobs.size();
     }
 
+    /** @copydoc SchedulerBase::get_next_arrival_time */
     sim_time_t get_next_arrival_time() override {
         // m_current_tracked_time is exactly "whatever time this
         // scheduler was last synced to via sync_to()" - using it here
@@ -59,46 +65,52 @@ public:
         return next;
     }
 
+    /** @copydoc SchedulerBase::has_eligible_jobs */
     bool has_eligible_jobs() override {
         return !m_eligible_jobs.empty();
     }
 
 protected:
+    /** @copydoc SchedulerBase::wait_queue_size */
     size_t wait_queue_size() const override {
         return m_wait_queue.size();
     }
 
 private:
     struct JobEntry {
+        /// Stable identifier of the Trace job represented by this entry.
         job_no_t job_id;
+        /// Arrival time used to determine eligibility.
         sim_time_t submit_time;
+        /// Requested time limit; also the LJF priority key.
         tdiff_t run_time;
+        /// Nodes requested when this job is started.
         num_nodes_t nodes;
         // No removed flag - see SJFScheduler for full reasoning.
         // schedule() erases scheduled entries from m_wait_queue
         // immediately via the iterator it already holds.
     };
 
-    // Comparator for descending order (longest first)
+    /// Orders estimates from longest to shortest for the multimap key.
     struct DescendingRunTime {
         bool operator()(tdiff_t a, tdiff_t b) const {
             return a > b;  // Reverse: larger run_time comes first
         }
     };
 
-    // Ordered by run_time (longest first), then by job_id for stability
+    /// Jobs ordered by longest estimate, then stable Trace job identifier.
     std::multimap<tdiff_t, JobEntry, DescendingRunTime> m_wait_queue;
 
-    // Track eligible jobs (submit_time <= current_time)
+    /// Identifiers of arrived jobs still waiting to be scheduled.
     std::set<job_no_t> m_eligible_jobs;
 
-    // Last tracked time for eligibility updates
+    /// Latest time to which arrival eligibility has been synchronized.
     sim_time_t m_current_tracked_time;
 
-    // Update eligible set as time advances
+    /** @brief Add newly arrived jobs to the eligibility set. @param[in] current_time New scheduler time. */
     void update_eligible_jobs(sim_time_t current_time);
 
-    // Find FCFS head (earliest submit_time among eligible jobs)
+    /** @brief Find the earliest-arriving eligible job. @return Iterator to the FCFS head. */
     std::multimap<tdiff_t, JobEntry, DescendingRunTime>::iterator find_fcfs_head();
 };
 

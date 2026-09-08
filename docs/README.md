@@ -81,6 +81,23 @@ Installs:
 - sphinx-rtd-theme (ReadTheDocs theme)
 - myst-parser (Markdown support)
 
+Install Doxygen separately through your system package manager (for example,
+`apt install doxygen` or `brew install doxygen`) to generate the optional C++
+API reference. It is not required for the Sphinx documentation site.
+
+### HTML site and C++ API reference
+
+```bash
+cd docs
+make html
+```
+
+`make html` builds the Sphinx site. When Doxygen is available, it also
+generates and links the C++ reference at `_build/html/cpp-api/`; otherwise it
+skips that optional reference. The Sphinx API navigation includes a link when
+the reference is generated. Run `make doxygen` when only the C++ API reference
+is needed.
+
 ### Build HTML Documentation
 
 ```bash
