@@ -77,36 +77,48 @@ MPI_TEST="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_multi_client_se
 if [ ! -f "$MPI_TEST" ]; then
     echo "  ⚠ SKIP - $MPI_TEST not found"
     echo "    (MPI not found at configure time, or not yet built)"
-elif ! command -v mpirun > /dev/null 2>&1; then
-    echo "  ⚠ SKIP - mpirun not found on PATH"
 else
-    if MPI_OUT=$(mpirun --allow-run-as-root --oversubscribe -np 4 \
-        $MPI_TEST \
-        $SERVER 53100 \
-        "$TRACE_DIR/composite_server1.csv" "$TRACE_DIR/composite_server2.csv" \
-        "$TRACE_DIR/composite_jobs.csv" 2>&1); then
-        MPI_STATUS=0
+    if command -v mpirun > /dev/null 2>&1; then
+        MPI_LAUNCHER=(mpirun -np 4)
+        MPI_LAUNCHER_NAME="mpirun"
+    elif command -v srun > /dev/null 2>&1; then
+        MPI_LAUNCHER=(srun --nodes=1 --ntasks=4 --kill-on-bad-exit=1)
+        MPI_LAUNCHER_NAME="srun"
     else
-        MPI_STATUS=$?
+        MPI_LAUNCHER=()
+        MPI_LAUNCHER_NAME=""
     fi
 
-    # Each server receives four ordinary jobs and two composite fragments.
-    # The output also proves the equal (t1 == t2 == t3) and strict
-    # (t1 < t2 < t3 < t4) AppendJobs/AdvanceTo boundaries were reached.
-    if [ "$MPI_STATUS" -eq 0 ] && \
-       echo "$MPI_OUT" | grep -q "submitted=6 completed=6" && \
-       [ "$(echo "$MPI_OUT" | grep -c "submitted=6 completed=6")" -eq 2 ] && \
-       echo "$MPI_OUT" | grep -q "t1 == t2" && \
-       echo "$MPI_OUT" | grep -q "t1 < t2" && \
-       echo "$MPI_OUT" | grep -q "composite at t3 == t2" && \
-       echo "$MPI_OUT" | grep -q "composite at t3 after ordinary batch"; then
-        echo "  ✓ PASS"
-        PASS=$((PASS + 1))
+    if [ -z "$MPI_LAUNCHER_NAME" ]; then
+        echo "  ⚠ SKIP - neither mpirun nor srun is available on PATH"
     else
-        echo "  ✗ FAIL"
-        echo "     mpirun output:"
-        echo "$MPI_OUT" | sed 's/^/       /'
-        FAIL=$((FAIL + 1))
+        if MPI_OUT=$("${MPI_LAUNCHER[@]}" "$MPI_TEST" \
+            "$SERVER" 53100 \
+            "$TRACE_DIR/composite_server1.csv" "$TRACE_DIR/composite_server2.csv" \
+            "$TRACE_DIR/composite_jobs.csv" 2>&1); then
+            MPI_STATUS=0
+        else
+            MPI_STATUS=$?
+        fi
+
+        # Each server receives four ordinary jobs and two composite fragments.
+        # The output also proves the equal (t1 == t2 == t3) and strict
+        # (t1 < t2 < t3 < t4) AppendJobs/AdvanceTo boundaries were reached.
+        if [ "$MPI_STATUS" -eq 0 ] && \
+           echo "$MPI_OUT" | grep -q "submitted=6 completed=6" && \
+           [ "$(echo "$MPI_OUT" | grep -c "submitted=6 completed=6")" -eq 2 ] && \
+           echo "$MPI_OUT" | grep -q "t1 == t2" && \
+           echo "$MPI_OUT" | grep -q "t1 < t2" && \
+           echo "$MPI_OUT" | grep -q "composite at t3 == t2" && \
+           echo "$MPI_OUT" | grep -q "composite at t3 after ordinary batch"; then
+            echo "  ✓ PASS"
+            PASS=$((PASS + 1))
+        else
+            echo "  ✗ FAIL"
+            echo "     $MPI_LAUNCHER_NAME output:"
+            echo "$MPI_OUT" | sed 's/^/       /'
+            FAIL=$((FAIL + 1))
+        fi
     fi
 fi
 

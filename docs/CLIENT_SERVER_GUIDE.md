@@ -247,6 +247,13 @@ mpirun -np 4 ./build/test_grpc_multi_client_server \
     tests/test_traces/grpc/composite_server1.csv \
     tests/test_traces/grpc/composite_server2.csv \
     tests/test_traces/grpc/composite_jobs.csv
+
+# Or, from a Slurm allocation:
+srun -N 1 -n 4 ./build/test_grpc_multi_client_server \
+    ./build/dr_evt_server <base_port> \
+    tests/test_traces/grpc/composite_server1.csv \
+    tests/test_traces/grpc/composite_server2.csv \
+    tests/test_traces/grpc/composite_jobs.csv
 ```
 
 Rank layout: ranks 0-1 are servers and ranks 2-3 are clients, paired 1:1.
@@ -260,7 +267,8 @@ a multi-node deployment recipe.
 
 `tests/run_grpc_tests.sh` covers both the basic single-pair session and
 the MPI harness (skipped gracefully, not failed, if the MPI binary wasn't
-built or `mpirun` isn't on `PATH`):
+built or neither `mpirun` nor `srun` is on `PATH`). The runner prefers
+`mpirun` and falls back to `srun`:
 
 ```bash
 ./tests/run_grpc_tests.sh
@@ -281,6 +289,6 @@ above.
 This is a separate, dedicated test script (not folded into
 `run_feature_tests.sh` or another existing harness) because it needs its
 own binaries (`dr_evt_server`, `dr_evt_client`, and optionally
-`test_grpc_multi_client_server`) and its own `mpirun` invocation, neither
+`test_grpc_multi_client_server`) and its own MPI-launcher invocation, neither
 of which fit the existing scripts' `./build/simulator <trace> --flags`
 pattern.

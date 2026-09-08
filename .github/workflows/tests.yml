@@ -63,7 +63,13 @@ jobs:
           cmake --version
           python3 --version
           echo "=== MPI version ==="
-          mpirun --version
+          if command -v mpirun >/dev/null 2>&1; then
+            mpirun --version
+          elif command -v srun >/dev/null 2>&1; then
+            srun --version
+          else
+            echo "No MPI launcher (mpirun or srun) found"
+          fi
           echo "=== Boost version ==="
           dpkg -l | grep libboost-dev
 

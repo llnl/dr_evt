@@ -445,8 +445,9 @@ sequenceDiagram
     end
 ```
 
-Run it inside a one-node Slurm allocation after installing a build with gRPC
-and MPI enabled:
+Run it where either `mpirun` or `srun` can launch four ranks after installing
+a build with gRPC and MPI enabled. The runner prefers `mpirun` and falls back
+to `srun`:
 
 ```bash
 ./tests/run_grpc_composite_mpi_test.sh
