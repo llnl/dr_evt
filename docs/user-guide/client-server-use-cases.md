@@ -111,38 +111,38 @@ fragments concurrently.
 
 ```{mermaid}
 sequenceDiagram
-    participant C as Composite-job coordinator
-    participant A as Server A scheduler
-    participant B as Server B scheduler
+    participant C as Coordinator
+    participant A as Server A
+    participant B as Server B
 
-    C->>A: Init; AppendJobs + SubmitJob(ordinary arrivals through tn)
-    C->>B: Init; AppendJobs + SubmitJob(ordinary arrivals through tn)
+    C->>A: Initialize and submit ordinary jobs through tn
+    C->>B: Initialize and submit ordinary jobs through tn
     Note over A,B: Each server has independent nodes and scheduler state
 
-    loop Each composite event at submit time tc
-        Note over C,B: Ordinary batch ends at tn <= tc; choose an advance watermark ta <= tc
+    loop Each composite event at tc
+        Note over C,B: Ordinary jobs end at or before tc. Pick ta at or before tc
         par Synchronize simulated time
-            C->>A: AdvanceTo(ta): process arrivals through ta
+            C->>A: Advance to ta and process arrivals
         and
-            C->>B: AdvanceTo(ta): process arrivals through ta
+            C->>B: Advance to ta and process arrivals
         end
-        C->>A: Read pre-event statistics
-        C->>B: Read pre-event statistics
+        C->>A: Read statistics before the event
+        C->>B: Read statistics before the event
         par Submit one fragment per system
-            C->>A: AppendJob(s) + SubmitJob (fragment A, submit_time=tc)
+            C->>A: Submit fragment A at tc
         and
-            C->>B: AppendJob(s) + SubmitJob (fragment B, submit_time=tc)
+            C->>B: Submit fragment B at tc
         end
-        par Evaluate newly appended fragments at the same time tc
-            C->>A: AdvanceTo(tc) + read post-event statistics
+        par Evaluate fragments at tc
+            C->>A: Advance to tc and read statistics
         and
-            C->>B: AdvanceTo(tc) + read post-event statistics
+            C->>B: Advance to tc and read statistics
         end
         Note over C: Record immediate, delayed, or partial start
-        opt Incremental ordinary-job stream
-            Note over C,B: Next AppendJobs batch starts at t0, where tc < t0
-            C->>A: AppendJobs + SubmitJob(each next ordinary arrival)
-            C->>B: AppendJobs + SubmitJob(each next ordinary arrival)
+        opt Incremental ordinary job stream
+            Note over C,B: Next ordinary batch starts after tc
+            C->>A: Submit each next ordinary arrival
+            C->>B: Submit each next ordinary arrival
         end
     end
     Note over C,B: This observes independent schedules; it makes no reservation or rollback
