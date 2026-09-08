@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1030" height="440" viewBox="0 0 1030 440" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="930" height="315" viewBox="50 35 930 315" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
   <title id="title">Scalable DR_EVT gRPC deployment</title>
   <desc id="description">Workload sources feed one or more client processes or digital-twin controllers. They use independent bidirectional gRPC sessions with one or more DR_EVT server processes. Each session owns an isolated simulation with its own scheduler state and nodes.</desc>
   <defs>
