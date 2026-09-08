@@ -74,9 +74,9 @@ class TestResult:
 def create_test_trace(filename, jobs):
     """Create a test trace file"""
     with open(filename, 'w') as f:
-        f.write("job_submit_time,num_nodes,exit_status,queue,time_limit\n")
+        f.write("job_submit_time,num_nodes,queue,time_limit\n")
         for job in jobs:
-            f.write(f"{job[0]},{job[1]},0,pbatch,{job[2]}\n")
+            f.write(f"{job[0]},{job[1]},pbatch,{job[2]}\n")
 
 
 def test_module_import(result):

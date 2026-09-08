@@ -12,7 +12,7 @@ For example (four MPI ranks means three servers)::
         --server-binary ./build/dr_evt_server --base-port 50051 -- \
         --jobs /shared/jobs.csv --total-nodes 1000
 
-The default client is ``grpc_multi_client.py``.  It receives its normal
+The default controller is ``grpc_multi_server.py``.  It receives its normal
 arguments after ``--``; do not provide ``--server`` yourself, since this
 launcher supplies the endpoints discovered from the server ranks.
 """
@@ -32,8 +32,8 @@ def parse_args():
     parser.add_argument("--base-port", type=int, default=50051,
                         help="server rank r listens on this port + r - 1")
     parser.add_argument("--client-script", type=pathlib.Path,
-                        help="Python client script for rank 0 "
-                             "(default: grpc_multi_client.py beside this file)")
+                        help="Python controller script for rank 0 "
+                             "(default: grpc_multi_server.py beside this file)")
     parser.add_argument("client_args", nargs=argparse.REMAINDER,
                         help="arguments for the client script; precede with --")
     args = parser.parse_args()
@@ -124,7 +124,7 @@ def main():
             status = 1
         else:
             script = args.client_script or pathlib.Path(__file__).with_name(
-                "grpc_multi_client.py")
+                "grpc_multi_server.py")
             command = [sys.executable, str(script), *args.client_args]
             addresses = []
             for item in reports[1:]:

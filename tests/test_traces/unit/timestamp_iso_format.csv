@@ -1,4 +1,4 @@
-job_submit_time,num_nodes,exit_status,queue,time_limit
-2024-01-01 00:00:00,30,0,pbatch,100
-2024-01-01 00:00:05,30,0,pbatch,60
-2024-01-01 00:00:10,30,0,pbatch,60
+job_submit_time,num_nodes,queue,time_limit
+2024-01-01 00:00:00,30,pbatch,100
+2024-01-01 00:00:05,30,pbatch,60
+2024-01-01 00:00:10,30,pbatch,60

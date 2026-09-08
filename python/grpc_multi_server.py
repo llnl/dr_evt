@@ -184,7 +184,7 @@ def main():
     parser.add_argument("--priority-policy", default="fcfs")
     parser.add_argument("--queue-impl", default="circular")
     parser.add_argument("--advance-to", type=float, default=1e9)
-    parser.add_argument("--session-name", default="multi-client",
+    parser.add_argument("--session-name", default="multi-server",
                         help="prefix for server-generated session report names")
     args = parser.parse_args()
     args.server_infile = args.server_infile or args.jobs

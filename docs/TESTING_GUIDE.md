@@ -646,7 +646,7 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 
 ### Input Trace (`.csv`)
 ```text
-job_submit_time,num_nodes,exit_status,queue,time_limit[,actual_run_time]
+job_submit_time,num_nodes,queue,time_limit[,actual_run_time]
 0,70,0,pbatch,200
 10,50,0,pbatch,300
 20,20,0,pbatch,50

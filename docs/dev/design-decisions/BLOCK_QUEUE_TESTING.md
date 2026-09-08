@@ -178,7 +178,7 @@ import random
 random.seed(42)
 num_jobs = 10000
 
-jobs = [['job_submit_time', 'num_nodes', 'exit_status', 'queue', 'time_limit']]
+jobs = [['job_submit_time', 'num_nodes', 'queue', 'time_limit']]
 current_time = 0
 
 for i in range(num_jobs):

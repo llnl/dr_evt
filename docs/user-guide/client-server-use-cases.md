@@ -32,7 +32,7 @@ not shared between sessions.
 :width: 100%
 :::
 
-`python/grpc_multi_client.py` demonstrates this arrangement. It reads the
+`python/grpc_multi_server.py` demonstrates this arrangement. It reads the
 sample CSV on the client, partitions rows among repeated `--server` options,
 and prints one statistics row per server. The CSV is only a convenient source
 of example arrivals: servers do not load it and require no prior knowledge of
@@ -40,7 +40,7 @@ the workload.
 
 ```bash
 python3 -m pip install grpcio grpcio-tools protobuf
-python3 python/grpc_multi_client.py \
+python3 python/grpc_multi_server.py \
   --jobs /shared/jobs.csv \
   --session-name twin-west \
   --server server-a:50051 \

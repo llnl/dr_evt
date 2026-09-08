@@ -247,14 +247,55 @@ void test_progressive_rejects_replay_format() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 7: --check_memory_pressure refuses to load the next file when
+// Test 7: exit_status belongs to the generated-output schema.  Replay input
+// accepts it for round-tripping a simulator output, but it must not affect the
+// replayed job or the newly generated output; input without it is equivalent.
+void test_input_exit_status_is_ignored() {
+    std::cout << "\n=== Test 7: input exit_status is ignored ===" << std::endl;
+
+    const char* with_status = "/tmp/test_exit_status_present.csv";
+    const char* without_status = "/tmp/test_exit_status_absent.csv";
+    {
+        std::ofstream file(with_status);
+        file << "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
+        file << "0,0,10,10,73,pbatch,10\n";
+    }
+    {
+        std::ofstream file(without_status);
+        file << "job_submit_time,begin_time,end_time,num_nodes,queue,time_limit\n";
+        file << "0,0,10,10,pbatch,10\n";
+    }
+
+    auto replay = [](const char* input, const char* output) {
+        Sim_Params params;
+        params.m_infile = input;
+        params.m_total_nodes = 100;
+        params.m_trace_format = "simple";
+        params.m_timestamp_format = "epoch";
+        params.set_outfile(output);
+        Simulation sim(params);
+        sim.run();
+        sim.write_simulated_trace();
+    };
+
+    replay(with_status, "/tmp/test_exit_status_present_out.csv");
+    replay(without_status, "/tmp/test_exit_status_absent_out.csv");
+    assert(slurp("/tmp/test_exit_status_present_out.csv") ==
+           slurp("/tmp/test_exit_status_absent_out.csv"));
+    assert(slurp("/tmp/test_exit_status_present_out.csv").find(
+               "0,0,10,10,0,pbatch,10\n") != std::string::npos);
+
+    std::cout << "  PASSED" << std::endl;
+}
+
+// Test 8: --check_memory_pressure refuses to load the next file when
 // doing so would push projected job-store usage past the configured
 // fraction of actual available memory - forced deterministically here
 // via the DR_EVT_TEST_AVAILABLE_MEMORY_BYTES test seam (see
 // get_available_memory_bytes()'s doc comment in system_memory.hpp),
 // not by relying on the test machine actually being low on memory.
 void test_memory_pressure_refuses_when_forced_low() {
-    std::cout << "\n=== Test 7: --check_memory_pressure refuses under forced low memory ==="
+    std::cout << "\n=== Test 8: --check_memory_pressure refuses under forced low memory ==="
               << std::endl;
 
     setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "10", 1);
@@ -275,11 +316,11 @@ void test_memory_pressure_refuses_when_forced_low() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 8: the same forced-low-memory condition as Test 7 must NOT
+// Test 9: the same forced-low-memory condition as Test 8 must NOT
 // affect a run that never enables --check_memory_pressure - the check
 // is opt-in, not a background limit.
 void test_memory_pressure_disabled_by_default() {
-    std::cout << "\n=== Test 8: --check_memory_pressure is off unless explicitly enabled ==="
+    std::cout << "\n=== Test 9: --check_memory_pressure is off unless explicitly enabled ==="
               << std::endl;
 
     setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "10", 1);
@@ -297,12 +338,12 @@ void test_memory_pressure_disabled_by_default() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 9: with --check_memory_pressure enabled but no artificially low
+// Test 10: with --check_memory_pressure enabled but no artificially low
 // memory forced (the real, actual available memory on the test
 // machine), a normal progressive-loading run must still succeed - not
 // a false positive against real, plentiful memory.
 void test_memory_pressure_no_false_positive() {
-    std::cout << "\n=== Test 9: --check_memory_pressure doesn't false-positive under real memory ==="
+    std::cout << "\n=== Test 10: --check_memory_pressure doesn't false-positive under real memory ==="
               << std::endl;
 
     auto params = make_progressive_params({PART1, PART2, PART3});
@@ -317,7 +358,7 @@ void test_memory_pressure_no_false_positive() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 10: the fraction itself must actually be what's compared
+// Test 11: the fraction itself must actually be what's compared
 // against, not a fixed threshold - under the exact same forced
 // available-memory condition, a tight fraction must refuse while a
 // loose fraction succeeds. 512000 bytes / sizeof(Job_Record) (80)
@@ -326,7 +367,7 @@ void test_memory_pressure_no_false_positive() {
 // jobs are actually loaded): 0.5 * 512000 / 80 = 3200 (< 4096, must
 // refuse), 0.9 * 512000 / 80 = 5760 (> 4096, must succeed).
 void test_memory_pressure_fraction_is_configurable() {
-    std::cout << "\n=== Test 10: --check_memory_pressure's fraction is configurable ==="
+    std::cout << "\n=== Test 11: --check_memory_pressure's fraction is configurable ==="
               << std::endl;
 
     setenv("DR_EVT_TEST_AVAILABLE_MEMORY_BYTES", "512000", 1);
@@ -369,6 +410,7 @@ int main() {
         test_progressive_empty_file_in_list();
         test_progressive_rejects_out_of_order_files();
         test_progressive_rejects_replay_format();
+        test_input_exit_status_is_ignored();
         test_memory_pressure_refuses_when_forced_low();
         test_memory_pressure_disabled_by_default();
         test_memory_pressure_no_false_positive();

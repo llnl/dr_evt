@@ -23,18 +23,20 @@ The trace parser currently requires `begin_time` and `end_time` columns even in 
 
 **Required columns:**
 ```
-job_submit_time, begin_time, end_time, num_nodes, exit_status, queue, time_limit
+job_submit_time, begin_time, end_time, num_nodes, queue, time_limit
 ```
 
 **Alternative (duration instead of end_time):**
 ```
-job_submit_time, begin_time, duration, num_nodes, exit_status, queue, time_limit
+job_submit_time, begin_time, duration, num_nodes, queue, time_limit
 ```
 
 **Semantics:**
 - All times are **historical actuals** from real execution
 - Simulator replays these times exactly
 - Scheduler is NOT invoked (or invoked but decisions are ignored)
+- `exit_status` belongs only to the generated-output schema, where the
+  simulator currently writes `0`; an input value is ignored.
 
 **Parser behavior:**
 - If `begin_time` AND (`end_time` OR `duration`) exist → **Replay mode**

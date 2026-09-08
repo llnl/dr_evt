@@ -162,9 +162,9 @@ job_submit_time,num_nodes,queue,time_limit
 
 **Replay mode** (`begin_time`/`end_time` already known, replayed exactly):
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,10,0,pbatch,100
-50,100,150,10,0,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
+0,0,100,10,pbatch,100
+50,100,150,10,pbatch,50
 ```
 
 `time_limit` is also accepted under the column names `timelimit` or
