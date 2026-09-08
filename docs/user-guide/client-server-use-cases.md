@@ -109,16 +109,28 @@ and a long-form composite-job trace, streams ordinary jobs to their servers,
 advances all servers to each composite event time, then submits the composite
 fragments concurrently.
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ```{mermaid}
 sequenceDiagram
     participant C as Composite-job coordinator
     participant A as Server A scheduler
     participant B as Server B scheduler
+=======
+For each composite event, the coordinator performs this sequence:
+>>>>>>> Stashed changes
 
-    C->>A: Init, then AppendJobs + SubmitJob(ordinary arrivals through tn)
-    C->>B: Init, then AppendJobs + SubmitJob(ordinary arrivals through tn)
-    Note over A,B: Each server has independent nodes and scheduler state
+1. Initialize each server and submit its current ordinary-job batch.
+2. Advance both servers through the ordinary batch to the selected watermark.
+3. Read pre-event statistics from both servers.
+4. Submit one composite fragment to each server.
+5. Advance both servers to the composite time and read post-event statistics.
+6. Record whether fragments started immediately, were delayed, or partially started.
+7. Append the next ordinary batch only after the composite evaluation, then
+   advance again to evaluate those arrivals. The next batch may start at the
+   composite time or later.
 
+<<<<<<< Updated upstream
     loop Each composite event at submit time tc
         Note over C,B: Ordinary batch ends at tn <= tc. Pick ta with tn <= ta <= tc
         par Synchronize simulated time
@@ -149,6 +161,26 @@ sequenceDiagram
     end
     Note over C,B: This observes independent schedules; it makes no reservation or rollback
 ```
+=======
+For each composite event, the coordinator performs this sequence:
+
+1. Initialize each server and submit its current ordinary-job batch.
+2. Advance both servers through the ordinary batch to the selected watermark.
+3. Read pre-event statistics from both servers.
+4. Submit one composite fragment to each server.
+5. Advance both servers to the composite time and read post-event statistics.
+6. Record whether fragments started immediately, were delayed, or partially started.
+7. Append the next ordinary batch only after the composite evaluation, then
+   advance again to evaluate those arrivals. The next batch may start at the
+   composite time or later.
+
+The servers keep independent nodes and scheduler state. This procedure observes
+their independent schedules; it does not make reservations or roll back work.
+>>>>>>> Stashed changes
+=======
+The servers keep independent nodes and scheduler state. This procedure observes
+their independent schedules; it does not make reservations or roll back work.
+>>>>>>> Stashed changes
 
 ### Timing exercised by the MPI composite-stream fixture
 
