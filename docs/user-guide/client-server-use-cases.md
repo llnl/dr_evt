@@ -21,33 +21,16 @@ test and experiment orchestration.
 
 ## One client, multiple servers
 
-One controller can open a separate session to each server. This works well for
-independent sites or queues, and for digital twins that route live arrivals to
-the appropriate simulation. Scheduler state and nodes are not shared between
-servers.
+This example uses one controller with a separate session to each server. It
+works well for independent sites or queues, and for digital twins that route
+live arrivals to the appropriate simulation. It is only one topology: clients
+and servers may both be scaled independently. Scheduler state and nodes are
+not shared between sessions.
 
-```{mermaid}
-flowchart LR
-    Client([Client<br/>or digital-twin controller])
-
-    subgraph Fleet[Independent server fleet]
-        direction TB
-        ServerA[Server A] --> SimulationA[(Simulation A)]
-        ServerB[Server B] --> SimulationB[(Simulation B)]
-        ServerN[Server N] --> SimulationN[(Simulation N)]
-    end
-
-    Client -->|Session 1| ServerA
-    Client -->|Session 2| ServerB
-    Client -->|Session N| ServerN
-
-    classDef client fill:#1d4ed8,color:#fff,stroke:#1e3a8a,stroke-width:2px
-    classDef server fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
-    classDef simulation fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px
-    class Client client
-    class ServerA,ServerB,ServerN server
-    class SimulationA,SimulationB,SimulationN simulation
-```
+:::{figure} ../_static/client-server-architecture.png
+:alt: Workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.
+:width: 100%
+:::
 
 `python/grpc_multi_client.py` demonstrates this arrangement. It reads the
 sample CSV on the client, partitions rows among repeated `--server` options,

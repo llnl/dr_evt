@@ -65,33 +65,23 @@ while `tracer` replays schedules for resource accounting. Containers package
 the remote client/server deployment, and MPI is optional test-harness
 coordination rather than a requirement for normal gRPC use.
 
-### One client, multiple servers
+### Distributed gRPC deployment
 
-One controller can keep independent gRPC sessions open to several servers.
-Each server owns its own scheduler state, nodes, and simulation.
+Clients and digital-twin controllers can open independent gRPC sessions to any
+number of server processes. Each server creates an isolated simulation for
+every session; neither the number of clients nor the number of servers is
+fixed.
 
-```mermaid
-flowchart LR
-    Client([Client<br/>or digital-twin controller])
+![Architecture: workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.](docs/_static/client-server-architecture.png)
 
-    subgraph Fleet[Independent server fleet]
-        direction TB
-        ServerA[Server A] --> SimulationA[(Simulation A)]
-        ServerB[Server B] --> SimulationB[(Simulation B)]
-        ServerN[Server N] --> SimulationN[(Simulation N)]
-    end
+### Simulation internals
 
-    Client -->|Session 1| ServerA
-    Client -->|Session 2| ServerB
-    Client -->|Session N| ServerN
+Each C++ `Simulation` owns a `Trace` and a scheduler. `Trace` retains the
+job store, running-job event queue, and resource history, while the scheduler
+retains its wait queue. The simulation coordinates them and writes the job and
+resource traces.
 
-    classDef client fill:#1d4ed8,color:#fff,stroke:#1e3a8a,stroke-width:2px
-    classDef server fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
-    classDef simulation fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px
-    class Client client
-    class ServerA,ServerB,ServerN server
-    class SimulationA,SimulationB,SimulationN simulation
-```
+![C++ Simulation component: Simulation owns a Scheduler above Trace. Scheduler contains the wait queue; Trace contains the job store, event queue, and resource history, then writes resource and job scheduling traces.](docs/_static/simulation-internals.png)
 
 ## Features
 
