@@ -8,34 +8,28 @@ DR_EVT (Discrete Resource Event Modeling) is a high-performance HPC job schedule
 - Compare run time estimation strategies
 - Analyze HPC workload traces
 
-## One client, multiple servers
+## Distributed client/server deployment
 
-For distributed or digital-twin deployments, one controller can open an
-independent gRPC session to each server. Scheduler state, nodes, and simulation
-results remain isolated on every server.
+For distributed or digital-twin deployments, client processes and controllers
+can open independent gRPC sessions to any number of server processes. Each
+session gets its own isolated simulation, scheduler state, and nodes.
 
-```{mermaid}
-flowchart LR
-    Client([Client<br/>or digital-twin controller])
+:::{figure} ../_static/client-server-architecture.png
+:alt: Workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.
+:width: 100%
+:::
 
-    subgraph Fleet[Independent server fleet]
-        direction TB
-        ServerA[Server A] --> SimulationA[(Simulation A)]
-        ServerB[Server B] --> SimulationB[(Simulation B)]
-        ServerN[Server N] --> SimulationN[(Simulation N)]
-    end
+## Simulation internals
 
-    Client -->|Session 1| ServerA
-    Client -->|Session 2| ServerB
-    Client -->|Session N| ServerN
+Each C++ `Simulation` owns a `Trace` and a scheduler. `Trace` retains the
+job store, running-job event queue, and resource history, while the scheduler
+retains its wait queue. The simulation coordinates them and writes the job and
+resource traces.
 
-    classDef client fill:#1d4ed8,color:#fff,stroke:#1e3a8a,stroke-width:2px
-    classDef server fill:#e0f2fe,stroke:#0284c7,stroke-width:2px
-    classDef simulation fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px
-    class Client client
-    class ServerA,ServerB,ServerN server
-    class SimulationA,SimulationB,SimulationN simulation
-```
+:::{figure} ../_static/simulation-internals.png
+:alt: C++ Simulation owns a Scheduler above Trace. Scheduler contains the wait queue; Trace contains the job store, event queue, and resource history, then writes resource and job scheduling traces.
+:width: 100%
+:::
 
 For setup and deployment examples, see [Client/Server Setup](grpc-setup.md)
 and [Client/Server Use Cases](client-server-use-cases.md).

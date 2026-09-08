@@ -18,6 +18,10 @@
 
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/sim.hpp"
+// This test uses the MPI C API only. Avoid including OpenMPI's deprecated
+// C++ bindings, whose implementation triggers -Wcast-function-type.
+#define OMPI_SKIP_MPICXX 1
+#define MPICH_SKIP_MPICXX 1
 #include <mpi.h>
 #include <iostream>
 #include <fstream>

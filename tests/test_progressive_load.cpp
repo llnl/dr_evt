@@ -53,7 +53,7 @@ Sim_Params make_progressive_params(const std::vector<std::string>& files) {
     return params;
 }
 
-std::string slurp(const std::string& path) {
+[[maybe_unused]] std::string slurp(const std::string& path) {
     std::ifstream ifs(path);
     std::ostringstream oss;
     oss << ifs.rdbuf();
@@ -155,7 +155,7 @@ void test_progressive_abort_overflow() {
     params.m_job_store_overflow = CircularOverflowPolicy::ABORT;
 
     Simulation sim(params);
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.run();
     } catch (const std::runtime_error&) {
@@ -204,7 +204,7 @@ void test_progressive_rejects_out_of_order_files() {
     auto params = make_progressive_params({PART3, PART2});
 
     Simulation sim(params);
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.run();
     } catch (const std::runtime_error&) {
@@ -236,7 +236,7 @@ void test_progressive_rejects_replay_format() {
     params.m_timestamp_format = "epoch";
 
     Simulation sim(params);
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.run();
     } catch (const std::runtime_error&) {
@@ -263,7 +263,7 @@ void test_memory_pressure_refuses_when_forced_low() {
     params.m_memory_pressure_fraction = 0.8;
     Simulation sim(params);
 
-    bool threw = false;
+    [[maybe_unused]] bool threw = false;
     try {
         sim.run();
     } catch (const std::runtime_error&) {
@@ -335,7 +335,7 @@ void test_memory_pressure_fraction_is_configurable() {
         auto params = make_progressive_params({PART1, PART2, PART3});
         params.m_memory_pressure_fraction = 0.5;
         Simulation sim(params);
-        bool threw = false;
+        [[maybe_unused]] bool threw = false;
         try {
             sim.run();
         } catch (const std::runtime_error&) {

@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
+  <title id="title">Scalable DR_EVT gRPC deployment</title>
+  <desc id="description">Workload sources feed one or more client processes or digital-twin controllers. They use independent bidirectional gRPC sessions with one or more DR_EVT server processes. Each session owns an isolated simulation with its own scheduler state and nodes.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7a8792"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#334155" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      .title { font-family: Arial, Helvetica, sans-serif; font-size: 18px; font-weight: 600; fill: #26323c; }
+      .body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; fill: #52606b; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 600; fill: #6d7b86; letter-spacing: .8px; }
+      .badge { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 600; fill: #52606b; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 600; fill: #687782; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="420" fill="#ffffff"/>
+  <text x="60" y="55" class="small">SCALABLE CLIENT / SERVER ARCHITECTURE</text>
+  <line x1="60" y1="72" x2="1220" y2="72" stroke="#e3e8eb" stroke-width="1"/>
+  <text x="60" y="105" class="body">Clients and servers scale independently; a server creates an isolated simulation for every session.</text>
+
+  <!-- workload sources -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="151" width="190" height="118" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
+  </g>
+  <text x="78" y="185" class="small">INPUT</text>
+  <text x="78" y="216" class="title">Workload</text>
+  <text x="78" y="241" class="body">Traces or live arrivals</text>
+
+  <!-- client processes: the offset cards indicate multiple concurrent clients -->
+  <rect x="316" y="133" width="255" height="130" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
+  <rect x="308" y="139" width="255" height="130" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
+  <g filter="url(#shadow)">
+    <rect x="300" y="145" width="255" height="130" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
+  </g>
+  <text x="324" y="181" class="title">Client</text>
+  <text x="324" y="205" class="body"><tspan x="324" dy="0">C++ or Python</tspan><tspan x="324" dy="17">with gRPC</tspan></text>
+  <line x1="324" y1="234" x2="531" y2="234" stroke="#e1e7ea" stroke-width="1"/>
+  <text x="324" y="258" class="body">Read inputs and control time</text>
+
+  <!-- server processes: the offset cards indicate multiple concurrent servers -->
+  <rect x="716" y="133" width="255" height="130" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
+  <rect x="708" y="139" width="255" height="130" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
+  <g filter="url(#shadow)">
+    <rect x="700" y="145" width="255" height="130" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
+  </g>
+  <text x="724" y="181" class="title">Server</text>
+  <text x="724" y="205" class="body"><tspan x="724" dy="0">C++ process</tspan><tspan x="724" dy="17">with gRPC</tspan></text>
+  <line x1="724" y1="234" x2="931" y2="234" stroke="#e1e7ea" stroke-width="1"/>
+  <text x="724" y="258" class="body">Each exposes a gRPC endpoint</text>
+
+  <!-- simulations: the stack shows one concurrent instance per session -->
+  <rect x="1046" y="167" width="190" height="118" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
+  <rect x="1038" y="159" width="190" height="118" rx="12" fill="#f8fafb" stroke="#d3dce1" stroke-width="1.2"/>
+  <g filter="url(#shadow)">
+    <rect x="1030" y="151" width="190" height="118" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
+  </g>
+  <text x="1054" y="185" class="small">PER SESSION</text>
+  <text x="1054" y="216" class="title">Simulation</text>
+  <text x="1054" y="232" class="body"><tspan x="1054" dy="0">C++</tspan><tspan x="1054" dy="17">Maintain states</tspan></text>
+
+  <!-- direct in-process Python binding -->
+  <g filter="url(#shadow)">
+    <rect x="1030" y="82" width="190" height="58" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
+  </g>
+  <text x="1054" y="108" class="small">IN-PROCESS PATH</text>
+  <text x="1054" y="129" class="body" style="font-weight:600">Python API</text>
+
+  <!-- connections, drawn last for crisp arrows -->
+  <line x1="250" y1="210" x2="297" y2="210" stroke="#7a8792" stroke-width="1.7" marker-end="url(#arrow)"/>
+  <line x1="555" y1="201" x2="697" y2="201" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="555" y1="210" x2="697" y2="210" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="555" y1="219" x2="697" y2="219" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <text x="630" y="165" class="label" text-anchor="middle"><tspan x="630" dy="0">N independent</tspan><tspan x="630" dy="16">gRPC sessions</tspan></text>
+  <line x1="955" y1="201" x2="1027" y2="201" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="955" y1="210" x2="1027" y2="210" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="955" y1="219" x2="1027" y2="219" stroke="#7a8792" stroke-width="1.35" marker-end="url(#arrow)"/>
+  <line x1="1125" y1="140" x2="1125" y2="139" stroke="#7a8792" stroke-width="1.7"/>
+  <path d="M1118 139 L1125 148 L1132 139 Z" fill="#7a8792"/>
+
+</svg>

@@ -663,8 +663,8 @@ void test_submit_job_records_busy_nodes() {
     job_no_t j1 = sim.append_job(10.0, 20, "pbatch", 100);
     sim.submit_job(j1, 10.0);
 
-    const auto& job0 = sim.get_trace().job_at(j0);
-    const auto& job1 = sim.get_trace().job_at(j1);
+    [[maybe_unused]] const auto& job0 = sim.get_trace().job_at(j0);
+    [[maybe_unused]] const auto& job1 = sim.get_trace().job_at(j1);
     assert(job0.get_busy_nodes() == 0);
     assert(job1.get_busy_nodes() == 30);
 

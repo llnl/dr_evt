@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="660" viewBox="0 0 1280 660" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
+  <title id="title">DR_EVT C++ Simulation component</title>
+  <desc id="description">Simulation contains a Scheduler above a Trace. Scheduler maps jobs to resources by policy and contains a wait queue of pending jobs. Trace maintains job, resource, and simulation state. It contains a job store, event queue, and resource history, and writes resource and job scheduling traces below the component.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#334155" flood-opacity=".08"/></filter>
+    <style>
+      .heading { font-size:12px; font-weight:600; fill:#6d7b86; letter-spacing:.8px; }
+      .title { font-size:17px; font-weight:600; fill:#26323c; }
+      .body { font-size:12px; fill:#52606b; }
+      .edge { fill:none; stroke:#71808c; stroke-width:1.5; }
+      .dash { fill:none; stroke:#71808c; stroke-width:1.5; stroke-dasharray:5 4; }
+      .arrow { fill:#71808c; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="660" fill="#fff"/>
+  <text x="60" y="55" class="heading">C++ COMPONENT: SIMULATION</text>
+  <line x1="60" y1="72" x2="1220" y2="72" stroke="#e3e8eb"/>
+
+  <!-- Simulation composition boundary. -->
+  <rect x="220" y="120" width="570" height="420" rx="16" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
+  <text x="270" y="180" class="title">C++ Simulation Engine</text>
+
+  <!-- Scheduler sits above Trace. -->
+  <g filter="url(#shadow)">
+    <rect x="500" y="145" width="230" height="130" rx="12" fill="#f7f9fa" stroke="#bdc9d0" stroke-width="1.5"/>
+    <rect x="520" y="215" width="190" height="45" rx="8" fill="#fff" stroke="#d8e0e4" stroke-width="1.3"/>
+  </g>
+  <text x="525" y="177" class="title">Scheduler</text>
+  <text x="525" y="199" class="body">Map job to resource by policy</text>
+  <text x="540" y="243" class="title" style="font-size:14px">Wait Queue</text>
+  <text x="630" y="243" class="body">Pending jobs</text>
+
+  <!-- Trace sits below Scheduler. -->
+  <rect x="280" y="310" width="450" height="205" rx="14" fill="#f7f9fa" stroke="#bdc9d0" stroke-width="1.4"/>
+  <text x="305" y="350" class="title">Trace</text>
+  <text x="305" y="372" class="body">Maintain job, resource</text>
+  <text x="305" y="392" class="body">and simulation state</text>
+  <g filter="url(#shadow)">
+    <rect x="540" y="340" width="165" height="60" rx="10" fill="#fff" stroke="#d8e0e4" stroke-width="1.3"/>
+    <rect x="305" y="430" width="180" height="55" rx="10" fill="#fff" stroke="#d8e0e4" stroke-width="1.3"/>
+    <rect x="540" y="430" width="165" height="55" rx="10" fill="#fff" stroke="#d8e0e4" stroke-width="1.3"/>
+  </g>
+  <text x="560" y="364" class="title" style="font-size:15px">Event Queue</text>
+  <text x="560" y="384" class="body">Start / end events</text>
+  <text x="326" y="454" class="title" style="font-size:15px">Job Store</text>
+  <text x="326" y="474" class="body">Job records</text>
+  <text x="560" y="454" class="title" style="font-size:15px">Resource History</text>
+  <text x="560" y="474" class="body">Occupancy</text>
+
+  <!-- Input and outputs. -->
+  <g filter="url(#shadow)">
+    <rect x="280" y="220" width="140" height="55" rx="10" fill="#fff" stroke="#d8e0e4" stroke-width="1.3"/>
+    <rect x="283" y="570" width="205" height="60" rx="10" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.3"/>
+    <rect x="520" y="570" width="205" height="60" rx="10" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.3"/>
+  </g>
+  <text x="350" y="254" class="title" style="font-size:15px" text-anchor="middle">Arriving Jobs</text>
+  <text x="308" y="594" class="title">Job Sched Trace</text>
+  <text x="308" y="614" class="body">Scheduled-job output</text>
+  <text x="545" y="594" class="title">Resource Trace</text>
+  <text x="545" y="614" class="body">Resource-accounting output</text>
+
+  <!-- Data and control flow. All connectors leave and enter cards with 3-unit clearance. -->
+  <path d="M280 247 L250 247 L250 457 L295 457" class="edge"/>
+  <path d="M295 452 L302 457 L295 462 Z" class="arrow"/>
+  <!-- Scheduler reads jobs from Trace's job store. -->
+  <path d="M455 430 L455 237 L510 237" class="dash"/>
+  <path d="M510 232 L517 237 L510 242 Z" class="arrow"/>
+  <!-- Scheduler and Trace exchange scheduling state. -->
+  <line x1="540" y1="285" x2="540" y2="300" class="edge"/>
+  <path d="M535 285 L540 278 L545 285 Z" class="arrow"/>
+  <path d="M535 300 L540 307 L545 300 Z" class="arrow"/>
+  <!-- Scheduler selections become Trace events. -->
+  <path d="M622.5 275 L622.5 330" class="dash"/>
+  <path d="M617.5 330 L622.5 337 L627.5 330 Z" class="arrow"/>
+  <!-- Event processing updates resource history. -->
+  <line x1="622.5" y1="400" x2="622.5" y2="420" class="edge"/>
+  <path d="M617.5 420 L622.5 427 L627.5 420 Z" class="arrow"/>
+  <!-- Trace outputs. -->
+  <line x1="622.5" y1="485" x2="622.5" y2="560" class="edge"/>
+  <path d="M617.5 560 L622.5 567 L627.5 560 Z" class="arrow"/>
+  <line x1="385" y1="485" x2="385" y2="560" class="edge"/>
+  <path d="M380 560 L385 567 L390 560 Z" class="arrow"/>
+
+</svg>
