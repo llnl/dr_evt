@@ -632,8 +632,10 @@ if(MPI_CXX_FOUND)
   list(APPEND DR_EVT_UNIT_TEST_TARGETS test_mpi_streaming-bin)
 endif()
 
-# Install Boost libraries if built via FetchContent
-if(NOT Boost_FOUND OR EXISTS "${CMAKE_BINARY_DIR}/_deps/boost-build")
+# Install Boost libraries only when this configure built Boost via
+# FetchContent.  An old _deps directory must not cause installation when a
+# system Boost was selected instead.
+if(DR_EVT_BOOST_FETCHCONTENT)
   file(GLOB BOOST_LIBS
     "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/filesystem/libboost_filesystem*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
     "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/program_options/libboost_program_options*${CMAKE_SHARED_LIBRARY_SUFFIX}*"

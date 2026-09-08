@@ -61,11 +61,11 @@ reference/terminology
 dev/design-decisions/BLOCK_QUEUE
 dev/design-decisions/BLOCK_QUEUE_TESTING
 dev/design-decisions/CIRCULAR_QUEUE
-dev/READTHEDOCS_SETUP
 dev/design-decisions/README
 dev/design-decisions/SIMULATION_VS_REPLAY_MODES
 dev/design-decisions/TIMEZONE_SUPPORT
 dev/design-decisions/OUT_TRACE_STREAMING
+dev/READTHEDOCS_SETUP
 ```
 
 ## Documentation
@@ -94,7 +94,7 @@ Complete guide for running simulations:
 
 - **[Streaming API](api/STREAMING_API.md)** - Online/incremental simulation API
 - **[Python API](api/PYTHON_API.md)** - Python bindings reference
-- **[gRPC Client/Server](CLIENT_SERVER_GUIDE.md)** - Network-exposed streaming API, including the MPI-based multi-client/multi-server test harness
+- **[gRPC Client/Server Guide and API](CLIENT_SERVER_GUIDE.md)** - Network-exposed streaming API, including the MPI-based multi-client/multi-server test harness
 
 ### Development
 

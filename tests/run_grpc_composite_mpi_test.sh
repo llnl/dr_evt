@@ -13,7 +13,14 @@ SERVER="$INSTALL_PREFIX/bin/dr_evt_server"
 MPI_TEST="$INSTALL_PREFIX/bin/tests/test_grpc_multi_client_server"
 
 if command -v mpirun >/dev/null 2>&1; then
-    MPI_LAUNCHER=(mpirun -np 4)
+    # CI runners may provide fewer than four Open MPI slots.  Allow the
+    # four local ranks required by this test without passing Open MPI-only
+    # options to another MPI implementation.
+    if mpirun --version 2>&1 | grep -qi "Open MPI"; then
+        MPI_LAUNCHER=(mpirun --oversubscribe -np 4)
+    else
+        MPI_LAUNCHER=(mpirun -np 4)
+    fi
     MPI_LAUNCHER_NAME="mpirun"
 elif command -v srun >/dev/null 2>&1; then
     MPI_LAUNCHER=(srun --nodes=1 --ntasks=4 --kill-on-bad-exit=1)

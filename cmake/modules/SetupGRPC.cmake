@@ -18,53 +18,38 @@ if (AVOID_SYSTEM_GRPC)
 else()
   set(DR_EVT_GRPC_SEARCH_MODE "")
 endif()
+unset(DR_EVT_GRPC_FETCHCONTENT CACHE)
 
-# DR_EVT_GRPC_FETCHCONTENT is a CACHE variable: once this project has
-# fallen back to FetchContent, find_package() is guaranteed to fail
-# again on every later configure (the FetchContent-populated _deps
-# directory is never a location find_package() searches), so repeating
-# that search is pure wasted filesystem traversal. Caching the decision
-# lets later configures skip straight to the FetchContent branch.
-#
-# The "found successfully" case is NOT cached the same way: targets
-# (gRPC::grpc++, protobuf::libprotobuf, etc.) are not persisted across
-# configures like CACHE variables are, and find_package() is the only
-# thing that creates them - skipping it there would leave them
-# undefined. Only the FetchContent branch is safe to skip re-running
-# find_package() for, since its own add_subdirectory() recreates its
-# targets fresh every configure regardless.
-#
-# To re-evaluate this decision (e.g. a working system gRPC becomes
-# available later), clear it explicitly: `cmake -U DR_EVT_GRPC_FETCHCONTENT ..`
-if (DR_EVT_GRPC_FETCHCONTENT)
-  message(STATUS "Using cached decision from a previous configure: "
-                  "building gRPC/Protobuf via FetchContent (skipping "
-                  "the find_package() search, since it would only fail "
-                  "again).")
-else()
-  find_package(gRPC CONFIG QUIET ${DR_EVT_GRPC_SEARCH_MODE})
+# Dependency selection is re-evaluated on every configure.  A previous
+# FetchContent build can leave _deps in the build directory, but it must not
+# prevent a newly available installed gRPC/Protobuf from being selected.
+unset(gRPC_FOUND CACHE)
+unset(gRPC_FOUND)
+unset(Protobuf_FOUND CACHE)
+unset(Protobuf_FOUND)
+find_package(gRPC CONFIG QUIET ${DR_EVT_GRPC_SEARCH_MODE})
 
-  if (gRPC_FOUND)
-    message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
-    # Try Protobuf where gRPC's own config was found first (HINTS
-    # augments, not replaces, the default search).
-    find_package(Protobuf CONFIG QUIET HINTS ${gRPC_DIR} ${DR_EVT_GRPC_SEARCH_MODE})
+if (gRPC_FOUND)
+  message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
+  # Try Protobuf where gRPC's own config was found first (HINTS augments,
+  # not replaces, the default search).
+  find_package(Protobuf CONFIG QUIET HINTS ${gRPC_DIR} ${DR_EVT_GRPC_SEARCH_MODE})
 
-    if (NOT Protobuf_FOUND)
-      # Debian/Ubuntu's protobuf-compiler-grpc ships a CMake config, but
-      # libprotobuf-dev doesn't - MODULE mode finds the library/headers/
-      # protoc directly and creates the same targets CONFIG mode would.
-      find_package(Protobuf MODULE QUIET ${DR_EVT_GRPC_SEARCH_MODE})
-    endif (NOT Protobuf_FOUND)
-  endif (gRPC_FOUND)
-
-  # Deliberately a separate if-block, not an else() on the one above:
-  # gRPC found but Protobuf never found must still fall back to
-  # FetchContent.
-  if (NOT Protobuf_FOUND OR NOT gRPC_FOUND)
-    set(DR_EVT_GRPC_FETCHCONTENT ON CACHE BOOL
-        "Whether gRPC/Protobuf are built via FetchContent (cached: computed once)")
+  if (NOT Protobuf_FOUND)
+    # Debian/Ubuntu's protobuf-compiler-grpc ships a CMake config, but
+    # libprotobuf-dev doesn't - MODULE mode finds the library/headers/
+    # protoc directly and creates the same targets CONFIG mode would.
+    find_package(Protobuf MODULE QUIET ${DR_EVT_GRPC_SEARCH_MODE})
   endif()
+endif()
+
+# gRPC and Protobuf must come from the same selected source.  Record the
+# current result for this configure; do not cache it or use it to skip
+# discovery on a future configure.
+if (gRPC_FOUND AND Protobuf_FOUND)
+  set(DR_EVT_GRPC_FETCHCONTENT OFF)
+else()
+  set(DR_EVT_GRPC_FETCHCONTENT ON)
 endif()
 
 if (DR_EVT_GRPC_FETCHCONTENT)

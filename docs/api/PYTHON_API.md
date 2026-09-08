@@ -1,4 +1,4 @@
-# DR_EVT Python API
+# Python API
 
 Complete Python bindings for DR_EVT HPC Job Scheduler Simulator with streaming mode support.
 

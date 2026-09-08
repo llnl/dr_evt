@@ -35,6 +35,34 @@ endif()
 # Note: Unlike gRPC/Protobuf (which use CONFIG mode with HINTS), FindBoost
 # uses MODULE mode and reads BOOST_ROOT and Boost_NO_SYSTEM_PATHS variables
 # directly, plus NO_DEFAULT_PATH when AVOID_SYSTEM_BOOST is set.
+# Discard discovery results from an earlier FetchContent configure before
+# searching again.  This permits a subsequently installed Boost to replace
+# the old _deps copy without requiring a new build directory.  The _deps
+# directory is used only to invalidate stale discovery data, never as the
+# decision to install Boost.
+unset(DR_EVT_BOOST_FETCHCONTENT CACHE)
+if (EXISTS "${CMAKE_BINARY_DIR}/_deps/boost-build")
+    unset(Boost_FOUND CACHE)
+    unset(Boost_FOUND)
+    unset(Boost_INCLUDE_DIR CACHE)
+    unset(Boost_INCLUDE_DIR)
+    unset(Boost_INCLUDE_DIRS CACHE)
+    unset(Boost_INCLUDE_DIRS)
+    unset(Boost_LIBRARY_DIRS CACHE)
+    unset(Boost_LIBRARY_DIRS)
+    unset(Boost_LIBRARIES CACHE)
+    unset(Boost_LIBRARIES)
+    foreach(DR_EVT_BOOST_COMPONENT regex filesystem system program_options serialization container)
+        string(TOUPPER "${DR_EVT_BOOST_COMPONENT}" DR_EVT_BOOST_COMPONENT_UPPER)
+        unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_FOUND CACHE)
+        unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_FOUND)
+        unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_LIBRARY_RELEASE CACHE)
+        unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_LIBRARY_RELEASE)
+        unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_LIBRARY_DEBUG CACHE)
+        unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_LIBRARY_DEBUG)
+    endforeach()
+    unset(DR_EVT_BOOST_COMPONENT_UPPER)
+endif()
 find_package(Boost QUIET COMPONENTS
     regex
     filesystem
@@ -88,10 +116,12 @@ if(NOT Boost_FOUND)
         Boost::system
         Boost::program_options
         CACHE STRING "Boost libraries")
+    set(DR_EVT_BOOST_FETCHCONTENT ON)
 
     message(STATUS "Boost installed via FetchContent at: ${boost_SOURCE_DIR}")
     message(STATUS "Boost imported targets available: ${Boost_LIBRARIES}")
 else()
+    set(DR_EVT_BOOST_FETCHCONTENT OFF)
     # System Boost found - modern CMake 3.24+ automatically creates Boost::component targets
     message(STATUS "Found Boost: ${Boost_VERSION}")
     message(STATUS "Boost include dirs: ${Boost_INCLUDE_DIRS}")
