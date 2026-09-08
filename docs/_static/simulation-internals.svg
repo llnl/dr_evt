@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="660" viewBox="0 0 1280 660" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1080" viewBox="200 110 600 540" role="img" aria-labelledby="title description" font-family="Arial, Helvetica, sans-serif">
   <title id="title">DR_EVT C++ Simulation component</title>
   <desc id="description">Simulation contains a Scheduler above a Trace. Scheduler maps jobs to resources by policy and contains a wait queue of pending jobs. Trace maintains job, resource, and simulation state. It contains a job store, event queue, and resource history, and writes resource and job scheduling traces below the component.</desc>
   <defs>
