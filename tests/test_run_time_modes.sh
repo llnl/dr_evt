@@ -37,7 +37,7 @@ FAIL=0
 
 # Use a trace where actual_run_time differs from time_limit
 # Job 1: time_limit=200, actual_run_time=50
-TRACE="tests/test_traces/comprehensive/25_early_completion_basic.csv"
+TRACE="tests/test_traces/scheduler_correctness/25_early_completion_basic.csv"
 
 # ------------------------------------------------------------------------
 # Test 1: run_time_mode=actual reads actual_run_time from trace

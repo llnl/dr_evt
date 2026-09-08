@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.append('../scripts')
 from python_reference_scheduler import EasyBackfillingScheduler, Job
 
-TRACE_DIR = Path("../tests/test_traces/comprehensive")
+TRACE_DIR = Path("../tests/test_traces/scheduler_correctness")
 TOTAL_NODES = 100
 
 # All 27 tests in order

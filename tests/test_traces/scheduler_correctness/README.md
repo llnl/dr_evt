@@ -1,17 +1,17 @@
-# Comprehensive Test Suite for EASY Backfilling
+# Scheduler Correctness Fixtures for EASY Backfilling
 
 **Count**: 34 tests  
 **Status**: ✅ 34/34 passing (100%)  
-**Runner**: `./tests/test_all_dr_evt.sh`
+**Runner**: `./tests/run_scheduler_correctness_tests.sh` (scheduler correctness)
 
 ## Overview
 
-This directory contains **34 comprehensive tests** for FCFS + EASY backfilling scheduler validation using **dual validation** (job schedules + resource traces).
+This directory contains **34 scheduler-correctness fixtures** for FCFS + EASY backfilling validation using **dual validation** (job schedules + resource traces).
 
 ## Quick Start
 
 ```bash
-./tests/test_all_dr_evt.sh
+./tests/run_scheduler_correctness_tests.sh
 ```
 
 Expected: `🎉 ALL TESTS PASSED!`

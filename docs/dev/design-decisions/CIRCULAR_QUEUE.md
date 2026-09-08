@@ -33,7 +33,7 @@ relative to deque across repeated runs); treat the specific percentages
 above as directionally representative, not precise.
 
 ✅ Produces byte-for-byte identical output to deque, in every one of the 34
-comprehensive differential test cases (`tests/test_fcfs_comprehensive.sh`),
+queue-implementation differential test cases (`tests/test_fcfs_queue_implementations.sh`),
 and separately confirmed on the 10K-job benchmark trace itself.
 
 Exact numbers will vary by hardware; re-run `tests/benchmark_block_sizes.sh`
@@ -89,7 +89,7 @@ correctness bug, so this needed explicit handling:
 ### Quick Test
 ```bash
 # Correctness test (deque vs multimap vs block vs circular)
-./tests/test_fcfs_comprehensive.sh --correctness
+./tests/test_fcfs_queue_implementations.sh --correctness
 
 # Performance benchmark (10K jobs, includes circular alongside all block sizes)
 ./tests/benchmark_block_sizes.sh
@@ -177,7 +177,7 @@ through the run.
   `CircularOverflowPolicy`
 
 ### Tests
-- `tests/test_fcfs_comprehensive.sh` - correctness verification (deque vs
+- `tests/test_fcfs_queue_implementations.sh` - correctness verification (deque vs
   multimap vs block vs circular)
 - `tests/benchmark_block_sizes.sh` - performance comparison (all block
   sizes plus circular)

@@ -1,4 +1,4 @@
-# Comprehensive Test Suite - Ordered by Complexity
+# Scheduler Correctness Fixtures - Ordered by Complexity
 
 ## Tier 1: FCFS Fundamentals (No Backfilling)
 Basic scheduler behavior without backfilling scenarios.

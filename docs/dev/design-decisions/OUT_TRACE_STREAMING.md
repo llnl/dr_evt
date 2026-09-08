@@ -10,7 +10,7 @@ streaming append operation is also now built -
 `Trace::append_jobs()`/`Simulation::append_jobs()` for several in one
 call, both exposed over gRPC (`AppendJobRequest`/`AppendJobsRequest`) -
 see "Batch vs streaming" below for what they do and
-`tests/test_append_job_api.cpp`/`tests/test_append_job_grpc.cpp` for their
+`tests/test_append_job_api.cpp`/`tests/test_grpc_streaming_api.cpp` for their
 tests.
 
 Progressive/multi-file loading (`--infile_list`, discussed at length

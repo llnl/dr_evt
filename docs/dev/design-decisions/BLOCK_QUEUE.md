@@ -112,7 +112,7 @@ Deque advantages:
 ### Quick Test
 ```bash
 # Unit tests (all block sizes, <5 sec)
-./build/test_block_queue_simple-bin
+./build/test_block_queue
 
 # Performance benchmark (10K jobs, ~2 min)
 ./tests/benchmark_block_sizes.sh
@@ -121,7 +121,7 @@ Deque advantages:
 ### Comprehensive Testing
 ```bash
 # Correctness test (deque vs multimap vs block vs circular - see CIRCULAR_QUEUE.md)
-./tests/test_fcfs_comprehensive.sh
+./tests/test_fcfs_queue_implementations.sh
 
 # All 7 block sizes with custom trace
 ./tests/benchmark_block_sizes.sh path/to/trace.csv
@@ -274,9 +274,9 @@ available as a simple, well-tested fallback
 - `src/sim/scheduler_base.cpp` - Factory function
 
 ### Tests
-- `tests/test_block_queue_simple.cpp` - Unit tests (all block sizes)
+- `tests/test_block_queue.cpp` - Unit tests (all block sizes)
 - `tests/benchmark_block_sizes.sh` - Performance comparison
-- `tests/test_fcfs_comprehensive.sh` - Correctness verification
+- `tests/test_fcfs_queue_implementations.sh` - Correctness verification
 - `tests/test_traces/scale/huge_10000jobs.csv` - 10K job test trace
 
 ### Documentation

@@ -121,7 +121,7 @@ For contributors and maintainers:
 - **gRPC Service:** Network-exposed streaming API for multi-cluster coordination
 - **Python Bindings:** Batch mode and the core streaming/monitoring API; some `Sim_Params` fields and `Simulation` methods (including `append_job()`/`append_jobs()`) aren't bound yet - see [Python API](api/PYTHON_API.md#missing-parameters-in-python-bindings)
 
-**Test Suite:** 150+ tests across comprehensive/unit/feature/append-job/progressive-loading/config/gRPC/scale/replay
+**Test Suite:** 150+ tests across scheduler_correctness/unit/feature/append-job/progressive-loading/config/gRPC/scale/replay
 categories (see [Testing Guide](TESTING_GUIDE.md) for the current breakdown and how to run them).
 
 ## About

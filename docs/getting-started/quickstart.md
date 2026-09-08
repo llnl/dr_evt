@@ -256,7 +256,7 @@ built binaries instead:
 ```bash
 # From the repo root, after building (and installing, or with
 # CMAKE_INSTALL_PREFIX pointed at wherever `make install` put things)
-./tests/test_all_dr_evt.sh          # comprehensive scheduler tests
+./tests/run_scheduler_correctness_tests.sh          # scheduler-correctness suite
 ./tests/run_append_job_tests.sh     # streaming API (append_job/append_jobs)
 ./tests/run_progressive_load_tests.sh  # --infile_list progressive loading
 ```

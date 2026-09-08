@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run all 34 comprehensive tests on DR_EVT C++ simulator
+# Run all 34 scheduler-correctness fixtures on the DR_EVT C++ simulator.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$SCRIPT_DIR/.."
@@ -9,7 +9,7 @@ cd "$REPO_ROOT"
 # Find simulator binary (tries CMAKE_INSTALL_PREFIX first, then build dir)
 source "$SCRIPT_DIR/set_simulator_path.sh"
 
-TRACE_DIR="tests/test_traces/comprehensive"
+TRACE_DIR="tests/test_traces/scheduler_correctness"
 TOTAL_NODES=100
 
 # Test list - all 34 tests
@@ -58,7 +58,7 @@ FAILED=0
 MISSING=0
 
 echo "=========================================="
-echo "DR_EVT C++ Simulator - Comprehensive Tests"
+echo "DR_EVT C++ Simulator - Scheduler Correctness Tests"
 echo "=========================================="
 echo ""
 

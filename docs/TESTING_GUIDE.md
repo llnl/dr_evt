@@ -23,7 +23,7 @@ correct.
 
 - [How to Run Tests](#how-to-run-tests)
 - [Installed Test Binaries](#installed-test-binaries) - Where `make install` puts C++ test binaries
-- [Comprehensive Tests (34)](#comprehensive-tests) - Scheduler correctness (Tiers 1-9)
+- [Scheduler Correctness Tests (34)](#scheduler-correctness-tests) - Tiers 1-9
 - [Unit Tests (7)](#unit-tests) - Basic I/O and format tests
 - [Feature Tests (3)](#feature-tests) - Policy comparisons
 - [Scale Tests (7)](#scale-tests) - Large-scale performance
@@ -49,8 +49,8 @@ correct.
 ```bash
 cd tests
 
-# Run comprehensive test suite (34 tests)
-./test_all_dr_evt.sh
+# Run scheduler-correctness suite (34 fixtures)
+./run_scheduler_correctness_tests.sh
 
 # Run unit tests
 ./run_unit_tests.sh
@@ -69,7 +69,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/tests/test_streaming_api
 ${CMAKE_INSTALL_PREFIX}/bin/tests/test_batch_vs_streaming
 
 # Run queue implementation differential tests (circular/deque/multimap/block)
-./test_fcfs_comprehensive.sh --correctness
+./test_fcfs_queue_implementations.sh --correctness
 
 # Run column alias tests (time_limit/actual_run_time accepted column-name variants)
 ./test_column_aliases.sh
@@ -94,9 +94,9 @@ ${CMAKE_INSTALL_PREFIX}/bin/tests/t_state
 
 ---
 
-## Comprehensive Tests
+## Scheduler Correctness Tests
 
-**Location:** `tests/test_traces/comprehensive/`
+**Location:** `tests/test_traces/scheduler_correctness/`
 **Total:** 34 tests organized in 9 tiers
 **Node count:** 100
 **Purpose:** Verify EASY backfilling scheduler correctness
@@ -106,13 +106,13 @@ ${CMAKE_INSTALL_PREFIX}/bin/tests/t_state
 **How to run a single test:**
 ```bash
 cd build
-${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/comprehensive/01_backfill_allowed.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator ../tests/test_traces/scheduler_correctness/01_backfill_allowed.csv \
     --total_nodes 100 \
     --run_time_mode limit \
     --outfile /tmp/output.csv
 
 # Compare with expected
-diff /tmp/output.csv ../tests/test_traces/comprehensive/01_backfill_allowed.expected_output.csv
+diff /tmp/output.csv ../tests/test_traces/scheduler_correctness/01_backfill_allowed.expected_output.csv
 ```
 
 **Test artifacts for each test:**
@@ -126,16 +126,16 @@ diff /tmp/output.csv ../tests/test_traces/comprehensive/01_backfill_allowed.expe
 
 | Test | Description | Jobs | Key Feature | Artifacts |
 |------|-------------|------|-------------|-----------|
-| `01_backfill_allowed` | Small job backfills while large job waits | 3 | Basic backfill | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/01_backfill_allowed.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/01_backfill_allowed.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/01_backfill_allowed.construction.md) |
-| `02_backfill_blocked_time` | Job too long for backfill window | 3 | Time constraint | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/02_backfill_blocked_time.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/02_backfill_blocked_time.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/02_backfill_blocked_time.construction.md) |
-| `03_backfill_blocked_resources` | Job too large for available nodes | 3 | Resource constraint | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/03_backfill_blocked_resources.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/03_backfill_blocked_resources.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/03_backfill_blocked_resources.construction.md) |
-| `04_backfill_resource_competition` | Multiple small jobs compete for backfill | 4 | FCFS among backfillers | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/04_backfill_resource_competition.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/04_backfill_resource_competition.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/04_backfill_resource_competition.construction.md) |
-| `05_multiple_backfills` | Two jobs backfill simultaneously | 4 | Concurrent backfills | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/05_multiple_backfills.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/05_multiple_backfills.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/05_multiple_backfills.construction.md) |
-| `06_backfill_out_of_order` | Later job backfills before earlier | 4 | Out-of-order execution | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/06_backfill_out_of_order.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/06_backfill_out_of_order.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/06_backfill_out_of_order.construction.md) |
-| `07_simultaneous_submit` | Jobs arrive at same time | 3 | Tie-breaking | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/07_simultaneous_submit.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/07_simultaneous_submit.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/07_simultaneous_submit.construction.md) |
-| `08_simultaneous_completion` | (no verified description) | 5 | - | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/08_simultaneous_completion.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/08_simultaneous_completion.expected_output.csv) |
-| `09_simultaneous_submit_complete` | (no verified description) | 2 | - | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/09_simultaneous_submit_complete.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/09_simultaneous_submit_complete.expected_output.csv) |
-| `10_queue_drain_idle` | System goes idle between jobs | 3 | Idle periods | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/10_queue_drain_idle.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/10_queue_drain_idle.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/10_queue_drain_idle.construction.md) |
+| `01_backfill_allowed` | Small job backfills while large job waits | 3 | Basic backfill | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/01_backfill_allowed.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/01_backfill_allowed.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/01_backfill_allowed.construction.md) |
+| `02_backfill_blocked_time` | Job too long for backfill window | 3 | Time constraint | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/02_backfill_blocked_time.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/02_backfill_blocked_time.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/02_backfill_blocked_time.construction.md) |
+| `03_backfill_blocked_resources` | Job too large for available nodes | 3 | Resource constraint | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/03_backfill_blocked_resources.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/03_backfill_blocked_resources.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/03_backfill_blocked_resources.construction.md) |
+| `04_backfill_resource_competition` | Multiple small jobs compete for backfill | 4 | FCFS among backfillers | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/04_backfill_resource_competition.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/04_backfill_resource_competition.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/04_backfill_resource_competition.construction.md) |
+| `05_multiple_backfills` | Two jobs backfill simultaneously | 4 | Concurrent backfills | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/05_multiple_backfills.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/05_multiple_backfills.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/05_multiple_backfills.construction.md) |
+| `06_backfill_out_of_order` | Later job backfills before earlier | 4 | Out-of-order execution | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/06_backfill_out_of_order.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/06_backfill_out_of_order.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/06_backfill_out_of_order.construction.md) |
+| `07_simultaneous_submit` | Jobs arrive at same time | 3 | Tie-breaking | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/07_simultaneous_submit.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/07_simultaneous_submit.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/07_simultaneous_submit.construction.md) |
+| `08_simultaneous_completion` | (no verified description) | 5 | - | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/08_simultaneous_completion.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/08_simultaneous_completion.expected_output.csv) |
+| `09_simultaneous_submit_complete` | (no verified description) | 2 | - | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/09_simultaneous_submit_complete.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/09_simultaneous_submit_complete.expected_output.csv) |
+| `10_queue_drain_idle` | System goes idle between jobs | 3 | Idle periods | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/10_queue_drain_idle.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/10_queue_drain_idle.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/10_queue_drain_idle.construction.md) |
 
 ### Tier 3-4: Event Timing & Competition (9 tests)
 
@@ -149,25 +149,25 @@ description; where it doesn't, treat the name as the only claim being made.
 
 | Test | Jobs | Artifacts |
 |------|------|-----------|
-| `11_multiple_drains` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/11_multiple_drains.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/11_multiple_drains.expected_output.csv) |
-| `12_drain_with_backlog` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/12_drain_with_backlog.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/12_drain_with_backlog.expected_output.csv) |
-| `13_consecutive_fcfs` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/13_consecutive_fcfs.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/13_consecutive_fcfs.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/13_consecutive_fcfs.construction.md) |
-| `14_fcfs_with_backfill` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/14_fcfs_with_backfill.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/14_fcfs_with_backfill.expected_output.csv) |
-| `15_fcfs_partial_overlap` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/15_fcfs_partial_overlap.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/15_fcfs_partial_overlap.expected_output.csv) |
-| `16_starvation_prevention` | 31 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/16_starvation_prevention.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/16_starvation_prevention.expected_output.csv) |
-| `17_late_large_priority` | 21 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/17_late_large_priority.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/17_late_large_priority.expected_output.csv) |
-| `18_backfill_no_starvation` | 12 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/18_backfill_no_starvation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/18_backfill_no_starvation.expected_output.csv) |
-| `19_resource_fragmentation` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/19_resource_fragmentation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/19_resource_fragmentation.expected_output.csv) |
+| `11_multiple_drains` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/11_multiple_drains.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/11_multiple_drains.expected_output.csv) |
+| `12_drain_with_backlog` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/12_drain_with_backlog.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/12_drain_with_backlog.expected_output.csv) |
+| `13_consecutive_fcfs` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/13_consecutive_fcfs.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/13_consecutive_fcfs.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/13_consecutive_fcfs.construction.md) |
+| `14_fcfs_with_backfill` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/14_fcfs_with_backfill.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/14_fcfs_with_backfill.expected_output.csv) |
+| `15_fcfs_partial_overlap` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/15_fcfs_partial_overlap.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/15_fcfs_partial_overlap.expected_output.csv) |
+| `16_starvation_prevention` | 31 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/16_starvation_prevention.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/16_starvation_prevention.expected_output.csv) |
+| `17_late_large_priority` | 21 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/17_late_large_priority.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/17_late_large_priority.expected_output.csv) |
+| `18_backfill_no_starvation` | 12 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/18_backfill_no_starvation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/18_backfill_no_starvation.expected_output.csv) |
+| `19_resource_fragmentation` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/19_resource_fragmentation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/19_resource_fragmentation.expected_output.csv) |
 
 ### Tier 5: Fragmentation & Sustained Load (5 tests)
 
 | Test | Jobs | Artifacts |
 |------|------|-----------|
-| `20_fragmentation_recovery` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/20_fragmentation_recovery.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/20_fragmentation_recovery.expected_output.csv) |
-| `21_sustained_high_load` | 50 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/21_sustained_high_load.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/21_sustained_high_load.expected_output.csv) |
-| `22_bursty_load` | 20 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/22_bursty_load.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/22_bursty_load.expected_output.csv) |
-| `23_mixed_load` | 30 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/23_mixed_load.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/23_mixed_load.expected_output.csv) |
-| `24_multiple_running_jobs` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/24_multiple_running_jobs.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/24_multiple_running_jobs.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/24_multiple_running_jobs.construction.md) |
+| `20_fragmentation_recovery` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/20_fragmentation_recovery.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/20_fragmentation_recovery.expected_output.csv) |
+| `21_sustained_high_load` | 50 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/21_sustained_high_load.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/21_sustained_high_load.expected_output.csv) |
+| `22_bursty_load` | 20 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/22_bursty_load.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/22_bursty_load.expected_output.csv) |
+| `23_mixed_load` | 30 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/23_mixed_load.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/23_mixed_load.expected_output.csv) |
+| `24_multiple_running_jobs` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/24_multiple_running_jobs.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/24_multiple_running_jobs.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/24_multiple_running_jobs.construction.md) |
 
 ### Tier 6-9: Completion Interactions & Backfill Edge Cases (10 tests)
 
@@ -177,16 +177,16 @@ above for the run_time_mode mechanics these traces exercise.
 
 | Test | Jobs | Artifacts |
 |------|------|-----------|
-| `25_early_completion_basic` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/25_early_completion_basic.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/25_early_completion_basic.expected_output.csv) |
-| `26_early_completion_cascading` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/26_early_completion_cascading.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/26_early_completion_cascading.expected_output.csv) |
-| `27_early_vs_late_completion` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/27_early_vs_late_completion.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/27_early_vs_late_completion.expected_output.csv) |
-| `28_simultaneous_completions_backfill` | 6 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/28_simultaneous_completions_backfill.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/28_simultaneous_completions_backfill.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/28_simultaneous_completions_backfill.construction.md) |
-| `29_large_completion_multiple_backfills` | 5 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/29_large_completion_multiple_backfills.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/29_large_completion_multiple_backfills.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/29_large_completion_multiple_backfills.construction.md) |
-| `30_fcfs_blocked_backfill_past` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/30_fcfs_blocked_backfill_past.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/30_fcfs_blocked_backfill_past.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/30_fcfs_blocked_backfill_past.construction.md) |
-| `31_completion_arrival_with_queue` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/31_completion_arrival_with_queue.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/31_completion_arrival_with_queue.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/31_completion_arrival_with_queue.construction.md) |
-| `32_simultaneous_backfill_with_reservation` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/32_simultaneous_backfill_with_reservation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/32_simultaneous_backfill_with_reservation.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/32_simultaneous_backfill_with_reservation.construction.md) |
-| `33_five_simultaneous_events` | 6 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/33_five_simultaneous_events.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/33_five_simultaneous_events.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/33_five_simultaneous_events.construction.md) |
-| `34_backfill_overallocation` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/34_backfill_overallocation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/34_backfill_overallocation.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/comprehensive/34_backfill_overallocation.construction.md) |
+| `25_early_completion_basic` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/25_early_completion_basic.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/25_early_completion_basic.expected_output.csv) |
+| `26_early_completion_cascading` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/26_early_completion_cascading.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/26_early_completion_cascading.expected_output.csv) |
+| `27_early_vs_late_completion` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/27_early_vs_late_completion.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/27_early_vs_late_completion.expected_output.csv) |
+| `28_simultaneous_completions_backfill` | 6 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/28_simultaneous_completions_backfill.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/28_simultaneous_completions_backfill.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/28_simultaneous_completions_backfill.construction.md) |
+| `29_large_completion_multiple_backfills` | 5 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/29_large_completion_multiple_backfills.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/29_large_completion_multiple_backfills.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/29_large_completion_multiple_backfills.construction.md) |
+| `30_fcfs_blocked_backfill_past` | 3 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/30_fcfs_blocked_backfill_past.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/30_fcfs_blocked_backfill_past.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/30_fcfs_blocked_backfill_past.construction.md) |
+| `31_completion_arrival_with_queue` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/31_completion_arrival_with_queue.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/31_completion_arrival_with_queue.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/31_completion_arrival_with_queue.construction.md) |
+| `32_simultaneous_backfill_with_reservation` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/32_simultaneous_backfill_with_reservation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/32_simultaneous_backfill_with_reservation.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/32_simultaneous_backfill_with_reservation.construction.md) |
+| `33_five_simultaneous_events` | 6 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/33_five_simultaneous_events.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/33_five_simultaneous_events.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/33_five_simultaneous_events.construction.md) |
+| `34_backfill_overallocation` | 4 | [Input](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/34_backfill_overallocation.csv) · [Expected](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/34_backfill_overallocation.expected_output.csv) · [Desc](https://github.com/llnl/dr_evt/blob/main/tests/test_traces/scheduler_correctness/34_backfill_overallocation.construction.md) |
 
 **Status:** 34/34 passing
 
@@ -302,12 +302,12 @@ cd build
 ```
 
 **Tests hardcoded in script:**
-- `comprehensive/01_backfill_allowed.csv`
-- `comprehensive/05_multiple_backfills.csv`
-- `comprehensive/13_consecutive_fcfs.csv`
-- `comprehensive/21_sustained_high_load.csv`
+- `scheduler_correctness/01_backfill_allowed.csv`
+- `scheduler_correctness/05_multiple_backfills.csv`
+- `scheduler_correctness/13_consecutive_fcfs.csv`
+- `scheduler_correctness/21_sustained_high_load.csv`
 
-**Verified to pass on:** All 34 comprehensive tests + 4 scale tests
+**Verified to pass on:** All 34 scheduler-correctness fixtures + 4 scale tests
 
 ---
 
@@ -371,7 +371,7 @@ cd build
 
 ## Append-Job Tests
 
-**Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_append_job_grpc.cpp` (gRPC)
+**Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_grpc_streaming_api.cpp` (gRPC)
 **Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` (single-job) and `Trace::append_jobs()`/`Simulation::append_jobs()` (batch) - the real streaming insertion points, for jobs the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling loops, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()`/`append_jobs()` rather than a preloaded trace file. This file used to be two (a separate `test_streaming_api.cpp` covered the `submit_job()`/`advance_to()` half by loading a small, hand-written CSV first) - consolidated once it became clear none of those tests actually depended on a preloaded file (each one's submit times were hand-written to match the CSV exactly, never diverging from it), so the same coverage is achievable via `append_job()` with no file needed at all.
 
 **How it works:**
@@ -529,7 +529,7 @@ make
 
 ## Queue Implementation Testing
 
-**Location:** `tests/test_traces/comprehensive/` (same 34 traces as the Comprehensive Tests above)
+**Location:** `tests/test_traces/scheduler_correctness/` (the same 34 scheduler-correctness fixtures described above)
 **Purpose:** Verify all four FCFS wait-queue *data structure* implementations
 (`--queue_impl circular/deque/multimap/block`) produce byte-for-byte identical
 output to each other
@@ -548,7 +548,7 @@ Python-reference comparison above wouldn't specifically localize.
 **How to run:**
 ```bash
 cd build
-../tests/test_fcfs_comprehensive.sh --correctness
+../tests/test_fcfs_queue_implementations.sh --correctness
 ```
 
 **Performance comparison** (not correctness - separate script):
@@ -599,7 +599,7 @@ for the full column reference.
 other test suite:
 
 1. **Replay mode** uses the trace's own real, historical begin/end times -
-   confirmed using `test_traces/comprehensive/25_early_completion_basic.csv`,
+   confirmed using `test_traces/scheduler_correctness/25_early_completion_basic.csv`,
    where `time_limit` and `actual_run_time` genuinely differ (200s vs 50s).
 2. `run_time_mode=distribution`'s `normal`/`lognormal` samples are capped
    at `time_limit` - a real HPC scheduler kills a job at its stated
@@ -621,7 +621,7 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 
 | Category | Total | Passing | Broken | Purpose |
 |----------|-------|---------|--------|---------|
-| **Comprehensive** | 34 | 34 | 0 | Scheduler correctness |
+| **Scheduler correctness** | 34 | 34 | 0 | Scheduler correctness |
 | **Unit** | 7 | 7 | 0 | Basic I/O & formats |
 | **Feature** | 6 | 6 | 0 | Policy comparisons, output formats, and rejection handling |
 | **Conservative** | 2 | 2 | 0 | CONSERVATIVE backfilling |
@@ -671,7 +671,7 @@ job_id,start_time,end_time
 
 `job_id` corresponds to input row order (0-indexed), which is safe even
 when multiple jobs share a submit time: the simulator internally
-stable-sorts by submit time at load, and all `comprehensive/`/`scale/`
+stable-sorts by submit time at load, and all `scheduler_correctness/`/`scale/`
 input files are already submit-time-sorted on disk, so this sort is a
 no-op and row order is preserved.
 
@@ -683,7 +683,7 @@ time,nodes_used,nodes_free,running_jobs
 0,70,30,0
 20,90,10,"0,2"
 ```
-(comprehensive/, scale/ - via the Python reference generators)
+(scheduler_correctness/, scale/ - via the Python reference generators)
 ```text
 time,free_nodes,allocated_nodes
 0,30,70
@@ -715,7 +715,7 @@ actually being checked against it.
 All expected outputs are generated by the Python reference implementation:
 
 ```bash
-# Comprehensive tests (34 tests)
+# Scheduler-correctness tests (34 fixtures)
 python scripts/generators/generate_all_expected_outputs.py
 
 # Scale tests (7 tests)
@@ -723,14 +723,14 @@ python scripts/generators/generate_scale_expected_outputs.py
 ```
 
 **Python reference:** `scripts/python_reference_scheduler.py`
-**Verification:** 34/34 comprehensive tests match Python reference
+**Verification:** 34/34 scheduler-correctness fixtures match Python reference
 
 ---
 
 ## Adding New Tests
 
 1. Create the input trace under the appropriate directory
-   (`comprehensive/`, `scale/`, `unit/`, or `feature/`), using `pbatch` as
+   (`scheduler_correctness/`, `scale/`, `unit/`, or `feature/`), using `pbatch` as
    the queue name.
 2. Run the relevant generator script
    (`generate_all_expected_outputs.py` or `generate_scale_expected_outputs.py`)
@@ -742,7 +742,7 @@ python scripts/generators/generate_scale_expected_outputs.py
    to get real independent verification in this suite, and it doesn't
    scale to larger tests. If reference implementation passes all of such
    verifications, the comparison against the reference becomes more useful.
-4. If adding to `comprehensive/`, add the test name to the `TESTS` list
+4. If adding to `scheduler_correctness/`, add the test name to the `TESTS` list
    in `generate_all_expected_outputs.py`; same for `scale/` and its
    generator.
 

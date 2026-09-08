@@ -60,7 +60,7 @@ docs/
 ### For Researchers
 1. [Test Summary](TESTING_GUIDE.md#test-summary) - ✓ All tests pass
 2. [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - EASY and Conservative
-3. [Comprehensive Tests](TESTING_GUIDE.md#comprehensive-tests) - Python-reference ground truth comparison
+3. [Scheduler Correctness Tests](TESTING_GUIDE.md#scheduler-correctness-tests) - Python-reference ground truth comparison
 
 ### For Developers
 1. [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - How it works

@@ -207,7 +207,7 @@ Run tests to verify installation:
 ```bash
 # Comprehensive test suite (34 tests)
 cd tests
-./test_all_dr_evt.sh
+./run_scheduler_correctness_tests.sh
 ```
 
 Should see:
@@ -220,7 +220,7 @@ Total:   34
 ```
 
 (An earlier version of this document referenced `./test_all.sh` - no such
-script exists, the actual name is `test_all_dr_evt.sh` - and a
+script exists, the actual name is `run_scheduler_correctness_tests.sh` - and a
 `scripts/verify_against_analytical.py` step claiming "verified against
 analytical oracles" - that script was an unused remnant of an abandoned
 test-suite design and has been removed; "34 tests pass" means the C++

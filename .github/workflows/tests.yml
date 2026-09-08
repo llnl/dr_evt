@@ -113,7 +113,7 @@ jobs:
           # docs/getting-started/installation.md's "Livermore Computing
           # (LC) HPC systems" section for the full explanation).
           # Build test binaries
-          make test_append_job_api-bin test_append_job_grpc-bin test_batch_vs_streaming-bin test_progressive_load-bin
+          make test_append_job_api-bin test_grpc_streaming_api-bin test_batch_vs_streaming-bin test_progressive_load-bin
           # gRPC client/server + MPI multi-client/server test harness
           # (already covered by `make -j$(nproc)` above since none of
           # these are EXCLUDE_FROM_ALL, but listed explicitly here too
@@ -145,24 +145,24 @@ jobs:
           ls -lh install/bin/simulator
           install/bin/simulator --help || true
 
-      - name: Run Comprehensive Tests (Build Directory)
-        id: comprehensive
+      - name: Run Scheduler Correctness Tests (Build Directory)
+        id: scheduler-correctness
         run: |
           echo "========================================"
-          echo "Running Comprehensive Tests (34 tests) - Build Directory"
+          echo "Running Scheduler Correctness Tests (34 fixtures) - Build Directory"
           echo "========================================"
           # Explicitly unset CMAKE_INSTALL_PREFIX to test build directory fallback
           unset CMAKE_INSTALL_PREFIX
-          ./tests/test_all_dr_evt.sh
+          ./tests/run_scheduler_correctness_tests.sh
 
-      - name: Run Comprehensive Tests (Installed Binary)
-        id: comprehensive-installed
+      - name: Run Scheduler Correctness Tests (Installed Binary)
+        id: scheduler-correctness-installed
         run: |
           echo "========================================"
-          echo "Running Comprehensive Tests (34 tests) - Installed Binary"
+          echo "Running Scheduler Correctness Tests (34 fixtures) - Installed Binary"
           echo "========================================"
           export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
-          ./tests/test_all_dr_evt.sh
+          ./tests/run_scheduler_correctness_tests.sh
 
       - name: Run Queue Implementation Differential Tests
         id: queue-impl
@@ -170,7 +170,7 @@ jobs:
           echo "========================================"
           echo "Comparing deque/multimap/block/circular queue implementations"
           echo "========================================"
-          ./tests/test_fcfs_comprehensive.sh --correctness
+          ./tests/test_fcfs_queue_implementations.sh --correctness
 
       - name: Run Column Alias Tests
         id: column-alias
@@ -309,8 +309,8 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Comprehensive - Build (34 tests): ${{ steps.comprehensive.outcome }}"
-          echo "  Comprehensive - Installed (34 tests): ${{ steps.comprehensive-installed.outcome }}"
+          echo "  Scheduler correctness - Build (34 fixtures): ${{ steps.scheduler-correctness.outcome }}"
+          echo "  Scheduler correctness - Installed (34 fixtures): ${{ steps.scheduler-correctness-installed.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
           echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"
           echo "  Run Time Mode (7 tests): ${{ steps.run-time-mode.outcome }}"
