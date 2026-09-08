@@ -9,11 +9,11 @@
       <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#334155" flood-opacity="0.10"/>
     </filter>
     <style>
-      .title { font-family: Arial, Helvetica, sans-serif; font-size: 18px; font-weight: 600; fill: #26323c; }
-      .body { font-family: Arial, Helvetica, sans-serif; font-size: 14px; fill: #52606b; }
-      .small { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 600; fill: #6d7b86; letter-spacing: .8px; }
-      .badge { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 600; fill: #52606b; }
-      .label { font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 600; fill: #687782; }
+      .title { font-family: Arial, Helvetica, sans-serif; font-size: 19px; font-weight: 600; fill: #26323c; }
+      .body { font-family: Arial, Helvetica, sans-serif; font-size: 15px; fill: #52606b; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: 600; fill: #6d7b86; letter-spacing: .8px; }
+      .badge { font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: 600; fill: #52606b; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 600; fill: #687782; }
     </style>
   </defs>
 
