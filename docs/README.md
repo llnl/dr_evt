@@ -72,9 +72,16 @@ docs/
 ### Prerequisites
 
 ```bash
-cd docs
-pip install -r requirements.txt
+# From the repository root: create an isolated environment for documentation
+# tooling, then activate it before installing the Sphinx dependencies.
+python3 -m venv .venv-docs
+source .venv-docs/bin/activate
+python -m pip install -r docs/requirements.txt
 ```
+
+Using a virtual environment is recommended so Sphinx and its extensions do
+not modify the system Python installation. `make install` in `docs/` installs
+into the currently active Python environment; it does not create one.
 
 Installs:
 - Sphinx (documentation generator)
@@ -90,8 +97,8 @@ required for the rest of the Sphinx documentation site.
 ### HTML site and C++ API reference
 
 ```bash
-cd docs
-make html
+source .venv-docs/bin/activate
+make -C docs html
 ```
 
 `make html` builds the Sphinx site. When Doxygen is available, it first
@@ -103,11 +110,11 @@ the API XML is needed.
 ### Build HTML Documentation
 
 ```bash
-cd docs
-sphinx-build -b html . _build/html
+source .venv-docs/bin/activate
+sphinx-build -b html docs docs/_build/html
 ```
 
-View at: `_build/html/index.html`
+View at: `docs/_build/html/index.html`
 
 ### Build PDF
 

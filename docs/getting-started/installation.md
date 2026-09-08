@@ -182,7 +182,18 @@ needed to run it.
 
 A separate `docs/requirements.txt` exists, but it's for building this
 Sphinx documentation site itself (`sphinx`, `myst-parser`, etc.) - unrelated
-to running or testing the simulator.
+to running or testing the simulator. Create and activate a dedicated virtual
+environment before installing those documentation dependencies:
+
+```bash
+python3 -m venv .venv-docs
+source .venv-docs/bin/activate
+python -m pip install -r docs/requirements.txt
+make -C docs html
+```
+
+`make install` in `docs/` uses the active Python environment; it does not
+create a virtual environment itself.
 
 If you're building the optional [Python bindings](../api/PYTHON_API.md)
 (`-DDR_EVT_BUILD_PYTHON=ON`), that's a compiled extension module, not a

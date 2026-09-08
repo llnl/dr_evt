@@ -9,8 +9,8 @@
  * @brief Execution-time statistics across job records.
  */
 
-#ifndef DR_EVT_TRACE_JOB_STAT_TEXEC
-#define DR_EVT_TRACE_JOB_STAT_TEXEC
+#ifndef DR_EVT_TRACE_JOB_STAT_TEXEC_HPP
+#define DR_EVT_TRACE_JOB_STAT_TEXEC_HPP
 #include <map>
 #include <array>
 #include <vector>
@@ -96,4 +96,4 @@ void Job_Stat_Texec<N>::add_stat(const Job_Records& j)
 
 /**@}*/
 } // end of namespace dr_evt
-#endif // DR_EVT_TRACE_JOB_STAT_TEXEC
+#endif // DR_EVT_TRACE_JOB_STAT_TEXEC_HPP
