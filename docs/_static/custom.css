@@ -21,3 +21,18 @@
 #composite-stream-timeline > svg .noteText {
     fill: #234d31 !important;
 }
+
+/* Mermaid's default sequence-diagram text is 12 pt; increase it by 2 pt. */
+#composite-stream-timeline > svg text {
+    font-size: 14pt !important;
+}
+
+/* Replace the yellow sequence notes in the Client/server session diagram. */
+#client-server-session-diagram > svg .note {
+    fill: #e2f3e7 !important;
+    stroke: #8ab99a !important;
+}
+
+#client-server-session-diagram > svg .noteText {
+    fill: #234d31 !important;
+}

@@ -11,6 +11,8 @@ definition, dependency resolution, and testing.
 ## Client/server session
 
 ```{mermaid}
+:name: client-server-session-diagram
+
 sequenceDiagram
     participant C as Client
     participant S as dr_evt_server
