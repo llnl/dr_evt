@@ -79,8 +79,15 @@ if (DR_EVT_GRPC_FETCHCONTENT)
   endif()
 
   include(FetchContent)
-  set(ABSL_ENABLE_INSTALL ON)
-  set(gRPC_INSTALL ON)
+  # gRPC and its bundled dependencies are implementation details of this
+  # build.  DR_EVT links them statically, so installing their libraries,
+  # headers, and CMake packages only bloats the DR_EVT installation.
+  set(ABSL_ENABLE_INSTALL OFF CACHE BOOL
+      "Do not install bundled Abseil with DR_EVT" FORCE)
+  set(gRPC_INSTALL OFF CACHE BOOL
+      "Do not install bundled gRPC with DR_EVT" FORCE)
+  set(protobuf_INSTALL OFF CACHE BOOL
+      "Do not install bundled Protobuf with DR_EVT" FORCE)
 
   # Pinned version. Bumping this should come with re-verifying
   # dr_evt_server.cpp/dr_evt_client.cpp's gRPC C++ API usage against
