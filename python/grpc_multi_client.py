@@ -150,9 +150,6 @@ def drive_server(address, jobs, args, grpc, pb, service, server_index):
                 raise ValueError(f"{address}: assigned jobs are not sorted by submit time")
             append = pb.AppendJobsRequest(requests=[pb.JobAppendData(**job) for job in jobs])
             response = session.call(pb.ClientMessage(append_jobs=append))
-            for job_index, job in zip(response.append_jobs.job_idx, jobs):
-                session.call(pb.ClientMessage(submit_job=pb.SubmitJobRequest(
-                    job_idx=job_index, submit_time=job["submit_time"])))
 
         session.call(pb.ClientMessage(advance_to=pb.AdvanceToRequest(
             target_time=args.advance_to)))

@@ -147,7 +147,10 @@ rollback guarantee.
 `tests/test_grpc_single_coordinator.py` is a one-client, two-server integration
 test. The coordinator reads both ordinary traces and the composite stream; the
 two ordinary streams use synchronized timestamps and differ only in requested
-node counts.
+node counts. For each server, it also builds an independent seven-arrival
+baseline with `simulator` and byte-compares the gRPC session's simulated-job
+and resource traces with that baseline. This verifies scheduling and resource
+accounting, not only the final job counts.
 
 | Test case | Step | Server 1 timing | Server 2 timing | Composite timing | Relation exercised |
 | --- | --- | --- | --- | --- | --- |

@@ -45,7 +45,7 @@ resource traces.
 - **Early Completion Support**: Jobs can finish before time_limit (actual_run_time < time_limit)
 
 ### APIs & Integration
-- **Streaming API**: Online simulation with dynamic job submission (`submit_job`, `advance_to`, `run_until_exclusive`)
+- **Streaming API**: Online simulation with dynamic job arrival (`append_job`, `advance_to`, `run_until_exclusive`)
 - **gRPC Service**: Network-exposed streaming API enabling:
   - **Multi-cluster coordination**: Distributed schedulers interact in real-time
   - Remote simulation control from any gRPC-capable language
@@ -528,7 +528,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/dr_evt_client --server localhost:50051 \
 │ (Any Lang)  │ ←──────────────→ │  (C++ Core)  │
 └─────────────┘                  └──────────────┘
      │                                   │
-     │ submit_job()                      │ Simulation
+     │ append_job()                      │ Simulation
      │ advance_to()                      │ Instance
      │ get_statistics()                  │
      └───────────────────────────────────┘

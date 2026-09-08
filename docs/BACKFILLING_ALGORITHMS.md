@@ -1,24 +1,50 @@
-# Backfilling Algorithms - Reference Implementation
+# Scheduling Policies
 
-This document describes the backfilling algorithms implemented in DR_EVT: EASY and CONSERVATIVE backfilling.
+This document describes DR_EVT's priority policies and backfilling algorithms.
 
 ## Table of Contents
 
-1. [EASY Backfilling](#easy-backfilling)
-2. [Conservative Backfilling](#conservative-backfilling)
+1. [Priority Policies](#priority-policies)
+2. [Backfilling Algorithms](#backfilling-algorithms)
 3. [Comparison](#comparison)
 
 ---
 
-# EASY Backfilling
+## Priority Policies
 
-## Overview
+Priority policies decide the order in which waiting jobs are considered. They
+do not change the resource or reservation rules; a configured backfill policy
+is applied after the priority order has selected its queue head.
+
+### FCFS
+
+First-come, first-served orders jobs by submit time. Ties retain their input
+order. FCFS is the default and the ordering assumed by EASY and conservative
+backfilling.
+
+### SJF
+
+Shortest-job-first orders waiting jobs by their requested `time_limit`, with
+the normal deterministic tie-breaking used by the scheduler. It favors short
+workloads, potentially at the expense of long-job wait time.
+
+### LJF
+
+Longest-job-first orders waiting jobs by requested `time_limit` in descending
+order. It is useful for policy comparison and for workloads where prioritizing
+long jobs is intentional.
+
+## Backfilling Algorithms
+
+### EASY Backfilling
+
+#### Overview
 
 FCFS (First-Come-First-Served) with EASY (Extensible Argonne Scheduling sYstem) backfilling.
 
 Jobs are scheduled in arrival order (FCFS), but smaller jobs can "backfill" - start early while larger jobs wait - as long as they don't delay the **first waiting job**.
 
-## Visual Overview
+#### Visual Overview
 
 ```{mermaid}
 graph TD
@@ -44,34 +70,34 @@ graph TD
 
 ---
 
-## Data Structures
+#### Data Structures
 
-### Wait Queue
+##### Wait Queue
 - **Ordered list** of jobs waiting to start
 - **FCFS order**: sorted by arrival time (submit_time)
 - **FCFS head**: First job in wait queue (index 0)
 
-### Running Jobs
+##### Running Jobs
 - Jobs currently executing
 - Track: (job_id, start_time, end_time, nodes)
 - **end_time based on time_limit** for reservation calculations (pessimistic)
 - **actual end_time** for actual completion (may be earlier)
 
-### System State
+##### System State
 - `TOTAL_NODES`: Total system capacity (e.g., 100)
 - `free_nodes = TOTAL_NODES - sum(running_job.nodes)`
 
 ---
 
-## Algorithm
+#### Algorithm
 
-### Scheduling Events
+##### Scheduling Events
 
 Scheduler runs at these events:
 1. Job arrival (submit_time)
 2. Job completion (actual end_time)
 
-### Scheduling Logic (per event)
+##### Scheduling Logic (per event)
 
 ```
 SCHEDULE():
@@ -83,7 +109,7 @@ SCHEDULE():
 
 ---
 
-## Step 1: Process FCFS Head
+#### Step 1: Process FCFS Head
 
 ```
 IF wait_queue is empty:
@@ -105,7 +131,7 @@ ELSE:
 
 ---
 
-## Step 2: Calculate Reservation
+#### Step 2: Calculate Reservation
 
 When FCFS head is blocked (needs more nodes than available):
 
@@ -131,7 +157,7 @@ FOR EACH (end_time, nodes) IN events:
 // FCFS head is GUARANTEED to start no later than reservation_time
 ```
 
-### Reservation Timeline Example
+##### Reservation Timeline Example
 
 ```{mermaid}
 gantt
@@ -162,7 +188,7 @@ gantt
 
 ---
 
-## Step 3: Try Backfilling
+#### Step 3: Try Backfilling
 
 ```
 backfill_window = reservation_time
@@ -187,7 +213,7 @@ FOR EACH job IN wait_queue[1:]:  // Skip FCFS head (index 0)
 // (free_nodes changed, FCFS head might fit now)
 ```
 
-### Backfilling Example
+##### Backfilling Example
 
 ```{mermaid}
 gantt
@@ -232,22 +258,22 @@ gantt
 
 ---
 
-## Early Completion Handling
+#### Early Completion Handling
 
 Jobs may finish before their time_limit (actual_runtime < time_limit).
 
-### Planning (Pessimistic)
+##### Planning (Pessimistic)
 - Reservation calculated using **time_limit**
 - Assume job runs full time_limit
 
-### Execution (Optimistic)
+##### Execution (Optimistic)
 - Job actually ends at: `start_time + actual_runtime`
 - When job ends early, immediately reschedule:
   - More free nodes available
   - FCFS head might fit now
   - New jobs can backfill
 
-### Example
+##### Example
 
 ```
 Job 0: time_limit=200, actual_runtime=50
@@ -258,9 +284,9 @@ Job 0: time_limit=200, actual_runtime=50
 
 ---
 
-## Edge Cases & Clarifications
+#### Edge Cases & Clarifications
 
-### 1. FCFS Head Can Fit
+##### 1. FCFS Head Can Fit
 **Q**: When FCFS head can fit, does it start immediately?  
 **A**: YES. **It starts immediately.** No additional time window constraints.
 
@@ -281,7 +307,7 @@ This means:
 
 "Remaining" is simply the free space right now. No special constraint implied.
 
-### 2. Multiple Running Jobs
+##### 2. Multiple Running Jobs
 **Q**: FCFS head needs resources from 2+ running jobs. When is reservation?  
 **A**: **Correct.** When ENOUGH resources freed (may require multiple jobs to finish).
 
@@ -297,7 +323,7 @@ Example:
 - At t=200, Job B frees 40 → 100 total free, >= 70 ✓
 - Reservation = t=200
 
-### 3. Backfill Time Window
+##### 3. Backfill Time Window
 **Q**: Strict `<` or `<=`?  
 **A**: **Strict `<`** (complete BEFORE reservation, not AT).
 
@@ -308,7 +334,7 @@ Example:
 - A job completing exactly at reservation time would delay FCFS head's start
 - Therefore: backfiller must complete **strictly before** reservation
 
-### 4. What if No Jobs Running?
+##### 4. What if No Jobs Running?
 When wait queue has jobs but nothing running:
 - FCFS head is first job
 - If can fit → starts immediately
@@ -317,7 +343,7 @@ When wait queue has jobs but nothing running:
 
 ---
 
-## Complete Example Trace
+#### Complete Example Trace
 
 **System**: 100 nodes
 
@@ -389,25 +415,25 @@ Job 2: start=20, end=70
 
 ---
 
-## Questions to Verify Understanding
+#### Questions to Verify Understanding
 
-### Q1: Job can fit but would outlast running job. Start it?
+##### Q1: Job can fit but would outlast running job. Start it?
 **A**: Depends. Is it FCFS head or backfiller?
 - FCFS head → START immediately (highest priority)
 - Backfiller → DON'T START (would delay FCFS head's reservation)
 
-### Q2: Reservation uses time_limit or actual_runtime?
+##### Q2: Reservation uses time_limit or actual_runtime?
 **A**: time_limit (pessimistic planning, conservative guarantee)
 
-### Q3: Backfill check: `completion < reservation` or `<=`?
+##### Q3: Backfill check: `completion < reservation` or `<=`?
 **A**: Strict `<` (must complete BEFORE, not AT)
 
-### Q4: Multiple running jobs - which end time matters?
+##### Q4: Multiple running jobs - which end time matters?
 **A**: Whichever combination frees ENOUGH resources (may need multiple)
 
 ---
 
-## Reference
+#### Reference
 
 This algorithm is EASY backfilling from:
 - Lifka, D. A. (1995). "The ANL/IBM SP scheduling system"
@@ -417,15 +443,15 @@ Key insight: **One reservation** (FCFS head) instead of shadow times for all job
 
 ---
 
-# Conservative Backfilling
+### Conservative Backfilling
 
-## Overview
+#### Overview
 
 FCFS with **CONSERVATIVE backfilling** provides stronger fairness guarantees than EASY.
 
 Jobs are scheduled in arrival order (FCFS), but backfilling can only occur if it **does not delay ANY waiting job** (not just the first).
 
-### Key Difference from EASY
+##### Key Difference from EASY
 
 | Aspect | EASY | CONSERVATIVE |
 |--------|------|--------------|
@@ -437,7 +463,7 @@ Jobs are scheduled in arrival order (FCFS), but backfilling can only occur if it
 
 ---
 
-## Visual Overview
+#### Visual Overview
 
 ```{mermaid}
 graph TD
@@ -466,9 +492,9 @@ graph TD
 
 ---
 
-## Algorithm
+#### Algorithm
 
-### Step 1: Process FCFS Head (Same as EASY)
+##### Step 1: Process FCFS Head (Same as EASY)
 
 ```
 IF wait_queue is empty:
@@ -486,7 +512,7 @@ ELSE:
 
 ---
 
-## Step 2: Calculate Reservations (Shadow Times) for ALL Waiting Jobs
+#### Step 2: Calculate Reservations (Shadow Times) for ALL Waiting Jobs
 
 Unlike EASY (which only calculates reservation for the first job), CONSERVATIVE calculates **independent reservations** (shadow times) for **every waiting job**.
 
@@ -540,7 +566,7 @@ FOR EACH job IN wait_queue:
 
 ---
 
-## Step 3: Conservative Backfilling
+#### Step 3: Conservative Backfilling
 
 ```
 FOR EACH job IN wait_queue[1:]:  // Skip FCFS head (index 0)
@@ -572,9 +598,9 @@ FOR EACH job IN wait_queue[1:]:  // Skip FCFS head (index 0)
 
 ---
 
-## Conservative Backfilling Example
+#### Conservative Backfilling Example
 
-### Scenario
+##### Scenario
 - 100 total nodes
 - Job 0: 60 nodes, ends at t=50
 - Job 1: 20 nodes, ends at t=100
@@ -586,7 +612,7 @@ FOR EACH job IN wait_queue[1:]:  // Skip FCFS head (index 0)
 3. Job 4: needs 15 nodes, duration 100 → reservation at t=0 (could start now!)
 4. Job 5: needs 10 nodes, duration 40 → backfill candidate
 
-### EASY Decision
+##### EASY Decision
 
 ```
 FCFS head = Job 2 (first in queue)
@@ -601,7 +627,7 @@ EASY: ✅ BACKFILL Job 5
 
 Result: Job 5 starts at t=0, ends at t=40
 
-### CONSERVATIVE Decision
+##### CONSERVATIVE Decision
 
 ```
 Calculate ALL reservations:
@@ -624,9 +650,9 @@ Result: Job 5 must wait (protects Job 4's reservation)
 
 ---
 
-## Implementation Considerations
+#### Implementation Considerations
 
-### Effective Running Jobs
+##### Effective Running Jobs
 
 When multiple jobs backfill in the same scheduling cycle, subsequent backfill checks must treat already-backfilled jobs as "effectively running":
 
@@ -642,7 +668,7 @@ FOR EACH backfill_candidate:
 
 This prevents multiple backfilled jobs from incorrectly overlapping with waiting jobs' reservations.
 
-### Complexity
+##### Complexity
 
 - **EASY**: O(n) per scheduling event
   - Calculate one reservation (FCFS head)
@@ -654,7 +680,7 @@ This prevents multiple backfilled jobs from incorrectly overlapping with waiting
 
 ---
 
-## Performance Comparison
+#### Performance Comparison
 
 Based on DR_EVT test results (2000 jobs, 400 nodes):
 
@@ -680,7 +706,7 @@ Based on DR_EVT test results (2000 jobs, 400 nodes):
 
 ---
 
-## When to Use Conservative Backfilling
+#### When to Use Conservative Backfilling
 
 **Use CONSERVATIVE when:**
 - Fairness is critical (SLAs, user expectations)
@@ -694,7 +720,7 @@ Based on DR_EVT test results (2000 jobs, 400 nodes):
 
 ---
 
-## Reference
+#### Reference
 
 Conservative backfilling concepts from:
 - Feitelson, D. G., & Weil, A. M. (1998). "Utilization and predictability in scheduling the IBM SP2 with backfilling"
@@ -704,9 +730,9 @@ Key insight: **All jobs get reservations** (shadow times), ensuring no job is de
 
 ---
 
-# Comparison
+## Comparison
 
-## Summary Table
+### Summary Table
 
 | Feature | EASY | CONSERVATIVE |
 |---------|------|--------------|
@@ -719,7 +745,7 @@ Key insight: **All jobs get reservations** (shadow times), ensuring no job is de
 | **Use Case** | High throughput systems | Fair-share clusters |
 | **Implementation** | Simpler | More complex |
 
-## Algorithm Choice Decision Tree
+### Algorithm Choice Decision Tree
 
 ```
 Is fairness guarantee critical?
@@ -731,7 +757,7 @@ Is fairness guarantee critical?
 
 ---
 
-## DR_EVT Implementation
+### DR_EVT Implementation
 
 Both algorithms are implemented in DR_EVT:
 

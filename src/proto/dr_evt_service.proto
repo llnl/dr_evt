@@ -13,11 +13,9 @@ syntax = "proto3";
 package dr_evt_grpc;
 
 // Single bidirectional-streaming RPC exposing DR_EVT's C++ streaming API
-// (append_job, submit_job, advance_to, run_until_exclusive, and the
-// monitoring queries) over the network. AppendJobRequest is the genuine
-// streaming case - a job the server has never seen before; SubmitJobRequest
-// still only enqueues a job already known to the server (via
-// InitializeTraceRequest's load or a prior AppendJobRequest). A Session()
+// (append_job, advance_to, run_until_exclusive, and the monitoring queries)
+// over the network. AppendJobRequest is the genuine streaming case: it adds
+// a previously unknown job and immediately enqueues it. A Session()
 // can host successive server-side Simulation instances: each InitRequest
 // creates one, and FinishSimulationRequest releases it.
 service SimulationService {
@@ -30,24 +28,22 @@ message ClientMessage {
     // Echoed back on the matching ServerMessage so the client can correlate
     // out-of-order or interleaved responses. Not interpreted by the server.
     uint64 request_id = 1;
-
     oneof request {
         InitRequest init = 2;
         InitializeTraceRequest initialize_trace = 3;
-        SubmitJobRequest submit_job = 4;
-        AdvanceToRequest advance_to = 5;
-        RunUntilExclusiveRequest run_until_exclusive = 6;
-        GetCurrentTimeRequest get_current_time = 7;
-        GetNodesInUseRequest get_nodes_in_use = 8;
-        GetAvailableNodesRequest get_available_nodes = 9;
-        GetActiveJobCountRequest get_active_job_count = 10;
-        GetFCFSHeadShadowTimeRequest get_fcfs_head_shadow_time = 11;
-        GetStatisticsRequest get_statistics = 12;
-        GetTraceSizeRequest get_trace_size = 13;
-        AppendJobRequest append_job = 14;
-        AppendJobsRequest append_jobs = 15;
-        FinishSimulationRequest finish_simulation = 16;
-        GetBackfillWindowRequest get_backfill_window = 17;
+        AdvanceToRequest advance_to = 4;
+        RunUntilExclusiveRequest run_until_exclusive = 5;
+        GetCurrentTimeRequest get_current_time = 6;
+        GetNodesInUseRequest get_nodes_in_use = 7;
+        GetAvailableNodesRequest get_available_nodes = 8;
+        GetActiveJobCountRequest get_active_job_count = 9;
+        GetFCFSHeadShadowTimeRequest get_fcfs_head_shadow_time = 10;
+        GetStatisticsRequest get_statistics = 11;
+        GetTraceSizeRequest get_trace_size = 12;
+        AppendJobRequest append_job = 13;
+        AppendJobsRequest append_jobs = 14;
+        FinishSimulationRequest finish_simulation = 15;
+        GetBackfillWindowRequest get_backfill_window = 16;
     }
 }
 
@@ -99,17 +95,8 @@ message InitializeTraceRequest {
     uint64 max_jobs = 1;           // 0 = no limit
 }
 
-message SubmitJobRequest {
-    uint32 job_idx = 1;
-    double submit_time = 2;
-}
-
-// The streaming counterpart to SubmitJobRequest: a job the
-// server has never seen before, rather than a reference by index into
-// an already-loaded trace. Adds the job to the store; does not submit
-// it to the scheduler - send a SubmitJobRequest with the returned
-// job_idx next for that (same two-step shape as the C++
-// Trace::append_job()/Simulation::submit_job() pair).
+// Adds a job the server has never seen before and immediately enqueues it
+// for scheduling.
 message AppendJobRequest {
     double submit_time = 1;
     uint32 num_nodes = 2;
@@ -150,6 +137,8 @@ message GetCurrentTimeRequest {}
 message GetNodesInUseRequest {}
 message GetAvailableNodesRequest {}
 message GetActiveJobCountRequest {}
+// Returns only the FCFS-head reservation time. Use GetBackfillWindowRequest
+// when the resource-change times that lead to that reservation are needed.
 message GetFCFSHeadShadowTimeRequest {}
 // Returns the current FCFS/EASY backfill opportunity in one consistent
 // snapshot.  Release events are calculated with the jobs' time limits, the
@@ -164,25 +153,23 @@ message ServerMessage {
     // Echoes the ClientMessage.request_id this responds to. 0 for
     // unsolicited server-initiated messages, if any are added later.
     uint64 request_id = 1;
-
     oneof response {
         ErrorResponse error = 2;
         InitResponse init = 3;
         InitializeTraceResponse initialize_trace = 4;
-        SubmitJobResponse submit_job = 5;
-        AdvanceToResponse advance_to = 6;
-        RunUntilExclusiveResponse run_until_exclusive = 7;
-        GetCurrentTimeResponse get_current_time = 8;
-        GetNodesInUseResponse get_nodes_in_use = 9;
-        GetAvailableNodesResponse get_available_nodes = 10;
-        GetActiveJobCountResponse get_active_job_count = 11;
-        GetFCFSHeadShadowTimeResponse get_fcfs_head_shadow_time = 12;
-        GetStatisticsResponse get_statistics = 13;
-        GetTraceSizeResponse get_trace_size = 14;
-        AppendJobResponse append_job = 15;
-        AppendJobsResponse append_jobs = 16;
-        FinishSimulationResponse finish_simulation = 17;
-        GetBackfillWindowResponse get_backfill_window = 18;
+        AdvanceToResponse advance_to = 5;
+        RunUntilExclusiveResponse run_until_exclusive = 6;
+        GetCurrentTimeResponse get_current_time = 7;
+        GetNodesInUseResponse get_nodes_in_use = 8;
+        GetAvailableNodesResponse get_available_nodes = 9;
+        GetActiveJobCountResponse get_active_job_count = 10;
+        GetFCFSHeadShadowTimeResponse get_fcfs_head_shadow_time = 11;
+        GetStatisticsResponse get_statistics = 12;
+        GetTraceSizeResponse get_trace_size = 13;
+        AppendJobResponse append_job = 14;
+        AppendJobsResponse append_jobs = 15;
+        FinishSimulationResponse finish_simulation = 16;
+        GetBackfillWindowResponse get_backfill_window = 17;
     }
 }
 
@@ -206,16 +193,13 @@ message InitializeTraceResponse {
     uint64 num_jobs_loaded = 1;
 }
 
-message SubmitJobResponse {}
-
 message AppendJobResponse {
-    uint32 job_idx = 1; // Pass to a subsequent SubmitJobRequest
+    uint32 job_idx = 1;
 }
 
 message AppendJobsResponse {
-    // Each new job's job_idx, in the same order as the request's
-    // requests field - pass each to a subsequent SubmitJobRequest, same
-    // as AppendJobResponse.
+    // Each new job's job_idx, in the same order as the request's requests
+    // field. All returned jobs have already been enqueued for scheduling.
     repeated uint32 job_idx = 1;
 }
 
@@ -240,6 +224,7 @@ message GetActiveJobCountResponse {
 }
 
 message GetFCFSHeadShadowTimeResponse {
+    // Earliest FCFS-head start time, or -1 when no job is waiting.
     double shadow_time = 1;
 }
 
