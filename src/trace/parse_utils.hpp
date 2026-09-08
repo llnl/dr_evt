@@ -39,7 +39,13 @@ std::string to_string(const job_queue_t q);
  * @return Trimmed string value.
  */
 std::string trim(const std::string& str,
-                  const std::string& whitespace = " \t");
+                  const std::string& whitespace);
+
+/// Remove leading and trailing whitespace.
+inline std::string trim(const std::string& str)
+{
+    return trim(str, " \t");
+}
 
 /**
  * @brief Locate CSV field ranges in one line.

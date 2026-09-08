@@ -38,8 +38,6 @@ class exception : public std::exception {
     std::string m_message;
 };
 
-using exception = ::dr_evt::exception;
-
 std::ostream& operator<<(std::ostream& os, const exception& e);
 
 /**@}*/
