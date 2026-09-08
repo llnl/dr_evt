@@ -47,16 +47,9 @@ TESTING_GUIDE
 
 api/STREAMING_API
 api/PYTHON_API
+api/CPP_API
 CLIENT_SERVER_GUIDE
 ```
-
-:::{only} doxygen
-<p><a href="api/html/index.html">C++ API reference (Doxygen)</a></p>
-:::
-
-:::{only} not doxygen
-The optional C++ API reference is unavailable because Doxygen was not installed for this build.
-:::
 
 ```{toctree}
 :maxdepth: 2

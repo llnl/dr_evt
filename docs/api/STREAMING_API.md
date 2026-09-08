@@ -208,6 +208,20 @@ reservation model.
 Simulation::Backfill_Window get_backfill_window() const;
 ```
 
+```cpp
+struct Simulation::Backfill_Window {
+    struct Resource_Release {
+        sim_time_t time;            // Absolute release time
+        num_nodes_t nodes_released; // Nodes becoming free at time
+    };
+
+    sim_time_t current_time;              // Snapshot time
+    num_nodes_t available_nodes;          // Nodes free immediately
+    sim_time_t shadow_time;               // FCFS-head start, or -1 if no head waits
+    std::vector<Resource_Release> releases; // Ordered projected releases
+};
+```
+
 The snapshot contains `current_time`, immediately `available_nodes`, the
 same FCFS-head `shadow_time` (`-1` if the queue is empty), and chronologically
 ordered resource-change events in `releases`. Each event gives the simulation

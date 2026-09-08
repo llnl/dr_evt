@@ -207,12 +207,10 @@ The following parameters from the protobuf schema (`dr_evt_params.proto`) are **
 
 ### Also Missing: Simulation Methods (not parameters)
 
-Beyond `Sim_Params` fields, five `Simulation` class methods aren't bound either:
+Beyond `Sim_Params` fields, three `Simulation` class methods aren't bound:
 
 | Method | Purpose | Impact |
 |--------|---------|--------|
-| `append_job()` | Add a single genuinely new job (one the trace never saw before) - what makes streaming actually streaming, rather than just enqueuing a job already in a preloaded trace | **High** - Python can only drive `submit_job()` on jobs already in the loaded trace; there's no way to feed a job Python learned about live (e.g. from a real job-submission event) into the simulation at all |
-| `append_jobs()` | The batch counterpart to `append_job()` - several new jobs in one call, more efficient when several are already known together | **Medium** - same underlying gap as `append_job()`, just for the batch case |
 | `get_resource_history()` | Return in-memory (time, nodes_in_use, nodes_available) history directly | **Medium** - Must write to CSV via `write_resource_trace()` (also unbound) and re-read, rather than getting data directly in Python |
 | `write_resource_trace(filename)` | Write resource history to a file, independent of `Sim_Params.resource_trace` | **Low** - No way to trigger this from Python at all |
 | `get_trace()` | Access the full `Trace` object (individual job records) | **Medium** - Only `get_trace_size()` (a job count) is exposed; `Trace`/`Job_Record` themselves aren't bound as Python classes, so there's no way to inspect individual submitted jobs from Python |
@@ -320,7 +318,7 @@ pip install --force-reinstall .
 | **Test on subset** | `max_jobs`, `max_time` | Preprocess trace file |
 | **Non-Pacific timezones** | `timezone` | Convert timestamps to Pacific time or use epoch |
 | **Realistic run time variation** | `run_time_distribution`, `run_time_scale`, `run_time_stddev` | Set `run_time_mode=DISTRIBUTION` in config file |
-| **Genuine streaming (feeding jobs Python learned about live)** | `append_job()`/`append_jobs()` (methods, not `Sim_Params` fields) | None from pure Python today - use the [gRPC client/server](../user-guide/grpc-setup.md) instead, which does expose `AppendJobRequest`/`AppendJobsRequest`, or call the C++ API directly |
+| **Genuine streaming (feeding jobs Python learned about live)** | `append_job()`/`append_jobs()` (methods, not `Sim_Params` fields) | Use `append_job()` for one job or `append_jobs()` with `JobAppendRequest` values for an ordered batch |
 | **Bounding job-store memory across a large trace** | `infile_list` | Use the CLI's `--infile_list` (see [Command-Line Options](../user-guide/command-line.md)) or a protobuf config file instead of the Python API |
 | **Refusing rather than risking memory exhaustion under load** | `memory_pressure_fraction` | Use the CLI's `--check_memory_pressure` or a protobuf config file instead of the Python API |
 
@@ -363,12 +361,19 @@ dr_evt.RunTimeMode.LIMIT         # Jobs run exactly time_limit (debug only)
 ### Job Submission
 
 ```python
-# Load trace first
-sim.initialize_trace()
+# Append and enqueue a genuinely new job. Returns its trace job ID.
+job_id = sim.append_job(10.0, 20, "pbatch", 200.0)
 
-# Submit a job (already in the loaded trace) to the scheduler's waiting queue
-sim.submit_job(job_idx=1, submit_time=10.0)
+# Append an ordered batch atomically. Returns IDs in request order.
+requests = [
+    dr_evt.JobAppendRequest(20.0, 10, "pbatch", 100.0),
+    dr_evt.JobAppendRequest(25.0, 15, "pbatch", 120.0),
+]
+job_ids = sim.append_jobs(requests)
 ```
+
+`append_jobs()` requires non-decreasing `submit_time` values. If any request
+is invalid, the whole batch is rejected and no job is appended.
 
 ### Time Advancement
 
@@ -386,7 +391,8 @@ sim.run_until_exclusive(100.0)
 
 Example:
 ```python
-sim.submit_job(0, 0.0)  # Job submitted at t=0
+# A new job arrives at t=0.
+sim.append_job(0.0, 10, "pbatch", 100.0)
 sim.run_until_exclusive(0.0)  # Job NOT started yet
 sim.advance_to(0.0)  # Job started, resources allocated
 ```
