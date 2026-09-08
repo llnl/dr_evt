@@ -50,7 +50,7 @@ FAIL=0
 # reclaiming/flush path's correctness.
 TINY_CAPACITY=5
 
-# Use a couple of comprehensive tests (fast) - simulator side only.
+# Use a couple of scheduler-correctness fixtures (fast) - simulator side only.
 RH_SIM_TESTS=(
     "05_multiple_backfills"
     "21_sustained_high_load"

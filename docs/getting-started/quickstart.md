@@ -162,9 +162,9 @@ job_submit_time,num_nodes,queue,time_limit
 
 **Replay mode** (`begin_time`/`end_time` already known, replayed exactly):
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,10,0,pbatch,100
-50,100,150,10,0,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
+0,0,100,10,pbatch,100
+50,100,150,10,pbatch,50
 ```
 
 `time_limit` is also accepted under the column names `timelimit` or
@@ -256,7 +256,7 @@ built binaries instead:
 ```bash
 # From the repo root, after building (and installing, or with
 # CMAKE_INSTALL_PREFIX pointed at wherever `make install` put things)
-./tests/test_all_dr_evt.sh          # comprehensive scheduler tests
+./tests/run_scheduler_correctness_tests.sh          # scheduler-correctness suite
 ./tests/run_append_job_tests.sh     # streaming API (append_job/append_jobs)
 ./tests/run_progressive_load_tests.sh  # --infile_list progressive loading
 ```

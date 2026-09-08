@@ -8,10 +8,10 @@ Create a simple test trace with 3 jobs:
 
 ```bash
 cat > my_first_trace.csv << EOF
-job_submit_time,num_nodes,exit_status,queue,time_limit
-0,80,0,pbatch,100
-10,15,0,pbatch,30
-20,60,0,pbatch,50
+job_submit_time,num_nodes,queue,time_limit
+0,80,pbatch,100
+10,15,pbatch,30
+20,60,pbatch,50
 EOF
 ```
 

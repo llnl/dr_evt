@@ -89,7 +89,7 @@ run_correctness_tests() {
 
     PASS=0
     FAIL=0
-    TRACE_DIR="tests/test_traces/comprehensive"
+    TRACE_DIR="tests/test_traces/scheduler_correctness"
 
     # Auto-detect run_time_mode based on file contents.
     # If trace has actual_duration column, use run_time_mode=actual.
@@ -298,8 +298,8 @@ run_performance_tests() {
 
     # Test files - comprehensive and scale tests
     TEST_FILES=(
-        "tests/test_traces/comprehensive/01_backfill_allowed.csv"
-        "tests/test_traces/comprehensive/21_sustained_high_load.csv"
+        "tests/test_traces/scheduler_correctness/01_backfill_allowed.csv"
+        "tests/test_traces/scheduler_correctness/21_sustained_high_load.csv"
         "tests/test_traces/scale/small_10jobs.csv"
         "tests/test_traces/scale/medium_50jobs.csv"
         "tests/test_traces/scale/large_100jobs.csv"

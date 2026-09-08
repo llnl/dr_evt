@@ -1,7 +1,7 @@
-name: Quick Test (Comprehensive Only)
+name: Quick Test (Scheduler Correctness Only)
 
 # Fast CI for quick validation (runs on every commit)
-# Only runs the comprehensive test suite to save time
+# Only runs the scheduler-correctness suite to save time.
 # Full test suite runs on PR and main branch
 
 on:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   quick-test:
-    name: Quick Comprehensive Check
+    name: Quick Scheduler Correctness Check
     runs-on: ubuntu-latest
 
     steps:
@@ -42,21 +42,21 @@ jobs:
           make -j$(nproc)
           make install
 
-      - name: Run Comprehensive Tests Only
+      - name: Run Scheduler Correctness Tests Only
         run: |
-          echo "Running comprehensive tests with build directory..."
+          echo "Running scheduler-correctness tests with build directory..."
           unset CMAKE_INSTALL_PREFIX
-          ./tests/test_all_dr_evt.sh
+          ./tests/run_scheduler_correctness_tests.sh
           echo ""
-          echo "Running comprehensive tests with installed binary..."
+          echo "Running scheduler-correctness tests with installed binary..."
           export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
-          ./tests/test_all_dr_evt.sh
+          ./tests/run_scheduler_correctness_tests.sh
 
       - name: Summary
         if: always()
         run: |
           echo "========================================"
           echo "Quick Test Complete"
-          echo "Comprehensive: 34/34 tests (verified in a manual session pass;"
+          echo "Scheduler correctness: 34/34 fixtures (verified in a manual session pass;"
           echo "this echo does not itself re-check the actual result above)"
           echo "========================================"

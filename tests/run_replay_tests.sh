@@ -31,7 +31,7 @@ echo ""
 PASS=0
 FAIL=0
 
-# Use several comprehensive tests as replay test inputs
+# Use several scheduler-correctness fixtures as replay test inputs
 REPLAY_TESTS=(
     "01_backfill_allowed"
     "05_multiple_backfills"
@@ -42,7 +42,7 @@ REPLAY_TESTS=(
 for test_base in "${REPLAY_TESTS[@]}"; do
     echo "Testing: $test_base"
 
-    input_trace="tests/test_traces/comprehensive/${test_base}.csv"
+    input_trace="tests/test_traces/scheduler_correctness/${test_base}.csv"
 
     if [ ! -f "$input_trace" ]; then
         echo "  ✗ Input not found: $input_trace"

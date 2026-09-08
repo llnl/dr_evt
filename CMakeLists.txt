@@ -452,17 +452,17 @@ if (DR_EVT_HAS_GRPC)
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
   list(APPEND DR_EVT_EXEC_TARGETS dr_evt_client-bin)
 
-  # Permanent gRPC-level test for AppendJobRequest - see
-  # tests/test_append_job_grpc.cpp
-  add_executable( test_append_job_grpc-bin tests/test_append_job_grpc.cpp )
-  target_include_directories(test_append_job_grpc-bin PUBLIC
+  # Permanent gRPC streaming API test: append requests and backfill-window
+  # queries.  See tests/test_grpc_streaming_api.cpp.
+  add_executable( test_grpc_streaming_api-bin tests/test_grpc_streaming_api.cpp )
+  target_include_directories(test_grpc_streaming_api-bin PUBLIC
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>)
-  target_link_libraries(test_append_job_grpc-bin PRIVATE dr_evt_service_proto)
-  set_target_properties(test_append_job_grpc-bin PROPERTIES OUTPUT_NAME test_append_job_grpc)
-  set_target_properties(test_append_job_grpc-bin PROPERTIES CMAKE_INSTALL_RPATH
+  target_link_libraries(test_grpc_streaming_api-bin PRIVATE dr_evt_service_proto)
+  set_target_properties(test_grpc_streaming_api-bin PROPERTIES OUTPUT_NAME test_grpc_streaming_api)
+  set_target_properties(test_grpc_streaming_api-bin PROPERTIES CMAKE_INSTALL_RPATH
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_append_job_grpc-bin)
+  list(APPEND DR_EVT_UNIT_TEST_TARGETS test_grpc_streaming_api-bin)
 
   # MPI-aware multi-client/multi-server test harness (optional: only
   # built if MPI is actually available - unlike gRPC/Protobuf, this
@@ -597,7 +597,7 @@ set_target_properties(test_batch_vs_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_batch_vs_streaming-bin)
 
 # Block-based wait queue test (always enabled)
-add_executable( test_block_queue-bin tests/test_block_queue_simple.cpp )
+add_executable( test_block_queue-bin tests/test_block_queue.cpp )
 
 target_include_directories(test_block_queue-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>

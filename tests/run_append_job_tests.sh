@@ -68,20 +68,20 @@ fi
 
 # --- Test: gRPC (AppendJobRequest over the actual wire) ---
 echo ""
-echo "Testing: append_job_grpc (over the actual gRPC wire)"
+echo "Testing: grpc_streaming_api (over the actual gRPC wire)"
 
 SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
-GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_append_job_grpc"
+GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_streaming_api"
 if [ ! -f "$GRPC_TEST_BIN" ]; then
-    GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_grpc"
+    GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_grpc_streaming_api"
 fi
 if [ ! -f "$GRPC_TEST_BIN" ]; then
-    GRPC_TEST_BIN="./build/test_append_job_grpc"
+    GRPC_TEST_BIN="./build/test_grpc_streaming_api"
 fi
 EMPTY_TRACE="tests/test_traces/feature/empty_trace.csv"
 
 if [ ! -f "$SERVER" ] || [ ! -f "$GRPC_TEST_BIN" ]; then
-    echo "  ⚠ SKIP - dr_evt_server and/or test_append_job_grpc not found"
+    echo "  ⚠ SKIP - dr_evt_server and/or test_grpc_streaming_api not found"
     echo "    (build with -DDR_EVT_ENABLE_GRPC=ON to include this test)"
 else
     PORT=53201

@@ -182,7 +182,18 @@ needed to run it.
 
 A separate `docs/requirements.txt` exists, but it's for building this
 Sphinx documentation site itself (`sphinx`, `myst-parser`, etc.) - unrelated
-to running or testing the simulator.
+to running or testing the simulator. Create and activate a dedicated virtual
+environment before installing those documentation dependencies:
+
+```bash
+python3 -m venv .venv-docs
+source .venv-docs/bin/activate
+python -m pip install -r docs/requirements.txt
+make -C docs html
+```
+
+`make install` in `docs/` uses the active Python environment; it does not
+create a virtual environment itself.
 
 If you're building the optional [Python bindings](../api/PYTHON_API.md)
 (`-DDR_EVT_BUILD_PYTHON=ON`), that's a compiled extension module, not a
@@ -196,7 +207,7 @@ Run tests to verify installation:
 ```bash
 # Comprehensive test suite (34 tests)
 cd tests
-./test_all_dr_evt.sh
+./run_scheduler_correctness_tests.sh
 ```
 
 Should see:
@@ -209,7 +220,7 @@ Total:   34
 ```
 
 (An earlier version of this document referenced `./test_all.sh` - no such
-script exists, the actual name is `test_all_dr_evt.sh` - and a
+script exists, the actual name is `run_scheduler_correctness_tests.sh` - and a
 `scripts/verify_against_analytical.py` step claiming "verified against
 analytical oracles" - that script was an unused remnant of an abandoned
 test-suite design and has been removed; "34 tests pass" means the C++

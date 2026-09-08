@@ -6,13 +6,19 @@ DR_EVT coding style mostly follows the standard C++ libraries and Boost projects
 + class names: start with uppercase (camel case after that e.g. DataType)
 + templated types: uppercase
   - derived typedef types:  `using value_type = SomeType::value_type_t`
-+ header preprocessor guard: `__<NAMESPACE_PATH_NAME>_HPP__`
++ header preprocessor guard: `DR_EVT_<NAMESPACE_PATH_NAME>_HPP`
+  - use uppercase path components separated by underscores, for example
+    `DR_EVT_TRACE_TRACE_HPP` for `src/trace/trace.hpp`
+  - do not begin or end a guard with a double underscore; those identifiers
+    are reserved to the implementation
 + indentation by 4 spaces, no tab
 + comments:
   - doxygen:
     - `/// single line comment `
     - `/** multi-line comment */`
-    - `@TODO  - TODO note`
+    - use Doxygen's `@todo` tag for work items that belong in generated
+      documentation; attach it to the relevant declaration, for example
+      `/// @todo Explain the remaining implementation work.`
 
   - inside of a function use `//`
   - outside use a doxygen comment
@@ -26,6 +32,14 @@ DR_EVT coding style mostly follows the standard C++ libraries and Boost projects
 + do not convert an unsigned type to a signed type unless it is algorithmically
   necessary
 + check and fix compiler warnings
-+ avoid using `using namespace xxx`, and explicitly specify the
-  namespace of each symbol of a different namespace referenced
-+ do not put implementation details inside of a class definition body
++ a `using namespace xxx` directive is acceptable only in a small local
+  scope and only for a narrow namespace where it materially improves
+  readability (for example, a short function body using `std::chrono`)
+  - never place a `using namespace` directive at global scope
+  - never import a broad namespace such as `std`; qualify those symbols
+  - prefer explicit qualification when the imported namespace is not local
+    and narrow
++ keep substantial implementation details outside a class definition body
+  - a one-line accessor, mutator, or other trivial method may be defined inline
+  - a short method of a few lines is also acceptable when keeping it inline
+    materially improves readability

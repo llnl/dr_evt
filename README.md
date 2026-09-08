@@ -88,7 +88,7 @@ For quick access without leaving GitHub:
 - **[CLI Options](docs/user-guide/command-line.md)** - Command-line reference
 - **[Testing Guide](docs/TESTING_GUIDE.md)** - Test philosophy, organization, and test suite details
 - **[Test Suite](tests/README.md)** - All tests and validation
-- **[Comprehensive Tests](tests/test_traces/comprehensive/README.md)** - 34 tests organized by complexity
+- **[Scheduler Correctness Tests](tests/test_traces/scheduler_correctness/README.md)** - 34 fixtures organized by complexity
 - **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
 
 **Note:** Local builds are optional for contributors. The official documentation is automatically built and published to ReadTheDocs on every commit to `main`.
@@ -446,8 +446,8 @@ diff sim.csv replay.csv
 ### Verify Installation
 
 ```bash
-# Run comprehensive test suite
-./tests/test_all_dr_evt.sh
+# Run scheduler-correctness suite (34 fixtures)
+./tests/run_scheduler_correctness_tests.sh
 
 # Run quick unit tests
 ./tests/run_unit_tests.sh

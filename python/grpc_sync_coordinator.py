@@ -14,7 +14,7 @@ import pathlib
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from grpc_multi_client import ServerSession, load_stubs, read_jobs
+from grpc_multi_server import ServerSession, load_stubs, read_jobs
 
 
 SYSTEM_FIELDS = {"system_id", "address", "trace"}

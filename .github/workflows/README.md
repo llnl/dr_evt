@@ -12,7 +12,7 @@ This directory contains GitHub Actions workflows for automated testing.
 - Manual trigger via GitHub UI
 
 **What it runs:**
-- Comprehensive tests (34) - `tests/test_all_dr_evt.sh`
+- Comprehensive tests (34) - `tests/run_scheduler_correctness_tests.sh`
 - Unit tests (7, 2 known-broken - see `tests/README.md`)
 - Feature tests (3)
 - Replay tests (3)
@@ -40,7 +40,7 @@ This directory contains GitHub Actions workflows for automated testing.
 - Manual trigger
 
 **What it runs:**
-- Comprehensive tests only (34) - `tests/test_all_dr_evt.sh`
+- Comprehensive tests only (34) - `tests/run_scheduler_correctness_tests.sh`
 
 **Compiler:**
 - GCC 11 only
@@ -86,7 +86,7 @@ Run the same tests locally before pushing:
 cd build && cmake .. && make -j4
 cd ..
 
-./tests/test_all_dr_evt.sh       # comprehensive/ (34 tests)
+./tests/run_scheduler_correctness_tests.sh       # scheduler_correctness/ (34 tests)
 ./tests/run_unit_tests.sh        # unit/ (7 tests, 2 known-broken)
 ./tests/run_feature_tests.sh     # feature/ (3 tests)
 ./tests/run_replay_tests.sh      # replay methodology (3 tests)
@@ -97,8 +97,8 @@ cd ..
 ```
 
 There is no `run_correctness_tests.sh` in this checkout - an earlier
-version of this document referenced it, but the actual comprehensive/
-runner is `test_all_dr_evt.sh`.
+version of this document referenced it, but the actual scheduler_correctness/
+runner is `run_scheduler_correctness_tests.sh`.
 
 ## Workflow Details
 
@@ -128,7 +128,7 @@ On test failure, uploads:
 When you add a new test:
 
 1. Add to the appropriate test category and directory
-2. For `comprehensive/`, add the test name to `test_all_dr_evt.sh`'s
+2. For `scheduler_correctness/`, add the test name to `run_scheduler_correctness_tests.sh`'s
    `TESTS` array and to `scripts/generators/generate_all_expected_outputs.py`'s
    `TESTS` list (to generate its expected output); for `scale/`, use
    `scripts/generators/generate_scale_expected_outputs.py`
@@ -150,9 +150,9 @@ When you add a new test:
 - Check dependencies in `tests.yml`
 - Check CMakeLists.txt for platform-specific issues
 
-### `28_simultaneous_completions_backfill` fails in `test_all_dr_evt.sh`
+### `28_simultaneous_completions_backfill` fails in `run_scheduler_correctness_tests.sh`
 
-If you're running an older copy of `test_all_dr_evt.sh`: this was a real,
+If you're running an older copy of `run_scheduler_correctness_tests.sh`: this was a real,
 known false-failure in the script's resource-trace comparison (too strict
 about the internal order of simultaneous end/start events within the
 same timestamp, not an actual scheduling bug) - fixed by consolidating to

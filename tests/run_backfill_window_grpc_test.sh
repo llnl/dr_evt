@@ -12,12 +12,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
-TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_append_job_grpc"
+TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_streaming_api"
 if [[ ! -x "$TEST_BIN" ]]; then
-    TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_grpc"
+    TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_grpc_streaming_api"
 fi
 if [[ ! -x "$TEST_BIN" ]]; then
-    TEST_BIN="./build/test_append_job_grpc"
+    TEST_BIN="./build/test_grpc_streaming_api"
 fi
 if [[ ! -x "$SERVER" ]]; then
     SERVER="./build/dr_evt_server"
@@ -27,8 +27,8 @@ TRACE="tests/test_traces/feature/empty_trace.csv"
 PORT="${DR_EVT_BACKFILL_WINDOW_TEST_PORT:-53211}"
 
 if [[ ! -x "$SERVER" || ! -x "$TEST_BIN" ]]; then
-    echo "Missing dr_evt_server or test_append_job_grpc." >&2
-    echo "Build with: cmake --build build --target dr_evt_server-bin test_append_job_grpc-bin" >&2
+    echo "Missing dr_evt_server or test_grpc_streaming_api." >&2
+    echo "Build with: cmake --build build --target dr_evt_server-bin test_grpc_streaming_api-bin" >&2
     exit 1
 fi
 

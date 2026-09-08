@@ -1,11 +1,11 @@
 # DR_EVT Test Suite
 
-Comprehensive test suite for the DR_EVT HPC Job Scheduler Simulator.
+Test suite for the DR_EVT HPC Job Scheduler Simulator.
 
 ## Overview
 
 DR_EVT has tests organized by purpose:
-- **Comprehensive (34)** - Verify scheduler algorithm correctness with dual validation
+- **Scheduler correctness (34)** - Verify scheduler algorithm correctness with dual validation
 - **Unit (7)** - Basic I/O and format tests
 - **Feature (6)** - Policy, mode, output-format, and rejection tests
 - **Scale (7)** - Larger job counts than comprehensive's ceiling
@@ -26,7 +26,7 @@ implementation's output, not independent mathematical verification - see
 cd build && cmake .. && make -j4
 
 # Run all correctness tests (most important)
-./tests/test_all_dr_evt.sh
+./tests/run_scheduler_correctness_tests.sh
 
 # Run unit tests
 ./tests/run_unit_tests.sh
@@ -52,17 +52,17 @@ cd build && cmake .. && make -j4
 
 ## Test Categories
 
-### 1. Comprehensive Tests (34 tests) ⭐ PRIMARY
+### 1. Scheduler Correctness Tests (34 fixtures) ⭐ PRIMARY
 
 **Purpose:** Verify EASY backfilling scheduler produces results consistent
 with the Python reference implementation (not independently verified
 ground truth - see `docs/TESTING_GUIDE.md`)
 
-**Location:** `test_traces/comprehensive/`
+**Location:** `test_traces/scheduler_correctness/`
 
 **Documentation:** `docs/testing/TEST_SUITE_ORDERED_BY_COMPLEXITY.md`
 
-**Runner:** `./tests/test_all_dr_evt.sh`
+**Runner:** `./tests/run_scheduler_correctness_tests.sh`
 
 **Verification Method (Dual Validation):**
 - ✅ **Job schedules** must match (start_time, end_time for each job)
@@ -129,12 +129,12 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 
 ### 4. Scale Tests (7 tests)
 
-**Purpose:** Larger job counts (10-2000) than `comprehensive/`'s 20-50 ceiling
+**Purpose:** Larger job counts (10-2000) than `scheduler_correctness/`'s 20-50 ceiling
 
 **Location:** `test_traces/scale/`
 
 **Node count:** 795 (matches `src/dr_evt_types.hpp`'s default - not
-`comprehensive/`'s 100; several jobs here request up to 497 nodes)
+`scheduler_correctness/`'s 100; several jobs here request up to 497 nodes)
 
 **Status:** ✅ 7/7 passing
 
@@ -210,7 +210,7 @@ See "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for h
 
 **Purpose:** Verify `Trace::append_job()`/`Simulation::append_job()` (single-job) and `Trace::append_jobs()`/`Simulation::append_jobs()` (batch) - the real streaming insertion points for jobs the trace has never seen before - together with `submit_job()`/`advance_to()`'s general correctness (online scheduling, exclusive-vs-inclusive advance, resource-leak checks, idle-gap handling), all driven via `append_job()`/`append_jobs()` rather than a preloaded file. Consolidates what used to be a separate `test_streaming_api.cpp` - its coverage never actually depended on jobs coming from a preloaded file, so it's achieved here with no file needed.
 
-**Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_append_job_grpc.cpp` (gRPC, only built with `-DDR_EVT_ENABLE_GRPC=ON`)
+**Location:** `tests/test_append_job_api.cpp` (C++), `tests/test_grpc_streaming_api.cpp` (gRPC, only built with `-DDR_EVT_ENABLE_GRPC=ON`)
 
 **Runner:** `./tests/run_append_job_tests.sh`
 
@@ -252,7 +252,7 @@ See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) f
 
 | Category | Tests | Status | Coverage |
 |----------|-------|--------|----------|
-| Comprehensive | 34 | ✅ 34/34 | Consistency with Python reference (dual validation) |
+| Scheduler correctness | 34 | ✅ 34/34 | Consistency with Python reference (dual validation) |
 | Unit | 7 | ✅ 7/7 | I/O, parsing, formats |
 | Feature | 6 | ✅ 6/6 | Policies, modes, millisecond output, and rejection handling |
 | Conservative | 2 | ✅ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
@@ -374,9 +374,9 @@ for (job : jobs_to_run) {
 
 ## Key Testing Principles
 
-### Dual Validation (Comprehensive Tests)
+### Dual Validation (Scheduler Correctness Tests)
 
-Every comprehensive test verifies **TWO things**:
+Every scheduler-correctness fixture verifies **TWO things**:
 1. **Job schedules match** - Start and end times for all jobs
 2. **Resource traces match** - Resource states at every event
 
@@ -428,19 +428,19 @@ Runners that actually exist in `tests/`:
 ```bash
 run_unit_tests.sh          # unit/ tests
 run_feature_tests.sh       # feature/ tests
-run_replay_tests.sh        # replay methodology (hardcodes 3 comprehensive/ tests)
+run_replay_tests.sh        # replay methodology (hardcodes 3 scheduler_correctness/ tests)
 run_configs_tests.sh       # protobuf config tests (requires -DDR_EVT_ENABLE_PROTOBUF=ON)
 run_python_tests.sh        # python API tests (requires -DDR_EVT_BUILD_PYTHON=ON; not verified in this pass)
 run_append_job_tests.sh    # append_job() streaming tests (C++ + gRPC, if built with -DDR_EVT_ENABLE_GRPC=ON)
 run_backfill_window_grpc_test.sh # FCFS/EASY backfill-window gRPC query (starts a local server)
 run_progressive_load_tests.sh # --infile_list progressive loading tests (C++ + CLI)
 run_grpc_tests.sh          # gRPC client/server tests (requires -DDR_EVT_ENABLE_GRPC=ON)
-test_all_dr_evt.sh         # comprehensive/ tests (see below)
-test_fcfs_comprehensive.sh # queue implementation differential testing (see below)
+run_scheduler_correctness_tests.sh         # scheduler-correctness suite (see below)
+test_fcfs_queue_implementations.sh # queue implementation differential testing (see below)
 benchmark_block_sizes.sh   # queue implementation performance comparison (see below)
 ```
 
-`test_all_dr_evt.sh` runs the simulator against every `comprehensive/`
+`run_scheduler_correctness_tests.sh` runs the simulator against every `scheduler_correctness/`
 test and diffs against `expected_output.csv`/`expected_resources.csv`.
 Verified in this session: 33/34 pass. The one exception,
 `28_simultaneous_completions_backfill`, is a false failure - the script's
@@ -458,8 +458,8 @@ There is no equivalent runner for `scale/` - that has been done manually
 during development. `compare_with_analytical.sh`, referenced elsewhere in
 older docs, does not exist in this checkout.
 
-`test_fcfs_comprehensive.sh --correctness` checks something different from
-`test_all_dr_evt.sh`: not whether the C++ simulator matches the Python
+`test_fcfs_queue_implementations.sh --correctness` checks something different from
+`run_scheduler_correctness_tests.sh`: not whether the C++ simulator matches the Python
 reference, but whether all four FCFS wait-queue implementations
 (`--queue_impl circular/deque/multimap/block`) produce byte-for-byte
 identical output to each other, across the same 34 comprehensive traces.
@@ -478,10 +478,10 @@ In `scripts/`:
 
 ```bash
 python_reference_scheduler.py           # the reference implementation itself
-generators/generate_all_expected_outputs.py   # generates comprehensive/'s expected files
+generators/generate_all_expected_outputs.py   # generates scheduler_correctness/'s expected files
 generators/generate_scale_expected_outputs.py # generates scale/'s expected files
 verify_against_analytical.py            # still present, covers only the subset
-                                         # of tests that predate the comprehensive/
+                                         # of tests that predate the scheduler_correctness/
                                          # design - see docs/TESTING_GUIDE.md
 ```
 
@@ -504,17 +504,17 @@ cd build
 ../tests/run_progressive_load_tests.sh
 ```
 
-### Run an individual comprehensive/ or scale/ test manually
+### Run an individual scheduler_correctness/ or scale/ test manually
 
 ```bash
-./build/simulator tests/test_traces/comprehensive/01_backfill_allowed.csv \
+./build/simulator tests/test_traces/scheduler_correctness/01_backfill_allowed.csv \
     --total_nodes 100 \
     --trace_format simple \
     --timestamp_format epoch \
     --run_time_mode limit \
     --outfile /tmp/output.csv
 
-diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expected_output.csv
+diff /tmp/output.csv tests/test_traces/scheduler_correctness/01_backfill_allowed.expected_output.csv
 ```
 
 `scale/` tests need `--total_nodes 795` instead of 100.
@@ -523,7 +523,7 @@ diff /tmp/output.csv tests/test_traces/comprehensive/01_backfill_allowed.expecte
 
 | Category | Count | Status | Notes |
 |----------|-------|--------|-------|
-| Comprehensive | 34 | ✓ 34/34 | Matches Python reference (not independent ground truth) |
+| Scheduler correctness | 34 | ✓ 34/34 | Matches Python reference (not independent ground truth) |
 | Unit | 7 | ✓ 7/7 | Basic I/O and format tests |
 | Feature | 6 | ✓ 6/6 | Policy comparisons, modes, millisecond output, and rejection handling |
 | Conservative | 2 | ✓ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
@@ -561,9 +561,9 @@ python3 -m pip install --upgrade pip
 
 ### Correctness Test (Analytical)
 
-### Comprehensive Test
+### Scheduler Correctness Test
 
-1. Create input: `tests/test_traces/comprehensive/<name>.csv` (queue must
+1. Create input: `tests/test_traces/scheduler_correctness/<name>.csv` (queue must
    be `pbatch`)
 2. Add `<name>` to the `TESTS` list in
    `scripts/generators/generate_all_expected_outputs.py`
@@ -607,7 +607,7 @@ cd ..
 
 2. Compare with expected output:
    ```bash
-   diff /tmp/test.csv tests/test_traces/comprehensive/<name>.expected_output.csv
+   diff /tmp/test.csv tests/test_traces/scheduler_correctness/<name>.expected_output.csv
    ```
 
 3. Check for:
@@ -647,7 +647,7 @@ When adding new features:
 4. Run `run_unit_tests.sh`, `run_feature_tests.sh`, `run_replay_tests.sh`,
    `run_resource_history_tests.sh`, `run_job_store_tests.sh`,
    `run_append_job_tests.sh`, `run_progressive_load_tests.sh`, plus manual comparison against
-   `comprehensive/`/`scale/`'s expected files (see "Running Tests" above -
+   `scheduler_correctness/`/`scale/`'s expected files (see "Running Tests" above -
    no single script covers those yet)
 5. Update this README if adding a new test category
 

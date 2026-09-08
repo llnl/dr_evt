@@ -11,7 +11,7 @@ Some terms are ambiguous and should be avoided or used with clear context.
 **Call it:** "Reference implementation" or "Python reference"
 **File naming:** none fixed - output is generated on demand during test
 development and diffed against the fixed `.expected_output.csv`/
-`.expected_resources.csv` files in `tests/test_traces/comprehensive/`
+`.expected_resources.csv` files in `tests/test_traces/scheduler_correctness/`
 **Script:** `scripts/python_reference_scheduler.py` (historical name, kept for now)
 
 ### 2. Run Time Mode
@@ -38,7 +38,7 @@ regardless of `run_time_mode`.
 
 ## File Naming Convention
 
-The comprehensive test suite (`tests/test_traces/comprehensive/`) names
+The comprehensive test suite (`tests/test_traces/scheduler_correctness/`) names
 each test's files by a shared `{test_name}` stem, not the
 `_input`/`_reference` suffixes this document used to describe:
 

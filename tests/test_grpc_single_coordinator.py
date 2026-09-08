@@ -25,7 +25,7 @@ import time
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "python"))
 
-from grpc_multi_client import ServerSession, load_stubs, read_jobs
+from grpc_multi_server import ServerSession, load_stubs, read_jobs
 from grpc_sync_coordinator import read_composites
 
 

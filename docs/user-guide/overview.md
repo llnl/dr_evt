@@ -67,11 +67,12 @@ Makespan: 2010 sec
 
 ### Simple Format (Recommended for Testing)
 
-7-column CSV format:
+Simple input supports both simulation and replay. A replay trace uses this
+6-column CSV format:
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,10,0,pbatch,100
-50,100,150,10,0,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
+0,0,100,10,pbatch,100
+50,100,150,10,pbatch,50
 ```
 
 **Columns**:
@@ -79,9 +80,12 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
 2. `begin_time` - Historical start time (required, for duration calculation)
 3. `end_time` - Historical end time (required, for duration calculation)
 4. `num_nodes` - Number of nodes requested (required)
-5. `exit_status` - Job exit code (optional)
-6. `queue` - Queue name, must be "pbatch" or "pall" (optional)
-7. `time_limit` - User-provided time limit in seconds (optional)
+5. `queue` - Queue name, must be "pbatch" or "pall"
+6. `time_limit` - User-provided time limit in seconds
+
+**Ignored input columns**: `exit_status` is an output-only compatibility field.
+If present in an input trace, its value is ignored; it never affects scheduling
+or replay. Simulator output currently emits it as `0`.
 
 **Usage**:
 ```bash
@@ -457,10 +461,10 @@ Makespan: 2010 sec
 
 ```bash
 cat > my_test.csv << EOF
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,50,0,pbatch,100
-10,10,60,10,0,pbatch,100
-20,20,60,5,0,pbatch,100
+job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
+0,0,100,50,pbatch,100
+10,10,60,10,pbatch,100
+20,20,60,5,pbatch,100
 EOF
 ```
 
@@ -577,7 +581,6 @@ for i in range(100):
         'begin_time': submit_time,  # Will be rescheduled
         'end_time': submit_time + duration,
         'num_nodes': nodes,
-        'exit_status': 0,
         'queue': 'pbatch',
         'time_limit': duration + 100
     })

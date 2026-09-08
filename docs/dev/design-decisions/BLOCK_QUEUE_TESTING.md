@@ -8,7 +8,7 @@ The block queue implementation has been thoroughly tested for correctness and pe
 
 ### 1. Unit Tests
 
-**`tests/test_block_queue_simple.cpp`**
+**`tests/test_block_queue.cpp`**
 - Fast unit test for BlockWaitQueue API
 - Tests individual operations: insert, remove, find_backfill_candidate
 - Small datasets (3-10 jobs)
@@ -17,12 +17,12 @@ The block queue implementation has been thoroughly tested for correctness and pe
 
 **To run:**
 ```bash
-./build/test_block_queue_simple-bin
+./build/test_block_queue
 ```
 
 ### 2. Integration & Correctness Tests
 
-**`tests/test_fcfs_comprehensive.sh`**
+**`tests/test_fcfs_queue_implementations.sh`**
 - Differential correctness testing
 - Compares 4 FCFS implementations:
   - fcfs (deque-based, explicit `--queue_impl deque`)
@@ -36,13 +36,13 @@ The block queue implementation has been thoroughly tested for correctness and pe
 **To run:**
 ```bash
 # All tests (correctness + performance)
-./tests/test_fcfs_comprehensive.sh
+./tests/test_fcfs_queue_implementations.sh
 
 # Correctness only
-./tests/test_fcfs_comprehensive.sh --correctness
+./tests/test_fcfs_queue_implementations.sh --correctness
 
 # Performance only
-./tests/test_fcfs_comprehensive.sh --performance
+./tests/test_fcfs_queue_implementations.sh --performance
 ```
 
 ### 3. Block Size Performance Comparison
@@ -162,7 +162,7 @@ Located in `tests/test_traces/scale/`:
 - `huge_10000jobs.csv`: 10,000 jobs (generated for block queue testing)
 
 ### Comprehensive Test Traces
-Located in `tests/test_traces/comprehensive/`:
+Located in `tests/test_traces/scheduler_correctness/`:
 - Full set of 170+ test traces
 - Mix of all sizes and features
 
@@ -178,7 +178,7 @@ import random
 random.seed(42)
 num_jobs = 10000
 
-jobs = [['job_submit_time', 'num_nodes', 'exit_status', 'queue', 'time_limit']]
+jobs = [['job_submit_time', 'num_nodes', 'queue', 'time_limit']]
 current_time = 0
 
 for i in range(num_jobs):
@@ -302,10 +302,10 @@ Block queue would only help with:
 cmake --build build
 
 # 2. Unit test (fast sanity check)
-./build/test_block_queue_simple-bin
+./build/test_block_queue
 
 # 3. Integration test (correctness verification)
-./tests/test_fcfs_comprehensive.sh --correctness
+./tests/test_fcfs_queue_implementations.sh --correctness
 
 # 4. Performance comparison (all block sizes)
 ./tests/benchmark_block_sizes.sh
@@ -320,7 +320,7 @@ cd build && ctest
 pull request against them (gcc-11 and clang-14, in parallel).
 
 Its "Run Queue Implementation Differential Tests" step runs
-`tests/test_fcfs_comprehensive.sh --correctness`, which exercises deque,
+`tests/test_fcfs_queue_implementations.sh --correctness`, which exercises deque,
 multimap, block queue (size 128), and circular queue against the 34
 comprehensive test traces - the same script and traces described above.
 Other CI steps (the 34-trace comprehensive test against known-correct
