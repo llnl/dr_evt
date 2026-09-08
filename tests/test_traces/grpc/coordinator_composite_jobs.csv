@@ -1,0 +1,5 @@
+composite_id,submit_time,system_id,num_nodes,queue,time_limit
+equal_boundary,10,server1,20,pbatch,25
+equal_boundary,10,server2,25,pbatch,25
+strict_boundary,25,server1,30,pbatch,20
+strict_boundary,25,server2,35,pbatch,20
