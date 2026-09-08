@@ -109,6 +109,7 @@ and a long-form composite-job trace, streams ordinary jobs to their servers,
 advances all servers to each composite event time, then submits the composite
 fragments concurrently.
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 ```{mermaid}
@@ -119,6 +120,9 @@ sequenceDiagram
 =======
 For each composite event, the coordinator performs this sequence:
 >>>>>>> Stashed changes
+=======
+For each composite event, the coordinator performs this sequence:
+>>>>>>> 0bd91aa (docs:convert mermaid to markdown)
 
 1. Initialize each server and submit its current ordinary-job batch.
 2. Advance both servers through the ordinary batch to the selected watermark.
@@ -130,6 +134,7 @@ For each composite event, the coordinator performs this sequence:
    advance again to evaluate those arrivals. The next batch may start at the
    composite time or later.
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
     loop Each composite event at submit time tc
         Note over C,B: Ordinary batch ends at tn <= tc. Pick ta with tn <= ta <= tc
@@ -181,6 +186,10 @@ their independent schedules; it does not make reservations or roll back work.
 The servers keep independent nodes and scheduler state. This procedure observes
 their independent schedules; it does not make reservations or roll back work.
 >>>>>>> Stashed changes
+=======
+The servers keep independent nodes and scheduler state. This procedure observes
+their independent schedules; it does not make reservations or roll back work.
+>>>>>>> 0bd91aa (docs:convert mermaid to markdown)
 
 ### Timing exercised by the MPI composite-stream fixture
 
