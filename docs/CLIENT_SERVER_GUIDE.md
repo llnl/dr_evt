@@ -174,6 +174,10 @@ the network API.
 ### Composite-stream test timeline
 
 ```{mermaid}
+:name: composite-stream-timeline
+:align: center
+:config: {"theme":"base","themeVariables":{"noteBkgColor":"#e2f3e7","noteBorderColor":"#8ab99a","noteTextColor":"#234d31"},"sequence":{"useMaxWidth":true,"diagramMarginX":5}}
+
 sequenceDiagram
     participant C1 as Client 1
     participant S1 as Server 1
