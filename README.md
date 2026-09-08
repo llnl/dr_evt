@@ -188,8 +188,6 @@ cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_GRPC=ON
 # Skip system path search (useful if system install is broken or mismatched by version)
 cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 
-# Clear FetchContent cache to retry system search
-cmake -U DR_EVT_GRPC_FETCHCONTENT ..
 ```
 `-DAVOID_SYSTEM_GRPC=ON` guarantees the from-source FetchContent build - see the OOM note under "Livermore Computing (LC) HPC systems" below.
 

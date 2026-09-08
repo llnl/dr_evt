@@ -17,7 +17,6 @@ if (BUILD_PROTOBUF)
   set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
-  set(protobuf_INSTALL OFF CACHE BOOL "" FORCE)
 
   # Without this, FetchContent re-contacts git on every configure
   set(FETCHCONTENT_UPDATES_DISCONNECTED_protobuf ON)

@@ -79,7 +79,15 @@ if [ ! -f "$MPI_TEST" ]; then
     echo "    (MPI not found at configure time, or not yet built)"
 else
     if command -v mpirun > /dev/null 2>&1; then
-        MPI_LAUNCHER=(mpirun -np 4)
+        # GitHub-hosted runners may expose fewer than four Open MPI slots.
+        # This test intentionally launches four local ranks, so permit that
+        # launcher to oversubscribe.  Other MPI implementations do not all
+        # accept this Open MPI-specific option.
+        if mpirun --version 2>&1 | grep -qi "Open MPI"; then
+            MPI_LAUNCHER=(mpirun --oversubscribe -np 4)
+        else
+            MPI_LAUNCHER=(mpirun -np 4)
+        fi
         MPI_LAUNCHER_NAME="mpirun"
     elif command -v srun > /dev/null 2>&1; then
         MPI_LAUNCHER=(srun --nodes=1 --ntasks=4 --kill-on-bad-exit=1)
