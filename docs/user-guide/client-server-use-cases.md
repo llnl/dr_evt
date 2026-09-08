@@ -109,64 +109,6 @@ and a long-form composite-job trace, streams ordinary jobs to their servers,
 advances all servers to each composite event time, then submits the composite
 fragments concurrently.
 
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-```{mermaid}
-sequenceDiagram
-    participant C as Composite-job coordinator
-    participant A as Server A scheduler
-    participant B as Server B scheduler
-=======
-For each composite event, the coordinator performs this sequence:
->>>>>>> Stashed changes
-=======
-For each composite event, the coordinator performs this sequence:
->>>>>>> 0bd91aa (docs:convert mermaid to markdown)
-
-1. Initialize each server and submit its current ordinary-job batch.
-2. Advance both servers through the ordinary batch to the selected watermark.
-3. Read pre-event statistics from both servers.
-4. Submit one composite fragment to each server.
-5. Advance both servers to the composite time and read post-event statistics.
-6. Record whether fragments started immediately, were delayed, or partially started.
-7. Append the next ordinary batch only after the composite evaluation, then
-   advance again to evaluate those arrivals. The next batch may start at the
-   composite time or later.
-
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-    loop Each composite event at submit time tc
-        Note over C,B: Ordinary batch ends at tn <= tc. Pick ta with tn <= ta <= tc
-        par Synchronize simulated time
-            C->>A: AdvanceTo(ta) and process arrivals through ta
-        and
-            C->>B: AdvanceTo(ta) and process arrivals through ta
-        end
-        C->>A: Read pre-event statistics
-        C->>B: Read pre-event statistics
-        par Submit one fragment per system
-            C->>A: AppendJob(s) + SubmitJob(fragment A at tc)
-        and
-            C->>B: AppendJob(s) + SubmitJob(fragment B at tc)
-        end
-        par Evaluate newly appended fragments at the same time tc
-            C->>A: AdvanceTo(tc) and read post-event statistics
-        and
-            C->>B: AdvanceTo(tc) and read post-event statistics
-        end
-        Note over C: Record immediate, delayed, or partial start
-        opt Incremental ordinary-job stream
-            Note over C,B: After the composite AdvanceTo(tc), next batch starts at t0 >= tc
-            C->>A: AppendJobs + SubmitJob(each next ordinary arrival)
-            C->>B: AppendJobs + SubmitJob(each next ordinary arrival)
-            C->>A: AdvanceTo(t0) to evaluate newly queued arrivals
-            C->>B: AdvanceTo(t0) to evaluate newly queued arrivals
-        end
-    end
-    Note over C,B: This observes independent schedules; it makes no reservation or rollback
-```
-=======
 For each composite event, the coordinator performs this sequence:
 
 1. Initialize each server and submit its current ordinary-job batch.
@@ -181,15 +123,6 @@ For each composite event, the coordinator performs this sequence:
 
 The servers keep independent nodes and scheduler state. This procedure observes
 their independent schedules; it does not make reservations or roll back work.
->>>>>>> Stashed changes
-=======
-The servers keep independent nodes and scheduler state. This procedure observes
-their independent schedules; it does not make reservations or roll back work.
->>>>>>> Stashed changes
-=======
-The servers keep independent nodes and scheduler state. This procedure observes
-their independent schedules; it does not make reservations or roll back work.
->>>>>>> 0bd91aa (docs:convert mermaid to markdown)
 
 ### Timing exercised by the MPI composite-stream fixture
 
