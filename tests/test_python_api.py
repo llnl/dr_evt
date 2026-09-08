@@ -192,17 +192,14 @@ def test_streaming_api(result):
 
         # Create simulation
         sim = dr_evt.Simulation(params)
-        num_jobs = sim.initialize_trace()
-        assert num_jobs == 2, f"Expected 2 jobs, got {num_jobs}"
-
-        # Test submit_job
-        sim.submit_job(0, 0.0)
+        # append_job() is the public streaming entry point.
+        sim.append_job(0.0, 10, "pbatch", 100)
         sim.advance_to(0.0)
         assert sim.get_nodes_in_use() == 10
-        result.record_pass("submit_job and advance_to")
+        result.record_pass("append_job and advance_to")
 
         # Test run_until_exclusive
-        sim.submit_job(1, 50.0)
+        sim.append_job(50.0, 20, "pbatch", 100)
         sim.run_until_exclusive(50.0)
         # Job 1 must NOT have started yet - the event at exactly the
         # target time is excluded by run_until_exclusive.
@@ -236,8 +233,6 @@ def test_monitoring_api(result):
         params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 
         sim = dr_evt.Simulation(params)
-        sim.initialize_trace()
-
         # Initial state
         assert sim.get_current_time() == 0.0
         assert sim.get_nodes_in_use() == 0
@@ -245,7 +240,7 @@ def test_monitoring_api(result):
         result.record_pass("Initial state monitoring")
 
         # After job starts
-        sim.submit_job(0, 0.0)
+        sim.append_job(0.0, 30, "pbatch", 100)
         sim.advance_to(0.0)
         assert sim.get_nodes_in_use() == 30
         assert sim.get_available_nodes() == 70
@@ -288,9 +283,8 @@ def test_backfill_window_api(result):
         params.priority_policy = dr_evt.PriorityPolicy.FCFS
 
         sim = dr_evt.Simulation(params)
-        assert sim.initialize_trace() == 3
-        for job_idx in range(3):
-            sim.submit_job(job_idx, 0.0)
+        for num_nodes, limit_time in [(40, 50), (60, 100), (100, 10)]:
+            sim.append_job(0.0, num_nodes, "pbatch", limit_time)
             sim.advance_to(0.0)
 
         window = sim.get_backfill_window()
@@ -329,17 +323,15 @@ def test_statistics(result):
         params.run_time_mode = dr_evt.RunTimeMode.LIMIT
 
         sim = dr_evt.Simulation(params)
-        sim.initialize_trace()
-
         # Run complete simulation
         sim.advance_to(0.0)
-        sim.submit_job(0, 0.0)
+        sim.append_job(0.0, 10, "pbatch", 50)
         sim.advance_to(0.0)
 
-        sim.submit_job(1, 10.0)
+        sim.append_job(10.0, 20, "pbatch", 50)
         sim.advance_to(10.0)
 
-        sim.submit_job(2, 20.0)
+        sim.append_job(20.0, 30, "pbatch", 50)
         sim.advance_to(20.0)
 
         sim.advance_to(100.0)
@@ -396,10 +388,9 @@ def test_backfill_policies(result):
             params.backfill_policy = policy
 
             sim = dr_evt.Simulation(params)
-            sim.initialize_trace()
-            sim.submit_job(0, 0.0)
+            sim.append_job(0.0, 50, "pbatch", 100)
             sim.advance_to(0.0)
-            sim.submit_job(1, 10.0)
+            sim.append_job(10.0, 30, "pbatch", 50)
             sim.advance_to(200.0)
 
             stats = sim.get_statistics()
@@ -439,13 +430,11 @@ def test_priority_policies(result):
             params.priority_policy = policy
 
             sim = dr_evt.Simulation(params)
-            sim.initialize_trace()
-
-            sim.submit_job(0, 0.0)
+            sim.append_job(0.0, 10, "pbatch", 100)
             sim.advance_to(0.0)
-            sim.submit_job(1, 5.0)
+            sim.append_job(5.0, 10, "pbatch", 20)
             sim.advance_to(5.0)
-            sim.submit_job(2, 10.0)
+            sim.append_job(10.0, 10, "pbatch", 50)
             sim.advance_to(200.0)
 
             stats = sim.get_statistics()

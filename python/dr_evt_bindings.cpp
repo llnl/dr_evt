@@ -9,7 +9,7 @@
  * Python bindings for DR_EVT streaming simulation API
  *
  * Provides Python interface to:
- * - Streaming API (submit_job, advance_to, run_until_exclusive)
+ * - Streaming API (append_job, advance_to, run_until_exclusive)
  * - Monitoring API (resource status, queue status, statistics)
  */
 
