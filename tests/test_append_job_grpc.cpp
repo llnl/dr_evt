@@ -114,7 +114,7 @@ bool test_single_append(const std::string& server_address, const std::string& tr
         a1->set_num_nodes(10);
         a1->set_queue("pbatch");
         a1->set_limit_time(100.0);
-        uint32_t job_idx1 = client.call(append_req1).append_job().job_idx();
+        [[maybe_unused]] uint32_t job_idx1 = client.call(append_req1).append_job().job_idx();
         assert(job_idx1 == 0);
 
         ClientMessage append_req2;
@@ -123,7 +123,7 @@ bool test_single_append(const std::string& server_address, const std::string& tr
         a2->set_num_nodes(20);
         a2->set_queue("pbatch");
         a2->set_limit_time(200.0);
-        uint32_t job_idx2 = client.call(append_req2).append_job().job_idx();
+        [[maybe_unused]] uint32_t job_idx2 = client.call(append_req2).append_job().job_idx();
         assert(job_idx2 == 1);
 
         ClientMessage advance_req;

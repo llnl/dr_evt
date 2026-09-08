@@ -69,6 +69,26 @@ PYBIND11_MODULE(dr_evt, m) {
         .def_readwrite("verbose", &Sim_Params::m_verbose,
                        "bool: Enables verbose simulator output.");
 
+    // One value passed to Simulation.append_jobs().
+    py::class_<Simulation::Job_Append_Request>(m, "JobAppendRequest")
+        .def(py::init([](sim_time_t submit_time, num_nodes_t num_nodes,
+                         const std::string& queue, tdiff_t limit_time) {
+                 return Simulation::Job_Append_Request{
+                     submit_time, num_nodes, queue, limit_time};
+             }),
+             py::arg("submit_time"), py::arg("num_nodes"), py::arg("queue"),
+             py::arg("limit_time"),
+             "Create one batch job request. submit_time is a float, num_nodes is an int, "
+             "queue is a str, and limit_time is a float.")
+        .def_readwrite("submit_time", &Simulation::Job_Append_Request::submit_time,
+                       "float: Arrival time, not earlier than the simulation's current time.")
+        .def_readwrite("num_nodes", &Simulation::Job_Append_Request::num_nodes,
+                       "int: Requested node count.")
+        .def_readwrite("queue", &Simulation::Job_Append_Request::queue,
+                       "str: Queue name.")
+        .def_readwrite("limit_time", &Simulation::Job_Append_Request::limit_time,
+                       "float: Requested wall-time limit.");
+
     // Statistics structure
     py::class_<Simulation::Statistics>(m, "Statistics")
         .def_readonly("jobs_submitted", &Simulation::Statistics::jobs_submitted, "int: Number of submitted jobs.")
@@ -128,6 +148,17 @@ PYBIND11_MODULE(dr_evt, m) {
              "    limit_time (float): Requested wall-time limit.\n"
              "Returns:\n"
              "    int: Identifier of the appended trace job.")
+
+        .def("append_jobs", &Simulation::append_jobs, py::arg("requests"),
+             "Append and enqueue multiple new jobs atomically.\n\n"
+             "Args:\n"
+             "    requests (Sequence[JobAppendRequest]): New jobs in non-decreasing "
+             "submit_time order.\n"
+             "Returns:\n"
+             "    list[int]: Appended job identifiers in the same order as requests.\n\n"
+             "Raises:\n"
+             "    RuntimeError: If validation or capacity handling rejects the batch; "
+             "no request is appended.")
 
         // Streaming API - Time advancement
         .def("run_until_exclusive", &Simulation::run_until_exclusive,
