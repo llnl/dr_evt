@@ -109,39 +109,52 @@ and a long-form composite-job trace, streams ordinary jobs to their servers,
 advances all servers to each composite event time, then submits the composite
 fragments concurrently.
 
-For each composite event, the coordinator performs this sequence:
+The coordinator is the only client that reads all three input streams. It owns
+the timing decision; the servers own only their independent scheduler state.
+For one system, let `tn` be the last arrival in the ordinary batch before a
+composite event, `ta` the coordinator's advance watermark, `tc` the composite
+event time, and `t0` the first arrival in the following ordinary batch. The
+pre-composite batch must satisfy `tn <= ta <= tc`. This covers both an
+equal-time event (`tn = ta = tc`) and a strict-boundary event
+(`tn <= ta < tc`).
 
-1. Initialize each server and submit its current ordinary-job batch.
-2. Advance both servers through the ordinary batch to the selected watermark.
-3. Read pre-event statistics from both servers.
-4. Submit one composite fragment to each server.
-5. Advance both servers to the composite time and read post-event statistics.
-6. Record whether fragments started immediately, were delayed, or partially started.
-7. Append the next ordinary batch only after the composite evaluation, then
-   advance again to evaluate those arrivals. The next batch may start at the
-   composite time or later.
+For each composite event, the coordinator does the following in order:
 
-The servers keep independent nodes and scheduler state. This procedure observes
-their independent schedules; it does not make reservations or roll back work.
+1. Append and submit each system's ordinary arrivals through `tn`.
+2. Advance every server to the common watermark `ta`, then read pre-event
+   statistics.
+3. Append and submit one composite fragment to each server at `tc`.
+4. Advance every server to `tc`, then read post-event statistics and record
+   immediate, delayed, or partial starts.
+5. Only after that evaluation, append the next ordinary batch. Its first
+   arrival may be at `t0 = tc` or at a later time.
+6. Advance again to `t0` so the newly queued ordinary arrivals are evaluated.
+   When `t0 = tc`, this is deliberately a second `AdvanceTo(tc)` call.
 
-### Timing exercised by the MPI composite-stream fixture
+This observes independent schedules; it makes no cross-server reservation or
+rollback guarantee.
 
-The two-server MPI integration fixture uses synchronized arrival timestamps;
-the streams differ in requested node counts, not in their ordinary-job timing.
+![Single-coordinator composite-stream procedure](../_static/single-coordinator-procedure.svg)
 
-| Step | Server 1 timing | Server 2 timing | Composite timing | Relation exercised |
-| --- | --- | --- | --- | --- |
-| Initial ordinary batch | `tn_s1 = 10` | `tn_s2 = 10` | `ta = tc = 10` | `tn_s1 = tn_s2 = ta = tc` |
-| Equal-time next batch | `t0_s1 = 10` | `t0_s2 = 10` | Previous `tc = 10` | `t0_s1 = t0_s2 = tc` |
-| Later ordinary arrival | `tn_s1 = 20` | `tn_s2 = 20` | Previous `tc = 10` | `tc < tn_s1` and `tc < tn_s2` |
-| Strict-boundary event | `tn_s1 = ta_s1 = 20` | `tn_s2 = ta_s2 = 20` | `tc = 25` | `tn <= ta < tc` |
-| Final ordinary batch | `t0_s1 = 30` | `t0_s2 = 30` | Previous `tc = 25` | `tc < t0_s1` and `tc < t0_s2` |
+### Timing exercised by the single-coordinator fixture
+
+`tests/test_grpc_single_coordinator.py` is a one-client, two-server integration
+test. The coordinator reads both ordinary traces and the composite stream; the
+two ordinary streams use synchronized timestamps and differ only in requested
+node counts.
+
+| Test case | Step | Server 1 timing | Server 2 timing | Composite timing | Relation exercised |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Initial ordinary batch | `tn_s1 = 10` | `tn_s2 = 10` | `ta = tc = 10` | `tn_s1 = tn_s2 = ta = tc` |
+| 2 | Equal-time next batch | `t0_s1 = 10` | `t0_s2 = 10` | Previous `tc = 10` | `t0_s1 = t0_s2 = tc`; a second `AdvanceTo(tc)` evaluates it |
+| 3 | Later ordinary arrival and strict-boundary event | `tn_s1 = ta_s1 = 20` | `tn_s2 = ta_s2 = 20` | `tc = 25` | `tn <= ta < tc` |
+| 4 | Final ordinary batch | `t0_s1 = 30` | `t0_s2 = 30` | Previous `tc = 25` | `tc < t0_s1` and `tc < t0_s2` |
 
 Thus the fixture covers the equal-time and strict forms of the per-system
-boundaries shown in the diagram. It does not cover every distributed timing
-permutation: both systems use the same timestamps, so a staggered case such as
-`tn_s1 < tc < t0_s2` is not exercised. The final `t0 = 30` batch is drained by
-`FinishSimulation()` rather than a separate explicit `AdvanceTo(...)`.
+boundaries above. It does not yet cover the interior timing case
+`tn < ta < tc`, or every distributed timing permutation: both systems use the
+same timestamps, so a staggered case such as `tn_s1 < tc < t0_s2` is not
+exercised.
 
 ```bash
 # Start one server for each address in systems.csv.
