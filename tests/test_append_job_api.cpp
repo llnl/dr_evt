@@ -122,12 +122,12 @@ void test_append_reclaims_before_growing() {
     sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::GROW);
     sim.get_trace().load_data(0);
 
-    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
     sim.advance_to(60.0);  // job0 finishes at t=50 - its slot is now reclaimable
 
     assert(sim.get_trace().data().capacity() == 1);
 
-    job_no_t j1 = sim.append_job(60.0, 10, "pbatch", 50);
+    [[maybe_unused]] job_no_t j1 = sim.append_job(60.0, 10, "pbatch", 50);
     assert(j1 == 1);
     // The point of this test: capacity must still be 1 (reclaimed
     // job0's slot) - if this were 2, append_job() grew instead of
@@ -151,7 +151,7 @@ void test_append_rejects_past_submit_time() {
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
 
-    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
     sim.advance_to(100.0);
 
     [[maybe_unused]] bool threw = false;
@@ -228,7 +228,7 @@ void test_append_jobs_rejects_past_submit_time() {
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
 
-    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
     sim.advance_to(100.0);
 
     std::vector<Simulation::Job_Append_Request> past_reqs = {
@@ -264,7 +264,7 @@ void test_append_jobs_reclaims_before_growing() {
     sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::GROW);
     sim.get_trace().load_data(0);
 
-    job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+    [[maybe_unused]] job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
     sim.advance_to(60.0);  // f0 finishes at t=50 - its slot is now reclaimable
     assert(sim.get_trace().data().capacity() == 1);
 
@@ -303,7 +303,7 @@ void test_append_jobs_abort_is_atomic() {
     sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::ABORT);
     sim.get_trace().load_data(0);
 
-    job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+    [[maybe_unused]] job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
     // Still running (hasn't reached end_time=50 yet) - not reclaimable.
     assert(sim.get_trace().data().size() == 1);
 
@@ -353,12 +353,12 @@ void test_basic_append_and_run() {
     assert(sim.get_nodes_in_use() == 0);
     std::cout << "  Initial state: 0 nodes in use" << std::endl;
 
-    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 100);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 100);
     sim.advance_to(0.0);
     assert(sim.get_nodes_in_use() == 10);
     std::cout << "  After job 0 appended+submitted: 10 nodes in use" << std::endl;
 
-    job_no_t j1 = sim.append_job(50.0, 20, "pbatch", 100);
+    [[maybe_unused]] job_no_t j1 = sim.append_job(50.0, 20, "pbatch", 100);
     sim.advance_to(50.0);
     assert(sim.get_nodes_in_use() == 30);
     std::cout << "  After job 1 appended+submitted: 30 nodes in use" << std::endl;
@@ -382,7 +382,7 @@ void test_exclusive_vs_inclusive() {
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
 
-    job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 10);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 10);
 
     // run_until_exclusive(0) must not process the START event at t=0.
     assert(sim.get_nodes_in_use() == 0);
@@ -486,7 +486,7 @@ void test_no_resource_leaks() {
 
     for (int i = 0; i < 10; i++) {
         sim_time_t start_time = i * 10.0;
-        job_no_t job_idx = sim.append_job(start_time, 10, "pbatch", 20);
+        [[maybe_unused]] job_no_t job_idx = sim.append_job(start_time, 10, "pbatch", 20);
         sim.advance_to(start_time);
         std::cout << "    t=" << start_time << ": "
                   << sim.get_nodes_in_use() << " nodes in use" << std::endl;
@@ -510,8 +510,8 @@ void test_advance_to_idle_gap() {
     Simulation sim(make_params());
     sim.get_trace().load_data(0);
 
-    job_no_t j0 = sim.append_job(0.0, 30, "pbatch", 50);
-    job_no_t j1 = sim.append_job(10.0, 30, "pbatch", 50);
+    [[maybe_unused]] job_no_t j0 = sim.append_job(0.0, 30, "pbatch", 50);
+    [[maybe_unused]] job_no_t j1 = sim.append_job(10.0, 30, "pbatch", 50);
 
     // Repeatedly advance in fixed 100-unit steps, like a caller polling
     // at a regular interval rather than knowing exactly where the gap
@@ -529,7 +529,7 @@ void test_advance_to_idle_gap() {
 
     // A third job genuinely arrives at t=500 - appended only now, not
     // known in advance like the other two.
-    job_no_t j2 = sim.append_job(500.0, 30, "pbatch", 50);
+    [[maybe_unused]] job_no_t j2 = sim.append_job(500.0, 30, "pbatch", 50);
     sim.advance_to(500.0);
     assert(approx_equal(sim.get_current_time(), 500.0));
     assert(sim.get_nodes_in_use() == 30);
@@ -571,7 +571,7 @@ void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
         sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::GROW);
         sim.get_trace().load_data(0);
 
-        job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+        [[maybe_unused]] job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
         sim.advance_to(60.0);
         assert(sim.get_trace().data().capacity() == 1);
 
@@ -596,7 +596,7 @@ void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
         sim.get_trace().set_job_store_overflow(CircularOverflowPolicy::ABORT);
         sim.get_trace().load_data(0);
 
-        job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
+        [[maybe_unused]] job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
         sim.advance_to(60.0);
 
         std::vector<Simulation::Job_Append_Request> batch;

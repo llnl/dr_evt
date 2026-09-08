@@ -34,6 +34,14 @@
 
 using namespace dr_evt;
 
+// The feeder replays a preloaded, rank-partitioned trace. It needs the same
+// internal enqueue helper batch mode uses; public live callers use append_job.
+class MpiFeederSimulation : public Simulation {
+  public:
+    using Simulation::Simulation;
+    using Simulation::submit_job;
+};
+
 // Partition jobs by rank (round-robin)
 std::vector<job_no_t> get_rank_jobs(size_t total_jobs, int rank, int size) {
     std::vector<job_no_t> my_jobs;
@@ -96,7 +104,7 @@ int main(int argc, char** argv) {
         }
 
         // Create simulation
-        Simulation sim(params);
+        MpiFeederSimulation sim(params);
 
         // Load trace data
         const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;
