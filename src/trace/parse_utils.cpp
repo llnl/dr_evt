@@ -18,8 +18,6 @@
 
 namespace dr_evt {
 
-using std::string;
-
 std::unordered_map<std::string, job_queue_t> str2jobq {
 #if PBATCH_GROUP
     {"pbatch", pBatch},
@@ -160,11 +158,11 @@ std::string to_string(const job_queue_t q)
 /*
  * Removes leading and trailing spaces from a string
  */
-string trim(const string& str,
-             const string& whitespace)
+std::string trim(const std::string& str,
+                 const std::string& whitespace)
 {
     const auto i_beg = str.find_first_not_of(whitespace);
-    if (i_beg == string::npos)
+    if (i_beg == std::string::npos)
         return ""; // no content
 
     const auto i_end = str.find_last_not_of(whitespace);
@@ -199,7 +197,7 @@ std::vector<substr_pos_t> comma_separate(const std::string& str)
  *  Without this, parsing comma-sepated-value data may result in an error.
  *  Does not handle a case as "'...,..."' where quotation is done erroneously.
  */
-void replace_comma_within_quotation(string& line)
+void replace_comma_within_quotation(std::string& line)
 {
     bool db_quote_open = false; // is double quotation open
     //bool quote_open = false; // is quotation open
@@ -268,7 +266,7 @@ void replace_comma_within_quotation(string& line)
 /*
  *  Case-insensitive substring search
  */
-bool search_ci(const string& str, const string& sub)
+bool search_ci(const std::string& str, const std::string& sub)
 {
     auto it =
         std::search(str.cbegin(), str.cend(),

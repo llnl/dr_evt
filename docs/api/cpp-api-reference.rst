@@ -3,5 +3,6 @@
 C++ API reference
 =================
 
-.. doxygenindex::
+.. doxygennamespace:: dr_evt
    :project: dr_evt
+   :members:

@@ -21,7 +21,7 @@
 namespace dr_evt {
 
 #define OPTIONS "d:hi:j:o:s:m:t:n:r:H:"
-static const struct option longopts[] = {
+static const struct option trace_longopts[] = {
     {"datfile",       required_argument,  0, 'd'},
     {"help",          no_argument,        0, 'h'},
     {"infile",        required_argument,  0, 'i'},
@@ -59,7 +59,7 @@ bool Trace_Params::getopt(int& argc, char** &argv)
         return false;
     }
 
-    while ((c = getopt_long(argc, argv, OPTIONS, longopts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, OPTIONS, trace_longopts, NULL)) != -1) {
         switch (c) {
             case 'd': /* --datfile */
                 m_datfile = std::string(optarg);

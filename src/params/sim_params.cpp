@@ -26,7 +26,7 @@
 namespace dr_evt {
 
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
-static const struct option longopts[] = {
+static const struct option sim_longopts[] = {
     {"help",                  no_argument,        0, 'h'},
     {"infile",                required_argument,  0, 'i'},
     {"infile_list",           required_argument,  0, 'L'},
@@ -92,7 +92,7 @@ void Sim_Params::getopt(int& argc, char** &argv)
     m_is_jobs_set = false;
     m_is_time_set = false;
 
-    while ((c = getopt_long(argc, argv, OPTIONS, longopts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, OPTIONS, sim_longopts, NULL)) != -1) {
         switch (c) {
             case 'h': /* --help */
                 print_usage(argv[0], 0);
