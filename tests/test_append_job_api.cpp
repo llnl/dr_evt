@@ -89,8 +89,6 @@ void test_append_with_empty_trace() {
     assert(j1 == 1);
     assert(sim.get_trace().data().size() == 2);
 
-    sim.submit_job(j0, 0.0);
-    sim.submit_job(j1, 5.0);
     sim.advance_to(1000.0);
 
     [[maybe_unused]] const auto& job0 = sim.get_trace().job_at(0);
@@ -125,7 +123,6 @@ void test_append_reclaims_before_growing() {
     sim.get_trace().load_data(0);
 
     job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
-    sim.submit_job(j0, 0.0);
     sim.advance_to(60.0);  // job0 finishes at t=50 - its slot is now reclaimable
 
     assert(sim.get_trace().data().capacity() == 1);
@@ -138,7 +135,6 @@ void test_append_reclaims_before_growing() {
     assert(sim.get_trace().data().capacity() == 1);
     assert(sim.get_trace().num_reclaimed() == 1);
 
-    sim.submit_job(j1, 60.0);
     sim.advance_to(200.0);
 
     sim.write_simulated_trace();
@@ -156,7 +152,6 @@ void test_append_rejects_past_submit_time() {
     sim.get_trace().load_data(0);
 
     job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
-    sim.submit_job(j0, 0.0);
     sim.advance_to(100.0);
 
     [[maybe_unused]] bool threw = false;
@@ -190,9 +185,6 @@ void test_append_jobs_batch() {
     assert(job_nos.size() == 3);
     assert(job_nos[0] == 0 && job_nos[1] == 1 && job_nos[2] == 2);
 
-    for (size_t i = 0; i < job_nos.size(); ++i) {
-        sim.submit_job(job_nos[i], reqs[i].submit_time);
-    }
     sim.advance_to(1000.0);
     sim.write_simulated_trace();
     assert(sim.get_trace().completed_count() == 3);
@@ -237,7 +229,6 @@ void test_append_jobs_rejects_past_submit_time() {
     sim.get_trace().load_data(0);
 
     job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 50);
-    sim.submit_job(j0, 0.0);
     sim.advance_to(100.0);
 
     std::vector<Simulation::Job_Append_Request> past_reqs = {
@@ -274,7 +265,6 @@ void test_append_jobs_reclaims_before_growing() {
     sim.get_trace().load_data(0);
 
     job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
-    sim.submit_job(f0, 0.0);
     sim.advance_to(60.0);  // f0 finishes at t=50 - its slot is now reclaimable
     assert(sim.get_trace().data().capacity() == 1);
 
@@ -314,7 +304,6 @@ void test_append_jobs_abort_is_atomic() {
     sim.get_trace().load_data(0);
 
     job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
-    sim.submit_job(f0, 0.0);
     // Still running (hasn't reached end_time=50 yet) - not reclaimable.
     assert(sim.get_trace().data().size() == 1);
 
@@ -365,13 +354,11 @@ void test_basic_append_and_run() {
     std::cout << "  Initial state: 0 nodes in use" << std::endl;
 
     job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 100);
-    sim.submit_job(j0, 0.0);
     sim.advance_to(0.0);
     assert(sim.get_nodes_in_use() == 10);
     std::cout << "  After job 0 appended+submitted: 10 nodes in use" << std::endl;
 
     job_no_t j1 = sim.append_job(50.0, 20, "pbatch", 100);
-    sim.submit_job(j1, 50.0);
     sim.advance_to(50.0);
     assert(sim.get_nodes_in_use() == 30);
     std::cout << "  After job 1 appended+submitted: 30 nodes in use" << std::endl;
@@ -396,7 +383,6 @@ void test_exclusive_vs_inclusive() {
     sim.get_trace().load_data(0);
 
     job_no_t j0 = sim.append_job(0.0, 10, "pbatch", 10);
-    sim.submit_job(j0, 0.0);
 
     // run_until_exclusive(0) must not process the START event at t=0.
     assert(sim.get_nodes_in_use() == 0);
@@ -450,7 +436,6 @@ void test_online_scheduling() {
 
             if (arr.num_nodes <= free_nodes) {
                 job_no_t job_idx = sim.append_job(current_time, arr.num_nodes, "pbatch", 50);
-                sim.submit_job(job_idx, current_time);
                 sim.advance_to(current_time);
                 running_jobs.push_back(job_idx);
                 std::cout << "    t=" << current_time << ": started job " << job_idx
@@ -502,7 +487,6 @@ void test_no_resource_leaks() {
     for (int i = 0; i < 10; i++) {
         sim_time_t start_time = i * 10.0;
         job_no_t job_idx = sim.append_job(start_time, 10, "pbatch", 20);
-        sim.submit_job(job_idx, start_time);
         sim.advance_to(start_time);
         std::cout << "    t=" << start_time << ": "
                   << sim.get_nodes_in_use() << " nodes in use" << std::endl;
@@ -528,8 +512,6 @@ void test_advance_to_idle_gap() {
 
     job_no_t j0 = sim.append_job(0.0, 30, "pbatch", 50);
     job_no_t j1 = sim.append_job(10.0, 30, "pbatch", 50);
-    sim.submit_job(j0, 0.0);
-    sim.submit_job(j1, 10.0);
 
     // Repeatedly advance in fixed 100-unit steps, like a caller polling
     // at a regular interval rather than knowing exactly where the gap
@@ -548,7 +530,6 @@ void test_advance_to_idle_gap() {
     // A third job genuinely arrives at t=500 - appended only now, not
     // known in advance like the other two.
     job_no_t j2 = sim.append_job(500.0, 30, "pbatch", 50);
-    sim.submit_job(j2, 500.0);
     sim.advance_to(500.0);
     assert(approx_equal(sim.get_current_time(), 500.0));
     assert(sim.get_nodes_in_use() == 30);
@@ -591,7 +572,6 @@ void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
         sim.get_trace().load_data(0);
 
         job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
-        sim.submit_job(f0, 0.0);
         sim.advance_to(60.0);
         assert(sim.get_trace().data().capacity() == 1);
 
@@ -617,7 +597,6 @@ void test_append_jobs_batch_capacity_isolated_from_single_job_fallback() {
         sim.get_trace().load_data(0);
 
         job_no_t f0 = sim.append_job(0.0, 10, "pbatch", 50);
-        sim.submit_job(f0, 0.0);
         sim.advance_to(60.0);
 
         std::vector<Simulation::Job_Append_Request> batch;
@@ -654,14 +633,12 @@ void test_submit_job_records_busy_nodes() {
 
     // job0 arrives alone - nothing else running yet, busy_nodes must be 0.
     job_no_t j0 = sim.append_job(0.0, 30, "pbatch", 100);
-    sim.submit_job(j0, 0.0);
     sim.advance_to(0.0);
     assert(sim.get_nodes_in_use() == 30);
 
     // job1 arrives at t=10, while job0's 30 nodes are still in use -
     // busy_nodes for job1 must reflect that occupancy (30), not 0.
     job_no_t j1 = sim.append_job(10.0, 20, "pbatch", 100);
-    sim.submit_job(j1, 10.0);
 
     [[maybe_unused]] const auto& job0 = sim.get_trace().job_at(j0);
     [[maybe_unused]] const auto& job1 = sim.get_trace().job_at(j1);

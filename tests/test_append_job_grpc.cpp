@@ -126,18 +126,6 @@ bool test_single_append(const std::string& server_address, const std::string& tr
         uint32_t job_idx2 = client.call(append_req2).append_job().job_idx();
         assert(job_idx2 == 1);
 
-        ClientMessage submit_req1;
-        auto* s1 = submit_req1.mutable_submit_job();
-        s1->set_job_idx(job_idx1);
-        s1->set_submit_time(0.0);
-        client.call(submit_req1);
-
-        ClientMessage submit_req2;
-        auto* s2 = submit_req2.mutable_submit_job();
-        s2->set_job_idx(job_idx2);
-        s2->set_submit_time(5.0);
-        client.call(submit_req2);
-
         ClientMessage advance_req;
         advance_req.mutable_advance_to()->set_target_time(1000.0);
         client.call(advance_req);
@@ -229,14 +217,6 @@ bool test_batch_append(const std::string& server_address, const std::string& tra
             return false;
         }
 
-        for (int i = 0; i < 3; ++i) {
-            ClientMessage submit_req;
-            auto* s = submit_req.mutable_submit_job();
-            s->set_job_idx(job_idxs[i]);
-            s->set_submit_time(jobs[i].submit_time);
-            client.call(submit_req);
-        }
-
         ClientMessage advance_req;
         advance_req.mutable_advance_to()->set_target_time(1e9);
         client.call(advance_req);
@@ -293,13 +273,7 @@ bool test_backfill_window(const std::string& server_address, const std::string& 
             request->set_num_nodes(job.nodes);
             request->set_queue("pbatch");
             request->set_limit_time(job.limit);
-            uint32_t job_idx = client.call(append).append_job().job_idx();
-
-            ClientMessage submit;
-            auto* submit_request = submit.mutable_submit_job();
-            submit_request->set_job_idx(job_idx);
-            submit_request->set_submit_time(0.0);
-            client.call(submit);
+            client.call(append);
         }
 
         ClientMessage advance;

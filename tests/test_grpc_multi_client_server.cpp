@@ -343,15 +343,8 @@ void append_and_submit(SimulationClient& client, const std::vector<Job>& jobs,
     if (job_idxs.size() != static_cast<int>(jobs.size())) {
         throw std::runtime_error("AppendJobs returned the wrong number of job indexes");
     }
-    for (size_t i = 0; i < jobs.size(); ++i) {
-        ClientMessage submit_req;
-        auto* submit = submit_req.mutable_submit_job();
-        submit->set_job_idx(job_idxs.Get(static_cast<int>(i)));
-        submit->set_submit_time(jobs[i].submit_time);
-        client.call(submit_req);
-    }
     std::cout << "[client rank " << my_rank << "] append_jobs(" << phase
-              << ") appended and submitted " << jobs.size() << " jobs" << std::endl;
+              << ") appended and enqueued " << jobs.size() << " jobs" << std::endl;
 }
 
 void advance_to(SimulationClient& client, double time, int my_rank,

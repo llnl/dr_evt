@@ -129,9 +129,6 @@ def initialize_system(system, session, pb):
         return 0
     response = session.call(pb.ClientMessage(append_jobs=pb.AppendJobsRequest(
         requests=[pb.JobAppendData(**job) for job in jobs])))
-    for job_index, job in zip(response.append_jobs.job_idx, jobs):
-        session.call(pb.ClientMessage(submit_job=pb.SubmitJobRequest(
-            job_idx=job_index, submit_time=job["submit_time"])))
     return len(jobs)
 
 
@@ -146,10 +143,6 @@ def submit_fragment(session, fragment, pb):
         num_nodes=fragment["num_nodes"],
         queue=fragment["queue"],
         limit_time=fragment["limit_time"],
-    )))
-    session.call(pb.ClientMessage(submit_job=pb.SubmitJobRequest(
-        job_idx=response.append_job.job_idx,
-        submit_time=fragment["submit_time"],
     )))
 
 
