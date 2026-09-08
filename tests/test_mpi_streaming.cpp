@@ -34,6 +34,14 @@
 
 using namespace dr_evt;
 
+// This parity test deliberately drives the protected helper for jobs already
+// loaded from its fixture. Public streaming callers use append_job() instead.
+class TestSimulation : public Simulation {
+  public:
+    using Simulation::Simulation;
+    using Simulation::submit_job;
+};
+
 struct JobInfo {
     job_no_t idx;
     sim_time_t submit_time;
@@ -79,7 +87,7 @@ void run_mpi_streaming(const std::string& trace_file, int total_nodes,
     oss << "/tmp/mpi_stream_rank." << rank << ".csv";
     params.set_outfile(oss.str());
 
-    Simulation sim(params);
+    TestSimulation sim(params);
 
     // Load trace
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;

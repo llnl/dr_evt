@@ -14,7 +14,7 @@ The DR_EVT simulator provides a streaming API that allows external code (e.g., g
 - Simple but inflexible
 
 **Streaming Mode** (via API):
-- Genuinely new jobs (the trace has never seen before) added incrementally via `append_job()`/`append_jobs()`, then submitted via `submit_job()`
+- Genuinely new jobs (the trace has never seen before) are added and enqueued incrementally via `append_job()`/`append_jobs()`
 - Caller controls time advancement via `advance_to()`/`run_until_exclusive()`
 - Enables interactive/online simulation scenarios
 
@@ -32,10 +32,8 @@ server or gRPC. The gRPC service maps its request messages onto these methods
 where applicable; see the [Client/Server Guide](../CLIENT_SERVER_GUIDE.md) for
 the wire protocol.
 
-For live jobs, the C++ API intentionally separates storage from scheduling:
-call `append_job()` (or `append_jobs()`) to create a previously unseen job,
-then `submit_job()` to enqueue it. `submit_job()` is also useful by itself for
-a job loaded earlier with `initialize_trace()`.
+For live jobs, `append_job()` (or `append_jobs()`) creates a previously unseen
+job and enqueues it atomically for scheduling.
 
 ### API Methods
 
@@ -52,7 +50,7 @@ num_jobs_t initialize_trace(num_jobs_t max_jobs = 0);
 
 **Returns:** number of jobs actually loaded
 
-**Must be called before `submit_job()`/`advance_to()`** - calling `get_trace().load_data()` directly instead skips the sort and duration-determination steps, silently producing wrong scheduling decisions and wrong statistics. This method is idempotent (safe to call more than once; it clears any previously-loaded data first).
+**Must be called before `advance_to()`** - calling `get_trace().load_data()` directly instead skips the sort and duration-determination steps, silently producing wrong scheduling decisions and wrong statistics. This method is idempotent (safe to call more than once; it clears any previously-loaded data first).
 
 **Example:**
 ```cpp
@@ -64,13 +62,9 @@ std::cout << "Loaded " << num_jobs << " jobs\n";
 ### `append_job(submit_time, num_nodes, queue, limit_time)`
 
 Adds a genuinely new job - one the trace has never seen before - to the
-job store. This is what makes streaming actually streaming: `submit_job()`
-alone can only enqueue a job already sitting in a preloaded trace (see
-`initialize_trace()` above); `append_job()` is how a job the caller
-learns about live (e.g. a real job-submission event arriving over the
-network) gets in at all. Does not submit the job to the scheduler -
-call `submit_job()` with the returned `job_no` next for that (same
-two-step shape as before: append, then submit).
+job store and immediately enqueues it for scheduling. This is how a job the
+caller learns about live (for example, from a network event) enters a
+streaming simulation.
 
 ```cpp
 job_no_t append_job(sim_time_t submit_time, num_nodes_t num_nodes,
@@ -83,12 +77,11 @@ job_no_t append_job(sim_time_t submit_time, num_nodes_t num_nodes,
 - `queue`: Which queue the job belongs to (e.g. `"pbatch"`)
 - `limit_time`: User-estimated time limit, in seconds
 
-**Returns:** the new job's `job_no`, for the `submit_job()` call that follows
+**Returns:** the new job's `job_no`
 
 **Example:**
 ```cpp
 job_no_t j = sim.append_job(10.0, 20, "pbatch", 200.0);
-sim.submit_job(j, 10.0);
 sim.advance_to(10.0);
 ```
 
@@ -114,8 +107,8 @@ std::vector<job_no_t> append_jobs(const std::vector<Job_Append_Request>& request
 **Parameters:**
 - `requests`: the new jobs' own data, in `submit_time` order
 
-**Returns:** each new job's `job_no`, in the same order as `requests` -
-pass each to `submit_job()` next, same as `append_job()`
+**Returns:** each new job's `job_no`, in the same order as `requests`.
+All returned jobs are already enqueued for scheduling.
 
 **Example:**
 ```cpp
@@ -124,32 +117,6 @@ std::vector<Simulation::Job_Append_Request> batch = {
     {15.0, 10, "pbatch", 100.0},
 };
 auto job_nos = sim.append_jobs(batch);
-for (size_t i = 0; i < job_nos.size(); ++i) {
-    sim.submit_job(job_nos[i], batch[i].submit_time);
-}
-```
-
-### `submit_job(job_idx, submit_time)`
-
-Submits a job to the scheduler's waiting queue.
-
-```cpp
-void submit_job(job_no_t job_idx, sim_time_t submit_time);
-```
-
-**Parameters:**
-- `job_idx`: The job's `job_no` - either from the loaded trace (0-based) or returned by an earlier `append_job()`/`append_jobs()` call
-- `submit_time`: When the job is submitted (must be >= current_time)
-
-**Behavior:**
-- Adds job to waiting queue
-- Does NOT advance time or make scheduling decisions
-- Call `advance_to()`/`run_until_exclusive()` afterward to let scheduler process
-
-**Example:**
-```cpp
-sim.submit_job(0, 0.0);    // Submit job 0 at t=0
-sim.submit_job(1, 50.0);   // Submit job 1 at t=50
 ```
 
 ### `advance_to(target_time)`
@@ -173,7 +140,7 @@ void advance_to(sim_time_t target_time);
 
 **Example:**
 ```cpp
-sim.submit_job(0, 0.0);
+sim.append_job(0.0, 10, "pbatch", 100.0);
 sim.advance_to(0.0);  // Process job 0's START event
 // Job 0 is now running
 
@@ -200,7 +167,7 @@ void run_until_exclusive(sim_time_t target_time);
 
 **Example:**
 ```cpp
-sim.submit_job(0, 0.0);
+sim.append_job(0.0, 10, "pbatch", 100.0);
 sim.run_until_exclusive(0.0);  // Does NOT process START event at t=0
 // Job 0 is still queued, not running
 
@@ -226,15 +193,34 @@ num_nodes_t get_available_nodes() const;
 size_t get_active_job_count() const;
 ```
 
-**Get an FCFS/EASY backfill reservation snapshot:**
+**Get the FCFS-head shadow time:**
+```cpp
+sim_time_t get_fcfs_head_shadow_time() const;
+```
+
+This returns the earliest time at which the current FCFS queue head is
+expected to start, based on the scheduler's time-limit reservation model. It
+returns `-1` when no job is waiting. It is meaningful for the FCFS/EASY
+reservation model.
+
+**Get resource-change times and the matching reservation snapshot:**
 ```cpp
 Simulation::Backfill_Window get_backfill_window() const;
 ```
 
 The snapshot contains `current_time`, immediately `available_nodes`, the
-FCFS head's `shadow_time` (`-1` if the queue is empty), and chronologically
-ordered, time-limit-based resource `releases` through the reservation. This
-is an in-process API; it does not require the gRPC service.
+same FCFS-head `shadow_time` (`-1` if the queue is empty), and chronologically
+ordered resource-change events in `releases`. Each event gives the simulation
+`time` at which capacity changes and the summed `nodes_released` then. Events
+use time-limit estimates and extend through the reservation; simultaneous
+releases are combined. This is an in-process API; it does not require gRPC.
+
+```cpp
+auto window = sim.get_backfill_window();
+for (const auto& change : window.releases) {
+    std::cout << change.time << ": +" << change.nodes_released << " nodes\n";
+}
+```
 
 **Get scheduling statistics** (wait times, turnaround, utilization):
 ```cpp
@@ -255,15 +241,7 @@ const Trace& get_trace() const;
 Simulation sim(params);
 sim.initialize_trace();
 
-// Submit all jobs at their submit times
-for (size_t i = 0; i < sim.get_trace().data().size(); i++) {
-    const auto& job = sim.get_trace().data()[i];
-    sim_time_t submit = job.get_submit_time().first;
-    sim.submit_job(i, submit);
-}
-
-// Run entire simulation
-sim.advance_to(MAX_TIME);
+sim.run();
 ```
 
 ### Pattern 2: Incremental Job Submission (genuinely new jobs)
@@ -275,11 +253,9 @@ sim.advance_to(MAX_TIME);
 while (external_system.has_more_jobs()) {
     Job job = external_system.get_next_job();
 
-    // Append the job (the trace has never seen it before), then submit it
+    // Append and enqueue the job (the trace has never seen it before)
     job_no_t job_no = sim.append_job(job.submit_time, job.num_nodes,
                                       job.queue, job.limit_time);
-    sim.submit_job(job_no, job.submit_time);
-
     // Advance to job's submit time
     sim.advance_to(job.submit_time);
 
@@ -296,7 +272,6 @@ for (sim_time_t t = 0; t <= 1000.0; t += 10.0) {
     // Append and submit any genuinely new jobs arriving in this window
     for (auto& job : jobs_arriving_at(t)) {
         job_no_t job_no = sim.append_job(t, job.num_nodes, job.queue, job.limit_time);
-        sim.submit_job(job_no, t);
     }
 
     // Advance to next time step
@@ -320,7 +295,6 @@ while (!event_queue.empty()) {
     if (evt.type == Event::JOB_ARRIVAL) {
         job_no_t job_no = sim.append_job(evt.time, evt.num_nodes,
                                           evt.queue, evt.limit_time);
-        sim.submit_job(job_no, evt.time);
         sim.advance_to(evt.time);
     } else if (evt.type == Event::CHECKPOINT) {
         sim.advance_to(evt.time);
@@ -352,25 +326,11 @@ int main() {
     num_jobs_t num_jobs = sim.initialize_trace();
     std::cout << "Loaded " << num_jobs << " jobs\n";
 
-    // Submit and run jobs incrementally
-    for (size_t i = 0; i < sim.get_trace().data().size(); i++) {
-        const auto& job = sim.get_trace().data()[i];
-        sim_time_t submit = job.get_submit_time().first;
-
-        // Submit job
-        sim.submit_job(i, submit);
-
-        // Advance to submit time
-        sim.advance_to(submit);
-
-        // Monitor
-        std::cout << "t=" << sim.get_current_time()
+    // Batch-loaded traces are run as a unit.
+    sim.run();
+    std::cout << "t=" << sim.get_current_time()
                   << ": " << sim.get_nodes_in_use()
                   << " nodes in use\n";
-    }
-
-    // Run until all jobs complete
-    sim.advance_to(10000.0);
 
     std::cout << "Simulation complete!\n";
     return 0;
@@ -423,7 +383,7 @@ Test programs verify the streaming API:
 
 Functional tests of the streaming API: `append_job()`/`append_jobs()`
 (genuine insertion of jobs the trace never saw before) together with
-`submit_job()`/`advance_to()`/`run_until_exclusive()`'s general
+`append_job()`/`advance_to()`/`run_until_exclusive()`'s general
 correctness - consolidated into one file since the latter's coverage
 never actually depended on a preloaded trace.
 
@@ -433,7 +393,7 @@ never actually depended on a preloaded trace.
 
 **Tests:**
 - `append_job()`/`append_jobs()`: basic insertion, batch validation (sorting, atomicity), reclaim-before-grow, `--job_store_overflow=abort`
-- Basic `submit_job()` and `advance_to()`/`run_until_exclusive()` operations
+- Basic atomic `append_job()` and `advance_to()`/`run_until_exclusive()` operations
 - Exclusive vs inclusive time advancement semantics
 - Online scheduling simulation
 - Resource leak detection

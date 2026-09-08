@@ -89,8 +89,8 @@ is not a requirement of the client API and is not an input the server is
 expected to load or know about.
 
 The API's core is the bidirectional session stream. A client initializes
-simulation settings, sends each arrival with `AppendJobRequest`, submits
-the returned job index with `SubmitJobRequest`, advances simulated time with
+simulation settings, sends each arrival with `AppendJobRequest` (which
+immediately enqueues it), advances simulated time with
 `AdvanceToRequest`, and obtains events or statistics from the responses.
 An application can generate those messages from a live digital twin, a
 database, another simulator, or any other source--no input trace is

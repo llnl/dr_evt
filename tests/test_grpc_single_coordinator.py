@@ -9,6 +9,9 @@ exercises the intended ordering boundaries without MPI:
   ``AdvanceTo(tc)``;
 * ``tn = ta < tc`` for the next composite event; and
 * a later ordinary batch with ``tc < t0``.
+
+It also compares each server's simulated-job and resource traces with an
+independent batch simulation of that server's complete arrival stream.
 """
 
 import argparse
@@ -42,9 +45,6 @@ def append_and_submit(session, pb, jobs):
             for job in jobs])))
     if len(response.append_jobs.job_idx) != len(jobs):
         raise RuntimeError("AppendJobs returned an unexpected number of job indexes")
-    for index, job in zip(response.append_jobs.job_idx, jobs):
-        session.call(pb.ClientMessage(submit_job=pb.SubmitJobRequest(
-            job_idx=index, submit_time=job["submit_time"])))
 
 
 def advance(session, pb, timestamp):
@@ -102,6 +102,40 @@ def wait_for_servers(grpc, addresses):
             channel.close()
 
 
+def run_independent_baseline(simulator, workdir, system_id, jobs):
+    """Run one server's complete stream independently and return its outputs."""
+    input_file = pathlib.Path(workdir) / f"{system_id}.baseline.input.csv"
+    simulated_file = pathlib.Path(workdir) / f"{system_id}.baseline.simulated.csv"
+    resource_file = pathlib.Path(workdir) / f"{system_id}.baseline.resource.csv"
+    rows = ["job_submit_time,num_nodes,queue,time_limit"]
+    rows.extend(
+        f"{job['submit_time']:g},{job['num_nodes']},{job['queue']},{job['limit_time']:g}"
+        for job in jobs)
+    input_file.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    command = [
+        str(simulator), str(input_file), "--total_nodes", "100",
+        "--trace_format", "simple", "--timestamp_format", "epoch",
+        "--run_time_mode", "limit", "--backfill_policy", "easy",
+        "--priority_policy", "fcfs", "--outfile", str(simulated_file),
+        "--resource_trace", str(resource_file),
+    ]
+    result = subprocess.run(command, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE, text=True)
+    if result.returncode:
+        raise RuntimeError(f"independent baseline failed: {result.stderr.strip()}")
+    return simulated_file, resource_file
+
+
+def assert_files_equal(expected, actual, description):
+    """Fail with a useful path pair when independently generated output differs."""
+    if not actual.is_file():
+        raise RuntimeError(f"missing {description}: {actual}")
+    if expected.read_bytes() != actual.read_bytes():
+        raise RuntimeError(
+            f"{description} differs from independent baseline: "
+            f"expected={expected}, actual={actual}")
+
+
 def run_test(server_binary):
     fixture_dir = REPO_ROOT / "tests" / "test_traces" / "grpc"
     systems = [
@@ -113,10 +147,27 @@ def run_test(server_binary):
         raise RuntimeError("fixture must contain composite events at t=10 and t=25")
 
     ordinary = {system["system_id"]: read_jobs(system["trace"]) for system in systems}
+    simulator = server_binary.with_name("simulator")
+    if not simulator.is_file():
+        raise RuntimeError(f"simulator binary required for baseline comparison: {simulator}")
     ports = [free_port(), free_port()]
     addresses = [f"127.0.0.1:{port}" for port in ports]
     grpc, pb, service, generated_dir = load_stubs(REPO_ROOT)
     with tempfile.TemporaryDirectory(prefix="dr-evt-single-coordinator-") as workdir:
+        # The baseline preserves the exact arrival order used below, including
+        # the deliberately ordered equal-time rows at t=10. It runs each
+        # system independently, then the gRPC output must match both traces.
+        baselines = {}
+        for system in systems:
+            system_id = system["system_id"]
+            jobs = ordinary[system_id]
+            stream = (jobs[:2] + [fragment_for(events[0], system_id)] +
+                      jobs[2:4] + [fragment_for(events[1], system_id)] + jobs[4:])
+            if len(stream) != 7:
+                raise RuntimeError("baseline stream must contain seven arrivals per server")
+            baselines[system_id] = run_independent_baseline(
+                simulator, workdir, system_id, stream)
+
         processes = start_servers(server_binary, ports, workdir)
         sessions = []
         try:
@@ -177,6 +228,15 @@ def run_test(server_binary):
                     finish_simulation=pb.FinishSimulationRequest())).finish_simulation
                 if finish.statistics.jobs_submitted != 7 or finish.statistics.jobs_completed != 7:
                     raise RuntimeError("server did not complete every ordinary and composite job")
+                expected_simulated, expected_resource = baselines[system["system_id"]]
+                assert_files_equal(
+                    expected_simulated,
+                    pathlib.Path(workdir) / finish.simulated_trace_file,
+                    f"{system['system_id']} simulated trace")
+                assert_files_equal(
+                    expected_resource,
+                    pathlib.Path(workdir) / finish.resource_trace_file,
+                    f"{system['system_id']} resource trace")
         finally:
             for session in sessions:
                 session.close()

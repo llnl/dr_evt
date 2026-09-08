@@ -266,10 +266,16 @@ class Trace {
                         num_nodes_t total_nodes = static_cast<num_nodes_t>(0u));
 
     /**
-     * NEW SIMULATION API: Insert a job into the event queue
-     * Creates start and end events for the job at specified times
-     * @param job_idx Index of job in m_data
-     * @param start_time When the job should start
+     * @brief Record that the scheduler has started an existing job.
+     *
+     * Updates the Trace job record and creates its start/end events. This is
+     * not scheduler-wait-queue insertion: Simulation::advance_to() calls it
+     * only after SchedulerBase::schedule() selects a queued job to run.
+     *
+     * @param job_idx Index of the existing job in m_data
+     * @param start_time Simulation time chosen by the scheduler
+     * @see Simulation::submit_job()
+     * @see SchedulerBase::insert_job()
      */
     void insert_job(job_no_t job_idx, sim_time_t start_time);
 
@@ -288,9 +294,10 @@ class Trace {
      * @param num_nodes Number of nodes the job requests.
      * @param queue Which queue the job was submitted to.
      * @param limit_time User-estimated time limit.
-     * @return The new job's job_no - pass this to submit_job() next to
-     *         actually enqueue it with the scheduler; append_job() only
-     *         adds the record to the store, it doesn't submit it.
+     * @return The new job's job_no. Simulation::append_job() immediately
+     *         passes it to its protected submit_job() helper to enqueue it.
+     * @see Simulation::append_job()
+     * @see Simulation::submit_job()
      */
     job_no_t append_job(sim_time_t current_time, const epoch_t& submit_time,
                         num_nodes_t num_nodes, job_queue_t queue,
@@ -350,8 +357,10 @@ class Trace {
      * @param current_time Current simulated time, for the batch-wide
      *        reclaim attempt's is_front_reclaimable() check.
      * @param requests The new jobs' own data, in submit_time order.
-     * @return Each new job's job_no, in the same order as requests -
-     *         pass each to submit_job() next, same as append_job().
+     * @return Each new job's job_no, in the same order as requests.
+     *         Simulation::append_jobs() immediately enqueues each one.
+     * @see Simulation::append_jobs()
+     * @see Simulation::submit_job()
      */
     std::vector<job_no_t> append_jobs(sim_time_t current_time,
                                        const std::vector<Job_Append_Request>& requests);
@@ -386,8 +395,8 @@ class Trace {
      * @param fname Path to this file - same trace format as any other
      *        input file (--infile), not the network-facing
      *        Job_Append_Request shape.
-     * @return Each loaded job's job_no, in submit_time order - pass
-     *         each to submit_job() next, same as append_jobs().
+     * @return Each loaded job's job_no, in submit_time order. The
+     *         progressive-loading path enqueues each one internally.
      */
     std::vector<job_no_t> load_next_file(sim_time_t current_time, const std::string& fname);
 

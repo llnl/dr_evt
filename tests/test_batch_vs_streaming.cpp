@@ -25,6 +25,15 @@
 
 using namespace dr_evt;
 
+// Batch-mode parity exercises the protected scheduler helper directly to
+// reproduce a preloaded trace's legacy submission path. Public streaming
+// callers append and enqueue atomically instead.
+class TestSimulation : public Simulation {
+  public:
+    using Simulation::Simulation;
+    using Simulation::submit_job;
+};
+
 struct JobResult {
     job_no_t job_idx;
     sim_time_t submit_time;
@@ -271,7 +280,7 @@ void run_streaming_mode(const std::string& input_file, const std::string& output
     params.m_priority_policy = PriorityPolicy::FCFS;
     params.set_outfile(output_file);
 
-    Simulation sim(params);
+    TestSimulation sim(params);
 
     // Load trace
     const auto max_num_jobs = params.m_is_jobs_set ? params.m_max_jobs : 0u;

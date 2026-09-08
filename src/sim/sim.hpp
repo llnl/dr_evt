@@ -119,24 +119,28 @@ class Simulation {
     };
 
     /**
+     * @brief Add a new job record and enqueue it for scheduling.
+     *
      * Append a genuinely new job - the streaming counterpart to
      * load_data(), for a job the trace has never seen before (as
-     * opposed to submit_job() below, which only enqueues a job already
-     * present in m_data from a prior load_data() call). Adds the job to
-     * the store; does not submit it to the scheduler - call submit_job()
-     * with the returned job_no next for that.
+     * opposed to the internal submit_job() helper, which enqueues a job
+     * already present in m_data). Adds the job to the store and immediately
+     * enqueues it for scheduling.
      *
-     * @param submit_time When the job is submitted (must be >= current_time,
-     *        same as submit_job() requires)
+     * @param submit_time When the job is submitted (must be >= current_time)
      * @param num_nodes Number of nodes the job requests
      * @param queue Which queue the job belongs to (e.g. "pbatch")
      * @param limit_time User-estimated time limit, in seconds
-     * @return The new job's job_no, for a subsequent submit_job() call
+     * @return The new job's job_no
+     * @see submit_job()
+     * @see SchedulerBase::insert_job()
      */
     job_no_t append_job(sim_time_t submit_time, num_nodes_t num_nodes,
                          const std::string& queue, tdiff_t limit_time);
 
     /**
+     * @brief Add several new job records and enqueue all of them.
+     *
      * Append several genuinely new jobs in one call - the batch
      * counterpart to append_job(), for the same never-seen-before case.
      * Validates every request's submit_time >= current_time before any
@@ -149,25 +153,41 @@ class Simulation {
      * @param requests The new jobs' own data, in submit_time order (see
      *        Trace::append_jobs() for why - this function forwards
      *        requests as-is, so pass them there already sorted).
-     * @return Each new job's job_no, in the same order as requests -
-     *         pass each to submit_job() next, same as append_job().
+     * @return Each new job's job_no, in the same order as requests.
+     * @see append_job()
+     * @see submit_job()
      */
     std::vector<job_no_t> append_jobs(const std::vector<Job_Append_Request>& requests);
 
+  protected:
     /**
-     * Submit a job to the scheduler's waiting queue (streaming mode)
+     * @brief Validate an existing job and enqueue it in the scheduler.
+     *
+     * Submit an already-known job to the scheduler's waiting queue.
+     * This is an implementation detail used by append_job(), append_jobs(),
+     * and batch loading; external streaming callers use append_job().
      * The internal scheduler will decide when to start the job based on
      * resources and backfilling policy.
      *
      * @param job_idx Job index to submit
      * @param submit_time When the job is submitted (must be >= current_time)
      *
-     * NOTE: This only adds the job to the waiting queue. Call advance_to()
-     * to let the scheduler make decisions and advance simulation time.
+     * This does not add a job record to Trace: job_idx must already identify
+     * one. It validates the arrival, records arrival-time accounting, then
+     * calls SchedulerBase::insert_job() to enqueue the scheduling data.
+     * Call advance_to() to let the scheduler select a job to start; that
+     * path calls Trace::insert_job() to record the start and end events.
+     *
+     * @see append_job()
+     * @see SchedulerBase::insert_job()
+     * @see Trace::insert_job()
      */
     void submit_job(job_no_t job_idx, sim_time_t submit_time);
 
+  public:
     /**
+     * @brief Advance simulation time and start eligible queued jobs.
+     *
      * Advance simulation to target time (streaming mode)
      * Processes all events up to target_time and lets the scheduler make
      * decisions about which jobs to start.
@@ -181,6 +201,10 @@ class Simulation {
      *
      * POSTCONDITION: m_current_time == target_time, and all scheduling
      * decisions have been made up to that time.
+     *
+     * Jobs selected by the scheduler are recorded through Trace::insert_job().
+     * @see submit_job()
+     * @see Trace::insert_job()
      */
     void advance_to(sim_time_t target_time);
 

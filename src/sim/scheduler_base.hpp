@@ -46,11 +46,36 @@ public:
 
     virtual ~SchedulerBase() = default;
 
-    // Core interface - must be implemented by subclasses
-    // STATEFUL: Each scheduler maintains its own internal wait_queue
+    /**
+     * @brief Enqueue an already-validated job in this scheduler's wait queue.
+     *
+     * This does not read or create a Trace job record and does not start the
+     * job. Simulation::submit_job() supplies the copied scheduling fields;
+     * a subsequent schedule() call chooses any job that can start.
+     *
+     * @param job_id Existing Trace job identifier
+     * @param submit_time Arrival time used for eligibility and ordering
+     * @param run_time_estimate Time-limit estimate used for reservations
+     * @param nodes_requested Requested node count
+     * @see Simulation::submit_job()
+     * @see Trace::insert_job()
+     */
     virtual void insert_job(job_no_t job_id, sim_time_t submit_time,
                            tdiff_t run_time_estimate, num_nodes_t nodes_requested) = 0;
 
+    /**
+     * @brief Select wait-queue jobs that may start at current_time.
+     *
+     * The returned identifiers are still existing Trace records. The caller
+     * records each selected start through Trace::insert_job().
+     *
+     * @param free_nodes Nodes currently available to allocate
+     * @param running_jobs Running job identifiers and their start times
+     * @param current_time Simulation time at which eligibility is evaluated
+     * @return Identifiers of jobs selected to start
+     * @see insert_job()
+     * @see Trace::insert_job()
+     */
     virtual std::vector<job_no_t> schedule(
         num_nodes_t free_nodes,
         const std::map<job_no_t, sim_time_t>& running_jobs,

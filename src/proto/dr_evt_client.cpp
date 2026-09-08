@@ -146,11 +146,8 @@ int main(int argc, char** argv)
         std::cout << "Session initialized. Server has not loaded any jobs yet.\n";
 
         // 2. Append every job - the server has never seen any of this
-        // data before now. Each AppendJobRequest only adds the record
-        // to the server's store and returns its job_idx; it does not
-        // submit it to the scheduler (that's step 3, same two-step
-        // shape as the C++ Trace::append_job()/Simulation::submit_job()
-        // pair).
+        // data before now. Each AppendJobRequest adds the record and
+        // immediately enqueues it for scheduling.
         std::vector<uint32_t> job_idxs;
         for (const auto& j : jobs) {
             ClientMessage append_req;
@@ -165,21 +162,7 @@ int main(int argc, char** argv)
         std::cout << "Appended " + std::to_string(jobs.size()) +
             " jobs the server had never seen before.\n";
 
-        // 3. Now submit every appended job, using the same submit_time
-        // each was appended with. All submissions happen before the
-        // first advance_to() call below, so m_current_time is still 0
-        // throughout this loop and the "submit_time >= current_time"
-        // precondition holds regardless of submit_time ordering.
-        for (size_t i = 0; i < jobs.size(); ++i) {
-            ClientMessage submit_req;
-            auto* submit = submit_req.mutable_submit_job();
-            submit->set_job_idx(job_idxs[i]);
-            submit->set_submit_time(jobs[i].submit_time);
-            client.call(submit_req);
-        }
-        std::cout << "Submitted " + std::to_string(jobs.size()) + " jobs.\n";
-
-        // 4. Finish declares there will be no more arrivals. It drains all
+        // 3. Finish declares there will be no more arrivals. It drains all
         // submitted work, writes session-scoped reports, and resets only
         // this stream's simulation; dr_evt_server itself keeps running.
         ClientMessage finish_req;

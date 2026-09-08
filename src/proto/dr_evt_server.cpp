@@ -224,13 +224,6 @@ public:
                         resp.mutable_initialize_trace()->set_num_jobs_loaded(loaded);
                         break;
                     }
-                    case ClientMessage::kSubmitJob: {
-                        require_init(sim);
-                        const SubmitJobRequest& r = req.submit_job();
-                        sim->submit_job(r.job_idx(), r.submit_time());
-                        resp.mutable_submit_job();
-                        break;
-                    }
                     case ClientMessage::kAppendJob: {
                         require_init(sim);
                         const AppendJobRequest& r = req.append_job();

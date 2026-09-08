@@ -405,7 +405,7 @@ nodes_free = sim.get_available_nodes()
 utilization = nodes_used / params.total_nodes
 ```
 
-### Queue Status
+### Queue Status and Shadow Time
 
 ```python
 # Number of jobs waiting
@@ -413,10 +413,14 @@ queue_size = sim.get_active_job_count()
 
 # When will FCFS head start? (reservation time)
 shadow_time = sim.get_fcfs_head_shadow_time()
-estimated_wait = shadow_time - sim.get_current_time()
+estimated_wait = shadow_time - sim.get_current_time() if shadow_time >= 0 else None
 ```
 
-### Backfill Window
+`shadow_time` is the FCFS head's earliest reserved start time under the
+scheduler's time-limit model, or `-1` when no job is waiting. It is the
+FCFS/EASY reservation query; it is not an actual-runtime completion forecast.
+
+### Resource-Change Times (Backfill Window)
 
 For one consistent FCFS/EASY reservation snapshot, without running the gRPC
 service, use `get_backfill_window()`:
@@ -429,8 +433,10 @@ for release in window.releases:
 ```
 
 `shadow_time` is the reserved start time for the FCFS queue head, or `-1`
-when no job is waiting. `releases` contains time-limit-based resource releases
-through that reservation; jobs ending together are combined.
+when no job is waiting. `releases` is the resource-change-time query: each
+entry reports the absolute simulation `time` and summed `nodes_released` at
+that time. Releases use time-limit estimates through the reservation; jobs
+ending together are combined.
 
 ### Comprehensive Statistics
 

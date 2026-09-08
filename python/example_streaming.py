@@ -10,12 +10,13 @@
 Example: DR_EVT Streaming API usage
 
 Demonstrates how to:
-1. Create simulator and load trace
-2. Submit jobs incrementally
+1. Read job requests from a CSV file
+2. Append jobs incrementally
 3. Monitor resource usage
 4. Get queue and scheduling statistics
 """
 
+import csv
 import os
 import dr_evt
 
@@ -40,29 +41,32 @@ def main():
     params.priority_policy = dr_evt.PriorityPolicy.FCFS
     params.verbose = False
 
-    # Create simulator
-    sim = dr_evt.Simulation(params)
+    # Read external job requests. append_job() is the public streaming API;
+    # initialize_trace() loads a batch trace and is not a source of jobs to
+    # re-submit individually.
+    with open(params.infile, newline='', encoding='utf-8') as trace:
+        jobs = list(csv.DictReader(trace))[:10]
 
-    # Load trace (required before streaming)
-    num_jobs = sim.initialize_trace(max_jobs=0)  # 0 = load all
-    print(f"Loaded {num_jobs} jobs from trace")
+    # Create simulator.
+    sim = dr_evt.Simulation(params)
+    print(f"Read {len(jobs)} jobs from trace")
 
     print("\n" + "="*60)
     print("Streaming Simulation with Monitoring")
     print("="*60)
 
     # Submit and run jobs incrementally
-    for job_idx in range(min(10, num_jobs)):
-        # Submit job at time t = job_idx * 10
-        submit_time = job_idx * 10.0
-        sim.submit_job(job_idx, submit_time)
+    for job_idx, job in enumerate(jobs):
+        submit_time = float(job["job_submit_time"])
+        sim.append_job(submit_time, int(job["num_nodes"]), job["queue"],
+                       float(job["time_limit"]))
 
         # Advance to submit time
         sim.advance_to(submit_time)
 
         # Monitor state after each job
         print(f"\nTime {sim.get_current_time():.1f}:")
-        print(f"  Job {job_idx} submitted")
+        print(f"  Job {job_idx} appended")
         print(f"  Nodes in use: {sim.get_nodes_in_use()}/{params.total_nodes}")
         print(f"  Available: {sim.get_available_nodes()}")
         print(f"  Wait queue: {sim.get_active_job_count()} jobs")

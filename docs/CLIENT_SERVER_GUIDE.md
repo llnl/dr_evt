@@ -3,7 +3,7 @@
 ## Overview
 
 DR_EVT's [streaming API](api/STREAMING_API.md) (`append_job()`/`append_jobs()`,
-`submit_job()`, `advance_to()`, and the monitoring/statistics methods) lets
+`advance_to()`, and the monitoring/statistics methods) lets
 external code feed genuinely new jobs incrementally and control simulation
 time advancement, rather than loading a full trace and running it
 start-to-finish in one call. The gRPC client/server exposes that same
@@ -70,9 +70,9 @@ in-process via the streaming API:
 | `InitializeTraceRequest` | `Simulation::initialize_trace()` |
 | `AppendJobRequest` | `Simulation::append_job()` - a genuinely new job the server has never seen before |
 | `AppendJobsRequest` | `Simulation::append_jobs()` - the batch counterpart, several new jobs in one call |
-| `SubmitJobRequest` | `Simulation::submit_job()` - enqueues a job already known to the server (via `InitializeTraceRequest` or a prior append) |
 | `AdvanceToRequest` | `Simulation::advance_to()` |
 | `RunUntilExclusiveRequest` | `Simulation::run_until_exclusive()` |
+| `GetFCFSHeadShadowTimeRequest` | FCFS-head shadow time only: the earliest reserved start time, or `-1` with no waiting head |
 | `GetBackfillWindowRequest` | One FCFS/EASY reservation snapshot: current capacity, shadow time, and projected releases |
 | `GetStatisticsRequest`, `GetCurrentTimeRequest`, etc. | The monitoring/statistics methods |
 
@@ -82,20 +82,25 @@ multiple in-flight requests (the provided `dr_evt_client` sends one at a
 time and waits for each response, but the protocol itself doesn't require
 that).
 
-### FCFS/EASY backfill-window query
+### FCFS/EASY shadow-time and resource-change queries
 
-After submitting work and advancing the simulation to the desired point in
-time, send `GetBackfillWindowRequest`. Its matching
+Send `GetFCFSHeadShadowTimeRequest` when only the FCFS queue head's earliest
+reserved start time is needed. Its `GetFCFSHeadShadowTimeResponse.shadow_time`
+is `-1` when no job is waiting.
+
+Send `GetBackfillWindowRequest` when the resource-change times that lead to
+that reservation are also needed. After submitting work and advancing the
+simulation to the desired point in time, its matching
 `GetBackfillWindowResponse` is an atomic scheduling snapshot with:
 
 - `current_time`: the simulation time at which the snapshot was made.
 - `available_nodes`: nodes free immediately at `current_time`.
 - `shadow_time`: the earliest start time reserved for the FCFS queue head;
   `-1` if no job is waiting.
-- `releases`: chronologically ordered `ResourceRelease` events between the
-  current time and the shadow time, inclusive. Each has its absolute
-  simulation `time` and `nodes_released`; jobs ending at the same time are
-  combined into one event.
+- `releases`: the resource-change-time query: chronologically ordered
+  `ResourceRelease` events between the current time and shadow time,
+  inclusive. Each has its absolute simulation `time` and `nodes_released`;
+  jobs ending at the same time are combined into one event.
 
 The projection deliberately uses each running job's `time_limit`, not its
 actual runtime. That is the same estimate used by the FCFS/EASY scheduler to
@@ -127,7 +132,7 @@ streaming: it reads job data (`submit_time`, `num_nodes`, `queue`,
 `time_limit`) from a file *only* client-side - the server never loads
 this file itself (no `InitializeTraceRequest` is sent at all) - and
 appends each job via `AppendJobRequest` to a server that has never seen
-any of it before, then submits each with `SubmitJobRequest` and its own
+any of it before; each append enqueues the job at its supplied
 `submit_time`. It's meant as a working reference for writing your own
 client against the same `.proto` service, not as a general-purpose tool.
 
@@ -177,9 +182,9 @@ sequenceDiagram
 
     Note over C1,S2: Client inputs: ordinary-server1.csv, ordinary-server2.csv, composite_jobs.csv
     par Initial ordinary batch, through t2 = 10
-        C1->>S1: AppendJobs([t=0, t=10]) + SubmitJob
+        C1->>S1: AppendJobs([t=0, t=10])
     and
-        C2->>S2: AppendJobs([t=0, t=10]) + SubmitJob
+        C2->>S2: AppendJobs([t=0, t=10])
     end
     par Equality boundary: t1 = t2 = t3 = 10
         C1->>S1: AdvanceTo(10)
@@ -188,9 +193,9 @@ sequenceDiagram
     end
     Note over C1,C2: MPI barrier
     par Composite event "equal_boundary"
-        C1->>S1: AppendJobs([composite fragment, t=10]) + SubmitJob
+        C1->>S1: AppendJobs([composite fragment, t=10])
     and
-        C2->>S2: AppendJobs([composite fragment, t=10]) + SubmitJob
+        C2->>S2: AppendJobs([composite fragment, t=10])
     end
     par Evaluate equal-time arrivals
         C1->>S1: AdvanceTo(10)
@@ -210,9 +215,9 @@ sequenceDiagram
     end
     Note over C1,C2: MPI barrier
     par Composite event "strict_boundary"
-        C1->>S1: AppendJobs([composite fragment, t=25]) + SubmitJob
+        C1->>S1: AppendJobs([composite fragment, t=25])
     and
-        C2->>S2: AppendJobs([composite fragment, t=25]) + SubmitJob
+        C2->>S2: AppendJobs([composite fragment, t=25])
     end
     par Evaluate composite event
         C1->>S1: AdvanceTo(25)
