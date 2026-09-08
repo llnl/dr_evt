@@ -83,7 +83,9 @@ Installs:
 
 Install Doxygen separately through your system package manager (for example,
 `apt install doxygen` or `brew install doxygen`) to generate the optional C++
-API reference. It is not required for the Sphinx documentation site.
+API reference. The Python dependencies include Breathe, which renders
+Doxygen's XML in the Sphinx site using the same theme. Doxygen itself is not
+required for the rest of the Sphinx documentation site.
 
 ### HTML site and C++ API reference
 
@@ -92,13 +94,11 @@ cd docs
 make html
 ```
 
-`make html` builds the Sphinx site. When Doxygen is available, it also
-generates and copies the C++ reference to `_build/html/cpp-api/`; otherwise
-it skips that optional reference. The Sphinx API navigation includes a link
-when the reference is generated. Read the Docs runs Doxygen before Sphinx so
-the same reference is published there when Doxygen is available; otherwise it
-publishes the Sphinx documentation without the C++ reference. Run `make
-doxygen` when only the C++ API reference is needed.
+`make html` builds the Sphinx site. When Doxygen is available, it first
+generates XML and Breathe renders the C++ API inside the Sphinx site using the
+same theme and navigation; otherwise it skips that optional reference. Read
+the Docs follows the same sequence. Run `make doxygen` when only refreshing
+the API XML is needed.
 
 ### Build HTML Documentation
 

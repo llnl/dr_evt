@@ -3,3 +3,5 @@ sphinx>=5.0
 sphinx-rtd-theme>=1.2.0
 myst-parser>=1.0.0
 sphinxcontrib-mermaid>=0.9.2
+# Breathe 4.35+ supports the project's Sphinx 5+ requirement.
+breathe>=4.35.0

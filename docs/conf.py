@@ -3,6 +3,10 @@
 import os
 import sys
 
+_docs_dir = os.path.dirname(__file__)
+_doxygen_xml = os.path.join(_docs_dir, 'doxygen', 'xml')
+_has_doxygen_xml = os.path.isfile(os.path.join(_doxygen_xml, 'index.xml'))
+
 # Project information
 project = 'DR_EVT'
 copyright = '2024-2026, Lawrence Livermore National Laboratory'
@@ -23,6 +27,8 @@ extensions = [
     'myst_parser',  # For Markdown support
     'sphinxcontrib.mermaid',  # For Mermaid diagrams
 ]
+if _has_doxygen_xml:
+    extensions.append('breathe')  # Render Doxygen XML in the Sphinx theme
 
 # Markdown configuration
 myst_enable_extensions = [
@@ -71,15 +77,17 @@ master_doc = 'index'
 # HTML output options
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
-# Doxygen writes its standalone HTML reference outside the Sphinx source
-# pages. Include its parent directory as static output so the generated site
-# is published at ``/cpp-api/``. Leave it absent when Doxygen is unavailable.
-_doxygen_html = os.path.join(os.path.dirname(__file__), 'doxygen', 'cpp-api')
-if os.path.isdir(_doxygen_html):
-    html_extra_path = ['doxygen']
+# Doxygen XML is rendered directly by Breathe on the C++ API page.  Keep the
+# reference optional for direct Sphinx builds where Doxygen is unavailable.
+if _has_doxygen_xml:
+    breathe_projects = {'dr_evt': _doxygen_xml}
+    breathe_default_project = 'dr_evt'
     tags.add('doxygen')
 else:
-    html_extra_path = []
+    # The Breathe directive lives in this page.  Excluding it prevents a
+    # direct Sphinx build from attempting to parse a reference that has not
+    # been generated yet.
+    exclude_patterns.append('api/cpp-api-reference.rst')
 html_logo = '_static/dr_evt_logo.svg'
 html_favicon = '_static/favicon.ico'
 

@@ -33,11 +33,12 @@ where applicable; see the [Client/Server Guide](../CLIENT_SERVER_GUIDE.md) for
 the wire protocol.
 
 :::{only} doxygen
-<p><a href="../cpp-api/index.html">Open the complete generated C++ API reference (Doxygen).</a></p>
+See the [complete generated C++ API reference](CPP_API.md).
 :::
 
 :::{only} not doxygen
-The complete generated C++ API reference is unavailable because Doxygen was not installed for this build.
+The complete generated C++ API reference is unavailable because Doxygen was not
+run for this build.
 :::
 
 For live jobs, `append_job()` (or `append_jobs()`) creates a previously unseen
