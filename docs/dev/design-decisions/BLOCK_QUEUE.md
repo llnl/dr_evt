@@ -2,7 +2,10 @@
 
 ## Quick Summary
 
-Block queue groups jobs into fixed-size blocks with multi-index containers for fast backfill search. **Block-16 is optimal (+30% overhead), but deque is still 30% faster.** Use deque for production.
+Block queue groups jobs into fixed-size blocks with multi-index containers for
+backfill search. **Block-16 is the fastest block size in the current
+benchmark, but remains 26% slower than deque; circular is the fastest C++
+queue implementation measured.**
 
 **Command:** `./simulator trace.csv --queue_impl block --block_size 16`
 
@@ -10,52 +13,37 @@ Block queue groups jobs into fixed-size blocks with multi-index containers for f
 queue implementation directly motivated by this analysis, measured faster than both deque and
 block queue.
 
-## Performance Results (10K jobs, 500 nodes)
+## Benchmark evidence
 
-500 nodes is the tightest node count that keeps every job in this trace
-schedulable (the trace's largest single job requests exactly 500 nodes),
-reflecting real scheduling contention. An earlier version of this
-benchmark used 2,000 nodes; these numbers supersede it.
+The canonical benchmark record and methodology are in
+[Wait Queues](../WAIT_QUEUES.md#benchmark-record). On its recorded
+10K-job, 500-node Sapphire Rapids workload, Block-16 averaged
+`3.956 ± 0.001` seconds. It was the fastest block size, but 26% slower than
+deque and substantially slower than circular.
 
-| Block Size | Time (s) | vs Deque |
-|------------|----------|----------|
-| **Deque**  | **0.680** | **1.00x (baseline)** |
-| Block-4    | 0.695    | 1.02x (2% slower) |
-| Block-8    | 0.587    | 0.86x (14% faster) |
-| **Block-16** | **0.596** | **0.87x (12% faster)** |
-| Block-32   | 0.619    | 0.91x (9% faster) |
-| Block-64   | 0.659    | 0.96x (3% faster) |
-| Block-128  | 0.676    | 0.99x (1% faster) |
-| Block-256  | 0.713    | 1.04x (5% slower) |
-
-At this node count, several block sizes actually edge out deque - a
-different picture than the 2,000-node version of this benchmark, where
-deque was fastest overall. Run-to-run variance in this measurement is
-real and non-trivial; treat these as directionally representative, not
-precise. See [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md) for how circular
-compares in the same run.
-
-✅ All block sizes produce byte-for-byte identical output to deque.
+Every C++ queue variant measured so far produced the same simulated-job output
+as deque in all 10 runs.
 
 ## The U-Shaped Curve
 
 ```
-Slowdown
-100%|                      Block-256 (97%)
-    |                        *
- 66%|  Block-4           *
-    |     *            *
- 30%|      Block-16 ← optimal
-    |         *
-  0%|  Deque
+Slowdown relative to deque
+ 51%| Block-4                         Block-256
+    |    *                                 *
+ 38%|       Block-8              Block-64, Block-128
+    |          *                     *         *
+ 26%|             Block-16 ← best block size   Block-32
+    |                *                              *
+  0%| Deque
     +---------------------------
        4   8  16  32  64 128 256
 ```
 
 **Why U-shaped:**
-- **Left (4-8):** Too many blocks → excessive iteration overhead
-- **Sweet spot (16):** Best balance, blocks drain fast (10% short jobs)
-- **Right (32-256):** Too few blocks → multi-index overhead dominates
+- **Left (4-8):** Too many blocks create excessive iteration overhead.
+- **Sweet spot (16):** The best balance among tested block sizes.
+- **Right (32-256):** Fewer, larger blocks reduce skip opportunities while
+  multi-index maintenance remains expensive.
 
 ## Architecture
 
@@ -93,7 +81,7 @@ void remove(job_no_t job_id);
 ❌ Removing hash index → no performance gain (trees are bottleneck)
 ❌ Metadata filtering → helps but can't overcome tree overhead
 
-## Why Deque Still Wins
+## Why Deque Outperforms Block Queue
 
 Multi-index overhead breakdown:
 - **70%** Red-black tree maintenance (2 trees per block, O(log n) ops)
@@ -134,8 +122,11 @@ See [`BLOCK_QUEUE_TESTING.md`](BLOCK_QUEUE_TESTING.md) for details.
 ### Command-Line Options
 
 ```bash
-# Default (deque)
+# Default (circular)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs
+
+# Deque fallback
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_impl deque
 
 # Block queue with specific size
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs \
@@ -243,7 +234,8 @@ for (auto& block_info : m_blocks) {
 
 ## Lessons Learned
 
-1. **Simple beats complex at typical scales** - Cache-friendly deque outperforms "optimized" structures <10K jobs
+1. **Simple beats complex at typical scales** - Cache-friendly deque outperforms
+   the multi-index block design on this 10K-job workload
 2. **U-curve is real** - Too small = iteration overhead, too large = multi-index overhead
 3. **Block drainage hypothesis confirmed** - 10% short jobs → Block-16 drains fastest
 4. **Multi-index is expensive** - 70% overhead from maintaining 2 red-black trees per block
@@ -257,7 +249,8 @@ block size (see [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md)); `deque` remains
 available as a simple, well-tested fallback
 
 ### Research/Testing
-✅ **Use Block-16** - best block size if testing block queue
+✅ **Use Block-16** - fastest block size in the current benchmark, if testing
+the block queue
 ❌ **Avoid Block-4, Block-256** - worst performance
 
 ### Future Work

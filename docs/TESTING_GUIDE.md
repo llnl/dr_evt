@@ -552,10 +552,18 @@ cd build
 ../tests/run_fcfs_queue_implementation_tests.sh --correctness
 ```
 
-**Performance comparison** (not correctness - separate script):
+**End-to-end performance comparison** (separate from the differential
+correctness suite):
 ```bash
 ../tests/benchmark_block_sizes.sh
 ```
+
+This runs deque, multimap, circular, every supported block size, and the
+Python reference with the same trace and node count. It measures whole-program
+wall-clock time, including parsing, scheduling, event handling, and trace
+output; it is not an isolated wait-queue microbenchmark. C++ queue outputs are
+compared with deque, while Python is reported as a reference-only timing row
+because its CSV schema differs.
 
 Runs in CI (`.github/workflows/tests.yml`, "Run Queue Implementation
 Differential Tests"). See

@@ -1,4 +1,4 @@
-# Timezone Offset Support Design
+# Timezone Offset Support
 
 ## Status: Implementation Complete (Untested)
 

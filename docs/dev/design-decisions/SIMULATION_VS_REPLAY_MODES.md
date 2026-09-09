@@ -1,4 +1,4 @@
-# Simulation vs Replay Modes - Design
+# Simulation vs. Replay Modes
 
 **Date**: 2026-08-27
 

@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Design Decisions
 
 This directory contains architectural decisions and design rationales for DR_EVT.
