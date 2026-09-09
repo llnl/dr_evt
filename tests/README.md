@@ -468,9 +468,11 @@ default implementation and `docs/dev/design-decisions/BLOCK_QUEUE.md`
 for the block-based one, and `docs/TESTING_GUIDE.md` for how this
 differs from the Python-reference comparison above.
 
-`benchmark_block_sizes.sh` measures performance (not correctness) across
-every block size and the circular queue, against a 10,000-job trace by
-default.
+`benchmark_block_sizes.sh` measures end-to-end performance across deque,
+multimap, circular, every block size, and the Python reference scheduler,
+against a 10,000-job trace by default. C++ queue outputs are compared with
+deque for correctness; the Python reference is timed with the same trace and
+node count but is not byte-compared because it writes a different CSV schema.
 
 ### Verification Scripts
 

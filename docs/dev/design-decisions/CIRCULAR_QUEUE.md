@@ -7,38 +7,22 @@ It's structurally identical to the deque-based FCFSScheduler it replaced
 as default - same job entry layout, same lazy-mark-and-compact removal,
 same `pop_front()` head consumption, same indexed backfill scan - but
 backed by `boost::circular_buffer` instead of `std::deque`. **Measured
-~28% faster than deque on average (10K jobs, 500 nodes).**
+75% faster than deque in the recorded end-to-end benchmark (10K jobs,
+500 nodes, 10 runs).**
 
 **Command:** `./simulator trace.csv` (default) or explicitly `./simulator trace.csv --queue_impl circular`
 
-## Performance Results (10K jobs, 500 nodes, average of 3 trials)
+## Benchmark evidence
 
-500 nodes is the tightest node count that keeps every job in this trace
-schedulable (the trace's largest single job requests exactly 500 nodes),
-so this reflects real scheduling contention rather than a mostly-idle
-cluster - a materially different (and more realistic) scenario than an
-earlier 2,000-node version of this benchmark.
+The canonical benchmark record and methodology are in
+[Wait Queues](../WAIT_QUEUES.md#benchmark-record). On its recorded
+10K-job, 500-node Sapphire Rapids workload, circular averaged `0.786 ± 0.002`
+seconds versus deque's `3.142 ± 0.052` seconds: 75% faster end-to-end.
 
-| Implementation | Time (s) | vs Deque |
-|----------------|----------|----------|
-| Deque          | 0.812    | 1.00x (baseline) |
-| Block-16       | 0.588    | 0.72x (27.6% faster) |
-| **Circular**   | **0.580** | **0.71x (28.5% faster)** |
-
-At this tighter node count, circular and block-16 are close (circular
-only ~1% faster than block-16 here) - a smaller margin than the ~24%
-gap measured at 2,000 nodes. Run-to-run variance in this measurement is
-real and non-trivial (observed single trials ranging from -12% to -73%
-relative to deque across repeated runs); treat the specific percentages
-above as directionally representative, not precise.
-
-✅ Produces byte-for-byte identical output to deque, in every one of the 34
-queue-implementation differential test cases (`tests/run_fcfs_queue_implementation_tests.sh`),
-and separately confirmed on the 10K-job benchmark trace itself.
-
-Exact numbers will vary by hardware; re-run `tests/benchmark_block_sizes.sh`
-(which also benchmarks circular alongside every block size) to measure on
-your own machine.
+Circular and every tested block size produced the same simulated-job output as
+deque in all 10 runs. The 34-case queue-implementation differential test also
+verifies byte-for-byte schedule and resource output across C++ queue
+implementations (`tests/run_fcfs_queue_implementation_tests.sh`).
 
 ## Why It's Faster Than Deque
 
@@ -111,7 +95,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs --queue_i
 ### Command-Line Options
 
 ```bash
-# Default (deque)
+# Default (circular)
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs
 
 # Circular queue, default capacity (sized to the job trace)
@@ -158,9 +142,9 @@ sized to the job trace) in both paths.
 ✅ **circular is the default** - no action needed for most FCFS workloads;
 measured faster than both deque and block queue.
 
-✅ **Use `--queue_impl deque`** if you'd rather not depend on Boost, or want
-the simplest, most battle-tested option; the performance difference
-measured here is real but not dramatic.
+✅ **Use `--queue_impl deque`** if you want the simplest, most battle-tested
+fallback. On the benchmark above, circular was substantially faster; rerun the
+benchmark on the deployment workload before making a workload-specific choice.
 
 ### Research/Testing
 ✅ Use the default capacity (0) unless you specifically want to test the
@@ -179,8 +163,8 @@ through the run.
 ### Tests
 - `tests/run_fcfs_queue_implementation_tests.sh` - correctness verification (deque vs
   multimap vs block vs circular)
-- `tests/benchmark_block_sizes.sh` - performance comparison (all block
-  sizes plus circular)
+- `tests/benchmark_block_sizes.sh` - end-to-end comparison of deque,
+  multimap, circular, every block size, and the Python reference
 
 ### Protobuf Wiring
 - `src/proto/dr_evt_service.proto`, `src/proto/dr_evt_server.cpp` - gRPC

@@ -66,6 +66,12 @@ The block queue implementation has been thoroughly tested for correctness and pe
 ```
 
 **Example output:**
+
+> This is an illustrative historical single-run output. For the current
+> repeated-run results and benchmark environment, see
+> [`CIRCULAR_QUEUE.md`](CIRCULAR_QUEUE.md). The benchmark now also includes
+> multimap and Python-reference timing rows.
+
 ```
 ==========================================
 Wait Queue Performance Comparison

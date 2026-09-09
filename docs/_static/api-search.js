@@ -4,9 +4,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const status = input.closest(".api-search")?.querySelector(".api-search-status");
     if (!content) return;
 
-    const items = Array.from(content.children).filter((element) =>
-      element.matches("section, .section, dl, .breathe-sectiondef")
-    );
+    const items = content.classList.contains("api-search-map")
+      ? Array.from(content.querySelectorAll("li"))
+      : Array.from(content.children).filter((element) =>
+          element.matches("section, .section, dl, .breathe-sectiondef")
+        );
 
     const filter = () => {
       const query = input.value.trim().toLocaleLowerCase();

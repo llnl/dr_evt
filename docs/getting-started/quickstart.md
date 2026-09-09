@@ -4,6 +4,9 @@
 
 DR_EVT includes a **SLURM-style backfilling scheduler**, enabling realistic job scheduling simulation.
 
+Source code, releases, and issue tracking are available in the
+[DR_EVT GitHub repository](https://github.com/LLNL/dr_evt).
+
 ## Features
 
 - **Priority Policies**: FCFS (First-Come-First-Served), an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF (Shortest-Job-First), LJF (Longest-Job-First)
