@@ -60,7 +60,7 @@
   </g>
   <text x="798" y="209" class="small">PER SESSION</text>
   <text x="798" y="240" class="title">Simulation</text>
-  <text x="798" y="256" class="body"><tspan x="798" dy="0">C++</tspan><tspan x="798" dy="17">Maintain states</tspan></text>
+  <text x="798" y="264" class="body"><tspan x="798" dy="0">C++</tspan><tspan x="798" dy="17">Maintain states</tspan></text>
 
   <!-- direct Python binding -->
   <g filter="url(#shadow)">

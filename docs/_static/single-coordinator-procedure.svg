@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1040" viewBox="0 0 960 1040" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="910" height="1040" viewBox="50 0 910 1040" role="img" aria-labelledby="title description">
   <title id="title">Single coordinator composite stream procedure</title>
   <desc id="description">A vertical flowchart showing how one coordinator drives two independent servers for ordinary and composite job streams.</desc>
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0 0 L8 2.5 L0 5 Z" fill="#35536b"/></marker>
     <style>
       .title { font-family: sans-serif; font-size: 30px; font-weight: 700; fill: #172b3a; }
-      .sub { font-family: sans-serif; font-size: 17px; fill: #4d6475; }
+      .sub { font-family: sans-serif; font-size: 18px; fill: #4d6475; }
       .box { fill: #f7fafc; stroke: #35536b; stroke-width: 1.5; }
       .input { fill: #e7f1f8; stroke: #276a8e; stroke-width: 1.5; }
       .note { fill: #fce7f3; stroke: #c887a6; stroke-width: 1.5; }
@@ -23,34 +23,34 @@
   <path d="M480 197 V235" class="arrow"/>
   <rect x="150" y="235" width="660" height="105" rx="12" class="box"/>
   <text x="180" y="270" class="step">1. Submit the ordinary batches</text>
-  <text x="180" y="298" class="text">Submit each system's arrivals through t<tspan baseline-shift="sub" font-size="12">n</tspan>.</text>
-  <text x="180" y="322" class="text">t<tspan baseline-shift="sub" font-size="12">n</tspan> is the last ordinary arrival; choose advance watermark t<tspan baseline-shift="sub" font-size="12">a</tspan>.</text>
+  <text x="180" y="298" class="text">Submit each system's arrivals through t<tspan baseline-shift="sub" font-size="13">n</tspan>.</text>
+  <text x="180" y="322" class="text">t<tspan baseline-shift="sub" font-size="13">n</tspan> is the last ordinary arrival; choose advance watermark t<tspan baseline-shift="sub" font-size="13">a</tspan>.</text>
   <path d="M480 340 V378" class="arrow"/>
   <rect x="150" y="378" width="660" height="105" rx="12" class="box"/>
   <text x="180" y="413" class="step">2. Advance through the ordinary batch</text>
-  <text x="180" y="441" class="text">Advance both independent servers to t<tspan baseline-shift="sub" font-size="12">a</tspan><tspan dx="4">and read pre-event statistics.</tspan></text>
-  <text x="180" y="465" class="text">Required relation: t<tspan baseline-shift="sub" font-size="12">n</tspan> &lt;= t<tspan baseline-shift="sub" font-size="12">a</tspan> &lt;= t<tspan baseline-shift="sub" font-size="12">c</tspan>.</text>
+  <text x="180" y="441" class="text">Advance both independent servers to t<tspan baseline-shift="sub" font-size="13">a</tspan><tspan dx="4">and read pre-event statistics.</tspan></text>
+  <text x="180" y="465" class="text">Required relation: t<tspan baseline-shift="sub" font-size="13">n</tspan> &lt;= t<tspan baseline-shift="sub" font-size="13">a</tspan> &lt;= t<tspan baseline-shift="sub" font-size="13">c</tspan>.</text>
   <path d="M480 483 V521" class="arrow"/>
   <rect x="150" y="521" width="660" height="92" rx="12" class="box"/>
   <text x="180" y="556" class="step">3. Submit the composite event</text>
-  <text x="180" y="584" class="text">Submit one fragment per server at composite submission time t<tspan baseline-shift="sub" font-size="12">c</tspan>.</text>
+  <text x="180" y="584" class="text">Submit one fragment per server at composite submission time t<tspan baseline-shift="sub" font-size="13">c</tspan>.</text>
   <path d="M480 613 V651" class="arrow"/>
   <rect x="150" y="651" width="660" height="105" rx="12" class="box"/>
   <text x="180" y="686" class="step">4. Evaluate the composite event</text>
-  <text x="180" y="714" class="text">Advance both servers to t<tspan baseline-shift="sub" font-size="12">c</tspan>, read post-event statistics, and record results.</text>
+  <text x="180" y="714" class="text">Advance both servers to t<tspan baseline-shift="sub" font-size="13">c</tspan>, read post-event statistics, and record results.</text>
   <text x="180" y="738" class="text">Servers remain independent: no shared reservation or rollback occurs.</text>
   <path d="M480 756 V794" class="arrow"/>
   <rect x="150" y="794" width="660" height="142" rx="12" class="note"/>
   <text x="180" y="829" class="step">5. Release the next ordinary batch</text>
-  <text x="180" y="857" class="text">t<tspan baseline-shift="sub" font-size="12">0</tspan> is the first arrival in the next ordinary batch, released after step 4.</text>
-  <text x="180" y="881" class="text">Submit it, then advance to t<tspan baseline-shift="sub" font-size="12">0</tspan>. It may equal t<tspan baseline-shift="sub" font-size="12">c</tspan> or occur later.</text>
-  <text x="180" y="909" class="text">If t<tspan baseline-shift="sub" font-size="12">0</tspan> = t<tspan baseline-shift="sub" font-size="12">c</tspan>, issue a deliberate second AdvanceTo(t<tspan baseline-shift="sub" font-size="12">c</tspan>).</text>
+  <text x="180" y="857" class="text">t<tspan baseline-shift="sub" font-size="13">0</tspan> is the first arrival in the next ordinary batch, released after step 4.</text>
+  <text x="180" y="881" class="text">Submit it, then advance to t<tspan baseline-shift="sub" font-size="13">0</tspan>. It may equal t<tspan baseline-shift="sub" font-size="13">c</tspan> or occur later.</text>
+  <text x="180" y="909" class="text">If t<tspan baseline-shift="sub" font-size="13">0</tspan> = t<tspan baseline-shift="sub" font-size="13">c</tspan>, issue a deliberate second AdvanceTo(t<tspan baseline-shift="sub" font-size="13">c</tspan>).</text>
   <path d="M810 865 H885 V287 H810" class="arrow"/>
   <rect x="902" y="480" width="32" height="180" rx="4" fill="white"/>
   <text x="920" y="570" transform="rotate(-90 920 570)" text-anchor="middle" class="sub">Next composite event</text>
   <text x="150" y="978" class="sub">Time notation:</text>
-  <text x="275" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">n</tspan> last ordinary arrival</text>
-  <text x="490" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">a</tspan> advance watermark</text>
-  <text x="700" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">c</tspan> composite submission time</text>
-  <text x="150" y="1004" class="sub">t<tspan baseline-shift="sub" font-size="11">0</tspan> first arrival in the following ordinary batch</text>
+  <text x="300" y="978" class="sub">t<tspan baseline-shift="sub" font-size="12">a</tspan> advance watermark</text>
+  <text x="540" y="978" class="sub">t<tspan baseline-shift="sub" font-size="12">c</tspan> composite submission time</text>
+  <text x="150" y="1004" class="sub">t<tspan baseline-shift="sub" font-size="12">0</tspan> first arrival in the following ordinary batch</text>
+  <text x="600" y="1004" class="sub">t<tspan baseline-shift="sub" font-size="12">n</tspan> last ordinary arrival</text>
 </svg>
