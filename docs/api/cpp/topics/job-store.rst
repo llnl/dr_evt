@@ -9,9 +9,11 @@ writes simulated-job output.
 
    .. doxygenclass:: dr_evt::Trace
       :project: dr_evt
+      :members:
 
    .. doxygenclass:: dr_evt::Job_Record
       :project: dr_evt
+      :members:
 
 See `Output-Trace Buffers and Streaming Trace State <../../../dev/OUTPUT_TRACE_BUFFERS.html>`_
 for the storage and reclamation model.

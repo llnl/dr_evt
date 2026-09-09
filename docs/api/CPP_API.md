@@ -8,13 +8,15 @@ applicable.
 
 <form class="api-search api-symbol-search" action="../search.html" method="get" role="search">
   <label for="cpp-api-symbol-search">Search C++ symbols</label>
-  <input id="cpp-api-symbol-search" name="q" type="search" placeholder="e.g., Trace::append_job, Sim_Params, QueueImplementation" autocomplete="off">
+  <input id="cpp-api-symbol-search" name="q" type="search" placeholder="e.g., append_job, insert_job, Sim_Params" autocomplete="off">
   <button type="submit">Search</button>
   <span class="api-search-help">Searches generated C++ declarations by symbol name.</span>
 </form>
 
-The symbol search uses the documentation-wide index, so results may also
-include guides that mention the symbol. Generated C++ declaration results are
+Search by the API's exact C++ name (for example, `append_job`, `insert_job`,
+or `submit_job`); `submit_to` and `insert_to` are not DR_EVT symbols. The
+symbol search uses the documentation-wide index, so results may also include
+guides that mention the symbol. Generated C++ declaration results are
 available when the build includes Doxygen XML.
 
 <div class="api-search" role="search">
