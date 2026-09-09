@@ -342,7 +342,7 @@ run_performance_tests() {
         # 1. Python reference implementation
         echo -n "  Python reference:  "
         PYTHON_START=$(date +%s.%N)
-        python3 scripts/python_reference_scheduler.py "$test_file" 100 > /tmp/python_out.csv 2>/dev/null
+        python3 scripts/python_reference_scheduler.py "$test_file" --nodes 100 > /tmp/python_out.csv 2>/dev/null
         PYTHON_END=$(date +%s.%N)
         PYTHON_TIME=$(echo "$PYTHON_END - $PYTHON_START" | bc)
         printf "%8.4f sec\n" "$PYTHON_TIME"

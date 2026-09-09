@@ -1,11 +1,13 @@
 #!/bin/bash
-# Wait Queue Performance Testing: Compare block sizes and circular queue
+# Wait Queue Performance Testing: Compare C++ queue implementations and the
+# Python reference scheduler.
 #
-# Tests block queue implementations with sizes: 4, 8, 16, 32, 64, 128, 256,
-# and the circular_buffer-based queue (--queue_impl circular)
-# - Verifies correctness (all must match deque output)
-# - Measures performance (time and queue statistics)
-# - Identifies the best-performing implementation
+# Tests deque, multimap, circular, and block queue implementations with sizes
+# 4, 8, 16, 32, 64, 128, and 256. It also times the Python reference using
+# the same input trace and node count.
+# - Verifies every C++ queue implementation matches deque output
+# - Measures end-to-end wall-clock time, including parsing and trace output
+# - Does not byte-compare Python output because its CSV schema differs
 
 set -e
 
@@ -22,7 +24,7 @@ VERBOSE=false
 print_usage() {
     echo "Usage: $0 [TRACE_FILE]"
     echo ""
-    echo "Wait queue performance testing: all block sizes plus circular queue"
+    echo "End-to-end queue benchmark: deque, multimap, circular, all block sizes, and Python reference"
     echo ""
     echo "ARGUMENTS:"
     echo "  TRACE_FILE    Path to test trace (default: tests/test_traces/scale/huge_10000jobs.csv)"
@@ -37,15 +39,13 @@ if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
     print_usage
 fi
 
+# Locate the installed simulator when CMAKE_INSTALL_PREFIX is set, otherwise
+# use the build-tree binary. This is shared with the other test scripts.
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 # Check trace file exists
 if [[ ! -f "$TRACE_FILE" ]]; then
     echo "Error: Trace file not found: $TRACE_FILE"
-    exit 1
-fi
-
-# Check build exists
-if [[ ! -f "build/simulator" ]]; then
-    echo "Error: Simulator not built. Run 'cmake --build build' first."
     exit 1
 fi
 
@@ -54,7 +54,7 @@ echo "Wait Queue Performance Comparison"
 echo "=========================================="
 echo "Trace: $TRACE_FILE"
 echo "Block sizes: ${BLOCK_SIZES[@]}"
-echo "Also testing: circular (boost::circular_buffer)"
+echo "Also testing: circular, multimap, and Python reference"
 echo ""
 
 # Detect trace parameters
@@ -75,6 +75,7 @@ echo "  Jobs in trace: $NUM_JOBS"
 echo "  Total nodes: $TOTAL_NODES"
 echo "  Max jobs: $MAX_JOBS"
 echo "  Backfill: $BACKFILL_POLICY"
+echo "  Measurement: end-to-end wall-clock time (not isolated queue operations)"
 echo ""
 
 # Run baseline (deque)
@@ -88,7 +89,7 @@ BASELINE_RESOURCES="/tmp/baseline_resources.csv"
 echo -n "Running... "
 START_TIME=$(date +%s%N)
 
-./build/simulator "$TRACE_FILE" \
+"$SIMULATOR" "$TRACE_FILE" \
     --priority_policy fcfs \
     --queue_impl deque \
     --total_nodes $TOTAL_NODES \
@@ -161,7 +162,7 @@ for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
     echo -n "  Running... "
     START_TIME=$(date +%s%N)
 
-    ./build/simulator "$TRACE_FILE" \
+    "$SIMULATOR" "$TRACE_FILE" \
         --priority_policy fcfs \
         --queue_impl block \
         --block_size $BLOCK_SIZE \
@@ -239,9 +240,54 @@ for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
     echo ""
 done
 
+# Run multimap queue.
+echo "=========================================="
+echo "3. MULTIMAP QUEUE: fcfs_alt"
+echo "=========================================="
+
+MULTIMAP_OUT="/tmp/multimap_output.csv"
+MULTIMAP_RESOURCES="/tmp/multimap_resources.csv"
+
+echo -n "Running... "
+START_TIME=$(date +%s%N)
+
+"$SIMULATOR" "$TRACE_FILE" \
+    --priority_policy fcfs_alt \
+    --total_nodes $TOTAL_NODES \
+    --max_jobs $MAX_JOBS \
+    --trace_format $TRACE_FORMAT \
+    --timestamp_format $TIMESTAMP_FORMAT \
+    --run_time_mode $RUN_TIME_MODE \
+    --backfill_policy $BACKFILL_POLICY \
+    --outfile "$MULTIMAP_OUT" \
+    --resource_trace "$MULTIMAP_RESOURCES" \
+    > /tmp/multimap_log.txt 2>&1
+
+END_TIME=$(date +%s%N)
+MULTIMAP_TIME=$(echo "scale=3; ($END_TIME - $START_TIME) / 1000000000" | bc)
+MULTIMAP_AVG_QUEUE=$(grep "Average queue length:" /tmp/multimap_log.txt | awk '{print $4}' || echo "N/A")
+MULTIMAP_PEAK_QUEUE=$(grep "Peak queue length:" /tmp/multimap_log.txt | awk '{print $4}' || echo "N/A")
+
+echo "done (${MULTIMAP_TIME}s)"
+echo "  Avg queue: $MULTIMAP_AVG_QUEUE"
+echo "  Peak queue: $MULTIMAP_PEAK_QUEUE"
+
+echo -n "  Checking correctness... "
+if diff -q "$BASELINE_OUT" "$MULTIMAP_OUT" > /dev/null 2>&1; then
+    echo "✓ PASS (identical to deque)"
+    CORRECTNESS_MULTIMAP="PASS"
+else
+    echo "✗ FAIL (differs from deque)"
+    CORRECTNESS_MULTIMAP="FAIL"
+    echo "    Baseline: $BASELINE_OUT"
+    echo "    Multimap: $MULTIMAP_OUT"
+fi
+
+echo ""
+
 # Run circular queue
 echo "=========================================="
-echo "3. CIRCULAR QUEUE: boost::circular_buffer"
+echo "4. CIRCULAR QUEUE: boost::circular_buffer"
 echo "=========================================="
 
 CIRCULAR_OUT="/tmp/circular_output.csv"
@@ -250,7 +296,7 @@ CIRCULAR_RESOURCES="/tmp/circular_resources.csv"
 echo -n "Running... "
 START_TIME=$(date +%s%N)
 
-./build/simulator "$TRACE_FILE" \
+"$SIMULATOR" "$TRACE_FILE" \
     --priority_policy fcfs \
     --queue_impl circular \
     --total_nodes $TOTAL_NODES \
@@ -286,9 +332,39 @@ fi
 
 echo ""
 
+# Run the Python reference with the same trace and node count. It deliberately
+# writes its own CSV schema, so this is an end-to-end performance reference,
+# not a byte-for-byte correctness comparison with the C++ output.
+PYTHON_TIME=""
+PYTHON_STATUS="unavailable"
+if command -v python3 > /dev/null 2>&1 && [[ -f "scripts/python_reference_scheduler.py" ]]; then
+    echo "=========================================="
+    echo "5. PYTHON REFERENCE: EASY backfilling"
+    echo "=========================================="
+
+    PYTHON_OUT_DIR="/tmp/python_reference_benchmark"
+    mkdir -p "$PYTHON_OUT_DIR"
+    echo -n "Running... "
+    START_TIME=$(date +%s%N)
+    if python3 scripts/python_reference_scheduler.py "$TRACE_FILE" \
+        --nodes "$TOTAL_NODES" \
+        --outdir "$PYTHON_OUT_DIR" \
+        > /tmp/python_reference_log.txt 2>&1; then
+        END_TIME=$(date +%s%N)
+        PYTHON_TIME=$(echo "scale=3; ($END_TIME - $START_TIME) / 1000000000" | bc)
+        PYTHON_STATUS="reference only"
+        echo "done (${PYTHON_TIME}s)"
+    else
+        PYTHON_STATUS="FAILED"
+        echo "FAILED (see /tmp/python_reference_log.txt)"
+    fi
+    echo "  Correctness: not byte-compared (different CSV schema)"
+    echo ""
+fi
+
 # Summary table
 echo "=========================================="
-echo "4. SUMMARY: Performance & Correctness"
+echo "6. SUMMARY: Performance & Correctness"
 echo "=========================================="
 echo ""
 
@@ -306,6 +382,21 @@ BEST_OVERALL_TIME=$BASELINE_TIME
 printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
     "Deque" "$BASELINE_TIME" "1.00x" "baseline" "$BASELINE_PEAK_QUEUE" "baseline"
 
+# Multimap queue
+MULTIMAP_VS_DEQUE=$(echo "scale=2; $MULTIMAP_TIME / $BASELINE_TIME" | bc)
+MULTIMAP_SLOWDOWN=$(printf "%.0f" $(echo "scale=4; (($MULTIMAP_TIME / $BASELINE_TIME) - 1.0) * 100.0" | bc))
+if [[ "$MULTIMAP_SLOWDOWN" =~ ^- ]]; then
+    MULTIMAP_SLOWDOWN_STR="${MULTIMAP_SLOWDOWN}%"
+else
+    MULTIMAP_SLOWDOWN_STR="+${MULTIMAP_SLOWDOWN}%"
+fi
+if (( $(echo "$MULTIMAP_TIME < $BEST_OVERALL_TIME" | bc -l) )); then
+    BEST_OVERALL_TIME=$MULTIMAP_TIME
+    BEST_OVERALL_NAME="Multimap"
+fi
+printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
+    "Multimap" "$MULTIMAP_TIME" "${MULTIMAP_VS_DEQUE}x" "$MULTIMAP_SLOWDOWN_STR" "$MULTIMAP_PEAK_QUEUE" "$CORRECTNESS_MULTIMAP"
+
 # Circular queue
 CIRCULAR_VS_DEQUE=$(echo "scale=2; $CIRCULAR_TIME / $BASELINE_TIME" | bc)
 CIRCULAR_SLOWDOWN=$(printf "%.0f" $(echo "scale=4; (($CIRCULAR_TIME / $BASELINE_TIME) - 1.0) * 100.0" | bc))
@@ -320,6 +411,20 @@ if (( $(echo "$CIRCULAR_TIME < $BEST_OVERALL_TIME" | bc -l) )); then
 fi
 printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
     "Circular" "$CIRCULAR_TIME" "${CIRCULAR_VS_DEQUE}x" "$CIRCULAR_SLOWDOWN_STR" "$CIRCULAR_PEAK_QUEUE" "$CORRECTNESS_CIRCULAR"
+
+# The Python reference is excluded from BEST_OVERALL_NAME: it is not an
+# interchangeable C++ wait-queue backend.
+if [[ -n "$PYTHON_TIME" ]]; then
+    PYTHON_VS_DEQUE=$(echo "scale=2; $PYTHON_TIME / $BASELINE_TIME" | bc)
+    PYTHON_SLOWDOWN=$(printf "%.0f" $(echo "scale=4; (($PYTHON_TIME / $BASELINE_TIME) - 1.0) * 100.0" | bc))
+    if [[ "$PYTHON_SLOWDOWN" =~ ^- ]]; then
+        PYTHON_SLOWDOWN_STR="${PYTHON_SLOWDOWN}%"
+    else
+        PYTHON_SLOWDOWN_STR="+${PYTHON_SLOWDOWN}%"
+    fi
+    printf "%-12s | %-10s | %-10s | %-10s | %-10s | %-12s\n" \
+        "Python ref." "$PYTHON_TIME" "${PYTHON_VS_DEQUE}x" "$PYTHON_SLOWDOWN_STR" "N/A" "$PYTHON_STATUS"
+fi
 
 # Find best block size, and fold that into the overall-best tracking
 BEST_BLOCK_SIZE=""
@@ -369,11 +474,11 @@ done
 
 echo ""
 echo "=========================================="
-echo "5. CONCLUSIONS"
+echo "7. CONCLUSIONS"
 echo "=========================================="
 echo ""
 
-# Check if all passed (block sizes and circular)
+# Check whether all comparable C++ queue implementations passed.
 ALL_PASSED=true
 for BLOCK_SIZE in "${BLOCK_SIZES[@]}"; do
     case $BLOCK_SIZE in
@@ -394,9 +499,12 @@ done
 if [[ "$CORRECTNESS_CIRCULAR" != "PASS" ]]; then
     ALL_PASSED=false
 fi
+if [[ "$CORRECTNESS_MULTIMAP" != "PASS" ]]; then
+    ALL_PASSED=false
+fi
 
 if $ALL_PASSED; then
-    echo "✓ All block sizes and circular queue produce identical output (correctness verified)"
+    echo "✓ All C++ queue implementations produce identical output (correctness verified)"
 else
     echo "✗ Some implementation produced different output (INVESTIGATION NEEDED)"
 fi
@@ -404,7 +512,14 @@ fi
 echo ""
 echo "Best block size: Block-$BEST_BLOCK_SIZE"
 echo "  Time: ${BEST_BLOCK_TIME}s"
-echo "  vs Deque: $(echo "scale=2; $BEST_BLOCK_TIME / $BASELINE_TIME" | bc)x slower"
+BEST_BLOCK_VS_DEQUE=$(echo "scale=2; $BEST_BLOCK_TIME / $BASELINE_TIME" | bc)
+if (( $(echo "$BEST_BLOCK_TIME < $BASELINE_TIME" | bc -l) )); then
+    BEST_BLOCK_ADVANTAGE=$(printf "%.0f" $(echo "scale=4; (1 - $BEST_BLOCK_TIME / $BASELINE_TIME) * 100" | bc))
+    echo "  vs Deque: ${BEST_BLOCK_VS_DEQUE}x (${BEST_BLOCK_ADVANTAGE}% faster)"
+else
+    BEST_BLOCK_SLOWDOWN=$(printf "%.0f" $(echo "scale=4; ($BEST_BLOCK_TIME / $BASELINE_TIME - 1) * 100" | bc))
+    echo "  vs Deque: ${BEST_BLOCK_VS_DEQUE}x (${BEST_BLOCK_SLOWDOWN}% slower)"
+fi
 echo ""
 
 # BEST_OVERALL_NAME/BEST_OVERALL_TIME were tracked across deque, every
@@ -433,6 +548,7 @@ echo ""
 
 # Cleanup option
 echo "Temporary files in /tmp/:"
-echo "  baseline_*, block*_*.{csv,txt}, circular_*.{csv,txt}"
+echo "  baseline_*, block*_*.{csv,txt}, circular_*.{csv,txt}, multimap_*.{csv,txt}, python_reference_benchmark/"
 echo ""
-echo "To clean up: rm /tmp/baseline_* /tmp/block* /tmp/circular_*"
+echo "To clean up: rm /tmp/baseline_* /tmp/block* /tmp/circular_* /tmp/multimap_*"
+echo "             rm -rf /tmp/python_reference_benchmark"
