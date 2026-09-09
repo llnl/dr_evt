@@ -9,11 +9,11 @@
       <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#334155" flood-opacity="0.10"/>
     </filter>
     <style>
-      .title { font-family: Arial, Helvetica, sans-serif; font-size: 19px; font-weight: 600; fill: #26323c; }
-      .body { font-family: Arial, Helvetica, sans-serif; font-size: 15px; fill: #52606b; }
-      .small { font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: 600; fill: #6d7b86; letter-spacing: .8px; }
-      .badge { font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: 600; fill: #52606b; }
-      .label { font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 600; fill: #687782; }
+      .title { font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 600; fill: #26323c; }
+      .body { font-family: Arial, Helvetica, sans-serif; font-size: 16px; fill: #52606b; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 600; fill: #6d7b86; letter-spacing: .8px; }
+      .badge { font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 600; fill: #52606b; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: 600; fill: #687782; }
     </style>
   </defs>
 
@@ -26,9 +26,9 @@
   <g filter="url(#shadow)">
     <rect x="60" y="181" width="120" height="135" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
   </g>
-  <text x="78" y="215" class="small">INPUT</text>
-  <text x="78" y="246" class="title">Workload</text>
-  <text x="78" y="271" class="body"><tspan x="78" dy="0">- Trace</tspan><tspan x="78" dy="17">- Live feed</tspan></text>
+  <text x="72" y="215" class="small">INPUT</text>
+  <text x="72" y="246" class="title">Workload</text>
+  <text x="72" y="271" class="body"><tspan x="72" dy="0">- Trace</tspan><tspan x="72" dy="17">- Live feed</tspan></text>
 
   <!-- client processes: the offset cards indicate multiple concurrent clients -->
   <rect x="236" y="163" width="170" height="150" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
@@ -36,10 +36,10 @@
   <g filter="url(#shadow)">
     <rect x="220" y="175" width="170" height="150" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
   </g>
-  <text x="244" y="211" class="title">Client</text>
-  <text x="244" y="235" class="body"><tspan x="244" dy="0">C++ or Python</tspan><tspan x="244" dy="17">with gRPC</tspan></text>
+  <text x="238" y="211" class="title">Client</text>
+  <text x="238" y="235" class="body"><tspan x="238" dy="0">C++ or Python</tspan><tspan x="238" dy="17">with gRPC</tspan></text>
   <line x1="244" y1="264" x2="366" y2="264" stroke="#e1e7ea" stroke-width="1"/>
-  <text x="244" y="281" class="body"><tspan x="244" dy="0">- Read job inputs</tspan><tspan x="244" dy="17">- Control progress</tspan></text>
+  <text x="238" y="281" class="body"><tspan x="238" dy="0">- Read job inputs</tspan><tspan x="238" dy="17">- Control progress</tspan></text>
 
   <!-- server processes: the offset cards indicate multiple concurrent servers -->
   <rect x="561" y="163" width="195" height="150" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
@@ -47,10 +47,10 @@
   <g filter="url(#shadow)">
     <rect x="545" y="175" width="195" height="150" rx="12" fill="#fbfcfc" stroke="#cfd9df" stroke-width="1.5"/>
   </g>
-  <text x="569" y="211" class="title">Server</text>
-  <text x="569" y="235" class="body"><tspan x="569" dy="0">C++ process</tspan><tspan x="569" dy="17">with gRPC</tspan></text>
+  <text x="563" y="211" class="title">Server</text>
+  <text x="563" y="235" class="body"><tspan x="563" dy="0">C++ process</tspan><tspan x="563" dy="17">with gRPC</tspan></text>
   <line x1="569" y1="264" x2="716" y2="264" stroke="#e1e7ea" stroke-width="1"/>
-  <text x="569" y="281" class="body"><tspan x="569" dy="0">- Open gRPC endpoint</tspan></text>
+  <text x="563" y="281" class="body"><tspan x="563" dy="0">- Open gRPC endpoint</tspan></text>
 
   <!-- simulations: the stack shows one concurrent instance per session -->
   <rect x="796" y="191" width="150" height="140" rx="12" fill="#f4f7f8" stroke="#d8e0e4" stroke-width="1.2"/>
@@ -58,15 +58,15 @@
   <g filter="url(#shadow)">
     <rect x="780" y="175" width="150" height="140" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
   </g>
-  <text x="804" y="209" class="small">PER SESSION</text>
-  <text x="804" y="240" class="title">Simulation</text>
-  <text x="804" y="256" class="body"><tspan x="804" dy="0">C++</tspan><tspan x="804" dy="17">Maintain states</tspan></text>
+  <text x="798" y="209" class="small">PER SESSION</text>
+  <text x="798" y="240" class="title">Simulation</text>
+  <text x="798" y="256" class="body"><tspan x="798" dy="0">C++</tspan><tspan x="798" dy="17">Maintain states</tspan></text>
 
   <!-- direct Python binding -->
   <g filter="url(#shadow)">
     <rect x="780" y="100" width="150" height="45" rx="12" fill="#fbfcfc" stroke="#d8e0e4" stroke-width="1.5"/>
   </g>
-  <text x="804" y="128" class="body" style="font-weight:600">Python API</text>
+  <text x="798" y="128" class="body" style="font-weight:600">Python API</text>
 
   <!-- connections, drawn last for crisp arrows -->
   <line x1="180" y1="240" x2="217" y2="240" stroke="#7a8792" stroke-width="1.7" marker-end="url(#arrow)"/>

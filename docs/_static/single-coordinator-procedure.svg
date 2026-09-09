@@ -4,13 +4,13 @@
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0 0 L8 2.5 L0 5 Z" fill="#35536b"/></marker>
     <style>
-      .title { font-family: sans-serif; font-size: 28px; font-weight: 700; fill: #172b3a; }
-      .sub { font-family: sans-serif; font-size: 16px; fill: #4d6475; }
+      .title { font-family: sans-serif; font-size: 30px; font-weight: 700; fill: #172b3a; }
+      .sub { font-family: sans-serif; font-size: 17px; fill: #4d6475; }
       .box { fill: #f7fafc; stroke: #35536b; stroke-width: 1.5; }
       .input { fill: #e7f1f8; stroke: #276a8e; stroke-width: 1.5; }
       .note { fill: #fce7f3; stroke: #c887a6; stroke-width: 1.5; }
-      .step { font-family: sans-serif; font-size: 19px; font-weight: 700; fill: #172b3a; }
-      .text { font-family: sans-serif; font-size: 16px; fill: #263d4d; }
+      .step { font-family: sans-serif; font-size: 21px; font-weight: 700; fill: #172b3a; }
+      .text { font-family: sans-serif; font-size: 17px; fill: #263d4d; }
       .arrow { stroke: #35536b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
     </style>
   </defs>
@@ -49,8 +49,8 @@
   <rect x="902" y="480" width="32" height="180" rx="4" fill="white"/>
   <text x="920" y="570" transform="rotate(-90 920 570)" text-anchor="middle" class="sub">Next composite event</text>
   <text x="150" y="978" class="sub">Time notation:</text>
-  <text x="260" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">n</tspan> last ordinary arrival</text>
-  <text x="455" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">a</tspan> advance watermark</text>
-  <text x="630" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">c</tspan> composite submission time</text>
+  <text x="275" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">n</tspan> last ordinary arrival</text>
+  <text x="490" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">a</tspan> advance watermark</text>
+  <text x="700" y="978" class="sub">t<tspan baseline-shift="sub" font-size="11">c</tspan> composite submission time</text>
   <text x="150" y="1004" class="sub">t<tspan baseline-shift="sub" font-size="11">0</tspan> first arrival in the following ordinary batch</text>
 </svg>

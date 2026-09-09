@@ -22,9 +22,9 @@
     fill: #234d31 !important;
 }
 
-/* Mermaid's default sequence-diagram text is 12 pt; increase it by 2 pt. */
+/* Mermaid's default sequence-diagram text is 12 pt; increase it to 16 pt. */
 #composite-stream-timeline > svg text {
-    font-size: 14pt !important;
+    font-size: 16pt !important;
 }
 
 /* Replace the yellow sequence notes in the Client/server session diagram. */
