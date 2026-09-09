@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">FCFS with EASY backfilling: mean end-to-end runtime relative to deque</title>
+  <desc id="desc">A diverging horizontal bar chart. Circular uses about one quarter of deque's time. Multimap uses about 8.8 times deque's time.</desc>
+  <style>.title{font:600 20px sans-serif;fill:#243746}.subtitle{font:13px sans-serif;fill:#52636f}.label{font:14px sans-serif;fill:#243746}.value{font:13px sans-serif;fill:#243746}.tick{font:12px sans-serif;fill:#52636f}.grid{stroke:#d9e2e8;stroke-width:1}.baseline{stroke:#52636f;stroke-width:2}</style>
+  <rect width="960" height="540" fill="#fff"/>
+  <text x="38" y="35" class="title">FCFS/EASY end-to-end runtime relative to deque</text>
+  <text x="38" y="57" class="subtitle">Mean of 10 runs; bar length is log₂(runtime / deque). Exact times and standard deviations are in the table.</text>
+  <g class="grid"><line x1="250" y1="95" x2="250" y2="475"/><line x1="365" y1="95" x2="365" y2="475"/><line x1="595" y1="95" x2="595" y2="475"/><line x1="710" y1="95" x2="710" y2="475"/><line x1="825" y1="95" x2="825" y2="475"/></g><line x1="480" y1="85" x2="480" y2="475" class="baseline"/>
+  <g class="tick"><text x="250" y="84" text-anchor="middle">0.25×</text><text x="365" y="84" text-anchor="middle">0.5×</text><text x="480" y="75" text-anchor="middle">1× deque</text><text x="595" y="84" text-anchor="middle">2×</text><text x="710" y="84" text-anchor="middle">4×</text><text x="825" y="84" text-anchor="middle">8×</text></g>
+  <g><text x="38" y="119" class="label">Circular</text><rect x="252" y="104" width="228" height="20" rx="3" fill="#8fd3a1"/><text x="242" y="119" text-anchor="end" class="value">0.25×</text>
+  <text x="38" y="154" class="label">Deque</text><circle cx="480" cy="149" r="7" fill="#607d8b"/><text x="492" y="154" class="value">1.00×</text>
+  <text x="38" y="189" class="label">Block-16</text><rect x="480" y="174" width="38" height="20" rx="3" fill="#9ec5e5"/><text x="528" y="189" class="value">1.25×</text>
+  <text x="38" y="224" class="label">Block-32</text><rect x="480" y="209" width="41" height="20" rx="3" fill="#9ec5e5"/><text x="531" y="224" class="value">1.28×</text>
+  <text x="38" y="259" class="label">Block-8</text><rect x="480" y="244" width="51" height="20" rx="3" fill="#9ec5e5"/><text x="541" y="259" class="value">1.36×</text>
+  <text x="38" y="294" class="label">Block-64</text><rect x="480" y="279" width="62" height="20" rx="3" fill="#9ec5e5"/><text x="552" y="294" class="value">1.38×</text>
+  <text x="38" y="329" class="label">Block-128</text><rect x="480" y="314" width="65" height="20" rx="3" fill="#9ec5e5"/><text x="555" y="329" class="value">1.39×</text>
+  <text x="38" y="364" class="label">Block-256</text><rect x="480" y="349" width="66" height="20" rx="3" fill="#9ec5e5"/><text x="556" y="364" class="value">1.49×</text>
+  <text x="38" y="399" class="label">Block-4</text><rect x="480" y="384" width="67" height="20" rx="3" fill="#9ec5e5"/><text x="557" y="399" class="value">1.50×</text>
+  <text x="38" y="434" class="label">Python reference</text><rect x="480" y="419" width="147" height="20" rx="3" fill="#e7a7c5"/><text x="637" y="434" class="value">2.43×</text>
+  <text x="38" y="469" class="label">Multimap</text><rect x="480" y="454" width="361" height="20" rx="3" fill="#e8aa85"/><text x="851" y="469" class="value">8.81×</text></g>
+  <text x="38" y="512" class="subtitle">Lower is better. Circular is left of the baseline because it uses less elapsed time.</text>
+</svg>
