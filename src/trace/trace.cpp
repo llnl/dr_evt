@@ -804,8 +804,11 @@ void Trace::write_job_line(const Job_Record& job)
         format_sim_time(convert_epoch<sim_time_t>(job.get_begin_time()), m_simulated_trace_msec) + "," +
         format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_simulated_trace_msec) + "," +
         std::to_string(job.get_num_nodes()) + "," +
-        "0," +
-        dr_evt::to_string(job.get_queue()) + "," +
+        "0,";
+    if (m_dcols.has_queue_column()) {
+        line += dr_evt::to_string(job.get_queue()) + ",";
+    }
+    line +=
         format_sim_time(job.get_limit_time(), m_simulated_trace_msec) + "\n";
     m_simulated_trace_ofs << line;
 }
@@ -824,7 +827,11 @@ void Trace::start_simulated_trace(const std::string& filename, bool msec)
         return;
     }
     m_simulated_trace_msec = msec;
-    std::string header = "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n";
+    std::string header = "job_submit_time,begin_time,end_time,num_nodes,exit_status";
+    if (m_dcols.has_queue_column()) {
+        header += ",queue";
+    }
+    header += ",time_limit\n";
     m_simulated_trace_ofs << header;
 }
 

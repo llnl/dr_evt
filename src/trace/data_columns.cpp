@@ -28,6 +28,7 @@ Data_Columns::Data_Columns()
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
+    m_has_queue_column(true),
     m_trace_format("simple"),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
@@ -49,6 +50,7 @@ Data_Columns::Data_Columns(const std::string& format)
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
+    m_has_queue_column(true),
     m_trace_format(format),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
@@ -84,6 +86,7 @@ Data_Columns::Data_Columns(const std::string& format, const std::string& timesta
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
+    m_has_queue_column(true),
     m_trace_format(format),
     m_timestamp_format(timestamp_format),
     m_timezone_str(timezone),
@@ -260,6 +263,8 @@ bool Data_Columns::check_header(const std::string& fname)
     // Rebuild m_cols_to_read with actual column indices from header
     m_cols_to_read.clear();
 
+    m_has_queue_column = col_map.find("queue") != col_map.end();
+
     if (m_trace_mode == TraceMode::REPLAY) {
         // Replay mode: need all columns including begin_time and end_time
         m_cols_to_read = {
@@ -267,22 +272,27 @@ bool Data_Columns::check_header(const std::string& fname)
             {find_column({"begin_time"}), "begin_time"},
             {find_column({"end_time"}), "end_time"},
             {find_column({"job_submit_time"}), "job_submit_time"},
-            {find_column({"queue"}), "queue"},
             {find_column(time_limit_aliases), "time_limit"}
         };
+        if (m_has_queue_column) {
+            m_cols_to_read.insert(m_cols_to_read.end() - 1,
+                                  {find_column({"queue"}), "queue"});
+        }
     } else {
         // Simulation mode: no begin_time or end_time
         col_no_t num_nodes_idx = find_column({"num_nodes"});
         col_no_t submit_time_idx = find_column({"job_submit_time"});
-        col_no_t queue_idx = find_column({"queue"});
         col_no_t time_limit_idx = find_column(time_limit_aliases);
 
         m_cols_to_read = {
             {num_nodes_idx, "num_nodes"},
             {submit_time_idx, "job_submit_time"},
-            {queue_idx, "queue"},
             {time_limit_idx, "time_limit"}
         };
+        if (m_has_queue_column) {
+            m_cols_to_read.insert(m_cols_to_read.end() - 1,
+                                  {find_column({"queue"}), "queue"});
+        }
 
         // Optional: actual_run_time column for RunTimeMode::ACTUAL
         auto [found, actual_run_time_idx] = find_column_optional(actual_run_time_aliases);
@@ -321,7 +331,11 @@ bool Data_Columns::check_header(const std::string& fname)
     }
 
     // Update Job_Record with correct field count
-    Job_Record::set_num_inputs(static_cast<unsigned>(m_cols_to_read.size()));
+    // The loader supplies the canonical pbatch value when the source does
+    // not have a queue column, so Job_Record always receives its canonical
+    // field layout.
+    Job_Record::set_num_inputs(static_cast<unsigned>(m_cols_to_read.size()) +
+                               (m_has_queue_column ? 0u : 1u));
 
     return true;
 }

@@ -25,6 +25,8 @@ FCFS with EASY backfilling on an Intel Sapphire Rapids node (112 cores,
 256 GB memory). Values are the mean of 10 end-to-end runs; `±` is the
 population standard deviation.
 
+**Benchmark script:** [`tests/benchmark_block_sizes.sh`](../../tests/benchmark_block_sizes.sh)
+
 The timing includes trace parsing, scheduling and backfilling, event handling,
 and trace output. It is not an isolated wait-queue microbenchmark. The queue
 implementation is the intended variable, but the complete difference cannot be
@@ -51,7 +53,7 @@ queue variant, including multimap. The Python reference is an end-to-end
 baseline, but is not byte-compared with C++ because it emits a different CSV
 schema.
 
-Run the benchmark with:
+Run the same benchmark with:
 
 ```bash
 tests/benchmark_block_sizes.sh

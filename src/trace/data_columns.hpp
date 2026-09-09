@@ -61,6 +61,11 @@ class Data_Columns {
     /// The index of the column_id entry for queue
     col_no_t m_queue_idx;
 
+    /// Whether the input header explicitly contains a queue column.  Jobs
+    /// without one use the canonical pbatch queue internally, while their
+    /// generated trace intentionally retains the queue-less schema.
+    bool m_has_queue_column;
+
     /// A particular column that is extrememly difficult to parse.
     std::string m_col_to_avoid;
     /// Column index of the m_col_to_avoid in the raw data
@@ -119,6 +124,9 @@ class Data_Columns {
     col_no_t column_idx(const std::string& col_name) const;
 
     col_no_t get_queue_idx() const { return m_queue_idx; }
+
+    /// True when the source trace explicitly supplied a queue column.
+    bool has_queue_column() const { return m_has_queue_column; }
 
   protected:
     void init();

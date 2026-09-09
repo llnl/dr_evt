@@ -26,6 +26,7 @@
 
 **MPI**: For multi-client/server test harness only (optional even with gRPC)
 - Install: `apt-get install libopenmpi-dev openmpi-bin`
+- Install the Python MPI binding for the launcher: `python3 -m pip install mpi4py`
 
 ### Protocol Buffers & gRPC Details
 

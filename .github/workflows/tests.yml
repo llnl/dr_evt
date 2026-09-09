@@ -293,7 +293,7 @@ jobs:
         id: progressive-load
         run: |
           echo "========================================"
-          echo "Running Progressive Loading Tests (10 C++ + 4 CLI)"
+          echo "Running Progressive Loading Tests (12 C++ + 4 CLI)"
           echo "========================================"
           ./tests/run_progressive_load_tests.sh
 
@@ -330,7 +330,7 @@ jobs:
           echo "  Python API (16 tests): ${{ steps.python-api.outcome }}"
           echo "  Append-Job (18 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  Backfill Window gRPC (included in Append-Job count): ${{ steps.backfill-window.outcome }}"
-          echo "  Progressive Loading (10 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
+          echo "  Progressive Loading (12 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"
           echo ""

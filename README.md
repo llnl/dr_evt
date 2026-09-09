@@ -37,14 +37,15 @@ resource traces.
 ## Features
 
 ### Core Simulation
+- **Priority Policies**: FCFS, SJF, LJF with multiple wait-queue implementations
 - **Backfilling Algorithms**: EASY and CONSERVATIVE backfilling (fully implemented)
   - EASY: O(n) complexity, optimizes utilization (~95%)
   - CONSERVATIVE: O(n²) complexity, guarantees fairness to all waiting jobs
   - Both verified against independent Python reference implementations
-- **Priority Policies**: FCFS, SJF, LJF with multiple wait-queue implementations
-- **Queue Implementations**: Circular buffer (default), deque, multimap, block-based (7 sizes: 4-256)
+- **Wait Queue Implementations**: Circular buffer (default), deque, multimap, block-based (7 sizes: 4-256)
 - **Replay and Simulation Modes**: Replay historical traces or simulate with run time distributions
-- **Early Completion Support**: Jobs can finish before time_limit (actual_run_time < time_limit)
+- **Various Simulated Job Duration Options**: Use `actual_run_time`, `time_limit`, or a configurable sampled distribution
+- **Python Reference Implementation**: Independent Python EASY-backfilling scheduler used for differential validation and expected-output generation
 
 ### APIs & Integration
 - **Streaming API**: Online simulation with dynamic job arrival (`append_job`, `advance_to`, `run_until_exclusive`)
@@ -83,13 +84,14 @@ resource traces.
 ### Quick Reference (GitHub)
 For quick access without leaving GitHub:
 - **[Complete Documentation Index](docs/)** - All guides, references, and specifications
-- **[Backfilling Algorithms](docs/BACKFILLING_ALGORITHMS.md)** - EASY and CONSERVATIVE algorithm specifications
+- **[Scheduling Policies](docs/BACKFILLING_ALGORITHMS.md)** - Priority policies plus EASY and CONSERVATIVE backfilling
 - **[Streaming API](docs/api/STREAMING_API.md)** - Online simulation API
 - **[Client/Server (gRPC)](docs/CLIENT_SERVER_GUIDE.md)** - Remote simulation over network
 - **[Python API](docs/api/PYTHON_API.md)** - Python bindings and reference implementation
 - **[CLI Options](docs/user-guide/command-line.md)** - Command-line reference
-- **[Testing Guide](docs/TESTING_GUIDE.md)** - Test philosophy, organization, and test suite details
-- **[Test Suite](tests/README.md)** - All tests and validation
+- **[Prototext Configuration](docs/user-guide/protobuf-config.md)** - Structured `.textproto` simulation configuration
+- **[Testing Guide](docs/TESTING_GUIDE.md)** - How to select, run, and interpret tests; verification methodology
+- **[Test Suite Inventory](tests/README.md)** - Test scripts, fixtures, expected outputs, and directory-level details
 - **[Scheduler Correctness Tests](tests/test_traces/scheduler_correctness/README.md)** - 34 fixtures organized by complexity
 - **[Scripts Guide](scripts/README.md)** - Testing and verification scripts
 
@@ -102,26 +104,16 @@ Build the same Sphinx documentation that powers ReadTheDocs:
 
 ```bash
 cd docs
-
-# Install dependencies (one-time setup)
-make install
-# or manually: pip install -r requirements.txt
-
-# Build HTML documentation
+python3 -m venv venv_docs
+source venv_docs/bin/activate
+pip install -r requirements.txt
 make html
-# Output: docs/_build/html/index.html
-
-# Build PDF documentation (requires LaTeX)
-make pdf
-# Output: docs/_build/latex/DR_EVT.pdf
-
-# Serve with live-reload (for development)
-make serve
-# Opens browser at http://localhost:8000
-
-# Check for broken links
-make linkcheck
 ```
+
+The HTML site is written to `docs/_build/html/index.html`. If `doxygen` is
+available on `PATH`, `make html` runs it first and populates the generated C++
+API Reference pages. Without Doxygen, the rest of the documentation still
+builds, but generated C++ declarations are omitted.
 
 
 ## Requirements
@@ -133,33 +125,54 @@ make linkcheck
  + **Boost**: Components required: `regex`, `filesystem`, `system`, `program_options`, `serialization`, `container`, `multi_index`, `circular_buffer`
    - Tested with Boost 1.70+
    - Install: `apt-get install libboost-all-dev` (Ubuntu/Debian) or `brew install boost` (macOS)
- + [**Protocol Buffers**](https://developers.google.com/protocol-buffers): Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
 
 ### Optional (for full features)
+
+**[Protocol Buffers](https://developers.google.com/protocol-buffers)**: For
+Prototext configuration files passed with `--config`
+(`-DDR_EVT_ENABLE_PROTOBUF=ON`)
+- Lets a simulation configuration file replace a long set of CLI options
+- Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
 
 **Python 3.7+**: For Python bindings (`-DDR_EVT_BUILD_PYTHON=ON`)
 - Python development headers required: `apt-get install python3-dev`
 - pybind11 auto-downloaded via FetchContent if not found
 
-**[gRPC](https://grpc.io/)**: For online simulation service (`-DDR_EVT_ENABLE_GRPC=ON`)
+**[gRPC](https://grpc.io/)**: For the client/server simulation service
+(`-DDR_EVT_ENABLE_GRPC=ON`)
 - **Auto-download**: If not found, gRPC (with bundled Protobuf) is auto-downloaded via FetchContent (~5-10 min first build). Can OOM under full parallelism on memory-constrained machines - see "Livermore Computing (LC) HPC systems" below.
 - **Manual install**: `apt-get install libgrpc++-dev protobuf-compiler-grpc` (Ubuntu/Debian)
 - **Important**: gRPC includes its own Protobuf. If gRPC is enabled, you don't need separate Protobuf install.
 
 **MPI**: For multi-client/server test harness only (optional even with gRPC)
 - Install: `apt-get install libopenmpi-dev openmpi-bin`
+- Install the Python MPI binding for the launcher: `python3 -m pip install mpi4py`
 
 ### Protocol Buffers & gRPC Details
 
-**Protobuf usage:** Configuration file parsing ([proto3 syntax](https://developers.google.com/protocol-buffers/docs/proto3))
-- Enabled by default (`-DDR_EVT_ENABLE_PROTOBUF=ON`)
-- If gRPC is enabled, Protobuf comes bundled with gRPC (no separate install needed)
-- If gRPC is **not** enabled, standalone Protobuf is auto-downloaded via FetchContent if not found
+Both features are disabled by default in a plain build:
+
+- `DR_EVT_ENABLE_PROTOBUF=OFF`
+- `DR_EVT_ENABLE_GRPC=OFF`
+
+**Protocol Buffers / Prototext:** Enable with
+`-DDR_EVT_ENABLE_PROTOBUF=ON` to use a Protocol Buffer text-format
+configuration file with `--config` instead of supplying the corresponding
+simulation settings as individual CLI options. If gRPC is not enabled,
+standalone Protobuf is found on the system or fetched with CMake
+FetchContent.
+
+**gRPC:** Enable with `-DDR_EVT_ENABLE_GRPC=ON` to build the `dr_evt_server`
+and `dr_evt_client` programs for remote client/server simulation control.
+gRPC automatically enables Protobuf because the service messages are defined
+in `.proto` files. The gRPC dependency path supplies a compatible Protobuf, so
+no separate Protobuf installation is needed for a gRPC build.
 
 **Key relationship:**
 ```
-gRPC build → includes Protobuf (bundled)
-Protobuf-only build → standalone Protobuf installation
+plain build                  → Protobuf OFF, gRPC OFF
+Prototext configuration build → Protobuf ON, gRPC OFF
+client/server build          → gRPC ON, Protobuf enabled automatically
 ```
 
 ### CMake Configuration Options
@@ -398,8 +411,9 @@ logic and computes its own start times, discarding any recorded `begin_time`.
 Only `tracer` honors the file's own times directly.
 
 **Input:** Trace with pre-computed schedule
-- Requires: `num_nodes`, `begin_time`, `end_time`, `job_submit_time`, `queue`,
-  `time_limit` - all six are required columns. `job_submit_time` isn't used
+- Requires: `num_nodes`, `begin_time`, `end_time`, `job_submit_time`, and
+  `time_limit`. `queue` is optional and defaults to `pbatch` when omitted.
+  `job_submit_time` isn't used
   to decide when a job runs (that's `begin_time`), but it drives a per-job
   "nodes busy at submission" stat for downstream analysis/visualization, and
   there's no shorter format that omits it.

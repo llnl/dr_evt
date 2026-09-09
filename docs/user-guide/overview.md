@@ -67,12 +67,12 @@ Makespan: 2010 sec
 
 ### Simple Format (Recommended for Testing)
 
-Simple input supports both simulation and replay. A replay trace uses this
-6-column CSV format:
+Simple input supports both simulation and replay. A replay trace can use this
+minimal 5-column CSV format:
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
 ```
 
 **Columns**:
@@ -80,8 +80,8 @@ job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
 2. `begin_time` - Historical start time (required, for duration calculation)
 3. `end_time` - Historical end time (required, for duration calculation)
 4. `num_nodes` - Number of nodes requested (required)
-5. `queue` - Queue name, must be "pbatch" or "pall"
-6. `time_limit` - User-provided time limit in seconds
+5. `time_limit` - User-provided time limit in seconds
+6. `queue` - Optional queue name; defaults to `pbatch` when omitted
 
 **Ignored input columns**: `exit_status` is an output-only compatibility field.
 If present in an input trace, its value is ignored; it never affects scheduling
@@ -504,7 +504,7 @@ diff results_easy.txt results_conservative.txt
 
 ### Problem: "Loaded 0 jobs from trace"
 
-**Cause**: Queue filtering - only "pbatch" and "pall" queues accepted
+**Cause**: Queue filtering - an explicitly supplied queue name is not accepted
 
 **Solution**: 
 - Use "pbatch" in queue column

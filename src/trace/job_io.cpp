@@ -44,6 +44,7 @@ int load(const string& fname,
     const auto& columns_to_read = dcols.get_cols_to_read();
     const auto record_sz = columns_to_read.size();
     const auto q_idx = dcols.get_queue_idx();
+    const bool has_queue_column = dcols.has_queue_column();
 
     if (columns_to_read.empty()) {
         std::cerr << "no column to read!" << std::endl;
@@ -74,7 +75,9 @@ int load(const string& fname,
 
         auto val_pos = dcols.pick_values(line);
       #if !SHOW_ALL_QUEUE
-        bool right_q = false; // queue of interest
+        // A queue-less trace is assigned pbatch below, so it is always in
+        // the queue of interest under the default filtering configuration.
+        bool right_q = !has_queue_column; // queue of interest
       #endif // !SHOW_ALL_QUEUE
 
         for (auto col_idx = static_cast<col_no_t>(0u); col_idx < record_sz; col_idx ++)
@@ -109,6 +112,15 @@ int load(const string& fname,
             continue;
         }
       #endif // !SHOW_ALL_QUEUE
+
+        if (!has_queue_column) {
+            // Job_Record has one canonical layout in each mode.  Keep the
+            // omitted source field out of the output schema, but insert its
+            // default value for the internal record.
+            const auto queue_pos = dcols.get_trace_mode() == TraceMode::REPLAY
+                ? 4u : 2u;
+            rec_str.insert(rec_str.begin() + queue_pos, "pbatch");
+        }
 
         try {
             // Constructor may raise an exception based on filtering.
