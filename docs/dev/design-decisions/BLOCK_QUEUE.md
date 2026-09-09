@@ -17,8 +17,8 @@ block queue.
 
 The canonical benchmark record and methodology are in
 [Wait Queues](../WAIT_QUEUES.md#benchmark-record). On its recorded
-10K-job, 500-node Sapphire Rapids workload, Block-16 averaged
-`3.956 ± 0.001` seconds. It was the fastest block size, but 26% slower than
+10,001-job, 500-node FCFS/EASY Sapphire Rapids workload, Block-16 averaged
+`3.961 ± 0.003` seconds. It was the fastest block size, but 25% slower than
 deque and substantially slower than circular.
 
 Every C++ queue variant measured so far produced the same simulated-job output

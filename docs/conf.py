@@ -42,6 +42,12 @@ myst_enable_extensions = [
 # document or across documents - fails cross-reference validation.
 myst_heading_anchors = 4
 
+# Responsibility pages and source-directory pages deliberately present the
+# same generated C++ declarations through two complementary navigation paths.
+# Breathe registers a C++ domain target for each rendering, so these expected
+# duplicate anchors are not actionable documentation warnings.
+suppress_warnings = ['duplicate_declaration.cpp']
+
 # Mermaid configuration
 mermaid_version = "10.6.1"  # Use specific stable version
 mermaid_init_js = """
@@ -87,10 +93,10 @@ if _has_doxygen_xml:
     breathe_default_project = 'dr_evt'
     tags.add('doxygen')
 else:
-    # The Breathe directive lives in this page.  Excluding it prevents a
-    # direct Sphinx build from attempting to parse a reference that has not
-    # been generated yet.
-    exclude_patterns.append('api/cpp-api-reference.rst')
+    # The generated source-directory pages contain Breathe directives.
+    # Excluding them keeps direct Sphinx builds useful when Doxygen XML has
+    # not been generated.
+    exclude_patterns.append('api/cpp/source/*')
 html_logo = '_static/dr_evt_logo.svg'
 html_favicon = '_static/favicon.ico'
 

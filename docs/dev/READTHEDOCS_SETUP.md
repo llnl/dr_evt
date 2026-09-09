@@ -71,12 +71,12 @@ docs/
 ├── dev/
 │   ├── README.md                    # Dev documentation index
 │   ├── READTHEDOCS_SETUP.md         # This file
+│   ├── OUTPUT_TRACE_BUFFERS.md       # Circular output-trace buffers and streaming state
 │   ├── design-decisions/            # Architectural decisions
 │   │   ├── README.md
 │   │   ├── BLOCK_QUEUE.md
 │   │   ├── BLOCK_QUEUE_TESTING.md
 │   │   ├── CIRCULAR_QUEUE.md
-│   │   ├── OUT_TRACE_STREAMING.md
 │   │   ├── SIMULATION_VS_REPLAY_MODES.md
 │   │   └── TIMEZONE_SUPPORT.md
 ├── BACKFILLING_ALGORITHMS.md

@@ -479,4 +479,4 @@ anything - treat its output as unverified until that happens.
 - `src/sim/sim.cpp` - Implementation
 - `tests/test_append_job_api.cpp` - Usage examples
 - [gRPC Client/Server Guide and API](../CLIENT_SERVER_GUIDE.md) - Network-exposed streaming API, MPI multi-client/multi-server harness
-- [Progressive/Multi-File Loading](../dev/design-decisions/OUT_TRACE_STREAMING.md) - `--infile_list`, a related but distinct capability: bounding job-store memory across a trace the caller already knows in full (split across files), rather than jobs arriving live
+- [Progressive/Multi-File Loading](../dev/OUTPUT_TRACE_BUFFERS.md) - `--infile_list`, a related but distinct capability: bounding job-store memory across a trace the caller already knows in full (split across files), rather than jobs arriving live
