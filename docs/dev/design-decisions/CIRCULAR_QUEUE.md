@@ -6,9 +6,9 @@ Circular queue is now DR_EVT's default FCFS wait-queue implementation.
 It's structurally identical to the deque-based FCFSScheduler it replaced
 as default - same job entry layout, same lazy-mark-and-compact removal,
 same `pop_front()` head consumption, same indexed backfill scan - but
-backed by `boost::circular_buffer` instead of `std::deque`. **Measured
-75% faster than deque in the recorded end-to-end benchmark (10K jobs,
-500 nodes, 10 runs).**
+backed by `boost::circular_buffer` instead of `std::deque`. **Measured at
+75% less elapsed time than deque (3.93× speedup) in the recorded end-to-end
+benchmark (10K jobs, 500 nodes, 10 runs).**
 
 **Command:** `./simulator trace.csv` (default) or explicitly `./simulator trace.csv --queue_impl circular`
 
@@ -16,8 +16,9 @@ backed by `boost::circular_buffer` instead of `std::deque`. **Measured
 
 The canonical benchmark record and methodology are in
 [Wait Queues](../WAIT_QUEUES.md#benchmark-record). On its recorded
-10K-job, 500-node Sapphire Rapids workload, circular averaged `0.786 ± 0.002`
-seconds versus deque's `3.142 ± 0.052` seconds: 75% faster end-to-end.
+10,001-job, 500-node FCFS/EASY Sapphire Rapids workload, circular averaged
+`0.805 ± 0.006` seconds versus deque's `3.160 ± 0.083` seconds: 75% less
+elapsed time, or a 3.93× end-to-end speedup.
 
 Circular and every tested block size produced the same simulated-job output as
 deque in all 10 runs. The 34-case queue-implementation differential test also

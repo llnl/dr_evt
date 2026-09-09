@@ -19,8 +19,9 @@ for comparison, testing, and research.
 
 ## Benchmark record
 
-This record was collected in September 2026 using the default 10K-job
-benchmark trace with 500 nodes on an Intel Sapphire Rapids node (112 cores,
+This record was collected in September 2026 using
+`tests/test_traces/scale/huge_10000jobs.csv` (10,001 jobs), 500 nodes, and
+FCFS with EASY backfilling on an Intel Sapphire Rapids node (112 cores,
 256 GB memory). Values are the mean of 10 end-to-end runs; `±` is the
 population standard deviation.
 
@@ -29,25 +30,26 @@ and trace output. It is not an isolated wait-queue microbenchmark. The queue
 implementation is the intended variable, but the complete difference cannot be
 attributed solely to queue operations.
 
+![Mean end-to-end runtime relative to deque; lower is better.](../_static/wait-queue-benchmark.svg)
+
 | Implementation | Time (s) | Relative to deque |
 | --- | ---: | --- |
-| Deque | 3.142 ± 0.052 | baseline |
-| Multimap | not yet measured | — |
-| **Circular** | **0.786 ± 0.002** | **75% faster (0.25×)** |
-| Block-4 | 4.739 ± 0.003 | 51% slower (1.51×) |
-| Block-8 | 4.282 ± 0.007 | 36% slower (1.36×) |
-| Block-16 | 3.956 ± 0.001 | 26% slower (1.26×) |
-| Block-32 | 4.057 ± 0.005 | 29% slower (1.29×) |
-| Block-64 | 4.352 ± 0.004 | 38% slower (1.39×) |
-| Block-128 | 4.383 ± 0.007 | 40% slower (1.40×) |
-| Block-256 | 4.712 ± 0.005 | 50% slower (1.50×) |
-| Python reference | not yet measured | — |
+| Deque | 3.160 ± 0.083 | baseline |
+| Multimap | 27.840 ± 0.024 | 781% slower (8.81×) |
+| **Circular** | **0.805 ± 0.006** | **75% less elapsed time (3.93× speedup)** |
+| Block-4 | 4.741 ± 0.004 | 50% slower (1.50×) |
+| Block-8 | 4.288 ± 0.004 | 36% slower (1.36×) |
+| Block-16 | 3.961 ± 0.003 | 25% slower (1.25×) |
+| Block-32 | 4.056 ± 0.005 | 28% slower (1.28×) |
+| Block-64 | 4.354 ± 0.002 | 38% slower (1.38×) |
+| Block-128 | 4.388 ± 0.007 | 39% slower (1.39×) |
+| Block-256 | 4.716 ± 0.006 | 49% slower (1.49×) |
+| Python reference | 7.675 ± 0.052 | 143% slower (2.43×) |
 
-The 10 runs produced identical simulated-job output across the measured C++
-queue variants. The multimap and Python entries are intentionally retained as
-unmeasured rows so future results can be added using the same methodology. The
-Python reference is useful as an end-to-end baseline, but is not byte-compared
-with C++ because it emits a different CSV schema.
+The 10 runs produced identical simulated-job output across every measured C++
+queue variant, including multimap. The Python reference is an end-to-end
+baseline, but is not byte-compared with C++ because it emits a different CSV
+schema.
 
 Run the benchmark with:
 
