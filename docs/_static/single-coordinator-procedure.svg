@@ -1,22 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="910" height="1040" viewBox="50 0 910 1040" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="1040" viewBox="110 0 850 1040" role="img" aria-labelledby="title description">
   <title id="title">Single coordinator composite stream procedure</title>
   <desc id="description">A vertical flowchart showing how one coordinator drives two independent servers for ordinary and composite job streams.</desc>
   <defs>
-    <marker id="arrow" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0 0 L8 2.5 L0 5 Z" fill="#35536b"/></marker>
+    <marker id="arrow" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0 0 L8 2.5 L0 5 Z" fill="#94a9b5"/></marker>
     <style>
       .title { font-family: sans-serif; font-size: 30px; font-weight: 700; fill: #172b3a; }
       .sub { font-family: sans-serif; font-size: 18px; fill: #4d6475; }
-      .box { fill: #f7fafc; stroke: #aab9c3; stroke-width: 1.25; }
-      .input { fill: #e7f1f8; stroke: #9bc1d2; stroke-width: 1.25; }
-      .note { fill: #fce7f3; stroke: #deb0c5; stroke-width: 1.25; }
+      .box { fill: #f7fafc; stroke: #d5dfe4; stroke-width: 1.25; }
+      .input { fill: #e7f1f8; stroke: #c6dce8; stroke-width: 1.25; }
+      .note { fill: #fce7f3; stroke: #ebc6d8; stroke-width: 1.25; }
       .step { font-family: sans-serif; font-size: 21px; font-weight: 700; fill: #172b3a; }
       .text { font-family: sans-serif; font-size: 17px; fill: #263d4d; }
-      .arrow { stroke: #35536b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .arrow { stroke: #94a9b5; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
     </style>
   </defs>
   <rect width="960" height="1040" fill="white"/>
-  <text x="480" y="42" text-anchor="middle" class="title">Single-coordinator composite-stream procedure</text>
-  <text x="480" y="70" text-anchor="middle" class="sub">One client reads both ordinary traces and the composite stream.</text>
+  <text x="535" y="42" text-anchor="middle" class="title">Single-coordinator composite-stream procedure</text>
+  <text x="535" y="70" text-anchor="middle" class="sub">One client reads both ordinary traces and the composite stream.</text>
   <rect x="150" y="105" width="660" height="92" rx="12" class="input"/>
   <text x="480" y="140" text-anchor="middle" class="step">Coordinator input</text>
   <text x="480" y="168" text-anchor="middle" class="text">ordinary trace A, ordinary trace B, and composite-job stream</text>
