@@ -6,9 +6,9 @@ DR_EVT includes a **SLURM-style backfilling scheduler**, enabling realistic job 
 
 ## Features
 
+- **Priority Policies**: FCFS (First-Come-First-Served), an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF (Shortest-Job-First), LJF (Longest-Job-First)
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
-- **Priority Policies**: FCFS (First-Come-First-Served), an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF (Shortest-Job-First), LJF (Longest-Job-First)
 - **Run Time Modes**: Read from trace (actual), sample from distribution, or use time limits
 
 ## Build Instructions
@@ -39,12 +39,13 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 
 ### Dependencies
 
-Both Boost and Protobuf are found via `find_package` first, falling back
-to CMake `FetchContent` (downloading and building from source, no
-root/sudo needed) if not found on the system - Boost takes ~10-15
-minutes this way, Protobuf ~5-10 minutes. Subsequent builds are fast.
-Protobuf is only needed at all if you enable it explicitly (see below) -
-the plain build shown above does not require or fetch it.
+If dependencies such as Boost, Protobuf, and gRPC are already available on
+the system, they are found via `find_package` first. Otherwise, CMake falls
+back to `FetchContent` (downloading and building from source, no root/sudo
+needed) - Boost takes ~10-15 minutes this way, Protobuf ~5-10 minutes.
+Subsequent builds are fast. ProtoBuf and gRPC are optional and enabled via
+build options (see below). For full setup details, see
+[Installation](installation.md).
 
 - **Boost**: `find_package` first; `FetchContent` fallback if not found
 - **Protobuf**: only relevant with `-DDR_EVT_ENABLE_PROTOBUF=ON` (needed for `--config` files and the gRPC client/server); `find_package` first, `FetchContent` fallback if not found - see [Protobuf Configuration](../user-guide/protobuf-config.md) and [Client/Server Setup](../user-guide/grpc-setup.md)
@@ -179,18 +180,6 @@ for how the parser picks a mode.
 
 ## Understanding the Algorithms
 
-### EASY Backfilling
-- **How it works**: The first job in the queue gets a guaranteed start time (reservation)
-- **Backfilling**: Smaller jobs can "jump the queue" if they finish before the first job's reservation
-- **Best for**: Mixed workloads with varying job sizes
-- **Tradeoff**: Simple but may delay some jobs unnecessarily
-
-### Conservative Backfilling
-- **How it works**: ALL queued jobs get reservations
-- **Backfilling**: Jobs can only backfill if they don't delay ANY reservation
-- **Best for**: Fairness - prevents starvation
-- **Tradeoff**: More conservative, may leave resources idle
-
 ### Priority Policies
 
 **FCFS (First-Come-First-Served)**
@@ -207,6 +196,18 @@ for how the parser picks a mode.
 - Longer jobs scheduled first
 - Useful for throughput optimization
 - May starve short jobs
+
+### EASY Backfilling
+- **How it works**: The first job in the queue gets a guaranteed start time (reservation)
+- **Backfilling**: Smaller jobs can "jump the queue" if they finish before the first job's reservation
+- **Best for**: Mixed workloads with varying job sizes
+- **Tradeoff**: Simple but may delay some jobs unnecessarily
+
+### Conservative Backfilling
+- **How it works**: ALL queued jobs get reservations
+- **Backfilling**: Jobs can only backfill if they don't delay ANY reservation
+- **Best for**: Fairness - prevents starvation
+- **Tradeoff**: More conservative, may leave resources idle
 
 ### Run Time Modes
 

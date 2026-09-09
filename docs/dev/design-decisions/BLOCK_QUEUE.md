@@ -1,4 +1,4 @@
-# Block Queue Wait Queue Implementation
+# Block Wait Queue Implementation
 
 ## Quick Summary
 

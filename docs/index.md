@@ -52,20 +52,12 @@ CLIENT_SERVER_GUIDE
 ```
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 3
 :caption: Development
 
 dev/README
-dev/JOB_LIFECYCLE
-reference/terminology
-dev/design-decisions/BLOCK_QUEUE
-dev/design-decisions/BLOCK_QUEUE_TESTING
-dev/design-decisions/CIRCULAR_QUEUE
-dev/design-decisions/README
-dev/design-decisions/SIMULATION_VS_REPLAY_MODES
-dev/design-decisions/TIMEZONE_SUPPORT
-dev/design-decisions/OUT_TRACE_STREAMING
 dev/READTHEDOCS_SETUP
+reference/terminology
 ```
 
 ## Documentation

@@ -24,6 +24,7 @@ docs/
 │   └── client-server-use-cases.md # Client/server deployment examples
 ├── dev/                             # Developer documentation
 │   ├── README.md                  # Developer docs index
+│   ├── BLOCK_WAIT_QUEUE.md        # Block wait-queue implementation and tests
 │   ├── READTHEDOCS_SETUP.md       # ReadTheDocs configuration notes
 │   └── design-decisions/          # Why we made choices
 │       ├── README.md
@@ -64,7 +65,7 @@ docs/
 
 ### For Developers
 1. [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - How it works
-2. [Design Decisions](dev/README.md) - Why, and system design notes
+2. [Design Decisions](dev/design-decisions/README.md) - Why, and system design notes
 3. [Streaming API](api/STREAMING_API.md) - Online simulation API
 
 ## Building Documentation

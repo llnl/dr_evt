@@ -8,6 +8,15 @@ This directory contains architectural decisions and design rationales for DR_EVT
 - **[Timezone Support](TIMEZONE_SUPPORT.md)** - How timezone handling works for ISO timestamp traces
 - **[Trace as a streaming-ready state container](OUT_TRACE_STREAMING.md)** - `Trace` owning all session state (job records + resource-history) as bounded circular buffers; genuine streaming insertion (`append_job()`/`append_jobs()`, exposed over gRPC), progressive/multi-file loading (`--infile_list`), and a memory-pressure check (`--check_memory_pressure FRACTION`) built on top of it
 
+```{toctree}
+:maxdepth: 1
+
+CIRCULAR_QUEUE
+SIMULATION_VS_REPLAY_MODES
+TIMEZONE_SUPPORT
+OUT_TRACE_STREAMING
+```
+
 ## Purpose
 
 These documents record the "why" behind non-obvious design choices. They help:
