@@ -27,6 +27,7 @@ docs/
 │   ├── README.md                  # Developer docs index
 │   ├── BLOCK_WAIT_QUEUE.md        # Block wait-queue implementation and tests
 │   ├── JOB_LIFECYCLE.md           # Job-store, wait-queue, and event lifecycle
+│   ├── OUTPUT_TRACE_BUFFERS.md    # Circular output-trace buffers and streaming state
 │   ├── READTHEDOCS_SETUP.md       # ReadTheDocs configuration notes
 │   └── design-decisions/          # Why we made choices
 │       ├── README.md
@@ -35,7 +36,6 @@ docs/
 │       ├── CIRCULAR_QUEUE.md
 │       ├── SIMULATION_VS_REPLAY_MODES.md
 │       ├── TIMEZONE_SUPPORT.md
-│       └── OUT_TRACE_STREAMING.md
 ├── reference/                      # Technical reference
 │   └── terminology.md             # Terms and definitions
 ├── api/                             # API documentation

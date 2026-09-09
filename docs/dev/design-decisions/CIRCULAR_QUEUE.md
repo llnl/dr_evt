@@ -194,5 +194,5 @@ these buffers are separate from the scheduler's FCFS wait queue:
 The output files themselves are streamed; they are not circular buffers. See
 [Output Trace Files](../../user-guide/output-traces.md) for their CSV formats and
 defaults. For the ownership, reclamation, capacity, and streaming behavior of
-both output-trace buffers, see [Trace as a self-contained, streaming-ready
-state container](OUT_TRACE_STREAMING.md).
+both output-trace buffers, see [Output-Trace Buffers and Streaming Trace
+State](../OUTPUT_TRACE_BUFFERS.md).

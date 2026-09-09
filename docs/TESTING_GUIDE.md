@@ -344,7 +344,7 @@ cd build
 **Location:** `tests/run_job_store_tests.sh`
 **Purpose:** Verify the job-store circular buffer (`Trace::m_data`, `--job_store_capacity`) produces identical output and stats regardless of the requested initial capacity, correctly excludes rejected jobs without stalling, aborts cleanly when capacity can't be satisfied, and measures the wall-clock cost of a too-small initial capacity
 
-**Batch mode note:** loading a whole trace file (the only mode that exists today) sizes capacity to fit the entire trace before the run starts - a too-small `--job_store_capacity` triggers repeated *reallocation* during loading (falling back to growing), not repeated *reclaiming* during the run, which essentially can't happen more than once in batch mode - see `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`.
+**Batch mode note:** loading a whole trace file (the only mode that exists today) sizes capacity to fit the entire trace before the run starts - a too-small `--job_store_capacity` triggers repeated *reallocation* during loading (falling back to growing), not repeated *reclaiming* during the run, which essentially can't happen more than once in batch mode - see `docs/dev/OUTPUT_TRACE_BUFFERS.md`.
 
 **How it works:**
 1. Run each input twice: once with the default (already-sufficient) capacity, once with a tiny requested capacity (2) that forces several grow reallocations during loading
@@ -376,7 +376,7 @@ cd build
 
 **How it works:**
 1. (C++) A trace with zero preloaded jobs (empty-of-rows CSV), then jobs appended one at a time via `append_job()` and run to completion → output/stats must be correct
-2. (C++) Force `--job_store_capacity 1`; confirm a second `append_job()` call reclaims the first (already-finished) job's slot rather than growing - the actual point this ordering matters, unlike `load_data()` (see `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`'s "Reclaim at the point of need" section for why `load_data()` itself never needs this)
+2. (C++) Force `--job_store_capacity 1`; confirm a second `append_job()` call reclaims the first (already-finished) job's slot rather than growing - the actual point this ordering matters, unlike `load_data()` (see `docs/dev/OUTPUT_TRACE_BUFFERS.md`'s reclamation section for why `load_data()` itself never needs this)
 3. (C++) `append_job()` enforces the same `submit_time >= current_time` precondition `submit_job()` already does → must throw on a past submit_time
 4. (C++) `append_jobs()` batch call - several jobs in one call, run to completion → output/stats must be correct
 5. (C++) `append_jobs()` rejects a batch not sorted by `submit_time`, non-decreasing - and, being all-or-nothing on input validation, leaves `m_data` completely untouched
@@ -462,7 +462,7 @@ ordering (`t1 < t2 < t3`), and final ordinary work after the composite stream
 ## Progressive Loading Tests
 
 **Location:** `tests/test_progressive_load.cpp` (C++), `tests/run_progressive_load_tests.sh` (both wraps the C++ binary and runs CLI-level checks)
-**Purpose:** Verify `--infile_list`/`Trace::load_next_file()`/`Simulation::run_progressive()` - loading a trace as a sequence of separate, pre-sorted files instead of one big one, so `--job_store_capacity` can actually bound memory (single-file mode always grows to fit the whole trace regardless of this setting; see `docs/dev/design-decisions/OUT_TRACE_STREAMING.md`)
+**Purpose:** Verify `--infile_list`/`Trace::load_next_file()`/`Simulation::run_progressive()` - loading a trace as a sequence of separate, pre-sorted files instead of one big one, so `--job_store_capacity` can actually bound memory (single-file mode always grows to fit the whole trace regardless of this setting; see `docs/dev/OUTPUT_TRACE_BUFFERS.md`)
 
 **How it works:**
 1. (C++) The same 6 jobs split across 3 files vs. one combined file must produce byte-identical output - splitting the input shouldn't change the schedule

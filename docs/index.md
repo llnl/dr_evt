@@ -60,7 +60,6 @@ dev/README
 dev/WAIT_QUEUES
 dev/JOB_LIFECYCLE
 dev/design-decisions/SIMULATION_VS_REPLAY_MODES
-dev/design-decisions/OUT_TRACE_STREAMING
 dev/design-decisions/TIMEZONE_SUPPORT
 dev/READTHEDOCS_SETUP
 ```

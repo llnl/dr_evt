@@ -321,7 +321,7 @@ Only `--job_store_capacity` actually bounds memory when used with `--infile_list
 (single-file mode always grows to fit the whole trace); `--check_memory_pressure`
 is a separate, independent check against real available memory - see
 [Command-Line Options](command-line.md) and
-[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
+[Output-trace buffers and streaming trace state](../dev/OUTPUT_TRACE_BUFFERS.md)
 for the full formula and rationale.
 
 ### Run Time Options

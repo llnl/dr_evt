@@ -66,4 +66,5 @@ correctness.
 
 design-decisions/CIRCULAR_QUEUE
 BLOCK_WAIT_QUEUE
+OUTPUT_TRACE_BUFFERS
 ```

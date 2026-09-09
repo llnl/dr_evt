@@ -2,9 +2,20 @@
 
 This is the entry point for the generated C++ reference. Start with a
 responsibility when you know the subsystem you are changing, or with a source
-directory when you are navigating the implementation. Each category has its
+directory or file when you are navigating the implementation. Each category has its
 own page, including the generated declarations and a page-local filter where
 applicable.
+
+<form class="api-search api-symbol-search" action="../search.html" method="get" role="search">
+  <label for="cpp-api-symbol-search">Search C++ symbols</label>
+  <input id="cpp-api-symbol-search" name="q" type="search" placeholder="e.g., Trace::append_job, Sim_Params, QueueImplementation" autocomplete="off">
+  <button type="submit">Search</button>
+  <span class="api-search-help">Searches generated C++ declarations by symbol name.</span>
+</form>
+
+The symbol search uses the documentation-wide index, so results may also
+include guides that mention the symbol. Generated C++ declaration results are
+available when the build includes Doxygen XML.
 
 <div class="api-search" role="search">
   <label for="cpp-api-map-search">Search C++ API categories</label>
@@ -19,15 +30,15 @@ applicable.
 ```{toctree}
 :maxdepth: 1
 
-cpp/topics/job-store
-cpp/topics/trace-replay
-cpp/topics/resource-trace
-cpp/topics/scheduling-backfill
-cpp/topics/simulator
-cpp/topics/client-server
+cpp/topics/job-store.rst
+cpp/topics/trace-replay.rst
+cpp/topics/resource-trace.rst
+cpp/topics/scheduling-backfill.rst
+cpp/topics/simulator.rst
+cpp/topics/client-server.rst
 cpp/topics/bindings
-cpp/topics/configuration
-cpp/topics/utilities
+cpp/topics/configuration.rst
+cpp/topics/utilities.rst
 ```
 
 ## Browse by source directory
@@ -42,6 +53,14 @@ cpp/source/params
 cpp/source/proto
 cpp/source/mpi
 cpp/source/utils
+```
+
+## Browse by code file
+
+```{toctree}
+:maxdepth: 1
+
+cpp/files
 ```
 
 </div>

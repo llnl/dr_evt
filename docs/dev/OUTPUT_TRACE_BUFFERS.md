@@ -1,4 +1,4 @@
-# Trace as a self-contained, streaming-ready state container
+# Output-Trace Buffers and Streaming Trace State
 
 `Trace` owns the state required to run a simulation and produce its output
 traces. The two potentially unbounded collections—the job-record store and the
@@ -17,7 +17,7 @@ rather than retaining a pointer to a separate, fixed-layout job vector.
 
 The buffers are independent of the scheduler's circular FCFS wait queue. The
 CSV output files are streamed; they are not circular buffers themselves. See
-[Output Trace Files](../../user-guide/output-traces.md) for their formats and
+[Output Trace Files](../user-guide/output-traces.md) for their formats and
 defaults.
 
 ## Job-record storage and stable identifiers

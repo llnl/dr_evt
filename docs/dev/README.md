@@ -11,8 +11,6 @@ maintainer-facing build guidance. It is separate from the user documentation.
   scheduler, and event queue.
 - [Simulation vs. Replay Modes](design-decisions/SIMULATION_VS_REPLAY_MODES.md)
   — The two execution models and their trade-offs.
-- [Trace as a Streaming-Ready State Container](design-decisions/OUT_TRACE_STREAMING.md)
-  — Job storage, resource history, streaming insertion, and progressive loading.
 - [Timezone Offset Support](design-decisions/TIMEZONE_SUPPORT.md) — ISO 8601
   timestamp offsets and their current implementation status.
 

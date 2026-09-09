@@ -46,7 +46,7 @@ traces/part2.csv
 traces/part3.csv
 ```
 
-See [`docs/dev/design-decisions/OUT_TRACE_STREAMING.md`](../dev/design-decisions/OUT_TRACE_STREAMING.md) for the full design.
+See [`docs/dev/OUTPUT_TRACE_BUFFERS.md`](../dev/OUTPUT_TRACE_BUFFERS.md) for the full design.
 
 ### `-o, --outfile FILENAME`
 Output file for simulated job trace.
@@ -237,7 +237,7 @@ What to do if an insert would exceed `--wait_queue_capacity`. Only used when
 ### `-K, --job_store_capacity SIZE`
 Initial capacity of the job-record store (`Trace::m_data`, a
 `boost::circular_buffer`). See
-[Trace as a streaming-ready state container](../dev/design-decisions/OUT_TRACE_STREAMING.md)
+[Output-trace buffers and streaming trace state](../dev/OUTPUT_TRACE_BUFFERS.md)
 for what this actually buys you - in short: with `--infile` (single-file
 mode, loading a whole trace file upfront), capacity always grows to fit
 the whole trace during loading regardless of this setting, so a smaller
@@ -301,7 +301,7 @@ environments as noted above).
 ./build/simulator --infile_list traces/file_list.txt --check_memory_pressure 0.8
 ```
 
-See [`docs/dev/design-decisions/OUT_TRACE_STREAMING.md`](../dev/design-decisions/OUT_TRACE_STREAMING.md) for the exact formula (mirrors the actual grow-doubling logic, not a fixed multiplier) and rationale.
+See [`docs/dev/OUTPUT_TRACE_BUFFERS.md`](../dev/OUTPUT_TRACE_BUFFERS.md) for the exact formula (mirrors the actual grow-doubling logic, not a fixed multiplier) and rationale.
 
 ### `-H, --resource_history_capacity SIZE`
 Initial capacity of the resource-history circular buffer (the
