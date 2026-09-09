@@ -69,13 +69,11 @@ A working, correctly-formatted equivalent already exists as
 `sequential_3jobs.trace` (6-column, tab-separated replay format) - consider
 using that instead of fixing the `.csv` versions from scratch.
 
-**Queue name requirement:** the `queue` field in any trace must be
-`pbatch` (or `pbatch0`-`pbatch3`) - other values, including the seemingly
-reasonable `"batch"`, are silently dropped during load (see
-`src/trace/job_io.cpp`'s queue filter). This fails silently, not loudly: a
-trace with the wrong queue name loads zero jobs and produces an empty
-`expected_output.csv`, with no error printed. This is exactly how
-`simple_2jobs.csv` and `timestamp_epoch_simple.csv` broke previously.
+**Queue input:** the default build reads an optional numeric `q_id`, defaulting
+to `1` when it is absent. The legacy `queue` field is selected only with
+`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`; its name-based filter accepts `pbatch` (or
+`pbatch0`-`pbatch3`) and can silently drop other names. This is legacy-only
+behavior, not a constraint on the default test fixtures.
 
 ### Feature Tests (6 tests)
 **Location:** `feature/`

@@ -200,6 +200,10 @@ option(DR_EVT_ENABLE_PROTOBUF "Enable Protobuf support" OFF)
 # since the gRPC service definition is itself a .proto file)
 option(DR_EVT_ENABLE_GRPC "Enable gRPC client/server support" OFF)
 
+# Select the trace-file queue representation at configure time. Legacy mode
+# keeps existing `queue`-name traces compatible; ID mode reads `q_id` only.
+option(DR_EVT_LEGACY_QUEUE_INPUT "Read legacy queue-name trace columns instead of q_id" OFF)
+
 if (DR_EVT_ENABLE_GRPC)
   if (NOT DR_EVT_ENABLE_PROTOBUF)
     message(STATUS "DR_EVT_ENABLE_GRPC=ON automatically enables DR_EVT_ENABLE_PROTOBUF")
@@ -580,6 +584,19 @@ set_target_properties(test_progressive_load-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_progressive_load-bin)
 
+# Trace queue-input schema test (legacy queue names or q_id, selected at
+# configure time) - intentionally separate from progressive loading.
+add_executable( test_queue_input-bin tests/test_queue_input.cpp )
+target_include_directories(test_queue_input-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(test_queue_input-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_queue_input-bin PROPERTIES OUTPUT_NAME test_queue_input)
+set_target_properties(test_queue_input-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_queue_input-bin)
+
 
 # Batch vs Streaming equivalence test
 add_executable( test_batch_vs_streaming-bin tests/test_batch_vs_streaming.cpp )
@@ -632,9 +649,9 @@ if(MPI_CXX_FOUND)
   list(APPEND DR_EVT_UNIT_TEST_TARGETS test_mpi_streaming-bin)
 endif()
 
-# Install Boost libraries only when this configure built Boost via
-# FetchContent.  An old _deps directory must not cause installation when a
-# system Boost was selected instead.
+# Install the complete Boost development payload only when this configure
+# built Boost via FetchContent. An old _deps directory must not cause
+# installation when a system Boost was selected instead.
 if(DR_EVT_BOOST_FETCHCONTENT)
   file(GLOB BOOST_LIBS
     "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/filesystem/libboost_filesystem*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
@@ -646,6 +663,23 @@ if(DR_EVT_BOOST_FETCHCONTENT)
   if(BOOST_LIBS)
     install(FILES ${BOOST_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
+
+  # Boost headers are spread across many libs/*/include/boost trees in the
+  # CMake distribution. Merge them into the conventional include/boost
+  # destination, including .ipp implementation headers and generated config
+  # headers. Without this, the installed libraries cannot be consumed by a
+  # subsequent configure that searches CMAKE_INSTALL_PREFIX.
+  if(EXISTS "${boost_SOURCE_DIR}/boost")
+    install(DIRECTORY "${boost_SOURCE_DIR}/boost"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  endif()
+  file(GLOB BOOST_HEADER_TREES LIST_DIRECTORIES true
+       "${boost_SOURCE_DIR}/libs/*/include/boost")
+  foreach(BOOST_HEADER_TREE IN LISTS BOOST_HEADER_TREES)
+    install(DIRECTORY "${BOOST_HEADER_TREE}/"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/boost)
+  endforeach()
+  unset(BOOST_HEADER_TREES)
 endif()
 
 # Install the binaries

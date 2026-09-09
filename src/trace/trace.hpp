@@ -42,7 +42,7 @@ namespace dr_evt {
 struct Job_Append_Request {
     epoch_t submit_time;
     num_nodes_t num_nodes;
-    job_queue_t queue;
+    job_queue_t queue = QueueUnknown;
     timeout_t limit_time;
 };
 

@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <fstream>
 #include "trace/job_io.hpp"
-#include "trace/parse_utils.hpp" // to_string(job_queue_t) - used by write_job_line()
+#include "trace/parse_utils.hpp"
 #include "trace/trace.hpp"
 #include "utils/system_memory.hpp" // get_available_memory_bytes() - check_memory_pressure()
 
@@ -132,7 +132,7 @@ Trace::Context::Context() :
     m_dat_start(epoch_t{}),
     m_dat_end(epoch_t{}),
     m_dat_span(0.0),
-    m_prev_job_q(pUnknown),
+    m_prev_job_q(QueueUnknown),
   #endif
     m_n_nodes_in_use(static_cast<num_nodes_t>(0u))
 {}
@@ -172,8 +172,8 @@ void Trace::process_events_until(const epoch_t& t_sub)
 
         if (cur->is_arrival()) {
           #if MARK_DAT_PERIOD
-            if (job_q == pAll) {
-                if ((m_ctx.m_prev_job_q != pAll) &&
+            if (_Is_Exclusive(job_q)) {
+                if ((!_Is_Exclusive(m_ctx.m_prev_job_q)) &&
                     (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u))) {
                     // No other DAT job is running and
                     // the last job seen was not a DAT job
@@ -194,7 +194,7 @@ void Trace::process_events_until(const epoch_t& t_sub)
           #endif
         } else {
           #if MARK_DAT_PERIOD
-            if (job_q == pAll) {
+            if (_Is_Exclusive(job_q)) {
               #if !EVENT_TIME_ORDER
                 if (m_ctx.m_pAll_cnt == static_cast<num_jobs_t>(0u)) {
                     std::string err = "Inconsistent event times with job "
@@ -805,9 +805,15 @@ void Trace::write_job_line(const Job_Record& job)
         format_sim_time(convert_epoch<sim_time_t>(job.get_end_time()), m_simulated_trace_msec) + "," +
         std::to_string(job.get_num_nodes()) + "," +
         "0,";
+  #if DR_EVT_LEGACY_QUEUE_INPUT
     if (m_dcols.has_queue_column()) {
         line += dr_evt::to_string(job.get_queue()) + ",";
     }
+  #else
+    if (m_dcols.has_q_id_column()) {
+        line += std::to_string(static_cast<unsigned>(job.get_queue())) + ",";
+    }
+  #endif
     line +=
         format_sim_time(job.get_limit_time(), m_simulated_trace_msec) + "\n";
     m_simulated_trace_ofs << line;
@@ -828,9 +834,15 @@ void Trace::start_simulated_trace(const std::string& filename, bool msec)
     }
     m_simulated_trace_msec = msec;
     std::string header = "job_submit_time,begin_time,end_time,num_nodes,exit_status";
+  #if DR_EVT_LEGACY_QUEUE_INPUT
     if (m_dcols.has_queue_column()) {
         header += ",queue";
     }
+  #else
+    if (m_dcols.has_q_id_column()) {
+        header += ",q_id";
+    }
+  #endif
     header += ",time_limit\n";
     m_simulated_trace_ofs << header;
 }

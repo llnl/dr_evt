@@ -1,5 +1,3 @@
-set(PROTOBUF_MIN_VERSION "3.0.0")
-
 # For cross-compilation, we need to use protoc executable compiled to
 # run on host (build) machines rather than on targer machines.
 # This is because protoc is called while compiling the application
@@ -23,7 +21,7 @@ if (Protobuf_PROTOC_EXECUTABLE)
     list(APPEND CMAKE_LIBRARY_PATH ${PROTOBUF_DIR}/lib)
     list(APPEND CMAKE_INCLUDE_PATH ${PROTOBUF_DIR}/include)
 
-    find_package(Protobuf "${PROTOBUF_MIN_VERSION}" MODULE)
+    find_package(Protobuf MODULE)
 
     list(REMOVE_ITEM CMAKE_PREFIX_PATH ${PROTOBUF_DIR})
     list(REMOVE_ITEM CMAKE_LIBRARY_PATH ${PROTOBUF_DIR}/lib)
@@ -40,13 +38,31 @@ else (Protobuf_PROTOC_EXECUTABLE)
   # Skip system paths for Protobuf (useful when system install is broken/incompatible)
   option(AVOID_SYSTEM_PROTOBUF "Do not search default system paths for Protobuf" FALSE)
 
+  # protobuf-config.cmake may itself find Abseil and utf8_range. HINTS only
+  # affects the outer find_package() call, so temporarily expose a supplied
+  # prefix to those nested lookups as well. Do not add an empty prefix.
+  set(DR_EVT_SAVED_CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
+  set(DR_EVT_PROTOBUF_CONFIG_PREFIXES)
+  if (CMAKE_INSTALL_PREFIX)
+    list(APPEND DR_EVT_PROTOBUF_CONFIG_PREFIXES "${CMAKE_INSTALL_PREFIX}")
+  endif()
+  if (Protobuf_ROOT)
+    list(APPEND DR_EVT_PROTOBUF_CONFIG_PREFIXES "${Protobuf_ROOT}")
+  endif()
+  if (PROTOBUF_ROOT)
+    list(APPEND DR_EVT_PROTOBUF_CONFIG_PREFIXES "${PROTOBUF_ROOT}")
+  endif()
+  if (DR_EVT_PROTOBUF_CONFIG_PREFIXES)
+    list(PREPEND CMAKE_PREFIX_PATH ${DR_EVT_PROTOBUF_CONFIG_PREFIXES})
+  endif()
+
   if (PROTOBUF_ROOT)
     option(protobuf_MODULE_COMPATIBLE
       "Be compatible with FindProtobuf.cmake" ON)
     option(protobuf_VERBOSE
       "Enable verbose protobuf output" OFF)
 
-    find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
+    find_package(Protobuf CONFIG QUIET
       NAMES protobuf PROTOBUF
       HINTS
       "${Protobuf_ROOT}" "${PROTOBUF_ROOT}"
@@ -57,29 +73,32 @@ else (Protobuf_PROTOC_EXECUTABLE)
     if (NOT Protobuf_FOUND)
       # Redo searching without hint (unless AVOID_SYSTEM_PROTOBUF is ON)
       if (NOT AVOID_SYSTEM_PROTOBUF)
-        find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET REQUIRED)
+      find_package(Protobuf CONFIG QUIET REQUIRED)
       endif()
     endif (NOT Protobuf_FOUND)
   else (PROTOBUF_ROOT)
-    # Search for Protobuf in FetchContent cache first (build/_deps/protobuf-src),
-    # then CMAKE_INSTALL_PREFIX, then system paths
+    # Search for Protobuf in FetchContent cache first, then a nonempty
+    # project install prefix, then system paths. An empty prefix must not
+    # become a search location when AVOID_SYSTEM_PROTOBUF is enabled.
     set(_PROTOBUF_SEARCH_PATHS
       "${CMAKE_BINARY_DIR}/_deps/protobuf-build"
       "${CMAKE_BINARY_DIR}/_deps/protobuf-src/cmake"
-      "${CMAKE_INSTALL_PREFIX}"
     )
+    if (CMAKE_INSTALL_PREFIX)
+      list(APPEND _PROTOBUF_SEARCH_PATHS "${CMAKE_INSTALL_PREFIX}")
+    endif()
 
     if (AVOID_SYSTEM_PROTOBUF)
       message(STATUS "AVOID_SYSTEM_PROTOBUF=ON: skipping system Protobuf search")
       # Only search in FetchContent cache, no system paths
-      find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
+      find_package(Protobuf CONFIG QUIET
         NAMES protobuf PROTOBUF
         HINTS ${_PROTOBUF_SEARCH_PATHS}
         PATH_SUFFIXES lib64/cmake/protobuf lib/cmake/protobuf lib/cmake
         NO_DEFAULT_PATH)
     else()
       # Search FetchContent cache first, then system paths
-      find_package(Protobuf "${PROTOBUF_MIN_VERSION}" CONFIG QUIET
+      find_package(Protobuf CONFIG QUIET
         NAMES protobuf PROTOBUF
         HINTS ${_PROTOBUF_SEARCH_PATHS}
         "$ENV{Protobuf_DIR}" "$ENV{PROTOBUF_DIR}"
@@ -88,6 +107,9 @@ else (Protobuf_PROTOC_EXECUTABLE)
 
     if (NOT Protobuf_FOUND)
       message(STATUS "Protobuf not found. Building via FetchContent.")
+      set(CMAKE_PREFIX_PATH "${DR_EVT_SAVED_CMAKE_PREFIX_PATH}")
+      unset(DR_EVT_SAVED_CMAKE_PREFIX_PATH)
+      unset(DR_EVT_PROTOBUF_CONFIG_PREFIXES)
       set(BUILD_PROTOBUF ON)
       include(${CMAKE_SOURCE_DIR}/external/protobuf/CMakeLists.txt)
       # That include() sets Protobuf_FOUND but not DR_EVT_HAS_PROTOBUF -
@@ -117,3 +139,8 @@ message(STATUS "Found libprotobuf: ${Protobuf_LIBRARY}")
 message(STATUS "Found protoc: ${Protobuf_EXECUTABLE}")
 
 set(DR_EVT_HAS_PROTOBUF TRUE)
+if (DEFINED DR_EVT_SAVED_CMAKE_PREFIX_PATH)
+  set(CMAKE_PREFIX_PATH "${DR_EVT_SAVED_CMAKE_PREFIX_PATH}")
+  unset(DR_EVT_SAVED_CMAKE_PREFIX_PATH)
+  unset(DR_EVT_PROTOBUF_CONFIG_PREFIXES)
+endif()

@@ -119,7 +119,7 @@ jobs:
           # docs/getting-started/installation.md's "Livermore Computing
           # (LC) HPC systems" section for the full explanation).
           # Build test binaries
-          make test_append_job_api-bin test_grpc_streaming_api-bin test_batch_vs_streaming-bin test_progressive_load-bin
+          make test_append_job_api-bin test_grpc_streaming_api-bin test_batch_vs_streaming-bin test_progressive_load-bin test_queue_input-bin
           # gRPC client/server + MPI multi-client/server test harness
           # (already covered by `make -j$(nproc)` above since none of
           # these are EXCLUDE_FROM_ALL, but listed explicitly here too
@@ -293,9 +293,13 @@ jobs:
         id: progressive-load
         run: |
           echo "========================================"
-          echo "Running Progressive Loading Tests (12 C++ + 4 CLI)"
+          echo "Running Progressive Loading Tests (11 C++ + 4 CLI)"
           echo "========================================"
           ./tests/run_progressive_load_tests.sh
+
+      - name: Run Queue Input Schema Test
+        id: queue-input-schema
+        run: $GITHUB_WORKSPACE/install/bin/tests/test_queue_input
 
       - name: Run Scale Tests (Optional)
         id: scale
@@ -330,7 +334,8 @@ jobs:
           echo "  Python API (16 tests): ${{ steps.python-api.outcome }}"
           echo "  Append-Job (18 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  Backfill Window gRPC (included in Append-Job count): ${{ steps.backfill-window.outcome }}"
-          echo "  Progressive Loading (12 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
+          echo "  Progressive Loading (11 C++ + 4 CLI): ${{ steps.progressive-load.outcome }}"
+          echo "  Queue Input Schema: ${{ steps.queue-input-schema.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests, optional): ${{ steps.scale.outcome }}"
           echo ""

@@ -430,7 +430,7 @@ job_no_t Simulation::append_job(sim_time_t submit_time, num_nodes_t num_nodes,
     float frac = submit_time - sec;
     epoch_t submit_epoch = {sec, frac};
 
-    job_queue_t q;
+    job_queue_t q = QueueUnknown;
     set_by(q, queue);
 
     job_no_t job_idx = m_trace.append_job(m_current_time, submit_epoch, num_nodes, q,
@@ -460,7 +460,7 @@ std::vector<job_no_t> Simulation::append_jobs(const std::vector<Job_Append_Reque
     for (const auto& r : requests) {
         time_t sec = static_cast<time_t>(r.submit_time);
         float frac = r.submit_time - sec;
-        job_queue_t q;
+        job_queue_t q = QueueUnknown;
         set_by(q, r.queue);
         trace_reqs.push_back(dr_evt::Job_Append_Request{
             epoch_t{sec, frac}, r.num_nodes, q, static_cast<timeout_t>(r.limit_time)});

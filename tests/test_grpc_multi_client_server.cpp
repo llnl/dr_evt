@@ -94,7 +94,7 @@ std::string get_own_ip()
 struct Job {
     double submit_time;
     uint32_t num_nodes;
-    std::string queue;
+    std::string queue = "pbatch";
     double limit_time;
 };
 
@@ -122,19 +122,18 @@ std::vector<Job> read_jobs(const std::string& trace_file)
     std::string line;
     std::getline(ifs, line);
     const auto header = split_csv(line);
-    if (header.size() < 4 || header[0] != "job_submit_time" ||
-        header[1] != "num_nodes" || header[2] != "queue" ||
-        header[3] != "time_limit") {
+    if (header.size() < 3 || header[0] != "job_submit_time" ||
+        header[1] != "num_nodes" || header[2] != "time_limit") {
         throw std::runtime_error("Expected simple job CSV header in " + trace_file);
     }
     while (std::getline(ifs, line)) {
         if (line.empty()) continue;
         const auto fields = split_csv(line);
-        if (fields.size() < 4) {
+        if (fields.size() < 3) {
             throw std::runtime_error("Malformed job row in " + trace_file);
         }
         jobs.push_back({std::stod(fields[0]), static_cast<uint32_t>(std::stoul(fields[1])),
-                        fields[2], std::stod(fields[3])});
+                        "pbatch", std::stod(fields[2])});
     }
     if (!std::is_sorted(jobs.begin(), jobs.end(),
                         [](const Job& a, const Job& b) {
@@ -152,10 +151,9 @@ std::vector<CompositeEvent> read_composite_events(const std::string& trace_file)
     std::string line;
     std::getline(ifs, line);
     const auto header = split_csv(line);
-    if (header.size() < 6 || header[0] != "composite_id" ||
+    if (header.size() < 5 || header[0] != "composite_id" ||
         header[1] != "submit_time" || header[2] != "system_id" ||
-        header[3] != "num_nodes" || header[4] != "queue" ||
-        header[5] != "time_limit") {
+        header[3] != "num_nodes" || header[4] != "time_limit") {
         throw std::runtime_error("Expected composite-job CSV header in " + trace_file);
     }
 
@@ -164,7 +162,7 @@ std::vector<CompositeEvent> read_composite_events(const std::string& trace_file)
     while (std::getline(ifs, line)) {
         if (line.empty()) continue;
         const auto fields = split_csv(line);
-        if (fields.size() < 6) throw std::runtime_error("Malformed composite row in " + trace_file);
+        if (fields.size() < 5) throw std::runtime_error("Malformed composite row in " + trace_file);
         const double submit_time = std::stod(fields[1]);
         if (fields[0] != current_id) {
             if (!events.empty() && submit_time <= events.back().submit_time) {
@@ -177,7 +175,7 @@ std::vector<CompositeEvent> read_composite_events(const std::string& trace_file)
         }
         const auto inserted = events.back().fragments.emplace(
             fields[2], Job{submit_time, static_cast<uint32_t>(std::stoul(fields[3])),
-                           fields[4], std::stod(fields[5])});
+                           "pbatch", std::stod(fields[4])});
         if (!inserted.second) throw std::runtime_error("Duplicate composite system_id: " + fields[2]);
     }
     return events;

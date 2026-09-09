@@ -11,8 +11,8 @@ DR_EVT now supports flexible trace file formats with command-line options for fo
 
 **simple** (default): Minimal CSV format for testing
 - The parser detects the mode from which columns are present - see [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md) for the full design
-- **Simulation mode** (no `begin_time`/`end_time` columns): `job_submit_time, num_nodes, time_limit` required; `queue` and `actual_run_time` are optional (`actual_run_time` is needed only for `--run_time_mode actual`)
-- **Replay mode** (`begin_time` and `end_time` present): `job_submit_time, begin_time, end_time, num_nodes, time_limit` required; `queue` is optional. Times are historical actuals, replayed exactly, not computed by the scheduler.
+- **Simulation mode** (no `begin_time`/`end_time` columns): `job_submit_time, num_nodes, time_limit` required; `q_id` and `actual_run_time` are optional (`actual_run_time` is needed only for `--run_time_mode actual`)
+- **Replay mode** (`begin_time` and `end_time` present): `job_submit_time, begin_time, end_time, num_nodes, time_limit` required; `q_id` is optional. Times are historical actuals, replayed exactly, not computed by the scheduler.
 - Column order doesn't matter - the parser reads the header row and looks up columns by name
 
 **lassen**: LLNL Lassen 33-column format
@@ -112,7 +112,7 @@ determines simulation vs replay mode (see below).
 |------|-------------|--------------|
 | `job_submit_time` | When the job arrives/submits | Both modes |
 | `num_nodes` | Number of nodes requested | Both modes |
-| `queue` | Optional queue name. If absent, the job uses `pbatch`. When present, `pbatch`/`pall` (and `pbatch0`-`pbatch3`) are accepted by default. Other named queues require rebuilding with `SHOW_ALL_QUEUE=1`. | Both modes |
+| `q_id` | Optional one-based queue ID. If absent, the job uses `1` (`Queue1`). | Both modes |
 | `time_limit` | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Both modes |
 | `begin_time` | Historical start time from trace | Replay mode only - presence of this column (together with `end_time` or `duration`) is what selects replay mode |
 | `end_time` | Historical end time from trace | Replay mode (or use `duration` instead) |
@@ -131,8 +131,10 @@ defined by fixed column position rather than header name (see below).
 **Ignored input columns**: input fields not used by the selected trace format
 are ignored. In particular, `exit_status` is accepted only so a generated
 simulator output can be used as replay input; its value is never read or used
-to affect scheduling or replay. `queue` is optional; when it is absent, the
-parser supplies `pbatch`.
+to affect scheduling or replay. In the default ID-input build, `queue` is
+ignored; `q_id` is optional and defaults to `1` (`Queue1`). Legacy named
+`queue` input is available only with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`; in
+that build `q_id` is ignored and an absent `queue` also defaults to `Queue1`.
 
 **TODO — user-defined queue names:** Allow users to define the accepted input
 queue names and preserve those names in output.

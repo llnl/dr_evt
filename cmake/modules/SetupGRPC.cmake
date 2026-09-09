@@ -13,6 +13,12 @@ option(protobuf_MODULE_COMPATIBLE TRUE)
 # binary that doesn't exist). find_package() can still succeed via an
 # explicit HINTS path even with this on.
 option(AVOID_SYSTEM_GRPC "Do not search default system paths for gRPC/Protobuf" FALSE)
+# find_package() consumes gRPC_DIR as a CMake variable, not directly as a
+# shell environment variable. Promote an exported value unless an explicit
+# -DgRPC_DIR=... has already been supplied.
+if (NOT DEFINED gRPC_DIR AND DEFINED ENV{gRPC_DIR})
+  set(gRPC_DIR "$ENV{gRPC_DIR}")
+endif()
 if (AVOID_SYSTEM_GRPC)
   set(DR_EVT_GRPC_SEARCH_MODE NO_DEFAULT_PATH)
 else()
@@ -27,21 +33,50 @@ unset(gRPC_FOUND CACHE)
 unset(gRPC_FOUND)
 unset(Protobuf_FOUND CACHE)
 unset(Protobuf_FOUND)
-find_package(gRPC CONFIG QUIET ${DR_EVT_GRPC_SEARCH_MODE})
+set(DR_EVT_GRPC_INSTALL_HINTS)
+set(DR_EVT_PROTOBUF_INSTALL_HINTS)
+# A package config can itself call find_package() for its dependencies (for
+# example, gRPCConfig.cmake locates Abseil). HINTS only applies to the outer
+# call, so make a nonempty project prefix visible through the whole nested
+# lookup. Restore the caller's prefix list immediately afterward.
+set(DR_EVT_SAVED_CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
+if (CMAKE_INSTALL_PREFIX)
+  list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_INSTALL_PREFIX}")
+  list(APPEND DR_EVT_GRPC_INSTALL_HINTS
+       "${CMAKE_INSTALL_PREFIX}/lib/cmake/grpc"
+       "${CMAKE_INSTALL_PREFIX}/lib64/cmake/grpc"
+       "${CMAKE_INSTALL_PREFIX}")
+  list(APPEND DR_EVT_PROTOBUF_INSTALL_HINTS
+       "${CMAKE_INSTALL_PREFIX}/lib/cmake/protobuf"
+       "${CMAKE_INSTALL_PREFIX}/lib64/cmake/protobuf"
+       "${CMAKE_INSTALL_PREFIX}")
+endif()
 
+# gRPCConfig.cmake can reference protobuf::libprotobuf and
+# protobuf::libprotoc without finding Protobuf itself. Resolve Protobuf first
+# so those targets exist before loading gRPC's config.
+find_package(Protobuf CONFIG QUIET
+             HINTS ${DR_EVT_PROTOBUF_INSTALL_HINTS}
+             ${DR_EVT_GRPC_SEARCH_MODE})
+if (NOT Protobuf_FOUND)
+  # Debian/Ubuntu's protobuf-compiler-grpc ships a CMake config, but
+  # libprotobuf-dev doesn't - MODULE mode finds the library/headers/protoc
+  # directly and creates the same targets CONFIG mode would.
+  find_package(Protobuf MODULE QUIET ${DR_EVT_GRPC_SEARCH_MODE})
+endif()
+
+# Check a project-local installation before the system or FetchContent. The
+# explicit hints are honored even with AVOID_SYSTEM_GRPC=ON.
+find_package(gRPC CONFIG QUIET HINTS ${DR_EVT_GRPC_INSTALL_HINTS}
+             ${DR_EVT_GRPC_SEARCH_MODE})
 if (gRPC_FOUND)
   message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
-  # Try Protobuf where gRPC's own config was found first (HINTS augments,
-  # not replaces, the default search).
-  find_package(Protobuf CONFIG QUIET HINTS ${gRPC_DIR} ${DR_EVT_GRPC_SEARCH_MODE})
-
-  if (NOT Protobuf_FOUND)
-    # Debian/Ubuntu's protobuf-compiler-grpc ships a CMake config, but
-    # libprotobuf-dev doesn't - MODULE mode finds the library/headers/
-    # protoc directly and creates the same targets CONFIG mode would.
-    find_package(Protobuf MODULE QUIET ${DR_EVT_GRPC_SEARCH_MODE})
-  endif()
 endif()
+
+unset(DR_EVT_GRPC_INSTALL_HINTS)
+unset(DR_EVT_PROTOBUF_INSTALL_HINTS)
+set(CMAKE_PREFIX_PATH "${DR_EVT_SAVED_CMAKE_PREFIX_PATH}")
+unset(DR_EVT_SAVED_CMAKE_PREFIX_PATH)
 
 # gRPC and Protobuf must come from the same selected source.  Record the
 # current result for this configure; do not cache it or use it to skip

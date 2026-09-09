@@ -67,20 +67,30 @@ constexpr const bool arrival = true;
 /// Departure event
 constexpr const bool departure = false;
 
-/** @brief Supported trace job queues.
- * @details parse_utils.cpp defines the mapping between job_queue_t and text.
+/** @brief Supported trace queue identities.
+ * @details The fixed-width values are shared by both trace-input modes.
+ * QueueUnknown is 0, while Queue1 is 1. The external q_id value is the same
+ * numeric value as its internal queue enum. Legacy queue names are mapped to
+ * these identities in parse_utils.cpp.
  */
 #if PBATCH_GROUP
-enum job_queue_t {pBatch, pAll, pDebug, pExempt, pExpedite,
-                  pBb, pIbm, pNvidia, pTest, standby, pUnknown};
-#define _Is_Batch(_q) ((_q) == pBatch)
+enum job_queue_t : std::uint16_t {
+    QueueUnknown = 0,
+    Queue1 = 1, Queue2, Queue3, Queue4, Queue5,
+    Queue6, Queue7, Queue8, Queue9, Queue10
+};
+#define _Is_Batch(_q) ((_q) == Queue1)
+#define _Is_Exclusive(_q) ((_q) == Queue2)
 #else
-enum job_queue_t {pBatch, pBatch0, pBatch1, pBatch2, pBatch3, pAll, pDebug,
-                  pExempt, pExpedite, pBb, pIbm, pNvidia, pTest, standby,
-                  pUnknown};
+enum job_queue_t : std::uint16_t {
+    QueueUnknown = 0,
+    Queue1 = 1, Queue2, Queue3, Queue4, Queue5, Queue6, Queue7,
+    Queue8, Queue9, Queue10, Queue11, Queue12, Queue13, Queue14
+};
 #define _Is_Batch(_q) \
-    ((_q) == pBatch || (_q) == pBatch0 || (_q) == pBatch1 \
-                    || (_q) == pBatch2 || (_q) == pBatch3)
+    ((_q) == Queue1 || (_q) == Queue2 || (_q) == Queue3 \
+                    || (_q) == Queue4 || (_q) == Queue5)
+#define _Is_Exclusive(_q) ((_q) == Queue6)
 #endif
 
 /// CSV substring range stored as [start position, length].

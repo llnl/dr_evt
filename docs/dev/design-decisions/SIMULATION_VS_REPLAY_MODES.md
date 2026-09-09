@@ -53,10 +53,10 @@ actual_run_time
 **Semantics:**
 - `job_submit_time`: When job arrives in queue
 - `num_nodes`: Number of nodes requested by the job
-- `queue`: Optional queue name. If it is absent, the job uses `pbatch`. When
-  present, the default build retains `pbatch` and `pall` jobs
-  (`pbatch0`-`pbatch3` also match `pbatch`); other named queues require
-  rebuilding with `SHOW_ALL_QUEUE=1`.
+- `q_id`: Optional one-based queue ID. If it is absent, the job uses `1`
+  (`Queue1`). The default build ignores a legacy named `queue` column.
+  Building with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON` instead selects legacy queue
+  names and their existing name-based filtering behavior.
 - `time_limit`: User's estimate (scheduler uses for planning/reservations)
 - `actual_run_time`: Ground-truth runtime when `--run_time_mode actual` is
   selected. Accepted aliases are `actual_runtime`, `duration`,
@@ -72,16 +72,15 @@ actual_run_time
 ### Simulation-mode output
 
 Simulation writes a scheduled-job CSV with the following header when the input
-has a `queue` column:
+has a `q_id` column:
 
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
+job_submit_time,begin_time,end_time,num_nodes,exit_status,q_id,time_limit
 ```
 
-When input omits `queue`, the output omits it too. `begin_time` and `end_time`
-are the scheduler's computed times. The output uses the canonical queue name
-when present (`pbatch0`-`pbatch3` are grouped as `pbatch` by default), and
-`exit_status` is currently written as `0` for compatibility. Jobs rejected
+When input omits `q_id`, the output omits it too. `begin_time` and `end_time`
+are the scheduler's computed times; `exit_status` is currently written as `0`
+for compatibility. Jobs rejected
 before scheduling are omitted. When requested, the separate resource trace
 records `time,free_nodes,allocated_nodes` after each resource-state change.
 See [Output Trace Files](../../user-guide/output-traces.md)

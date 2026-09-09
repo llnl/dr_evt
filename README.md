@@ -412,7 +412,9 @@ Only `tracer` honors the file's own times directly.
 
 **Input:** Trace with pre-computed schedule
 - Requires: `num_nodes`, `begin_time`, `end_time`, `job_submit_time`, and
-  `time_limit`. `queue` is optional and defaults to `pbatch` when omitted.
+  `time_limit`. `q_id` is optional and defaults to `1` (`Queue1`) when
+  omitted. Legacy `queue` input requires configuring with
+  `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`.
   `job_submit_time` isn't used
   to decide when a job runs (that's `begin_time`), but it drives a per-job
   "nodes busy at submission" stat for downstream analysis/visualization, and

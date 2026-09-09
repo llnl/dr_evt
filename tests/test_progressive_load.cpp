@@ -288,55 +288,6 @@ void test_input_exit_status_is_ignored() {
     std::cout << "  PASSED" << std::endl;
 }
 
-// Test 8: queue is optional in simple trace input.  It defaults internally
-// to pbatch, but output must preserve the source schema: no queue column in
-// means no queue column out; an explicit queue remains explicit.
-void test_optional_queue_column_is_preserved_in_output() {
-    std::cout << "\n=== Test 8: optional queue column preserves output schema ===" << std::endl;
-
-    const char* with_queue = "/tmp/test_queue_present.csv";
-    const char* without_queue = "/tmp/test_queue_absent.csv";
-    const char* with_queue_out = "/tmp/test_queue_present_out.csv";
-    const char* without_queue_out = "/tmp/test_queue_absent_out.csv";
-    {
-        std::ofstream file(with_queue);
-        file << "job_submit_time,num_nodes,queue,time_limit\n";
-        file << "0,10,pbatch,10\n";
-    }
-    {
-        std::ofstream file(without_queue);
-        file << "job_submit_time,num_nodes,time_limit\n";
-        file << "0,10,10\n";
-    }
-
-    auto simulate = [](const char* input, const char* output) {
-        Sim_Params params;
-        params.m_infile = input;
-        params.m_total_nodes = 100;
-        params.m_trace_format = "simple";
-        params.m_timestamp_format = "epoch";
-        params.m_run_time_mode = RunTimeMode::LIMIT;
-        params.set_outfile(output);
-        Simulation sim(params);
-        sim.run();
-        sim.write_simulated_trace();
-    };
-
-    simulate(with_queue, with_queue_out);
-    simulate(without_queue, without_queue_out);
-
-    const auto explicit_queue_output = slurp(with_queue_out);
-    const auto default_queue_output = slurp(without_queue_out);
-    assert(explicit_queue_output.find(
-               "job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit\n") == 0);
-    assert(explicit_queue_output.find(",pbatch,") != std::string::npos);
-    assert(default_queue_output.find(
-               "job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit\n") == 0);
-    assert(default_queue_output.find("queue") == std::string::npos);
-
-    std::cout << "  PASSED" << std::endl;
-}
-
 // Test 9: --check_memory_pressure refuses to load the next file when
 // doing so would push projected job-store usage past the configured
 // fraction of actual available memory - forced deterministically here
@@ -460,7 +411,6 @@ int main() {
         test_progressive_rejects_out_of_order_files();
         test_progressive_rejects_replay_format();
         test_input_exit_status_is_ignored();
-        test_optional_queue_column_is_preserved_in_output();
         test_memory_pressure_refuses_when_forced_low();
         test_memory_pressure_disabled_by_default();
         test_memory_pressure_no_false_positive();

@@ -28,7 +28,11 @@ Data_Columns::Data_Columns()
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
-    m_has_queue_column(true),
+  #if DR_EVT_LEGACY_QUEUE_INPUT
+    m_has_queue_column(false),
+  #else
+    m_has_q_id_column(false),
+  #endif
     m_trace_format("simple"),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
@@ -50,7 +54,11 @@ Data_Columns::Data_Columns(const std::string& format)
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
-    m_has_queue_column(true),
+  #if DR_EVT_LEGACY_QUEUE_INPUT
+    m_has_queue_column(false),
+  #else
+    m_has_q_id_column(false),
+  #endif
     m_trace_format(format),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
@@ -86,7 +94,11 @@ Data_Columns::Data_Columns(const std::string& format, const std::string& timesta
   : m_cur_tz(nullptr),
     m_total_columns(static_cast<num_cols_t>(0u)),
     m_queue_idx(static_cast<col_no_t>(0u)),
-    m_has_queue_column(true),
+  #if DR_EVT_LEGACY_QUEUE_INPUT
+    m_has_queue_column(false),
+  #else
+    m_has_q_id_column(false),
+  #endif
     m_trace_format(format),
     m_timestamp_format(timestamp_format),
     m_timezone_str(timezone),
@@ -138,7 +150,7 @@ void Data_Columns::init()
             std::string err("Possible duplicate column name with " + c.second);
             throw std::invalid_argument {err.c_str()};
         }
-        if (c.second == "queue") {
+        if (c.second == "queue" || c.second == "q_id") {
             m_queue_idx = i;
         }
     }
@@ -263,7 +275,13 @@ bool Data_Columns::check_header(const std::string& fname)
     // Rebuild m_cols_to_read with actual column indices from header
     m_cols_to_read.clear();
 
+  #if DR_EVT_LEGACY_QUEUE_INPUT
     m_has_queue_column = col_map.find("queue") != col_map.end();
+  #else
+    // Queue names are deliberately ignored in ID mode. q_id is optional,
+    // just as queue is in legacy mode; an absent value defaults to Queue1.
+    m_has_q_id_column = col_map.find("q_id") != col_map.end();
+  #endif
 
     if (m_trace_mode == TraceMode::REPLAY) {
         // Replay mode: need all columns including begin_time and end_time
@@ -274,10 +292,17 @@ bool Data_Columns::check_header(const std::string& fname)
             {find_column({"job_submit_time"}), "job_submit_time"},
             {find_column(time_limit_aliases), "time_limit"}
         };
+      #if DR_EVT_LEGACY_QUEUE_INPUT
         if (m_has_queue_column) {
             m_cols_to_read.insert(m_cols_to_read.end() - 1,
                                   {find_column({"queue"}), "queue"});
         }
+      #else
+        if (m_has_q_id_column) {
+            m_cols_to_read.insert(m_cols_to_read.end() - 1,
+                                  {find_column({"q_id"}), "q_id"});
+        }
+      #endif
     } else {
         // Simulation mode: no begin_time or end_time
         col_no_t num_nodes_idx = find_column({"num_nodes"});
@@ -289,10 +314,17 @@ bool Data_Columns::check_header(const std::string& fname)
             {submit_time_idx, "job_submit_time"},
             {time_limit_idx, "time_limit"}
         };
+      #if DR_EVT_LEGACY_QUEUE_INPUT
         if (m_has_queue_column) {
             m_cols_to_read.insert(m_cols_to_read.end() - 1,
                                   {find_column({"queue"}), "queue"});
         }
+      #else
+        if (m_has_q_id_column) {
+            m_cols_to_read.insert(m_cols_to_read.end() - 1,
+                                  {find_column({"q_id"}), "q_id"});
+        }
+      #endif
 
         // Optional: actual_run_time column for RunTimeMode::ACTUAL
         auto [found, actual_run_time_idx] = find_column_optional(actual_run_time_aliases);
@@ -331,11 +363,15 @@ bool Data_Columns::check_header(const std::string& fname)
     }
 
     // Update Job_Record with correct field count
-    // The loader supplies the canonical pbatch value when the source does
-    // not have a queue column, so Job_Record always receives its canonical
-    // field layout.
+    // The loader supplies Queue1 as the default when the selected field
+    // is absent, so Job_Record always receives its canonical field layout.
+  #if DR_EVT_LEGACY_QUEUE_INPUT
     Job_Record::set_num_inputs(static_cast<unsigned>(m_cols_to_read.size()) +
                                (m_has_queue_column ? 0u : 1u));
+  #else
+    Job_Record::set_num_inputs(static_cast<unsigned>(m_cols_to_read.size()) +
+                               (m_has_q_id_column ? 0u : 1u));
+  #endif
 
     return true;
 }

@@ -1,6 +1,6 @@
-job_submit_time,num_nodes,queue,time_limit
-0,22,pbatch,100
-0,24,pbatch,100
-0,26,pbatch,100
-0,28,pbatch,100
-50,80,pbatch,50
+job_submit_time,num_nodes,time_limit
+0,22,100
+0,24,100
+0,26,100
+0,28,100
+50,80,50

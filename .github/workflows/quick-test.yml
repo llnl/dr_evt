@@ -58,7 +58,8 @@ jobs:
           # Covers optional queue input and preservation of the input schema
           # in generated output, alongside the rest of the C++ progressive
           # loading API tests.
-          ./build/test_progressive_load
+          $GITHUB_WORKSPACE/install/bin/tests/test_progressive_load
+          $GITHUB_WORKSPACE/install/bin/tests/test_queue_input
 
       - name: Summary
         if: always()

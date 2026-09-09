@@ -81,7 +81,9 @@ job_submit_time,begin_time,end_time,num_nodes,time_limit
 3. `end_time` - Historical end time (required, for duration calculation)
 4. `num_nodes` - Number of nodes requested (required)
 5. `time_limit` - User-provided time limit in seconds
-6. `queue` - Optional queue name; defaults to `pbatch` when omitted
+6. `q_id` - Optional one-based job queue ID;
+   The legacy named `queue` field is selected only with
+   `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`.
 
 **Ignored input columns**: `exit_status` is an output-only compatibility field.
 If present in an input trace, its value is ignored; it never affects scheduling
@@ -504,11 +506,13 @@ diff results_easy.txt results_conservative.txt
 
 ### Problem: "Loaded 0 jobs from trace"
 
-**Cause**: Queue filtering - an explicitly supplied queue name is not accepted
+**Cause**: In a legacy queue-name build, an explicitly supplied queue name is
+not accepted
 
 **Solution**: 
-- Use "pbatch" in queue column
-- Or set `SHOW_ALL_QUEUE=1` in common.hpp and rebuild
+- In the default build, omit `queue` or use an optional numeric `q_id`
+- For legacy input (`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`), use `pbatch` in the
+  `queue` column or set `SHOW_ALL_QUEUE=1` in `common.hpp` and rebuild
 
 ### Problem: "Job event times are incorrect"
 

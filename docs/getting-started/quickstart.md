@@ -173,8 +173,9 @@ job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
 
 `time_limit` is also accepted under the column names `timelimit` or
 `walltime`, so an existing trace can be reused without editing its header.
-`queue` is optional and defaults to `pbatch` when absent. If supplied,
-`pbatch`/`pall` (and `pbatch0`-`pbatch3`) queue values are accepted by default.
+`q_id` is optional and defaults to `1` (`Queue1`) when absent. To accept the
+legacy named `queue` column instead, configure with
+`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`.
 
 See [Trace File Formats](../user-guide/trace-formats.md) for the full
 column reference (including the Lassen format and the `lassen` format
