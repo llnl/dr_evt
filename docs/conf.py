@@ -79,6 +79,7 @@ master_doc = 'index'
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 html_css_files = ['custom.css']
+html_js_files = ['api-search.js']
 # Doxygen XML is rendered directly by Breathe on the C++ API page.  Keep the
 # reference optional for direct Sphinx builds where Doxygen is unavailable.
 if _has_doxygen_xml:

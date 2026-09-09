@@ -194,3 +194,21 @@ through the run.
 - `BLOCK_QUEUE.md` - the queue implementation this one was written to
   outperform, and the source of the multi-index overhead analysis referenced
   above
+
+## Output-trace buffers
+
+The circular-buffer approach also supports the two trace outputs, although
+these buffers are separate from the scheduler's FCFS wait queue:
+
+- `Trace::m_data` is a `boost::circular_buffer` of job records. It retains
+  the state needed to write simulated-job schedule rows and can reclaim
+  completed records from the front in streaming runs.
+- `Trace::m_resource_history` is a `boost::circular_buffer` of finalized
+  resource samples. When it fills, its samples are flushed to the resource
+  trace file and the buffer is cleared, bounding memory use.
+
+The output files themselves are streamed; they are not circular buffers. See
+[Output Trace Files](../../user-guide/output-traces.md) for their CSV formats and
+defaults. For the ownership, reclamation, capacity, and streaming behavior of
+both output-trace buffers, see [Trace as a self-contained, streaming-ready
+state container](OUT_TRACE_STREAMING.md).

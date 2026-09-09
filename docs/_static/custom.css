@@ -36,3 +36,38 @@
 #client-server-session-diagram > svg .noteText {
     fill: #234d31 !important;
 }
+
+/* Directory-organized C++ and Python API reference search controls. */
+.api-search {
+    align-items: center;
+    background: #f6f9fb;
+    border: 1px solid #d8e1e6;
+    border-radius: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0 1.5rem;
+    padding: 0.75rem;
+}
+
+.api-search label {
+    color: #344b5c;
+    font-weight: 600;
+}
+
+.api-search input {
+    border: 1px solid #aebdca;
+    border-radius: 3px;
+    flex: 1 1 18rem;
+    min-width: 0;
+    padding: 0.45rem 0.6rem;
+}
+
+.api-search-status {
+    color: #64748b;
+    font-size: 0.9em;
+}
+
+.api-search-hidden {
+    display: none !important;
+}
