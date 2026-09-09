@@ -6,9 +6,9 @@
     <style>
       .title { font-family: sans-serif; font-size: 30px; font-weight: 700; fill: #172b3a; }
       .sub { font-family: sans-serif; font-size: 18px; fill: #4d6475; }
-      .box { fill: #f7fafc; stroke: #35536b; stroke-width: 1.5; }
-      .input { fill: #e7f1f8; stroke: #276a8e; stroke-width: 1.5; }
-      .note { fill: #fce7f3; stroke: #c887a6; stroke-width: 1.5; }
+      .box { fill: #f7fafc; stroke: #aab9c3; stroke-width: 1.25; }
+      .input { fill: #e7f1f8; stroke: #9bc1d2; stroke-width: 1.25; }
+      .note { fill: #fce7f3; stroke: #deb0c5; stroke-width: 1.25; }
       .step { font-family: sans-serif; font-size: 21px; font-weight: 700; fill: #172b3a; }
       .text { font-family: sans-serif; font-size: 17px; fill: #263d4d; }
       .arrow { stroke: #35536b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
