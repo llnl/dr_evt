@@ -18,13 +18,15 @@ docs/
 ├── user-guide/                     # Complete user manual
 │   ├── overview.md                # User guide overview
 │   ├── command-line.md            # All CLI options
-│   ├── trace-formats.md           # Input trace file formats
 │   ├── protobuf-config.md         # Protobuf config file format
+│   ├── trace-formats.md           # Input trace files
+│   ├── output-traces.md           # Output trace files
 │   ├── grpc-setup.md              # Client/server build/setup
 │   └── client-server-use-cases.md # Client/server deployment examples
 ├── dev/                             # Developer documentation
 │   ├── README.md                  # Developer docs index
 │   ├── BLOCK_WAIT_QUEUE.md        # Block wait-queue implementation and tests
+│   ├── JOB_LIFECYCLE.md           # Job-store, wait-queue, and event lifecycle
 │   ├── READTHEDOCS_SETUP.md       # ReadTheDocs configuration notes
 │   └── design-decisions/          # Why we made choices
 │       ├── README.md
@@ -37,6 +39,7 @@ docs/
 ├── reference/                      # Technical reference
 │   └── terminology.md             # Terms and definitions
 ├── api/                             # API documentation
+│   ├── CPP_API.md                 # Entry point for generated C++ API reference
 │   ├── PYTHON_API.md              # Python bindings reference
 │   └── STREAMING_API.md           # Streaming/online API guide
 ├── BACKFILLING_ALGORITHMS.md       # EASY and Conservative backfilling
@@ -54,9 +57,10 @@ docs/
 ### For Regular Users
 1. [User Guide](user-guide/overview.md) - Complete manual
 2. [Command-Line Options](user-guide/command-line.md) - All options
-3. [Trace Formats](user-guide/trace-formats.md) - Input files
-4. [Client/Server Setup](user-guide/grpc-setup.md) - Network client/server setup
-5. [Client/Server Use Cases](user-guide/client-server-use-cases.md) - Bare-metal, container, and multi-server deployment patterns
+3. [Input Trace Files](user-guide/trace-formats.md) - Input trace file formats
+4. [Output Trace Files](user-guide/output-traces.md) - Simulated-job and resource-trace outputs
+5. [Client/Server Setup](user-guide/grpc-setup.md) - Network client/server setup
+6. [Client/Server Use Cases](user-guide/client-server-use-cases.md) - Bare-metal, container, and multi-server deployment patterns
 
 ### For Researchers
 1. [Test Summary](TESTING_GUIDE.md#test-summary) - ✓ All tests pass
@@ -67,6 +71,7 @@ docs/
 1. [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md) - How it works
 2. [Design Decisions](dev/design-decisions/README.md) - Why, and system design notes
 3. [Streaming API](api/STREAMING_API.md) - Online simulation API
+4. [C++ API Reference](api/CPP_API.md) - Generated C++ reference by source directory
 
 ## Building Documentation
 

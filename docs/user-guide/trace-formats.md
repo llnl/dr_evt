@@ -1,4 +1,4 @@
-# Trace File Format Options
+# Input Trace Files
 
 DR_EVT now supports flexible trace file formats with command-line options for format, timestamp style, and timezone.
 

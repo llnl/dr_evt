@@ -1,5 +1,13 @@
 # Python API
 
+<div class="api-search" role="search">
+  <label for="python-api-search">Search Python API</label>
+  <input id="python-api-search" data-api-search="python-api-content" type="search" placeholder="e.g., SimParams, append_job, statistics" autocomplete="off">
+  <span class="api-search-status" aria-live="polite"></span>
+</div>
+
+<div id="python-api-content" class="api-search-content">
+
 Complete Python bindings for DR_EVT HPC Job Scheduler Simulator with streaming mode support.
 
 ## Overview
@@ -742,3 +750,5 @@ To add new Python bindings:
 **Version:** 1.0.0
 **Status:** Production Ready
 **License:** MIT
+
+</div>

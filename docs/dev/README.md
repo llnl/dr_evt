@@ -1,12 +1,14 @@
 # Developer Documentation
 
-This directory contains development notes, and design decisions that are useful
-for understanding the implementation history but are not part of the main user documentation.
+This section contains implementation notes, architectural rationale, and
+maintainer-facing build guidance. It is separate from the user documentation.
 
 ## What Goes Here
 
-### `design-decisions/`
-Important design decisions worth preserving in the repository:
+### [Design decisions](design-decisions/README.md)
+
+Important decisions worth preserving in the repository:
+
 - Why certain approaches were chosen
 - Breaking changes and migration guides
 - Terminology changes and rationale
@@ -20,7 +22,7 @@ methods.
 ```{toctree}
 :maxdepth: 2
 
-design-decisions/README
 JOB_LIFECYCLE
 BLOCK_WAIT_QUEUE
+design-decisions/README
 ```
