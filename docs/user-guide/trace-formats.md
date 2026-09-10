@@ -11,8 +11,8 @@ DR_EVT now supports flexible trace file formats with command-line options for fo
 
 **simple** (default): Minimal CSV format for testing
 - The parser detects the mode from which columns are present - see [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md) for the full design
-- **Simulation mode** (no `begin_time`/`end_time` columns): `job_submit_time, num_nodes, queue, time_limit` required; `actual_run_time` optional (needed only for `--run_time_mode actual`)
-- **Replay mode** (`begin_time` and `end_time`, or `begin_time` and `duration`, present): `job_submit_time, begin_time, end_time, num_nodes, queue, time_limit` required - times are historical actuals, replayed exactly, not computed by the scheduler.
+- **Simulation mode** (no `begin_time`/`end_time` columns): `job_submit_time, num_nodes, time_limit` required; `q_id` and `actual_run_time` are optional (`actual_run_time` is needed only for `--run_time_mode actual`)
+- **Replay mode** (`begin_time` and `end_time` present): `job_submit_time, begin_time, end_time, num_nodes, time_limit` required; `q_id` is optional. Times are historical actuals, replayed exactly, not computed by the scheduler.
 - Column order doesn't matter - the parser reads the header row and looks up columns by name
 
 **lassen**: LLNL Lassen 33-column format
@@ -78,26 +78,26 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
 
 ### Simulation Mode (scheduler computes start/end times)
 ```text
-job_submit_time,num_nodes,queue,time_limit
-0,10,pbatch,100
-50,10,pbatch,50
-120,10,pbatch,80
+job_submit_time,num_nodes,time_limit
+0,10,100
+50,10,50
+120,10,80
 ```
 
 ### Replay Mode, With Epoch Timestamps
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
-120,150,230,10,pbatch,80
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
+120,150,230,10,80
 ```
 
 ### Replay Mode, With ISO Timestamps
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,pbatch,100
-2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,pbatch,50
-2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,pbatch,80
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,100
+2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,50
+2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,80
 ```
 
 ## Column Descriptions
@@ -112,11 +112,11 @@ determines simulation vs replay mode (see below).
 |------|-------------|--------------|
 | `job_submit_time` | When the job arrives/submits | Both modes |
 | `num_nodes` | Number of nodes requested | Both modes |
-| `queue` | Queue name - only `pbatch`/`pall` (and `pbatch0`-`pbatch3`) are accepted by default; see `SHOW_ALL_QUEUE` in `src/common.hpp` to change this | Both modes |
+| `q_id` | Optional one-based queue ID. If absent, the job uses `1` (`Queue1`). | Both modes |
 | `time_limit` | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Both modes |
 | `begin_time` | Historical start time from trace | Replay mode only - presence of this column (together with `end_time` or `duration`) is what selects replay mode |
 | `end_time` | Historical end time from trace | Replay mode (or use `duration` instead) |
-| `duration` | Historical run time, as an alternative to `end_time` in replay mode | Replay mode (alternative to `end_time`) |
+| `duration` | Accepted alias for `actual_run_time` | Simulation mode, only with `--run_time_mode actual` |
 | `exit_status` | Output-only compatibility field. The simulator currently writes `0`. | Generated output only |
 | `actual_run_time` | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Simulation mode, only with `--run_time_mode actual` |
 
@@ -131,17 +131,22 @@ defined by fixed column position rather than header name (see below).
 **Ignored input columns**: input fields not used by the selected trace format
 are ignored. In particular, `exit_status` is accepted only so a generated
 simulator output can be used as replay input; its value is never read or used
-to affect scheduling or replay.
+to affect scheduling or replay. In the default ID-input build, `queue` is
+ignored; `q_id` is optional and defaults to `1` (`Queue1`). Legacy named
+`queue` input is available only with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`; in
+that build `q_id` is ignored and an absent `queue` also defaults to `Queue1`.
+
+**TODO — user-defined queue names:** Allow users to define the accepted input
+queue names and preserve those names in output.
 
 **Mode detection - simulation vs replay**:
 - No `begin_time`/`end_time` columns present → **simulation mode**: the
   scheduler computes start times; how the job's actual run time is
   determined is controlled separately by `--run_time_mode`
-- `begin_time` and (`end_time` or `duration`) present → **replay mode**:
-  times are historical actuals, replayed exactly - `duration = end_time -
-  begin_time` if `end_time` is given rather than `duration` directly
-- `begin_time` present without either `end_time` or `duration` (or vice
-  versa) is rejected as an ambiguous trace format
+- `begin_time` and `end_time` present → **replay mode**: times are historical
+  actuals, replayed exactly
+- Exactly one of `begin_time` or `end_time` present is rejected as an
+  ambiguous trace format
 
 See [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md)
 for the full design rationale.
@@ -160,10 +165,10 @@ for the full design rationale.
 ```bash
 # Create test trace
 cat > test.csv << EOF
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
-120,150,230,10,pbatch,80
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
+120,150,230,10,80
 EOF
 
 # Run test

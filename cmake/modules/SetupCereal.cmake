@@ -6,10 +6,24 @@ set(DR_EVT_HAS_CEREAL TRUE)
 set(CEREAL_SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/cereal)
 set(CEREAL_HEADER cereal.hpp)
 
+# A previous FetchContent build may leave CEREAL cached under external/cereal
+# after that directory has been removed. Do not keep using a path that no
+# longer exists: the install prefix is a fallback before a new download.
+if (CEREAL AND NOT EXISTS "${CEREAL}")
+  unset(CEREAL CACHE)
+endif ()
+
+set(DR_EVT_CEREAL_INSTALL_HINTS)
+if (CMAKE_INSTALL_PREFIX)
+  list(APPEND DR_EVT_CEREAL_INSTALL_HINTS
+       "${CMAKE_INSTALL_PREFIX}/include/cereal")
+endif()
 find_file(CEREAL ${CEREAL_HEADER}
           HINTS ${CEREAL_SOURCE_DIR}/include/cereal
+                ${DR_EVT_CEREAL_INSTALL_HINTS}
                 $ENV{CEREAL_ROOT}/include/cereal
                 ${CEREAL_ROOT}/include/cereal)
+unset(DR_EVT_CEREAL_INSTALL_HINTS)
 
 if (CEREAL)
   message(STATUS "Found Cereal: ${CEREAL}")

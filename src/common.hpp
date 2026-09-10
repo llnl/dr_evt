@@ -21,7 +21,7 @@
 /**
  *  This will enable to print out only time_limit vs exec_time.
  */
-//#define LIMIT_VS_EXEC_TIME_ONLY 1
+// #define LIMIT_VS_EXEC_TIME_ONLY 1
 
 // The dedicated allocation time (DAT) requires an application in advance
 // to gain execlusive access to the entire compute resources of a cluster.
@@ -33,7 +33,7 @@
 #define MARK_DAT_PERIOD 1
 
 // Includes jobs from all the queues rather than pbatch and pall
-//#define SHOW_ALL_QUEUE 1
+// #define SHOW_ALL_QUEUE 1
 
 /// Group all pbatch[0-3] queues into the canonical pBatch queue.
 #define PBATCH_GROUP 1
@@ -42,14 +42,14 @@
  *  Show the record number in the raw file for each record.
  *  The record number starts from 1 and increase by the line.
  */
-//#define SHOW_ORG_NO 1
+// #define SHOW_ORG_NO 1
 
 /**
  *  The limit on the amount of node resource a batch job can request on Lassen.
  *  Comment out to avoid applying this filtering. Jobs with such an error will
  *  be ignored.
  */
-//#define BATCH_JOB_NODE_LIMIT 256
+// #define BATCH_JOB_NODE_LIMIT 256
 
 /**
  * Make sure that job submit time is earlier than the job begin time and that
@@ -66,24 +66,21 @@
 /// Default timezone for trace timestamps that do not contain an offset.
 #define DATA_TIMEZONE "PST8PDT"
 
-#if !defined (DATA_TIMEZONE)
+#if !defined(DATA_TIMEZONE)
 #define DATA_TIMEZONE "" // Assume UTC
 #endif
 
-
 #if LIMIT_VS_EXEC_TIME_ONLY
- #ifdef INCLUDE_DAT
-  #undef INCLUDE_DAT
- #endif
+#ifdef INCLUDE_DAT
+#undef INCLUDE_DAT
+#endif
 #endif
 
-
 /** @brief Compare two primary keys and use a tie-break expression on equality.
- * @param _A Left primary key expression.
- * @param _B Right primary key expression.
- * @param _T Boolean tie-break expression evaluated when keys are equal. */
-#define LESS_OR(_A,_B,_T) (((_A) < (_B)) || (((_A) == (_B)) && (_T)))
-
+ * @param[in] _A Left primary key expression.
+ * @param[in] _B Right primary key expression.
+ * @param[in] _T Boolean tie-break expression evaluated when keys are equal. */
+#define LESS_OR(_A, _B, _T) (((_A) < (_B)) || (((_A) == (_B)) && (_T)))
 
 namespace dr_evt {
 /** \addtogroup dr_evt_global

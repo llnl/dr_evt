@@ -37,42 +37,47 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * @brief Map a Boost graph selector to its canonical selector and ordering trait.
+ * @brief Map a Boost graph selector to its canonical selector and ordering
+ * trait.
  * @tparam S Boost vertex/container selector type.
  * @details ordered is true for selectors with deterministic ordering and false
  * for hash-based selectors.
  */
-template<typename S = void>
-struct adjlist_selector_t {
-    /// Canonical Boost selector type.
-    using type = ::boost::vecS;
-    /// Compile-time indication of deterministic ordering.
-    using ordered = std::true_type;
+template <typename S = void> struct adjlist_selector_t {
+  /// Canonical Boost selector type.
+  using type = ::boost::vecS;
+  /// Compile-time indication of deterministic ordering.
+  using ordered = std::true_type;
 };
 
-template<> struct adjlist_selector_t<::boost::vecS> {
-    using type = ::boost::vecS;
-    using ordered = std::true_type;
+/** @brief Traits for Boost's contiguous vector selector. */
+template <> struct adjlist_selector_t<::boost::vecS> {
+  using type = ::boost::vecS;     ///< Canonical selector type.
+  using ordered = std::true_type; ///< Indicates deterministic ordering.
 };
 
-template<> struct adjlist_selector_t<::boost::listS> {
-    using type = ::boost::listS;
-    using ordered = std::true_type;
+/** @brief Traits for Boost's linked-list selector. */
+template <> struct adjlist_selector_t<::boost::listS> {
+  using type = ::boost::listS;    ///< Canonical selector type.
+  using ordered = std::true_type; ///< Indicates deterministic ordering.
 };
 
-template<> struct adjlist_selector_t<::boost::setS> {
-    using type = ::boost::setS;
-    using ordered = std::true_type;
+/** @brief Traits for Boost's ordered unique-set selector. */
+template <> struct adjlist_selector_t<::boost::setS> {
+  using type = ::boost::setS;     ///< Canonical selector type.
+  using ordered = std::true_type; ///< Indicates deterministic ordering.
 };
 
-template<> struct adjlist_selector_t<::boost::multisetS> {
-    using type = ::boost::multisetS;
-    using ordered = std::true_type;
+/** @brief Traits for Boost's ordered multiset selector. */
+template <> struct adjlist_selector_t<::boost::multisetS> {
+  using type = ::boost::multisetS; ///< Canonical selector type.
+  using ordered = std::true_type;  ///< Indicates deterministic ordering.
 };
 
-template<> struct adjlist_selector_t<::boost::hash_setS> {
-    using type = ::boost::hash_setS;
-    using ordered = std::false_type;
+/** @brief Traits for Boost's unordered hash-set selector. */
+template <> struct adjlist_selector_t<::boost::hash_setS> {
+  using type = ::boost::hash_setS; ///< Canonical selector type.
+  using ordered = std::false_type; ///< Indicates nondeterministic ordering.
 };
 
 /**@}*/

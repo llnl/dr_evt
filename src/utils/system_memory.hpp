@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef  DR_EVT_UTILS_SYSTEM_MEMORY_HPP
-#define  DR_EVT_UTILS_SYSTEM_MEMORY_HPP
+#ifndef DR_EVT_UTILS_SYSTEM_MEMORY_HPP
+#define DR_EVT_UTILS_SYSTEM_MEMORY_HPP
 #include <cstddef>
 
 namespace dr_evt {

@@ -12,8 +12,8 @@
 #ifndef DR_EVT_TRACE_COLUMN_ID_HPP
 #define DR_EVT_TRACE_COLUMN_ID_HPP
 
-#include <string>
 #include "common.hpp"
+#include <string>
 
 namespace dr_evt {
 /** \addtogroup dr_evt_trace
@@ -26,9 +26,14 @@ namespace dr_evt {
  */
 using column_id_t = std::pair<col_no_t, std::string>;
 
-inline bool operator<(const column_id_t& c1, const column_id_t& c2)
-{ // No need for tie-breaking for this problem
-    return (c1.first < c2.first);
+/** @brief Order columns by their zero-based position.
+ * @param[in] c1 Left column descriptor.
+ * @param[in] c2 Right column descriptor.
+ * @return `true` when @p c1 has a smaller position. */
+inline bool
+operator<(const column_id_t &c1,
+          const column_id_t &c2) { // No need for tie-breaking for this problem
+  return (c1.first < c2.first);
 }
 
 /**@}*/

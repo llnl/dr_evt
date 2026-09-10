@@ -20,16 +20,16 @@ simulation itself.
 
 ## Building
 
-The gRPC client/server is optional and requires two CMake flags:
+The gRPC client/server is optional. Enabling it automatically enables
+Protobuf support:
 
 ```bash
 cmake .. \
-  -DDR_EVT_ENABLE_PROTOBUF=ON \
   -DDR_EVT_ENABLE_GRPC=ON
 make dr_evt_server-bin dr_evt_client-bin
 ```
 
-`DR_EVT_ENABLE_GRPC=ON` requires `DR_EVT_ENABLE_PROTOBUF=ON` too, since the
+`DR_EVT_ENABLE_GRPC=ON` enables `DR_EVT_ENABLE_PROTOBUF=ON`, since the
 gRPC service definition (`dr_evt_service.proto`) is itself built on the
 Protobuf runtime. When gRPC is enabled, it also becomes the sole provider
 of Protobuf support for the rest of the project (including the existing
@@ -42,14 +42,16 @@ linking two separate copies of Protobuf for no benefit.
 
 `cmake/modules/SetupGRPC.cmake` tries, in order:
 
-1. `find_package(gRPC CONFIG)` and `find_package(Protobuf CONFIG)` - works
-   with a properly-packaged install (e.g. `apt install libgrpc++-dev
-   protobuf-compiler-grpc` on Debian/Ubuntu also provides gRPC's own CMake
-   config; a MODULE-mode Protobuf fallback is tried too, since Debian/
-   Ubuntu's separate `libprotobuf-dev` package does not ship a CMake
-   config file itself, only gRPC's own package does).
-2. `FetchContent`, building gRPC's own full source tree (which bundles a
-   compatible Protobuf) if neither of the above succeeds.
+1. `find_package(gRPC CONFIG)`. A complete installed gRPC package supplies
+   its compatible Protobuf targets; older package configurations are given a
+   follow-up Protobuf lookup if needed.
+2. `FetchContent`, building gRPC's full source tree with its bundled,
+   compatible Protobuf if a complete installed package is unavailable.
+
+With `AVOID_SYSTEM_GRPC=ON`, the first step skips default system prefixes but
+still checks explicit hints and a non-system `CMAKE_INSTALL_PREFIX`. A partial
+`_deps/grpc-build` tree is never treated as an installed package; its already
+downloaded `_deps/grpc-src` source tree can instead be reused by FetchContent.
 
 The second path exists specifically for users **without root/sudo access**
 to install system packages - the common case on shared HPC/cluster
@@ -128,7 +130,7 @@ or reinitialize a session in place; disconnect and reconnect for a new run.
 ```
 
 `dr_evt_client` is a minimal example client demonstrating genuine
-streaming: it reads job data (`submit_time`, `num_nodes`, `queue`,
+streaming: it reads queue-free job data (`submit_time`, `num_nodes`,
 `time_limit`) from a file *only* client-side - the server never loads
 this file itself (no `InitializeTraceRequest` is sent at all) - and
 appends each job via `AppendJobRequest` to a server that has never seen
@@ -243,7 +245,7 @@ Requires MPI (`find_package(MPI)` in `CMakeLists.txt` - the target is
 silently skipped, not a build failure, if MPI isn't found):
 
 ```bash
-cmake .. -DDR_EVT_ENABLE_PROTOBUF=ON -DDR_EVT_ENABLE_GRPC=ON
+cmake .. -DDR_EVT_ENABLE_GRPC=ON
 make test_grpc_multi_client_server-bin
 
 mpirun -np 4 ./build/test_grpc_multi_client_server \

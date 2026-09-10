@@ -42,12 +42,12 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 
 ### Dependencies
 
-If dependencies such as Boost, Protobuf, and gRPC are already available on
-the system, they are found via `find_package` first. Otherwise, CMake falls
-back to `FetchContent` (downloading and building from source, no root/sudo
-needed) - Boost takes ~10-15 minutes this way, Protobuf ~5-10 minutes.
-Subsequent builds are fast. ProtoBuf and gRPC are optional and enabled via
-build options (see below). For full setup details, see
+Boost is found via `find_package` first and otherwise uses FetchContent.
+Protobuf and gRPC are optional: a Protobuf-only build discovers or fetches
+standalone Protobuf, while a gRPC build discovers gRPC first and otherwise
+fetches gRPC with its compatible bundled Protobuf. No root/sudo access is
+needed. First-time source builds can take several minutes; subsequent builds
+reuse the populated sources. For full setup details, see
 [Installation](installation.md).
 
 - **Boost**: `find_package` first; `FetchContent` fallback if not found
@@ -159,22 +159,23 @@ row (any order works) - not fixed-position, and not tab-separated.
 
 **Simulation mode** (scheduler computes start/end times - the common case):
 ```text
-job_submit_time,num_nodes,queue,time_limit
-0,10,pbatch,100
-50,10,pbatch,50
+job_submit_time,num_nodes,time_limit
+0,10,100
+50,10,50
 ```
 
 **Replay mode** (`begin_time`/`end_time` already known, replayed exactly):
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
 ```
 
 `time_limit` is also accepted under the column names `timelimit` or
 `walltime`, so an existing trace can be reused without editing its header.
-Only `pbatch`/`pall` (and `pbatch0`-`pbatch3`) queue values are accepted
-by default.
+`q_id` is optional and defaults to `1` (`Queue1`) when absent. To accept the
+legacy named `queue` column instead, configure with
+`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`.
 
 See [Trace File Formats](../user-guide/trace-formats.md) for the full
 column reference (including the Lassen format and the `lassen` format

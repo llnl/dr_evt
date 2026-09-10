@@ -48,6 +48,12 @@ EXPECTED_CONS="$SCRIPT_DIR/test_traces/feature/easy_vs_conservative_expected_con
 OUTDIR="$ROOT_DIR/test_output/easy_vs_conservative"
 NODES=100
 
+cd "$ROOT_DIR"
+
+# Resolve an explicitly configured or installed simulator before falling back
+# to the repository build tree.
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -81,17 +87,8 @@ if [ ! -f "$EXPECTED_CONS" ]; then
     exit 1
 fi
 
-# Build if needed
-if [ ! -f "$ROOT_DIR/build/simulator" ]; then
-    echo "Building simulator..."
-    cd "$ROOT_DIR"
-    cmake -B build -S .
-    cmake --build build -j
-    cd -
-fi
-
 echo "=== Running EASY Backfilling ==="
-"$ROOT_DIR/build/simulator" "$TRACE" \
+"$SIMULATOR" "$TRACE" \
     --total_nodes $NODES \
     --priority_policy fcfs \
     --backfill_policy easy \
@@ -101,7 +98,7 @@ echo "=== Running EASY Backfilling ==="
     > "$OUTDIR/easy.log" 2>&1
 
 echo "=== Running CONSERVATIVE Backfilling ==="
-"$ROOT_DIR/build/simulator" "$TRACE" \
+"$SIMULATOR" "$TRACE" \
     --total_nodes $NODES \
     --priority_policy fcfs_conservative \
     --backfill_policy conservative \

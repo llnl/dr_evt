@@ -93,7 +93,7 @@ The `tracer` binary is useful for:
 | Feature | Simulation Mode (`simulator`) | Replay (`tracer`) |
 |---------|----------------|-------------|
 | Binary | `simulator` | `tracer` - a separate binary, no scheduler code linked in |
-| Input | `job_submit_time`, `time_limit` | `num_nodes`, `begin_time`, `end_time`, `job_submit_time`, `queue`, `time_limit` - all required (`job_submit_time` isn't used for scheduling here, but it drives the per-job "nodes busy at submission" stat, and there's no shorter format that omits it) |
+| Input | `job_submit_time`, `time_limit` | `num_nodes`, `begin_time`, `end_time`, `job_submit_time`, `time_limit` - all required; optional `q_id` defaults to `1` (`Queue1`). Legacy builds use optional `queue` instead. (`job_submit_time` isn't used for scheduling here, but it drives the per-job "nodes busy at submission" stat.) |
 | Scheduler | Active - computes each job's start time | Not linked in - `begin_time`/`end_time` are taken directly from the file |
 | Resources | Computed from the scheduler's decisions | Computed by replaying the file's own begin/end times |
 | Purpose | Simulate scheduling policies | Reproduce a known execution's resource usage |

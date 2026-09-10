@@ -44,16 +44,10 @@ echo "Testing: append_job_api (C++ level)"
 # under bin/ like the main simulator/tracer/dr_evt_server/dr_evt_client
 # binaries - check there first.
 APPEND_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_append_job_api"
-if [ ! -f "$APPEND_API_BIN" ]; then
-    APPEND_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_append_job_api"
-fi
-if [ ! -f "$APPEND_API_BIN" ]; then
-    APPEND_API_BIN="./build/test_append_job_api"
-fi
 
-if [ ! -f "$APPEND_API_BIN" ]; then
-    echo "  ✗ FAIL - test_append_job_api binary not found"
-    echo "    Build first: cd build && cmake .. && make test_append_job_api-bin"
+if [ ! -x "$APPEND_API_BIN" ]; then
+    echo "  ✗ FAIL - installed test_append_job_api binary not found"
+    echo "    Expected: $APPEND_API_BIN"
     FAIL=$((FAIL + 1))
 else
     if "$APPEND_API_BIN" > /tmp/append_job_api_out.txt 2>&1; then
@@ -72,15 +66,9 @@ echo "Testing: grpc_streaming_api (over the actual gRPC wire)"
 
 SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
 GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_streaming_api"
-if [ ! -f "$GRPC_TEST_BIN" ]; then
-    GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_grpc_streaming_api"
-fi
-if [ ! -f "$GRPC_TEST_BIN" ]; then
-    GRPC_TEST_BIN="./build/test_grpc_streaming_api"
-fi
 EMPTY_TRACE="tests/test_traces/feature/empty_trace.csv"
 
-if [ ! -f "$SERVER" ] || [ ! -f "$GRPC_TEST_BIN" ]; then
+if [ ! -x "$SERVER" ] || [ ! -x "$GRPC_TEST_BIN" ]; then
     echo "  ⚠ SKIP - dr_evt_server and/or test_grpc_streaming_api not found"
     echo "    (build with -DDR_EVT_ENABLE_GRPC=ON to include this test)"
 else

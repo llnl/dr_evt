@@ -14,13 +14,13 @@ import pathlib
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from grpc_multi_server import ServerSession, load_stubs, read_jobs
+from grpc_multi_server import (DEFAULT_QUEUE_INPUT, QUEUE_FIELD, ServerSession,
+                               load_stubs, read_jobs)
 
 
 SYSTEM_FIELDS = {"system_id", "address", "trace"}
 COMPOSITE_FIELDS = {
-    "composite_id", "submit_time", "system_id", "num_nodes", "queue",
-    "time_limit",
+    "composite_id", "submit_time", "system_id", "num_nodes", "time_limit",
 }
 
 
@@ -82,7 +82,7 @@ def read_composites(path, systems):
                 "system_id": system_id,
                 "submit_time": submit_time,
                 "num_nodes": int(row["num_nodes"]),
-                "queue": row["queue"],
+                "queue": (row.get(QUEUE_FIELD) or DEFAULT_QUEUE_INPUT).strip(),
                 "limit_time": float(row["time_limit"]),
             })
 
@@ -235,7 +235,7 @@ def main():
     parser.add_argument("--systems", required=True, type=pathlib.Path,
                         help="CSV: system_id,address,trace[,server_infile,total_nodes]")
     parser.add_argument("--composites", required=True, type=pathlib.Path,
-                        help="long-form CSV: composite_id,submit_time,system_id,num_nodes,queue,time_limit")
+                        help="long-form CSV; optional queue field is q_id by default or queue in legacy mode")
     parser.add_argument("--output", type=argparse.FileType("w"), default=sys.stdout,
                         help="JSON Lines experiment output (default: stdout)")
     args = parser.parse_args()

@@ -56,9 +56,12 @@ def main():
     print("="*60)
 
     # Submit and run jobs incrementally
+    queue_field = "queue" if dr_evt.legacy_queue_input else "q_id"
+    default_queue = "pbatch" if dr_evt.legacy_queue_input else "1"
     for job_idx, job in enumerate(jobs):
         submit_time = float(job["job_submit_time"])
-        sim.append_job(submit_time, int(job["num_nodes"]), job["queue"],
+        queue_input = (job.get(queue_field) or default_queue).strip()
+        sim.append_job(submit_time, int(job["num_nodes"]), queue_input,
                        float(job["time_limit"]))
 
         # Advance to submit time

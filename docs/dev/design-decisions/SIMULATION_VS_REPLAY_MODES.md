@@ -23,12 +23,7 @@ The trace parser currently requires `begin_time` and `end_time` columns even in 
 
 **Required columns:**
 ```
-job_submit_time, begin_time, end_time, num_nodes, queue, time_limit
-```
-
-**Alternative (duration instead of end_time):**
-```
-job_submit_time, begin_time, duration, num_nodes, queue, time_limit
+job_submit_time, begin_time, end_time, num_nodes, time_limit
 ```
 
 **Semantics:**
@@ -39,33 +34,57 @@ job_submit_time, begin_time, duration, num_nodes, queue, time_limit
   simulator currently writes `0`; an input value is ignored.
 
 **Parser behavior:**
-- If `begin_time` AND (`end_time` OR `duration`) exist → **Replay mode**
+- If `begin_time` AND `end_time` exist → **Replay mode**
 - Jobs start at `begin_time` from trace
-- Duration = `end_time - begin_time` OR `duration` column
+- Duration = `end_time - begin_time`
 
 ### Simulation Mode Format
 
-**Required columns:**
+**Required input header columns:**
 ```
-job_submit_time, num_nodes, queue, time_limit
+job_submit_time, num_nodes, time_limit
 ```
 
-**Optional column (for duration):**
+**Optional input column (only with `--run_time_mode actual`):**
 ```
-actual_duration
+actual_run_time
 ```
 
 **Semantics:**
 - `job_submit_time`: When job arrives in queue
+- `num_nodes`: Number of nodes requested by the job
+- `q_id`: Optional one-based queue ID. If it is absent, the job uses `1`
+  (`Queue1`). The default build ignores a legacy named `queue` column.
+  Building with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON` instead selects legacy queue
+  names and their existing name-based filtering behavior.
 - `time_limit`: User's estimate (scheduler uses for planning/reservations)
-- `actual_duration`: Ground truth runtime (if column present)
+- `actual_run_time`: Ground-truth runtime when `--run_time_mode actual` is
+  selected. Accepted aliases are `actual_runtime`, `duration`,
+  `actual_duration`, and `run_time`.
 - `begin_time`: Computed by scheduler
-- `end_time`: Computed as `begin_time + actual_duration`
+- `end_time`: Computed as `begin_time + actual_run_time`
 
 **Parser behavior:**
 - If `begin_time` is ABSENT → **Simulation mode**
 - Scheduler computes start times
 - Actual duration determined by mode (see below)
+
+### Simulation-mode output
+
+Simulation writes a scheduled-job CSV with the following header when the input
+has a `q_id` column:
+
+```text
+job_submit_time,begin_time,end_time,num_nodes,exit_status,q_id,time_limit
+```
+
+When input omits `q_id`, the output omits it too. `begin_time` and `end_time`
+are the scheduler's computed times; `exit_status` is currently written as `0`
+for compatibility. Jobs rejected
+before scheduling are omitted. When requested, the separate resource trace
+records `time,free_nodes,allocated_nodes` after each resource-state change.
+See [Output Trace Files](../../user-guide/output-traces.md)
+for filenames, examples, and streaming behavior.
 
 ## Duration Determination in Simulation Mode
 
@@ -76,9 +95,9 @@ The simulator supports three methods for determining actual job duration, contro
 **Requires:** `actual_run_time` column in trace
 
 ```text
-job_submit_time,num_nodes,queue,time_limit,actual_run_time
-0,80,pbatch,100,87
-10,15,pbatch,20,18
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,80,100,87
+10,15,20,18
 ```
 
 **Behavior:**
@@ -95,9 +114,9 @@ job_submit_time,num_nodes,queue,time_limit,actual_run_time
 **Requires:** Only `time_limit` column
 
 ```text
-job_submit_time,num_nodes,queue,time_limit
-0,80,pbatch,100
-10,15,pbatch,20
+job_submit_time,num_nodes,time_limit
+0,80,100
+10,15,20
 ```
 
 **Behavior:**

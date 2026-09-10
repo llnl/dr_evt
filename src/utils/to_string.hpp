@@ -13,28 +13,38 @@ namespace dr_evt {
 /** \addtogroup dr_evt_utils
  *  @{ */
 
+/** @brief Format a floating-point value in fixed notation.
+ * @tparam T Either `float` or `double`.
+ * @param[in] a_value Value to format.
+ * @param[in] precision Number of digits after the decimal point.
+ * @return Formatted value as std::string. */
 template <typename T>
 inline std::enable_if_t<std::is_same<T, float>::value ||
-                        std::is_same<T, double>::value, std::string>
-to_string_with_precision(const T a_value, const int precision = 6)
-{
-    std::ostringstream out;
-    out.precision(precision);
-    out << std::fixed << a_value;
-    return out.str();
+                            std::is_same<T, double>::value,
+                        std::string>
+to_string_with_precision(const T a_value, const int precision = 6) {
+  std::ostringstream out;
+  out.precision(precision);
+  out << std::fixed << a_value;
+  return out.str();
 }
 
+/** @brief Format a floating-point value in scientific notation.
+ * @tparam T Either `float` or `double`.
+ * @param[in] a_value Value to format.
+ * @param[in] precision Number of digits after the decimal point.
+ * @return Formatted value as std::string. */
 template <typename T>
 inline std::enable_if_t<std::is_same<T, float>::value ||
-                        std::is_same<T, double>::value, std::string>
-to_string_in_scientific(const T a_value, const int precision = 6)
-{
-    std::ostringstream out;
-    out.precision(precision);
-    out << std::scientific << a_value;
-    return out.str();
+                            std::is_same<T, double>::value,
+                        std::string>
+to_string_in_scientific(const T a_value, const int precision = 6) {
+  std::ostringstream out;
+  out.precision(precision);
+  out << std::scientific << a_value;
+  return out.str();
 }
 
 /**@}*/
-} // end of namespasce dr_evt
+} // namespace dr_evt
 #endif // DR_EVT_UTILS_TO_STRING_HPP

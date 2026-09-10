@@ -68,7 +68,7 @@ for test_file in "$TRACE_DIR"/*.csv; do
     fi
 
     # Convert simulator output to comparable format
-    # Simulator: job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
+    # Simulator: job_submit_time,begin_time,end_time,num_nodes,exit_status,queue-or-q_id,time_limit
     # Expected: job_id,start_time,end_time
     OUTPUT="/tmp/unit_${test_name}_comparable.csv"
     awk -F, 'NR==1 {print "job_id,start_time,end_time"; next} {print NR-2","$2","$3}' "$SIM_OUT" > "$OUTPUT"

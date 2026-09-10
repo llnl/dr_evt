@@ -106,8 +106,10 @@ caught an identity-mixup bug in those 5 tests as originally written.
 - Sequential execution
 - Timezone handling
 
-**Queue name requirement:** the `queue` field must be `pbatch` (or
-`pbatch0`-`pbatch3`) - `"batch"` and other values are silently dropped
+**Queue input:** the default build accepts an optional numeric `q_id` and
+defaults it to `1` when absent. Legacy named `queue` input is selected only
+with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`; in that mode `queue` must be `pbatch`
+(or `pbatch0`-`pbatch3`) - `"batch"` and other values are silently dropped
 during load with no error, producing zero loaded jobs. This is exactly
 what broke `simple_2jobs.csv` and `timestamp_epoch_simple.csv` previously
 (since fixed).

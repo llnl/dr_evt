@@ -12,17 +12,27 @@ endif()
 # Skip system paths for Boost (useful when system install is broken/incompatible)
 option(AVOID_SYSTEM_BOOST "Do not search default system paths for Boost" FALSE)
 
+# Accept both CMake's package-root spelling and the longstanding uppercase
+# project spelling from the environment.  A value supplied with -DBoost_ROOT
+# or -DBOOST_ROOT always takes precedence.
+if (NOT DEFINED Boost_ROOT AND DEFINED ENV{Boost_ROOT})
+    set(Boost_ROOT "$ENV{Boost_ROOT}")
+endif()
+if (NOT DEFINED BOOST_ROOT AND DEFINED ENV{BOOST_ROOT})
+    set(BOOST_ROOT "$ENV{BOOST_ROOT}")
+endif()
+
 # Configure search path for Boost
 if (AVOID_SYSTEM_BOOST)
     message(STATUS "AVOID_SYSTEM_BOOST=ON: skipping system Boost search")
     set(Boost_NO_SYSTEM_PATHS ON)
     set(DR_EVT_BOOST_SEARCH_MODE NO_DEFAULT_PATH)
-elseif (DEFINED BOOST_ROOT)
-    message(STATUS "BOOST_ROOT: ${BOOST_ROOT}")
+elseif (DEFINED Boost_ROOT)
+    message(STATUS "Boost_ROOT: ${Boost_ROOT}")
     set(Boost_NO_SYSTEM_PATHS ON)
     set(DR_EVT_BOOST_SEARCH_MODE NO_DEFAULT_PATH)
-elseif (DEFINED ENV{BOOST_ROOT})
-    message(STATUS "ENV BOOST_ROOT: $ENV{BOOST_ROOT}")
+elseif (DEFINED BOOST_ROOT)
+    message(STATUS "BOOST_ROOT: ${BOOST_ROOT}")
     set(Boost_NO_SYSTEM_PATHS ON)
     set(DR_EVT_BOOST_SEARCH_MODE NO_DEFAULT_PATH)
 else()
@@ -63,15 +73,55 @@ if (EXISTS "${CMAKE_BINARY_DIR}/_deps/boost-build")
     endforeach()
     unset(DR_EVT_BOOST_COMPONENT_UPPER)
 endif()
-find_package(Boost QUIET COMPONENTS
+# Prefer a Boost package installed by a previous `cmake --install` into this
+# project's nonempty prefix. HINTS remains usable with NO_DEFAULT_PATH, so
+# this also works when AVOID_SYSTEM_BOOST is enabled; FetchContent remains the
+# fallback. Do not add an empty prefix, which could otherwise undermine an
+# explicit no-system-search configuration.
+set(DR_EVT_BOOST_INSTALL_HINTS)
+if (CMAKE_INSTALL_PREFIX)
+    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${CMAKE_INSTALL_PREFIX}")
+endif()
+if (DEFINED Boost_ROOT)
+    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${Boost_ROOT}")
+endif()
+if (DEFINED BOOST_ROOT)
+    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${BOOST_ROOT}")
+endif()
+set(DR_EVT_BOOST_COMPONENTS
     regex
     filesystem
     system
     program_options
     serialization
-    container
-    ${DR_EVT_BOOST_SEARCH_MODE}
-)
+    container)
+
+# Prefer a modern exported Boost package when one is available.
+find_package(Boost CONFIG QUIET COMPONENTS ${DR_EVT_BOOST_COMPONENTS}
+    HINTS ${DR_EVT_BOOST_INSTALL_HINTS}
+    ${DR_EVT_BOOST_SEARCH_MODE})
+
+# The Boost CMake distribution used by FetchContent does not always install
+# BoostConfig.cmake. Fall back to FindBoost for a prefix containing the normal
+# include/boost and lib or lib64 layout. This is deliberately a second choice:
+# CMP0167 NEW prefers an exported package when one exists.
+if (NOT Boost_FOUND)
+    cmake_policy(PUSH)
+    if (POLICY CMP0167)
+        cmake_policy(SET CMP0167 OLD)
+    endif()
+    if (CMAKE_INSTALL_PREFIX AND NOT DEFINED Boost_ROOT AND NOT DEFINED BOOST_ROOT)
+        set(Boost_ROOT "${CMAKE_INSTALL_PREFIX}")
+    endif()
+    if (CMAKE_INSTALL_PREFIX AND NOT DEFINED BOOST_LIBRARYDIR)
+        set(BOOST_LIBRARYDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    endif()
+    find_package(Boost MODULE QUIET COMPONENTS ${DR_EVT_BOOST_COMPONENTS}
+    )
+    cmake_policy(POP)
+endif()
+unset(DR_EVT_BOOST_COMPONENTS)
+unset(DR_EVT_BOOST_INSTALL_HINTS)
 
 if(NOT Boost_FOUND)
     # If Boost is missing, install it via FetchContent
@@ -105,17 +155,21 @@ if(NOT Boost_FOUND)
         "${boost_SOURCE_DIR}/libs/multi_index/include"
         "${boost_SOURCE_DIR}/libs/serialization/include"
         "${boost_SOURCE_DIR}/libs/container/include"
-        "${boost_SOURCE_DIR}/libs/circular_buffer/include"
-        CACHE PATH "Boost include directories")
-    set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}" CACHE PATH "Boost include directory")
+        "${boost_SOURCE_DIR}/libs/circular_buffer/include")
+    set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}")
+    set(Boost_INCLUDE_DIRS "${Boost_INCLUDE_DIRS}"
+        CACHE STRING "Boost include directories" FORCE)
+    set(Boost_INCLUDE_DIR "${Boost_INCLUDE_DIR}"
+        CACHE PATH "Boost include directory" FORCE)
 
     # Boost CMake automatically creates targets with Boost:: prefix
     set(Boost_LIBRARIES
         Boost::regex
         Boost::filesystem
         Boost::system
-        Boost::program_options
-        CACHE STRING "Boost libraries")
+        Boost::program_options)
+    set(Boost_LIBRARIES "${Boost_LIBRARIES}"
+        CACHE STRING "Boost libraries" FORCE)
     set(DR_EVT_BOOST_FETCHCONTENT ON)
 
     message(STATUS "Boost installed via FetchContent at: ${boost_SOURCE_DIR}")

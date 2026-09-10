@@ -22,7 +22,6 @@
 
 #cmakedefine DR_EVT_GNU_LINUX 1
 
-#cmakedefine DR_EVT_HAS_SUNDIALS 1
 #cmakedefine DR_EVT_HAS_CEREAL 1
 #cmakedefine DR_EVT_HAS_CATCH2 1
 #cmakedefine DR_EVT_HAS_OPENMP 1
@@ -31,6 +30,7 @@
 #cmakedefine DR_EVT_HAS_PROTOBUF 1
 #cmakedefine DR_EVT_HAS_PROTOBUF_LOG_HANDLER 1
 #cmakedefine DR_EVT_HAS_ABSL_LOG_SINK 1
+#cmakedefine01 DR_EVT_LEGACY_QUEUE_INPUT
 
 
 #ifdef DR_EVT_HAS_OPENMP

@@ -13,15 +13,6 @@ cd "$REPO_ROOT"
 
 SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
 TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_streaming_api"
-if [[ ! -x "$TEST_BIN" ]]; then
-    TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_grpc_streaming_api"
-fi
-if [[ ! -x "$TEST_BIN" ]]; then
-    TEST_BIN="./build/test_grpc_streaming_api"
-fi
-if [[ ! -x "$SERVER" ]]; then
-    SERVER="./build/dr_evt_server"
-fi
 
 TRACE="tests/test_traces/feature/empty_trace.csv"
 PORT="${DR_EVT_BACKFILL_WINDOW_TEST_PORT:-53211}"

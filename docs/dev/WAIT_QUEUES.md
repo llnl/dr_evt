@@ -25,6 +25,8 @@ FCFS with EASY backfilling on an Intel Sapphire Rapids node (112 cores,
 256 GB memory). Values are the mean of 10 end-to-end runs; `±` is the
 population standard deviation.
 
+**Benchmark script:** [`tests/benchmark_block_sizes.sh`](../../tests/benchmark_block_sizes.sh)
+
 The timing includes trace parsing, scheduling and backfilling, event handling,
 and trace output. It is not an isolated wait-queue microbenchmark. The queue
 implementation is the intended variable, but the complete difference cannot be
@@ -35,23 +37,23 @@ attributed solely to queue operations.
 | Implementation | Time (s) | Relative to deque |
 | --- | ---: | --- |
 | Deque | 3.160 ± 0.083 | baseline |
-| Multimap | 27.840 ± 0.024 | 781% slower (8.81×) |
+| Multimap | 27.840 ± 0.024 | 781% slower (8.81× slowdown) |
 | **Circular** | **0.805 ± 0.006** | **75% less elapsed time (3.93× speedup)** |
-| Block-4 | 4.741 ± 0.004 | 50% slower (1.50×) |
-| Block-8 | 4.288 ± 0.004 | 36% slower (1.36×) |
-| Block-16 | 3.961 ± 0.003 | 25% slower (1.25×) |
-| Block-32 | 4.056 ± 0.005 | 28% slower (1.28×) |
-| Block-64 | 4.354 ± 0.002 | 38% slower (1.38×) |
-| Block-128 | 4.388 ± 0.007 | 39% slower (1.39×) |
-| Block-256 | 4.716 ± 0.006 | 49% slower (1.49×) |
-| Python reference | 7.675 ± 0.052 | 143% slower (2.43×) |
+| Block-4 | 4.741 ± 0.004 | 50% slower (1.50× slowdown) |
+| Block-8 | 4.288 ± 0.004 | 36% slower (1.36× slowdown) |
+| Block-16 | 3.961 ± 0.003 | 25% slower (1.25× slowdown) |
+| Block-32 | 4.056 ± 0.005 | 28% slower (1.28× slowdown) |
+| Block-64 | 4.354 ± 0.002 | 38% slower (1.38× slowdown) |
+| Block-128 | 4.388 ± 0.007 | 39% slower (1.39× slowdown) |
+| Block-256 | 4.716 ± 0.006 | 49% slower (1.49× slowdown) |
+| Python reference | 7.675 ± 0.052 | 143% slower (2.43× slowdown) |
 
 The 10 runs produced identical simulated-job output across every measured C++
 queue variant, including multimap. The Python reference is an end-to-end
 baseline, but is not byte-compared with C++ because it emits a different CSV
 schema.
 
-Run the benchmark with:
+Run the same benchmark with:
 
 ```bash
 tests/benchmark_block_sizes.sh

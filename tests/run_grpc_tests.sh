@@ -20,7 +20,20 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_ROOT="$SCRIPT_DIR/.."
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if ! RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dr-evt-grpc-tests.XXXXXXXX" 2>/dev/null)"; then
+    RUN_DIR="$(mktemp -d "/tmp/dr-evt-grpc-tests.XXXXXXXX")"
+fi
+SERVER_PID=""
+
+cleanup() {
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    rm -rf -- "$RUN_DIR"
+}
+trap cleanup EXIT INT TERM
 
 cd "$REPO_ROOT"
 
@@ -29,30 +42,37 @@ echo "gRPC Client/Server Tests"
 echo "=========================================="
 echo ""
 
-if [ ! -f "${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server" ] || [ ! -f "${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_client" ]; then
+INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-$REPO_ROOT/install}"
+if [[ "$INSTALL_PREFIX" != /* ]]; then
+    INSTALL_PREFIX="$REPO_ROOT/${INSTALL_PREFIX#./}"
+fi
+
+if [ ! -x "$INSTALL_PREFIX/bin/dr_evt_server" ] || [ ! -x "$INSTALL_PREFIX/bin/dr_evt_client" ]; then
     echo "Error: dr_evt_server and/or dr_evt_client not found"
     echo "Build with -DDR_EVT_ENABLE_GRPC=ON (implies -DDR_EVT_ENABLE_PROTOBUF=ON)"
     exit 1
 fi
 
-SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
-CLIENT="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_client"
+SERVER="$INSTALL_PREFIX/bin/dr_evt_server"
+CLIENT="$INSTALL_PREFIX/bin/dr_evt_client"
 
 PASS=0
 FAIL=0
-TRACE_DIR="tests/test_traces/grpc"
+TRACE_DIR="$REPO_ROOT/tests/test_traces/grpc"
 
 # --- Test 1: basic single-pair server/client session ---
 echo "Testing: basic_server_client_session"
 
 PORT=53001
-$SERVER "127.0.0.1:${PORT}" > /tmp/grpc_test_server.log 2>&1 &
+(cd "$RUN_DIR" && exec "$SERVER" "127.0.0.1:${PORT}") \
+    > "$RUN_DIR/basic-server.log" 2>&1 &
 SERVER_PID=$!
 sleep 1
 
 CLIENT_OUT=$($CLIENT "127.0.0.1:${PORT}" "$TRACE_DIR/trace_a.csv" 2>&1) || true
 kill "$SERVER_PID" 2>/dev/null || true
 wait "$SERVER_PID" 2>/dev/null || true
+SERVER_PID=""
 
 # trace_a.csv (100 nodes, ample capacity, no queuing): job 0 (0->20),
 # job 1 (10->25 - overlaps job 0, but both fit within 100 nodes), job 2
@@ -64,7 +84,7 @@ if echo "$CLIENT_OUT" | grep -q "Jobs completed:  3" && \
 else
     echo "  ✗ FAIL"
     echo "     Server log:"
-    sed 's/^/       /' /tmp/grpc_test_server.log
+    sed 's/^/       /' "$RUN_DIR/basic-server.log"
     echo "     Client output:"
     echo "$CLIENT_OUT" | sed 's/^/       /'
     FAIL=$((FAIL + 1))
@@ -73,8 +93,8 @@ fi
 # --- Test 2: MPI multi-client/multi-server lockstep synchronization ---
 echo "Testing: mpi_multi_client_server_lockstep"
 
-MPI_TEST="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_multi_client_server"
-if [ ! -f "$MPI_TEST" ]; then
+MPI_TEST="$INSTALL_PREFIX/bin/tests/test_grpc_multi_client_server"
+if [ ! -x "$MPI_TEST" ]; then
     echo "  ⚠ SKIP - $MPI_TEST not found"
     echo "    (MPI not found at configure time, or not yet built)"
 else
@@ -100,7 +120,11 @@ else
     if [ -z "$MPI_LAUNCHER_NAME" ]; then
         echo "  ⚠ SKIP - neither mpirun nor srun is available on PATH"
     else
-        if MPI_OUT=$("${MPI_LAUNCHER[@]}" "$MPI_TEST" \
+        if MPI_OUT=$("${MPI_LAUNCHER[@]}" /bin/bash -c '
+            cd "$1"
+            shift
+            exec "$@"
+        ' grpc-test-rank "$RUN_DIR" "$MPI_TEST" \
             "$SERVER" 53100 \
             "$TRACE_DIR/composite_server1.csv" "$TRACE_DIR/composite_server2.csv" \
             "$TRACE_DIR/composite_jobs.csv" 2>&1); then

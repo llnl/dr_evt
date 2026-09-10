@@ -1,7 +1,7 @@
-name: Quick Test (Scheduler Correctness Only)
+name: Quick Test (Scheduler Correctness + Trace Schema)
 
 # Fast CI for quick validation (runs on every commit)
-# Only runs the scheduler-correctness suite to save time.
+# Runs scheduler correctness plus the lightweight C++ trace-schema API suite.
 # Full test suite runs on PR and main branch
 
 on:
@@ -12,8 +12,10 @@ on:
 
 jobs:
   quick-test:
-    name: Quick Scheduler Correctness Check
+    name: Quick Scheduler Correctness and Trace Schema Check
     runs-on: ubuntu-latest
+    env:
+      CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
 
     steps:
       - name: Checkout repository
@@ -44,13 +46,17 @@ jobs:
 
       - name: Run Scheduler Correctness Tests Only
         run: |
-          echo "Running scheduler-correctness tests with build directory..."
-          unset CMAKE_INSTALL_PREFIX
-          ./tests/run_scheduler_correctness_tests.sh
-          echo ""
           echo "Running scheduler-correctness tests with installed binary..."
-          export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
           ./tests/run_scheduler_correctness_tests.sh
+
+      - name: Run Trace Schema Unit Tests
+        id: trace-schema
+        run: |
+          # Covers optional queue input and preservation of the input schema
+          # in generated output, alongside the rest of the C++ progressive
+          # loading API tests.
+          $GITHUB_WORKSPACE/install/bin/tests/test_progressive_load
+          $GITHUB_WORKSPACE/install/bin/tests/test_queue_input
 
       - name: Summary
         if: always()
@@ -59,4 +65,5 @@ jobs:
           echo "Quick Test Complete"
           echo "Scheduler correctness: 34/34 fixtures (verified in a manual session pass;"
           echo "this echo does not itself re-check the actual result above)"
+          echo "Trace schema / progressive-loading API: ${{ steps.trace-schema.outcome }}"
           echo "========================================"

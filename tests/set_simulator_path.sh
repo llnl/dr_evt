@@ -1,21 +1,17 @@
 #!/bin/bash
-# Common function to find simulator - source this in test scripts
+# Common function to find the installed simulator - source this in test scripts.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-$REPO_ROOT/install}"
 
 if [ -n "${SIMULATOR:-}" ] && [ -x "${SIMULATOR}" ]; then
     : # Explicit simulator path takes precedence.
-elif [ -n "${CMAKE_INSTALL_PREFIX:-}" ] && [ -x "${CMAKE_INSTALL_PREFIX}/bin/simulator" ]; then
-    SIMULATOR="${CMAKE_INSTALL_PREFIX}/bin/simulator"
-elif [ -x "./build/simulator" ]; then
-    SIMULATOR="./build/simulator"
+elif [ -x "$INSTALL_PREFIX/bin/simulator" ]; then
+    SIMULATOR="$INSTALL_PREFIX/bin/simulator"
 else
-    echo "Error: Simulator not found. Tried:"
-    echo "  - \${SIMULATOR} (if set)"
-    echo "  - \${CMAKE_INSTALL_PREFIX}/bin/simulator (if CMAKE_INSTALL_PREFIX is set)"
-    echo "  - ./build/simulator (build directory)"
-    echo ""
-    echo "Build and install first:"
-    echo "  cd build && cmake .. && make && make install"
-    echo "Or set SIMULATOR environment variable to the binary path."
+    echo "Error: installed simulator not found or not executable: $INSTALL_PREFIX/bin/simulator"
+    echo "Install the project first, or set CMAKE_INSTALL_PREFIX to its install prefix."
     exit 1
 fi
 

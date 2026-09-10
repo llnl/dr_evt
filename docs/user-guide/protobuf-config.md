@@ -153,7 +153,7 @@ avoid a positional argument entirely (mutually exclusive with one).
 | `timezone` | string | `"UTC"` | Any IANA timezone (e.g., `"America/Los_Angeles"`) |
 
 **trace_format:**
-- `"simple"` - header-based CSV format. Replay input requires `job_submit_time`, `begin_time`, `end_time`, `num_nodes`, `queue`, and `time_limit`. `exit_status` is an output-only compatibility field and is ignored if present in input.
+- `"simple"` - header-based CSV format. Replay input requires `job_submit_time`, `begin_time`, `end_time`, `num_nodes`, and `time_limit`; optional `q_id` defaults to `1` (`Queue1`). The legacy named `queue` field is used only when built with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`. `exit_status` is an output-only compatibility field and is ignored if present in input.
 - `"lassen"` - 33-column LLNL HPC trace format
 
 **timestamp_format:**

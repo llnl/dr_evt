@@ -14,15 +14,28 @@ Use `--outfile` to choose the simulated-job schedule file:
 
 If `--outfile` is omitted, DR_EVT derives a filename from the input trace
 (for example, `jobs.csv` becomes `jobs_sim.csv`). The CSV contains one row for
-each scheduled job:
+each scheduled job. In the default ID-input build, an input trace that
+explicitly provides `q_id` retains that column:
 
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
+job_submit_time,begin_time,end_time,num_nodes,exit_status,q_id,time_limit
+```
+
+When the selected queue field is omitted from input, it is omitted from
+output too:
+
+```text
+job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit
 ```
 
 `begin_time` and `end_time` are the schedule produced by simulation, or the
 historical values replayed in replay mode. `exit_status` is written as `0`.
-Jobs rejected before scheduling are not written to this output.
+Jobs rejected before scheduling are not written to this output. With
+`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`, the equivalent selected input/output column
+is the legacy named `queue` field instead of `q_id`.
+
+**TODO — user-defined queue names:** Preserve user-defined input queue names
+instead of emitting only DR_EVT's built-in canonical names.
 
 ## Resource-usage trace
 

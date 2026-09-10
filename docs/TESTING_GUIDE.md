@@ -655,10 +655,10 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 
 ### Input Trace (`.csv`)
 ```text
-job_submit_time,num_nodes,queue,time_limit[,actual_run_time]
-0,70,0,pbatch,200
-10,50,0,pbatch,300
-20,20,0,pbatch,50
+job_submit_time,num_nodes,time_limit[,actual_run_time]
+0,70,200
+10,50,300
+20,20,50
 ```
 
 - `actual_run_time` optional (defaults to `time_limit`); used for early

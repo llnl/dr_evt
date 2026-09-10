@@ -25,11 +25,6 @@ import os
 import subprocess
 import tempfile
 
-# Add build directory to Python path (for CI/testing without install)
-build_path = os.path.join(os.path.dirname(__file__), '..', 'build')
-if os.path.exists(build_path):
-    sys.path.insert(0, build_path)
-
 try:
     import dr_evt
 except ImportError as e:
@@ -37,6 +32,8 @@ except ImportError as e:
     print("\nBuild Python bindings with:", file=sys.stderr)
     print("  cd build && cmake .. -DDR_EVT_BUILD_PYTHON=ON && make", file=sys.stderr)
     sys.exit(1)
+
+QUEUE_INPUT = "pbatch" if dr_evt.legacy_queue_input else "1"
 
 
 class TestResult:
@@ -74,9 +71,9 @@ class TestResult:
 def create_test_trace(filename, jobs):
     """Create a test trace file"""
     with open(filename, 'w') as f:
-        f.write("job_submit_time,num_nodes,queue,time_limit\n")
+        f.write("job_submit_time,num_nodes,time_limit\n")
         for job in jobs:
-            f.write(f"{job[0]},{job[1]},pbatch,{job[2]}\n")
+            f.write(f"{job[0]},{job[1]},{job[2]}\n")
 
 
 def test_module_import(result):
@@ -193,13 +190,13 @@ def test_streaming_api(result):
         # Create simulation
         sim = dr_evt.Simulation(params)
         # append_job() is the public streaming entry point.
-        sim.append_job(0.0, 10, "pbatch", 100)
+        sim.append_job(0.0, 10, QUEUE_INPUT, 100)
         sim.advance_to(0.0)
         assert sim.get_nodes_in_use() == 10
         result.record_pass("append_job and advance_to")
 
         # Test run_until_exclusive
-        sim.append_job(50.0, 20, "pbatch", 100)
+        sim.append_job(50.0, 20, QUEUE_INPUT, 100)
         sim.run_until_exclusive(50.0)
         # Job 1 must NOT have started yet - the event at exactly the
         # target time is excluded by run_until_exclusive.
@@ -240,7 +237,7 @@ def test_monitoring_api(result):
         result.record_pass("Initial state monitoring")
 
         # After job starts
-        sim.append_job(0.0, 30, "pbatch", 100)
+        sim.append_job(0.0, 30, QUEUE_INPUT, 100)
         sim.advance_to(0.0)
         assert sim.get_nodes_in_use() == 30
         assert sim.get_available_nodes() == 70
@@ -284,7 +281,7 @@ def test_backfill_window_api(result):
 
         sim = dr_evt.Simulation(params)
         for num_nodes, limit_time in [(40, 50), (60, 100), (100, 10)]:
-            sim.append_job(0.0, num_nodes, "pbatch", limit_time)
+            sim.append_job(0.0, num_nodes, QUEUE_INPUT, limit_time)
             sim.advance_to(0.0)
 
         window = sim.get_backfill_window()
@@ -325,13 +322,13 @@ def test_statistics(result):
         sim = dr_evt.Simulation(params)
         # Run complete simulation
         sim.advance_to(0.0)
-        sim.append_job(0.0, 10, "pbatch", 50)
+        sim.append_job(0.0, 10, QUEUE_INPUT, 50)
         sim.advance_to(0.0)
 
-        sim.append_job(10.0, 20, "pbatch", 50)
+        sim.append_job(10.0, 20, QUEUE_INPUT, 50)
         sim.advance_to(10.0)
 
-        sim.append_job(20.0, 30, "pbatch", 50)
+        sim.append_job(20.0, 30, QUEUE_INPUT, 50)
         sim.advance_to(20.0)
 
         sim.advance_to(100.0)
@@ -388,9 +385,9 @@ def test_backfill_policies(result):
             params.backfill_policy = policy
 
             sim = dr_evt.Simulation(params)
-            sim.append_job(0.0, 50, "pbatch", 100)
+            sim.append_job(0.0, 50, QUEUE_INPUT, 100)
             sim.advance_to(0.0)
-            sim.append_job(10.0, 30, "pbatch", 50)
+            sim.append_job(10.0, 30, QUEUE_INPUT, 50)
             sim.advance_to(200.0)
 
             stats = sim.get_statistics()
@@ -430,11 +427,11 @@ def test_priority_policies(result):
             params.priority_policy = policy
 
             sim = dr_evt.Simulation(params)
-            sim.append_job(0.0, 10, "pbatch", 100)
+            sim.append_job(0.0, 10, QUEUE_INPUT, 100)
             sim.advance_to(0.0)
-            sim.append_job(5.0, 10, "pbatch", 20)
+            sim.append_job(5.0, 10, QUEUE_INPUT, 20)
             sim.advance_to(5.0)
-            sim.append_job(10.0, 10, "pbatch", 50)
+            sim.append_job(10.0, 10, QUEUE_INPUT, 50)
             sim.advance_to(200.0)
 
             stats = sim.get_statistics()

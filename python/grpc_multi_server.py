@@ -12,17 +12,25 @@ Install the client dependencies first:
 
 The script generates Python stubs from src/proto/dr_evt_service.proto into a
 temporary directory at runtime, so generated files are never checked in.
+Set DR_EVT_LEGACY_QUEUE_INPUT=1 when connecting to a server built with the
+legacy queue-name input option; otherwise numeric q_id values are used.
 """
 
 import argparse
 import csv
 import importlib
 import itertools
+import os
 import pathlib
 import queue
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+LEGACY_QUEUE_INPUT = os.environ.get("DR_EVT_LEGACY_QUEUE_INPUT", "").lower() \
+    in {"1", "on", "true", "yes"}
+QUEUE_FIELD = "queue" if LEGACY_QUEUE_INPUT else "q_id"
+DEFAULT_QUEUE_INPUT = "pbatch" if LEGACY_QUEUE_INPUT else "1"
 
 
 def load_stubs(repo_root):
@@ -97,7 +105,7 @@ class ServerSession:
 
 
 def read_jobs(path):
-    required = {"job_submit_time", "num_nodes", "queue", "time_limit"}
+    required = {"job_submit_time", "num_nodes", "time_limit"}
     with path.open(newline="") as jobs_file:
         reader = csv.DictReader(jobs_file)
         if not reader.fieldnames or not required.issubset(reader.fieldnames):
@@ -108,7 +116,7 @@ def read_jobs(path):
             {
                 "submit_time": float(row["job_submit_time"]),
                 "num_nodes": int(row["num_nodes"]),
-                "queue": row["queue"],
+                "queue": (row.get(QUEUE_FIELD) or DEFAULT_QUEUE_INPUT).strip(),
                 "limit_time": float(row["time_limit"]),
             }
             for row in reader

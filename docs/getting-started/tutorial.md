@@ -8,10 +8,10 @@ Create a simple test trace with 3 jobs:
 
 ```bash
 cat > my_first_trace.csv << EOF
-job_submit_time,num_nodes,queue,time_limit
-0,80,pbatch,100
-10,15,pbatch,30
-20,60,pbatch,50
+job_submit_time,num_nodes,time_limit
+0,80,100
+10,15,30
+20,60,50
 EOF
 ```
 
@@ -58,10 +58,10 @@ cat results.csv
 
 Expected output:
 ```text
-job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
-0,0,100,80,0,pbatch,100
-10,10,40,15,0,pbatch,30
-20,100,150,60,0,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,exit_status,q_id,time_limit
+0,0,100,80,0,1,100
+10,10,40,15,0,1,30
+20,100,150,60,0,1,50
 ```
 
 **What happened:**

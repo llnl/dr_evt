@@ -7,12 +7,16 @@ find_package(Threads REQUIRED)
 
 option(protobuf_MODULE_COMPATIBLE TRUE)
 
-# Skips gRPC/Protobuf's default system search paths entirely - useful
-# when a system-wide install exists but is broken (e.g. a Python-
-# package-bundled gRPC/Protobuf whose CMake config references a protoc
-# binary that doesn't exist). find_package() can still succeed via an
-# explicit HINTS path even with this on.
+# Skip default system package locations while retaining explicit paths and a
+# non-system project install prefix. If no complete package is found, the
+# FetchContent fallback below builds gRPC with its bundled Protobuf.
 option(AVOID_SYSTEM_GRPC "Do not search default system paths for gRPC/Protobuf" FALSE)
+# find_package() consumes gRPC_DIR as a CMake variable, not directly as a
+# shell environment variable. Promote an exported value unless an explicit
+# -DgRPC_DIR=... has already been supplied.
+if (NOT DEFINED gRPC_DIR AND DEFINED ENV{gRPC_DIR})
+  set(gRPC_DIR "$ENV{gRPC_DIR}")
+endif()
 if (AVOID_SYSTEM_GRPC)
   set(DR_EVT_GRPC_SEARCH_MODE NO_DEFAULT_PATH)
 else()
@@ -25,23 +29,63 @@ unset(DR_EVT_GRPC_FETCHCONTENT CACHE)
 # prevent a newly available installed gRPC/Protobuf from being selected.
 unset(gRPC_FOUND CACHE)
 unset(gRPC_FOUND)
-unset(Protobuf_FOUND CACHE)
-unset(Protobuf_FOUND)
-find_package(gRPC CONFIG QUIET ${DR_EVT_GRPC_SEARCH_MODE})
-
-if (gRPC_FOUND)
-  message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
-  # Try Protobuf where gRPC's own config was found first (HINTS augments,
-  # not replaces, the default search).
-  find_package(Protobuf CONFIG QUIET HINTS ${gRPC_DIR} ${DR_EVT_GRPC_SEARCH_MODE})
-
-  if (NOT Protobuf_FOUND)
-    # Debian/Ubuntu's protobuf-compiler-grpc ships a CMake config, but
-    # libprotobuf-dev doesn't - MODULE mode finds the library/headers/
-    # protoc directly and creates the same targets CONFIG mode would.
-    find_package(Protobuf MODULE QUIET ${DR_EVT_GRPC_SEARCH_MODE})
+set(DR_EVT_GRPC_INSTALL_HINTS)
+# A package config can itself call find_package() for its dependencies (for
+# example, gRPCConfig.cmake locates Abseil). HINTS only applies to the outer
+# call, so make a nonempty project prefix visible through the whole nested
+# lookup. Restore the caller's prefix list immediately afterward.
+set(DR_EVT_SAVED_CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
+set(DR_EVT_USE_INSTALL_PREFIX TRUE)
+if (AVOID_SYSTEM_GRPC AND CMAKE_INSTALL_PREFIX)
+  list(FIND CMAKE_SYSTEM_PREFIX_PATH "${CMAKE_INSTALL_PREFIX}"
+       DR_EVT_GRPC_SYSTEM_PREFIX_INDEX)
+  if (NOT DR_EVT_GRPC_SYSTEM_PREFIX_INDEX EQUAL -1)
+    set(DR_EVT_USE_INSTALL_PREFIX FALSE)
   endif()
 endif()
+if (CMAKE_INSTALL_PREFIX AND DR_EVT_USE_INSTALL_PREFIX)
+  list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_INSTALL_PREFIX}")
+  list(APPEND DR_EVT_GRPC_INSTALL_HINTS
+       "${CMAKE_INSTALL_PREFIX}/lib/cmake/grpc"
+       "${CMAKE_INSTALL_PREFIX}/lib64/cmake/grpc"
+       "${CMAKE_INSTALL_PREFIX}")
+endif()
+unset(DR_EVT_GRPC_SYSTEM_PREFIX_INDEX)
+unset(DR_EVT_USE_INSTALL_PREFIX)
+
+# A FetchContent build tree can contain gRPCConfig.cmake before its exported
+# target files exist. It is not an installed package; allow FetchContent below
+# to reuse its source tree instead of loading this incomplete config.
+if (DEFINED gRPC_DIR AND
+    gRPC_DIR STREQUAL "${CMAKE_BINARY_DIR}/_deps/grpc-build" AND
+    (NOT EXISTS "${gRPC_DIR}/gRPCTargets.cmake" OR
+     NOT EXISTS "${gRPC_DIR}/gRPCPluginTargets.cmake"))
+  unset(gRPC_DIR CACHE)
+  unset(gRPC_DIR)
+endif()
+
+# Select gRPC first. Importing standalone Protobuf before this decision leaves
+# protobuf::* aliases that collide with gRPC's bundled copy on fallback.
+find_package(gRPC CONFIG QUIET
+             HINTS ${DR_EVT_GRPC_INSTALL_HINTS} ${CMAKE_PREFIX_PATH}
+             ${DR_EVT_GRPC_SEARCH_MODE})
+if (gRPC_FOUND)
+  message(STATUS "Found gRPC: ${gRPC_VERSION} (gRPC_DIR: ${gRPC_DIR})")
+  if (TARGET protobuf::libprotobuf AND TARGET protobuf::protoc)
+    set(Protobuf_FOUND TRUE)
+  else()
+    # Older gRPC configs do not always load their Protobuf dependency.
+    find_package(Protobuf CONFIG QUIET HINTS "${gRPC_DIR}"
+                 ${DR_EVT_GRPC_SEARCH_MODE})
+    if (NOT Protobuf_FOUND AND NOT AVOID_SYSTEM_GRPC)
+      find_package(Protobuf MODULE QUIET)
+    endif()
+  endif()
+endif()
+
+unset(DR_EVT_GRPC_INSTALL_HINTS)
+set(CMAKE_PREFIX_PATH "${DR_EVT_SAVED_CMAKE_PREFIX_PATH}")
+unset(DR_EVT_SAVED_CMAKE_PREFIX_PATH)
 
 # gRPC and Protobuf must come from the same selected source.  Record the
 # current result for this configure; do not cache it or use it to skip
@@ -64,8 +108,21 @@ if (DR_EVT_GRPC_FETCHCONTENT)
   endif()
 
   include(FetchContent)
-  set(ABSL_ENABLE_INSTALL ON)
-  set(gRPC_INSTALL ON)
+  # Bundled gRPC and its dependencies are linked statically into DR_EVT and
+  # are not part of the DR_EVT install surface. Suppressing their install
+  # rules also prevents nested projects from writing to cached destinations
+  # such as /usr/local.
+  set(ABSL_ENABLE_INSTALL OFF CACHE BOOL
+      "Do not install bundled Abseil with DR_EVT" FORCE)
+  set(gRPC_INSTALL OFF CACHE BOOL
+      "Do not install bundled gRPC with DR_EVT" FORCE)
+  set(protobuf_INSTALL OFF CACHE BOOL
+      "Do not install bundled Protobuf with DR_EVT" FORCE)
+  # Protobuf forwards protobuf_INSTALL to this option without FORCE. An older
+  # configure can therefore leave the value ON in CMakeCache.txt and produce
+  # an invalid utf8_range export that refers to non-installed Abseil targets.
+  set(utf8_range_ENABLE_INSTALL OFF CACHE BOOL
+      "Do not install bundled utf8_range with DR_EVT" FORCE)
 
   # Pinned version. Bumping this should come with re-verifying
   # dr_evt_server.cpp/dr_evt_client.cpp's gRPC C++ API usage against
@@ -144,12 +201,32 @@ if (DR_EVT_GRPC_FETCHCONTENT)
   # downloaded. The tag is pinned, so there's nothing to check for.
   set(FETCHCONTENT_UPDATES_DISCONNECTED_GRPC ON)
 
+  set(DR_EVT_GRPC_FETCHCONTENT_OPTIONS)
+  if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+    list(APPEND DR_EVT_GRPC_FETCHCONTENT_OPTIONS EXCLUDE_FROM_ALL)
+  endif()
   FetchContent_Declare(
     grpc
     GIT_REPOSITORY https://github.com/grpc/grpc.git
     GIT_TAG        v1.83.1
-    PATCH_COMMAND  ${DR_EVT_GRPC_PATCH_COMMAND})
-  FetchContent_MakeAvailable(grpc)
+    PATCH_COMMAND  ${DR_EVT_GRPC_PATCH_COMMAND}
+    ${DR_EVT_GRPC_FETCHCONTENT_OPTIONS})
+  # FetchContent_MakeAvailable() adds gRPC as a normal subdirectory, which
+  # also adds every nested third-party install rule to this project's
+  # `install` target.  Populate explicitly so CMake 3.24 (our minimum) can
+  # add it with EXCLUDE_FROM_ALL; FetchContent_Declare(EXCLUDE_FROM_ALL) is
+  # only available in newer CMake versions.
+  if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+    FetchContent_MakeAvailable(grpc)
+  else()
+    FetchContent_GetProperties(grpc)
+    if (NOT grpc_POPULATED)
+      FetchContent_Populate(grpc)
+      add_subdirectory("${grpc_SOURCE_DIR}" "${grpc_BINARY_DIR}"
+                       EXCLUDE_FROM_ALL)
+    endif()
+  endif()
+  unset(DR_EVT_GRPC_FETCHCONTENT_OPTIONS)
   unset(DR_EVT_GRPC_PATCH_COMMAND)
   set(CMAKE_CXX_FLAGS ${DR_EVT_SAVED_CXX_FLAGS})
   unset(DR_EVT_SAVED_CXX_FLAGS)

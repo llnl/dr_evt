@@ -67,12 +67,12 @@ Makespan: 2010 sec
 
 ### Simple Format (Recommended for Testing)
 
-Simple input supports both simulation and replay. A replay trace uses this
-6-column CSV format:
+Simple input supports both simulation and replay. A replay trace can use this
+minimal 5-column CSV format:
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
 ```
 
 **Columns**:
@@ -80,8 +80,10 @@ job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
 2. `begin_time` - Historical start time (required, for duration calculation)
 3. `end_time` - Historical end time (required, for duration calculation)
 4. `num_nodes` - Number of nodes requested (required)
-5. `queue` - Queue name, must be "pbatch" or "pall"
-6. `time_limit` - User-provided time limit in seconds
+5. `time_limit` - User-provided time limit in seconds
+6. `q_id` - Optional one-based job queue ID;
+   The legacy named `queue` field is selected only with
+   `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`.
 
 **Ignored input columns**: `exit_status` is an output-only compatibility field.
 If present in an input trace, its value is ignored; it never affects scheduling
@@ -117,8 +119,8 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
 
 Integer seconds since 1970-01-01:
 ```text
-0,0,100,10,0,pbatch,100      # Time 0, 100 seconds
-50,100,150,10,0,pbatch,50    # Time 50, 100, 150
+0,0,100,10,0,1,100      # Time 0, 100 seconds, default Queue1
+50,100,150,10,0,1,50    # Time 50, 100, 150, default Queue1
 ```
 
 **Usage**: `--timestamp_format epoch`
@@ -133,7 +135,7 @@ Integer seconds since 1970-01-01:
 
 ISO 8601 format with timezone:
 ```text
-2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,pbatch,100
+2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,1,100
 ```
 
 **Usage**: 
@@ -461,10 +463,10 @@ Makespan: 2010 sec
 
 ```bash
 cat > my_test.csv << EOF
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,50,pbatch,100
-10,10,60,10,pbatch,100
-20,20,60,5,pbatch,100
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,50,100
+10,10,60,10,100
+20,20,60,5,100
 EOF
 ```
 
@@ -504,11 +506,13 @@ diff results_easy.txt results_conservative.txt
 
 ### Problem: "Loaded 0 jobs from trace"
 
-**Cause**: Queue filtering - only "pbatch" and "pall" queues accepted
+**Cause**: In a legacy queue-name build, an explicitly supplied queue name is
+not accepted
 
 **Solution**: 
-- Use "pbatch" in queue column
-- Or set `SHOW_ALL_QUEUE=1` in common.hpp and rebuild
+- In the default build, omit `queue` or use an optional numeric `q_id`
+- For legacy input (`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`), use `pbatch` in the
+  `queue` column or set `SHOW_ALL_QUEUE=1` in `common.hpp` and rebuild
 
 ### Problem: "Job event times are incorrect"
 

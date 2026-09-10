@@ -7,11 +7,11 @@
 
 #ifndef DR_EVT_SIM_JOB_SUBMIT_MODEL_HPP
 #define DR_EVT_SIM_JOB_SUBMIT_MODEL_HPP
-#include <array>
-#include <vector>
-#include <algorithm>
-#include <iostream>
 #include "sim/job_submit_common.hpp"
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <vector>
 
 namespace dr_evt {
 /** \addtogroup dr_evt_sim
@@ -23,88 +23,83 @@ namespace dr_evt {
  * boundaries suitable for sampling or reporting arrival distributions.
  */
 class Job_Submit_Model {
-  protected:
-    /// Per-hour historical samples, transformed into bin boundaries.
-    submit_week_t m_samples;
+protected:
+  /// Per-hour historical samples, transformed into bin boundaries.
+  submit_week_t m_samples;
 
-    /** @brief Sort each hour slot and derive its sampling-bin boundaries. */
-    void make_bins ();
+  /** @brief Sort each hour slot and derive its sampling-bin boundaries. */
+  void make_bins();
 
-  public:
-    /** @brief Construct a model by taking ownership of submission samples.
-     * @param[in] samples Per-hour samples to transform into bins. */
-    Job_Submit_Model (submit_week_t&& samples);
-    /** @brief Construct a model by copying submission samples.
-     * @param[in] samples Per-hour samples to copy and transform into bins. */
-    Job_Submit_Model (const submit_week_t& samples);
-    /** @brief Write bin boundaries for all hour slots.
-     * @param[in,out] os Destination stream.
-     * @return The same destination stream after writing. */
-    std::ostream& show_bins (std::ostream& os) const;
+public:
+  /** @brief Construct a model by taking ownership of submission samples.
+   * @param[in] samples Per-hour samples to transform into bins. */
+  Job_Submit_Model(submit_week_t &&samples);
+  /** @brief Construct a model by copying submission samples.
+   * @param[in] samples Per-hour samples to copy and transform into bins. */
+  Job_Submit_Model(const submit_week_t &samples);
+  /** @brief Write bin boundaries for all hour slots.
+   * @param[in,out] os Destination stream.
+   * @return The same destination stream after writing. */
+  std::ostream &show_bins(std::ostream &os) const;
 };
 
-void Job_Submit_Model::make_bins ()
-{
-    for (auto& hslot: m_samples) {
-        if (hslot.empty ()) {
-            continue;
-        }
-        const size_t n = hslot.size () - 1u;
-        std::sort (hslot.begin (), hslot.end ());
-        hslot.resize (hslot.size () + 1u);
-
-        if (n == 0ul) {
-            hslot[1] = hslot[0];
-            continue;
-        }
-        auto half_range = (hslot[1] - hslot[0])/2;
-
-        // lower bound of the range around the current sample
-        auto lb = (hslot[0] > half_range)?
-                      (hslot[0] - half_range) :
-                      static_cast<num_jobs_t> (0u);
-
-        // upper bound of the range around the current sample
-        auto ub = (hslot[1] + hslot[0] + 1)/2;
-
-        for (size_t i = 1u; i < n; ++i) {
-            hslot[i-1] = lb;
-            lb = ub;
-            ub = (hslot[i+1] + hslot[i] + 1)/2;
-        }
-        half_range = (hslot[n] - hslot[n-1])/2;
-        hslot[n-1]  = lb;
-        lb = ub;
-        ub = half_range + hslot[n];
-        hslot[n] = lb;
-        hslot[n+1] = ub;
+void Job_Submit_Model::make_bins() {
+  for (auto &hslot : m_samples) {
+    if (hslot.empty()) {
+      continue;
     }
-}
+    const size_t n = hslot.size() - 1u;
+    std::sort(hslot.begin(), hslot.end());
+    hslot.resize(hslot.size() + 1u);
 
-Job_Submit_Model::Job_Submit_Model (submit_week_t&& samples)
-  : m_samples (std::move (samples))
-{
-    make_bins ();
-}
-
-Job_Submit_Model::Job_Submit_Model (const submit_week_t& samples)
-  : m_samples (samples)
-{
-    make_bins ();
-}
-
-std::ostream& Job_Submit_Model::show_bins (std::ostream& os) const
-{
-    unsigned hr = 0u;
-    for (auto& hslot: m_samples) {
-        os << hr ++ << ':';
-        for (auto const w: hslot) {
-            os << ' ' << w;
-        }
-        os << std::endl;
+    if (n == 0ul) {
+      hslot[1] = hslot[0];
+      continue;
     }
+    auto half_range = (hslot[1] - hslot[0]) / 2;
 
-    return os;
+    // lower bound of the range around the current sample
+    auto lb = (hslot[0] > half_range) ? (hslot[0] - half_range)
+                                      : static_cast<num_jobs_t>(0u);
+
+    // upper bound of the range around the current sample
+    auto ub = (hslot[1] + hslot[0] + 1) / 2;
+
+    for (size_t i = 1u; i < n; ++i) {
+      hslot[i - 1] = lb;
+      lb = ub;
+      ub = (hslot[i + 1] + hslot[i] + 1) / 2;
+    }
+    half_range = (hslot[n] - hslot[n - 1]) / 2;
+    hslot[n - 1] = lb;
+    lb = ub;
+    ub = half_range + hslot[n];
+    hslot[n] = lb;
+    hslot[n + 1] = ub;
+  }
+}
+
+Job_Submit_Model::Job_Submit_Model(submit_week_t &&samples)
+    : m_samples(std::move(samples)) {
+  make_bins();
+}
+
+Job_Submit_Model::Job_Submit_Model(const submit_week_t &samples)
+    : m_samples(samples) {
+  make_bins();
+}
+
+std::ostream &Job_Submit_Model::show_bins(std::ostream &os) const {
+  unsigned hr = 0u;
+  for (auto &hslot : m_samples) {
+    os << hr++ << ':';
+    for (auto const w : hslot) {
+      os << ' ' << w;
+    }
+    os << std::endl;
+  }
+
+  return os;
 }
 
 /**@}*/
