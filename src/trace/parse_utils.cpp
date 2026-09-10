@@ -14,57 +14,51 @@
 #include <unordered_map>
 #include <map>
 #include <cctype>
+#include <algorithm>
 #include "trace/parse_utils.hpp"
 
 namespace dr_evt {
 
 std::unordered_map<std::string, job_queue_t> str2jobq {
 #if PBATCH_GROUP
-    {"pbatch", pBatch},
-    {"pbatch0", pBatch},
-    {"pbatch1", pBatch},
-    {"pbatch2", pBatch},
-    {"pbatch3", pBatch},
+    {"pbatch", Queue1}, {"pbatch0", Queue1}, {"pbatch1", Queue1},
+    {"pbatch2", Queue1}, {"pbatch3", Queue1},
 #else
-    {"pbatch", pBatch},
-    {"pbatch0", pBatch0},
-    {"pbatch1", pBatch1},
-    {"pbatch2", pBatch2},
-    {"pbatch3", pBatch3},
+    {"pbatch", Queue1}, {"pbatch0", Queue2}, {"pbatch1", Queue3},
+    {"pbatch2", Queue4}, {"pbatch3", Queue5},
 #endif
-    {"pall", pAll},
-    {"pdebug", pDebug},
-    {"exempt", pExempt},
-    {"expedite", pExpedite},
-    {"pbb", pBb},
-    {"pibm", pIbm},
-    {"pnvidia", pNvidia},
-    {"ptest", pTest},
-    {"standby", standby},
-    {"", pUnknown}
+  #if PBATCH_GROUP
+    {"pall", Queue2}, {"pdebug", Queue3}, {"exempt", Queue4},
+    {"expedite", Queue5}, {"pbb", Queue6}, {"pibm", Queue7},
+    {"pnvidia", Queue8}, {"ptest", Queue9}, {"standby", Queue10},
+  #else
+    {"pall", Queue6}, {"pdebug", Queue7}, {"exempt", Queue8},
+    {"expedite", Queue9}, {"pbb", Queue10}, {"pibm", Queue11},
+    {"pnvidia", Queue12}, {"ptest", Queue13}, {"standby", Queue14},
+  #endif
+    {"", QueueUnknown}
 };
 
+#if DR_EVT_LEGACY_QUEUE_INPUT
 std::map<job_queue_t, std::string> jobq2str {
 #if PBATCH_GROUP
-    {pBatch, "pbatch"},
+    {Queue1, "pbatch"},
 #else
-    {pBatch, "pbatch"},
-    {pBatch0, "pbatch0"},
-    {pBatch1, "pbatch1"},
-    {pBatch2, "pbatch2"},
-    {pBatch3, "pbatch3"},
+    {Queue1, "pbatch"}, {Queue2, "pbatch0"}, {Queue3, "pbatch1"},
+    {Queue4, "pbatch2"}, {Queue5, "pbatch3"},
 #endif
-    {pAll, "pall"},
-    {pDebug, "pdebug"},
-    {pExempt, "pexempt"},
-    {pExpedite, "pexpedite"},
-    {pBb, "pbb"},
-    {pIbm, "pibm"},
-    {pNvidia, "pnvidia"},
-    {pTest, "ptest"},
-    {standby, "standby"},
-    {pUnknown, ""}
+  #if PBATCH_GROUP
+    {Queue2, "pall"}, {Queue3, "pdebug"}, {Queue4, "pexempt"},
+    {Queue5, "pexpedite"}, {Queue6, "pbb"}, {Queue7, "pibm"},
+    {Queue8, "pnvidia"}, {Queue9, "ptest"}, {Queue10, "standby"},
+  #else
+    {Queue6, "pall"}, {Queue7, "pdebug"}, {Queue8, "pexempt"},
+    {Queue9, "pexpedite"}, {Queue10, "pbb"}, {Queue11, "pibm"},
+    {Queue12, "pnvidia"}, {Queue13, "ptest"}, {Queue14, "standby"},
+  #endif
+    {QueueUnknown, ""}
 };
+#endif
 
 void set_by(epoch_t& t, const std::string& str) {
     // Auto-detect format: if string contains only digits (and optional minus sign),
@@ -136,7 +130,7 @@ void set_by(job_queue_t& q, const std::string& str) {
         = str2jobq.find(str);
     if (it == str2jobq.cend()) {
         if (str.compare("\"\"") == 0) {
-            q = pUnknown;
+            q = QueueUnknown;
             return;
         }
         throw std::invalid_argument
@@ -145,6 +139,24 @@ void set_by(job_queue_t& q, const std::string& str) {
     q = it->second;
 }
 
+void set_by_queue_id(job_queue_t& q, const std::string& str) {
+    if (str.empty() || !std::all_of(str.begin(), str.end(), ::isdigit)) {
+        throw std::invalid_argument {"Invalid queue id: " + str};
+    }
+    const auto id = std::stoul(str);
+    const auto max_queue_id =
+#if PBATCH_GROUP
+        static_cast<unsigned>(Queue10);
+#else
+        static_cast<unsigned>(Queue14);
+#endif
+    if (id == 0u || id > max_queue_id) {
+        throw std::invalid_argument {"Queue id is out of range: " + str};
+    }
+    q = static_cast<job_queue_t>(id);
+}
+
+#if DR_EVT_LEGACY_QUEUE_INPUT
 std::string to_string(const job_queue_t q)
 {
     std::map<job_queue_t, std::string>::const_iterator it
@@ -154,6 +166,7 @@ std::string to_string(const job_queue_t q)
     }
     return it->second;
 }
+#endif
 
 /*
  * Removes leading and trailing spaces from a string

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cassert>
 #include <map>
+#include <limits>
 #include <vector>
 #include "trace/data_columns.hpp"
 #include "trace/job_record.hpp"
@@ -33,6 +34,7 @@ Data_Columns::Data_Columns()
   #else
     m_has_q_id_column(false),
   #endif
+    m_col_to_avoid_idx(std::numeric_limits<col_no_t>::max()),
     m_trace_format("simple"),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
@@ -59,6 +61,7 @@ Data_Columns::Data_Columns(const std::string& format)
   #else
     m_has_q_id_column(false),
   #endif
+    m_col_to_avoid_idx(std::numeric_limits<col_no_t>::max()),
     m_trace_format(format),
     m_timestamp_format("iso"),
     m_timezone_str("America/Los_Angeles"),
@@ -99,6 +102,7 @@ Data_Columns::Data_Columns(const std::string& format, const std::string& timesta
   #else
     m_has_q_id_column(false),
   #endif
+    m_col_to_avoid_idx(std::numeric_limits<col_no_t>::max()),
     m_trace_format(format),
     m_timestamp_format(timestamp_format),
     m_timezone_str(timezone),
@@ -150,7 +154,11 @@ void Data_Columns::init()
             std::string err("Possible duplicate column name with " + c.second);
             throw std::invalid_argument {err.c_str()};
         }
-        if (c.second == "queue" || c.second == "q_id") {
+      #if DR_EVT_LEGACY_QUEUE_INPUT
+        if (c.second == "queue") {
+      #else
+        if (c.second == "q_id") {
+      #endif
             m_queue_idx = i;
         }
     }
@@ -357,7 +365,11 @@ bool Data_Columns::check_header(const std::string& fname)
             std::string err("Possible duplicate column name with " + c.second);
             throw std::invalid_argument {err.c_str()};
         }
+      #if DR_EVT_LEGACY_QUEUE_INPUT
         if (c.second == "queue") {
+      #else
+        if (c.second == "q_id") {
+      #endif
             m_queue_idx = i;
         }
     }

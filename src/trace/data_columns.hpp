@@ -30,35 +30,27 @@ namespace dr_evt {
  */
 class Data_Columns {
   public:
+    /// Ordered logical fields selected from each input row.
     using data_columns_t = std::vector<column_id_t>;
 
   protected:
-    /// Map a name to the column index in the raw data and that in the filtered
+    /// Map a logical name to its raw-input and filtered-field positions.
     using col_by_name_t = std::unordered_map<std::string,
                                              std::pair<col_no_t, col_no_t>>;
 
-    /**
-     * Column filter defines the columns to read.
-     * The rest will be filtered out.
-     */
+    /// Ordered filter defining the raw fields retained from each input row.
     data_columns_t m_cols_to_read;
 
-    /// maps a column name to an index to the filter
+    /// Lookup from logical field name to raw and filtered column indices.
     col_by_name_t m_col_by_name;
 
-    /**
-     * The current timezone is backed up before processing and restored after.
-     * The timezone information is needed to determine daylight saving in case
-     * that the timestamps in data are missing timezone info.
-     * In that case, the timezone of the data needs to be set as the macro value
-     * DATA_TIMEZONE in common.h
-     */
+    /// Saved process timezone, restored when this mapping is destroyed.
     const char* m_cur_tz;
 
-    /// Total number of columns in the data file checked against
+    /// Number of physical columns declared by the validated header.
     num_cols_t m_total_columns;
 
-    /// The index of the column_id entry for queue
+    /// Filtered index of the build-selected queue field (`queue` or `q_id`).
     col_no_t m_queue_idx;
 
   #if DR_EVT_LEGACY_QUEUE_INPUT
@@ -69,9 +61,9 @@ class Data_Columns {
     bool m_has_q_id_column;
   #endif
 
-    /// A particular column that is extrememly difficult to parse.
+    /// Raw field excluded from ordinary CSV scanning (for example, user_script).
     std::string m_col_to_avoid;
-    /// Column index of the m_col_to_avoid in the raw data
+    /// Raw position of m_col_to_avoid, or the largest index when unused.
     col_no_t m_col_to_avoid_idx;
 
   public:
@@ -85,10 +77,14 @@ class Data_Columns {
      * @param[in] timestamp_format Timestamp encoding name.
      * @param[in] timezone Timezone used for timestamps without offsets. */
     Data_Columns(const std::string& format, const std::string& timestamp_format, const std::string& timezone);
+    /// Restore the process timezone saved during construction.
     virtual ~Data_Columns();
 
+    /// Return the configured timestamp encoding name.
     std::string get_timestamp_format() const { return m_timestamp_format; }
+    /// Return the timezone used for timestamps without explicit offsets.
     std::string get_timezone() const { return m_timezone_str; }
+    /// Return the simulation or replay mode inferred from the source header.
     TraceMode get_trace_mode() const { return m_trace_mode; }
 
     /// Allow read-only access to the column filter
@@ -103,7 +99,7 @@ class Data_Columns {
      * @return true when the header is compatible and column positions were resolved. */
     bool check_header(const std::string& fname);
 
-    /// Return the number of columns
+    /// Return the number of fields retained by the current filter.
     num_cols_t size() const { return static_cast<num_cols_t>(m_cols_to_read.size()); }
 
     /// Select the substring ranges that matches the columns of interest
@@ -126,6 +122,7 @@ class Data_Columns {
      * @return Filtered column index as col_no_t. */
     col_no_t column_idx(const std::string& col_name) const;
 
+    /// Return the filtered position of the selected queue field.
     col_no_t get_queue_idx() const { return m_queue_idx; }
 
   #if DR_EVT_LEGACY_QUEUE_INPUT
@@ -137,11 +134,15 @@ class Data_Columns {
   #endif
 
   protected:
+    /// Initialize field lookup tables and timezone state from the base mapping.
     void init();
 
-    std::string m_trace_format;      // "simple" or "lassen"
-    std::string m_timestamp_format;  // "epoch" or "iso"
-    std::string m_timezone_str;  // Timezone string
+    /// Requested input layout name, such as `simple` or `lassen`.
+    std::string m_trace_format;
+    /// Requested timestamp encoding, such as `epoch` or `iso`.
+    std::string m_timestamp_format;
+    /// Timezone for timestamps that do not carry their own offset.
+    std::string m_timezone_str;
 
     /// Trace mode (replay or simulation) detected from columns
     TraceMode m_trace_mode;

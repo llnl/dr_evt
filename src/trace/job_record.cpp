@@ -196,7 +196,11 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         }
       #endif
 
+      #if DR_EVT_LEGACY_QUEUE_INPUT
         set_by(m_q, *it++);
+      #else
+        set_by_queue_id(m_q, *it++);
+      #endif
         set_by(m_t_limit, *it++);
 
         // Compute actual_run_time from recorded times
@@ -219,7 +223,11 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         m_is_simulated = false;
 
         set_by(m_t_submit, *it++);
+      #if DR_EVT_LEGACY_QUEUE_INPUT
         set_by(m_q, *it++);
+      #else
+        set_by_queue_id(m_q, *it++);
+      #endif
         set_by(m_t_limit, *it++);
 
         // If actual_run_time provided, read it; otherwise will be set by determine_job_run_time()
@@ -235,6 +243,73 @@ Job_Record::Job_Record(const std::vector<std::string>& str_vec)
         // always true for every simulation-mode job regardless of actual
         // status, which is exactly the bug that made it unreliable as a
         // "was scheduled" check in the first place.
+    }
+}
+
+Job_Record::Job_Record(const std::vector<std::string>& fields,
+                       job_queue_t queue, bool is_replay_mode)
+  : m_q(queue)
+  #if MARK_DAT_PERIOD
+  , m_dat(false)
+  #endif
+  , m_busy_nodes(static_cast<num_nodes_t>(0u))
+{
+    using dr_evt::operator-;
+    using dr_evt::operator<;
+
+    const auto expected_fields = is_replay_mode ? 5u : 3u;
+    if (fields.size() != expected_fields &&
+        !( !is_replay_mode && fields.size() == expected_fields + 1u)) {
+        throw std::invalid_argument {"Queue-free record format does not match"};
+    }
+
+    auto it = fields.cbegin();
+    set_by(m_num_nodes, *it++);
+
+  #if BATCH_JOB_NODE_LIMIT
+    if ((m_num_nodes > BATCH_JOB_NODE_LIMIT) && _Is_Batch(m_q)) {
+        throw std::domain_error
+            {"Batch job exceeds the limit of num nodes: " +
+             std::to_string(m_num_nodes) + " > " +
+             std::to_string(BATCH_JOB_NODE_LIMIT)};
+    }
+  #endif
+
+    if (is_replay_mode) {
+        set_by(m_t_begin, *it++);
+        set_by(m_t_end, *it++);
+        set_by(m_t_submit, *it++);
+
+      #if EVENT_TIME_ORDER
+        if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
+            try {
+                m_t_submit = convert_time(dr_evt::to_string(m_t_submit));
+                m_t_begin = convert_time(dr_evt::to_string(m_t_begin));
+                m_t_end = convert_time(dr_evt::to_string(m_t_end));
+            } catch (const std::invalid_argument&) {
+                throw std::domain_error
+                    {"Job event times are incorrect! (unable to normalize)"};
+            }
+            if ((m_t_begin > m_t_end) || (m_t_submit > m_t_begin)) {
+                throw std::domain_error {"Job event times are incorrect!"};
+            }
+        }
+      #endif
+
+        set_by(m_t_limit, *it++);
+        m_actual_run_time = static_cast<tdiff_t>(m_t_end - m_t_begin);
+        m_is_simulated = false;
+    } else {
+        m_t_begin = unscheduled_sentinel();
+        m_t_end = unscheduled_sentinel();
+        m_is_simulated = false;
+        set_by(m_t_submit, *it++);
+        set_by(m_t_limit, *it++);
+        if (fields.size() == expected_fields + 1u) {
+            set_by(m_actual_run_time, *it++);
+        } else {
+            m_actual_run_time = 0.0;
+        }
     }
 }
 
@@ -270,7 +345,11 @@ std::string Job_Record::to_string() const
         to_string(get_wait_time()) + '\t' +
         to_string(get_actual_run_time()) + '\t' +
         to_string(m_busy_nodes) + '\t' +
+      #if DR_EVT_LEGACY_QUEUE_INPUT
         to_string(m_q)
+      #else
+        std::to_string(static_cast<unsigned>(m_q))
+      #endif
       #if MARK_DAT_PERIOD
         + dat_str[m_dat]
       #endif

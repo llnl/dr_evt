@@ -16,6 +16,9 @@ if (BUILD_PROTOBUF)
   # Disable Protobuf tests and examples
   set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  # FetchContent dependencies must be installable as a complete development
+  # payload, including their public headers and CMake package files.
+  set(protobuf_INSTALL ON CACHE BOOL "" FORCE)
   set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
 
   # Without this, FetchContent re-contacts git on every configure

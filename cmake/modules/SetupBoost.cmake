@@ -113,11 +113,11 @@ if (NOT Boost_FOUND)
     if (CMAKE_INSTALL_PREFIX AND NOT DEFINED Boost_ROOT AND NOT DEFINED BOOST_ROOT)
         set(Boost_ROOT "${CMAKE_INSTALL_PREFIX}")
     endif()
-    if (CMAKE_INSTALL_PREFIX AND NOT DEFINED Boost_LIBRARYDIR)
-        set(Boost_LIBRARYDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    if (CMAKE_INSTALL_PREFIX AND NOT DEFINED BOOST_LIBRARYDIR)
+        set(BOOST_LIBRARYDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
     endif()
     find_package(Boost MODULE QUIET COMPONENTS ${DR_EVT_BOOST_COMPONENTS}
-        ${DR_EVT_BOOST_SEARCH_MODE})
+    )
     cmake_policy(POP)
 endif()
 unset(DR_EVT_BOOST_COMPONENTS)
@@ -155,17 +155,21 @@ if(NOT Boost_FOUND)
         "${boost_SOURCE_DIR}/libs/multi_index/include"
         "${boost_SOURCE_DIR}/libs/serialization/include"
         "${boost_SOURCE_DIR}/libs/container/include"
-        "${boost_SOURCE_DIR}/libs/circular_buffer/include"
-        CACHE PATH "Boost include directories")
-    set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}" CACHE PATH "Boost include directory")
+        "${boost_SOURCE_DIR}/libs/circular_buffer/include")
+    set(Boost_INCLUDE_DIR "${boost_SOURCE_DIR}")
+    set(Boost_INCLUDE_DIRS "${Boost_INCLUDE_DIRS}"
+        CACHE STRING "Boost include directories" FORCE)
+    set(Boost_INCLUDE_DIR "${Boost_INCLUDE_DIR}"
+        CACHE PATH "Boost include directory" FORCE)
 
     # Boost CMake automatically creates targets with Boost:: prefix
     set(Boost_LIBRARIES
         Boost::regex
         Boost::filesystem
         Boost::system
-        Boost::program_options
-        CACHE STRING "Boost libraries")
+        Boost::program_options)
+    set(Boost_LIBRARIES "${Boost_LIBRARIES}"
+        CACHE STRING "Boost libraries" FORCE)
     set(DR_EVT_BOOST_FETCHCONTENT ON)
 
     message(STATUS "Boost installed via FetchContent at: ${boost_SOURCE_DIR}")

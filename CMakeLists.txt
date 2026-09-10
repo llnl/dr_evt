@@ -653,16 +653,20 @@ endif()
 # built Boost via FetchContent. An old _deps directory must not cause
 # installation when a system Boost was selected instead.
 if(DR_EVT_BOOST_FETCHCONTENT)
-  file(GLOB BOOST_LIBS
-    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/filesystem/libboost_filesystem*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
-    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/program_options/libboost_program_options*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
-    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/system/libboost_system*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
-    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/regex/libboost_regex*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
-    "${CMAKE_BINARY_DIR}/_deps/boost-build/libs/container/libboost_container*${CMAKE_SHARED_LIBRARY_SUFFIX}*"
-  )
-  if(BOOST_LIBS)
-    install(FILES ${BOOST_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  endif()
+  # Install every shared Boost library that the fetched build produced, not
+  # merely the components linked directly by DR_EVT. Boost components can
+  # carry runtime dependencies of their own (for example,
+  # program_options -> boost_atomic), which must accompany installed tools.
+  # These files may not exist until after the first build, so the glob must
+  # run from the generated install script—not while CMake configures.
+  install(CODE "
+    file(GLOB_RECURSE DR_EVT_BOOST_SHARED_LIBS LIST_DIRECTORIES false
+      \"${CMAKE_BINARY_DIR}/_deps/boost-build/libs/libboost*.so*\")
+    if(DR_EVT_BOOST_SHARED_LIBS)
+      file(INSTALL DESTINATION \"${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}\"
+           TYPE FILE FILES \${DR_EVT_BOOST_SHARED_LIBS})
+    endif()
+  ")
 
   # Boost headers are spread across many libs/*/include/boost trees in the
   # CMake distribution. Merge them into the conventional include/boost

@@ -27,6 +27,7 @@ using std::vector;
 using std::string;
 
 
+#if DR_EVT_LEGACY_QUEUE_INPUT
 int load(const string& fname,
          const Data_Columns& dcols,
          vector<Job_Record>& data,
@@ -43,8 +44,10 @@ int load(const string& fname,
 
     const auto& columns_to_read = dcols.get_cols_to_read();
     const auto record_sz = columns_to_read.size();
-    const auto q_idx = dcols.get_queue_idx();
     const bool has_queue_column = dcols.has_queue_column();
+  #if !SHOW_ALL_QUEUE
+    const auto q_idx = dcols.get_queue_idx();
+  #endif
 
     if (columns_to_read.empty()) {
         std::cerr << "no column to read!" << std::endl;
@@ -85,7 +88,7 @@ int load(const string& fname,
             const auto& pos = val_pos [col_idx];
             string substr = line.substr(pos.first, pos.second);
           #if !SHOW_ALL_QUEUE
-            if (col_idx == q_idx) { // Check the job queue
+            if (has_queue_column && col_idx == q_idx) { // Check the job queue
               #if INCLUDE_DAT || MARK_DAT_PERIOD
                 bool q1 = false, q2 = false;
                #if 0 // Case-insensitive search
@@ -113,10 +116,9 @@ int load(const string& fname,
         }
       #endif // !SHOW_ALL_QUEUE
 
+        // Job_Record has one canonical layout in each mode. Keep the omitted
+        // source field out of the output schema, but insert its default.
         if (!has_queue_column) {
-            // Job_Record has one canonical layout in each mode.  Keep the
-            // omitted source field out of the output schema, but insert its
-            // default value for the internal record.
             const auto queue_pos = dcols.get_trace_mode() == TraceMode::REPLAY
                 ? 4u : 2u;
             rec_str.insert(rec_str.begin() + queue_pos, "pbatch");
@@ -146,6 +148,112 @@ int load(const string& fname,
 
     return EXIT_SUCCESS;
 }
+#else
+int load(const string& fname, const Data_Columns& dcols,
+         vector<Job_Record>& data, num_jobs_t max_cnt)
+{
+    if (fname.empty()) {
+        return EXIT_FAILURE;
+    }
+    std::ifstream ifs(fname);
+    if (!ifs) {
+        return EXIT_FAILURE;
+    }
+
+    const auto& columns_to_read = dcols.get_cols_to_read();
+    const auto record_sz = columns_to_read.size();
+    if (columns_to_read.empty()) {
+        std::cerr << "no column to read!" << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    string line;
+    std::getline(ifs, line); // Consume the header line.
+    if (max_cnt == static_cast<num_jobs_t>(0u)) {
+        max_cnt = std::numeric_limits<num_jobs_t>::max();
+    }
+
+    if (dcols.has_q_id_column()) {
+        const auto q_idx = dcols.get_queue_idx();
+        num_jobs_t cnt = static_cast<num_jobs_t>(0u);
+        while (std::getline(ifs, line)) {
+            if (cnt++ >= max_cnt) {
+                break;
+            }
+            while (!line.empty() && (line.back() == ' ' || line.back() == '\t' ||
+                                      line.back() == '\r' || line.back() == '\n')) {
+                line.pop_back();
+            }
+
+            vector<string> fields;
+            fields.reserve(record_sz - 1u);
+            job_queue_t queue = Queue1;
+            try {
+                const auto val_pos = dcols.pick_values(line);
+                for (auto col_idx = static_cast<col_no_t>(0u); col_idx < record_sz;
+                     ++col_idx) {
+                    const auto& pos = val_pos[col_idx];
+                    string value = trim(line.substr(pos.first, pos.second));
+                    if (col_idx == q_idx) {
+                        set_by_queue_id(queue, value);
+                        continue;
+                    }
+                    fields.emplace_back(std::move(value));
+                }
+                data.emplace_back(fields, queue,
+                                  dcols.get_trace_mode() == TraceMode::REPLAY);
+              #if SHOW_ORG_NO
+                data.back().set_org_line_no(cnt);
+              #endif
+            } catch (std::domain_error& e) {
+                std::cerr << std::string(e.what()) + ": [" +
+                    std::to_string(cnt) + "]" << endl;
+            } catch (std::exception& e) {
+                std::ostringstream oss_err;
+                oss_err << e.what() << ": [" << cnt << "] " << line << endl;
+                throw std::invalid_argument {oss_err.str().c_str()};
+            }
+        }
+        return EXIT_SUCCESS;
+    }
+
+    // This queue-free path has no queue-ID index, conversion, or condition.
+    num_jobs_t cnt = static_cast<num_jobs_t>(0u);
+    while (std::getline(ifs, line)) {
+        if (cnt++ >= max_cnt) {
+            break;
+        }
+        while (!line.empty() && (line.back() == ' ' || line.back() == '\t' ||
+                                  line.back() == '\r' || line.back() == '\n')) {
+            line.pop_back();
+        }
+
+        vector<string> fields;
+        fields.reserve(record_sz);
+        try {
+            const auto val_pos = dcols.pick_values(line);
+            for (auto col_idx = static_cast<col_no_t>(0u); col_idx < record_sz;
+                 ++col_idx) {
+                const auto& pos = val_pos[col_idx];
+                fields.emplace_back(trim(line.substr(pos.first, pos.second)));
+            }
+            data.emplace_back(fields, Queue1,
+                              dcols.get_trace_mode() == TraceMode::REPLAY);
+          #if SHOW_ORG_NO
+            data.back().set_org_line_no(cnt);
+          #endif
+        } catch (std::domain_error& e) {
+            std::cerr << std::string(e.what()) + ": [" +
+                std::to_string(cnt) + "]" << endl;
+        } catch (std::exception& e) {
+            std::ostringstream oss_err;
+            oss_err << e.what() << ": [" << cnt << "] " << line << endl;
+            throw std::invalid_argument {oss_err.str().c_str()};
+        }
+    }
+    return EXIT_SUCCESS;
+}
+#endif // DR_EVT_LEGACY_QUEUE_INPUT
 
 void print_limit_vs_exec_time(const vector<Job_Record>& data)
 {

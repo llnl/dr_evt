@@ -29,8 +29,15 @@ void set_by(unsigned& v, const std::string& str);
 void set_by(double& v, const std::string& str);
 /** @brief Parse a queue name. @param[out] q Parsed queue enum. @param[in] str Input text. */
 void set_by(job_queue_t& q, const std::string& str);
-/** @brief Format a queue enum. @param[in] q Queue value. @return Canonical queue name. */
+/** @brief Parse a one-based, site-neutral queue ID.
+ * @param[out] q Parsed queue enum.
+ * @param[in] str Numeric queue identifier. */
+void set_by_queue_id(job_queue_t& q, const std::string& str);
+#if DR_EVT_LEGACY_QUEUE_INPUT
+/** @brief Format a queue enum as its canonical legacy name.
+ * @param[in] q Queue value. @return Canonical queue name. */
 std::string to_string(const job_queue_t q);
+#endif
 
 /**
  * @brief Remove leading and trailing delimiter characters.

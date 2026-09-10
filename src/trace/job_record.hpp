@@ -46,7 +46,8 @@ class Job_Record {
     timeout_t m_t_limit; ///< The time limit of the job (user estimate)
     tdiff_t m_actual_run_time; ///< Actual execution time (ground truth)
     num_nodes_t m_num_nodes; ///< The amount of resources this job uses
-    job_queue_t m_q; ///< The queue to which the job was submitted
+    /// Queue identity; QueueUnknown is safe until parsing assigns one.
+    job_queue_t m_q = QueueUnknown;
     bool m_is_simulated; ///< True if times were computed by scheduler (simulation mode)
   #if SHOW_ORG_NO
     job_no_t m_org_no;
@@ -71,6 +72,14 @@ class Job_Record {
   #else
     Job_Record(const std::vector<std::string>& str_vec) noexcept(false);
   #endif
+
+    /**
+     * @brief Construct a trace job from queue-free fields and a typed queue.
+     * @details Used by the ID-input loader so it never has to inject a
+     * synthetic q_id string into every input row.
+     */
+    Job_Record(const std::vector<std::string>& fields, job_queue_t queue,
+               bool is_replay_mode) noexcept(false);
 
     Job_Record(const Job_Record& other);
     Job_Record(Job_Record&& other) noexcept;

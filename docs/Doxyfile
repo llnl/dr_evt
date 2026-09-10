@@ -35,7 +35,10 @@ XML_OUTPUT             = xml
 
 # Documentation extraction
 EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = NO
+# The developer reference documents implementation state as well as the
+# public API.  Private/protected members are essential when maintaining the
+# scheduler, parser, and trace-buffer invariants.
+EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
 

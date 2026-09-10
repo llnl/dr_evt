@@ -67,7 +67,7 @@ std::ostream& print(std::ostream& os, const JobContainer& data)
 
     for (const auto& job: data) {
       #if !INCLUDE_DAT
-        if (job.get_queue() == pAll) {
+        if (_Is_Exclusive(job.get_queue())) {
             continue;
         }
       #endif
