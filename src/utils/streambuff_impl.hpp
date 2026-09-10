@@ -8,7 +8,9 @@
 #ifndef DR_EVT_UTILS_STREAMBUFF_IMPL_HPP
 #define DR_EVT_UTILS_STREAMBUFF_IMPL_HPP
 
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 
 namespace dr_evt {
 /** \addtogroup dr_evt_utils
