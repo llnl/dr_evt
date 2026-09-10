@@ -35,16 +35,10 @@ TRACE_DIR="tests/test_traces/progressive"
 echo "Testing: progressive_load_api (C++ level)"
 
 PROGRESSIVE_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_progressive_load"
-if [ ! -f "$PROGRESSIVE_API_BIN" ]; then
-    PROGRESSIVE_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/test_progressive_load"
-fi
-if [ ! -f "$PROGRESSIVE_API_BIN" ]; then
-    PROGRESSIVE_API_BIN="./build/test_progressive_load"
-fi
 
-if [ ! -f "$PROGRESSIVE_API_BIN" ]; then
-    echo "  ✗ FAIL - test_progressive_load binary not found"
-    echo "    Build first: cd build && cmake .. && make test_progressive_load-bin"
+if [ ! -x "$PROGRESSIVE_API_BIN" ]; then
+    echo "  ✗ FAIL - installed test_progressive_load binary not found"
+    echo "    Expected: $PROGRESSIVE_API_BIN"
     FAIL=$((FAIL + 1))
 else
     if "$PROGRESSIVE_API_BIN" > /tmp/progressive_load_api_out.txt 2>&1; then

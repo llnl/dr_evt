@@ -30,12 +30,7 @@ echo -e "${BLUE}================================================================
 echo ""
 
 # Check prerequisites
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo -e "${RED}Error: ./build/simulator not found${NC}"
-    echo "Build first with:"
-    echo "  cd build && cmake .. && make -j8"
-    exit 1
-fi
+source "$SCRIPT_DIR/set_simulator_path.sh"
 
 if [ ! -f "./scripts/python_conservative_scheduler.py" ]; then
     echo -e "${RED}Error: Python conservative scheduler not found${NC}"
@@ -90,7 +85,7 @@ echo ""
 # Run C++ implementation
 echo -e "${YELLOW}Running C++ CONSERVATIVE implementation...${NC}"
 START_CPP=$(date +%s)
-./build/simulator "$TRACE" \
+"$SIMULATOR" "$TRACE" \
     --total_nodes "$NODES" \
     --priority_policy fcfs_conservative \
     --backfill_policy conservative \

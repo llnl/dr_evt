@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef  DR_EVT_PROTO_DR_EVT_PARAMS_HPP
-#define  DR_EVT_PROTO_DR_EVT_PARAMS_HPP
+#ifndef DR_EVT_PROTO_DR_EVT_PARAMS_HPP
+#define DR_EVT_PROTO_DR_EVT_PARAMS_HPP
 
 #if defined(DR_EVT_HAS_CONFIG)
 #include "dr_evt_config.hpp"
@@ -18,10 +18,10 @@
 #error DR_EVT requires protocol buffer
 #endif
 
-#include <string>
-#include "proto/dr_evt_params.pb.h"
 #include "params/sim_params.hpp"
 #include "params/trace_params.hpp"
+#include "proto/dr_evt_params.pb.h"
+#include <string>
 
 namespace dr_evt {
 /** \addtogroup dr_evt_proto
@@ -31,15 +31,15 @@ namespace dr_evt {
  * @param[in] filename Prototext or binary configuration filename.
  * @param[out] sp Destination simulation parameters.
  * @param[in] verbose true to emit parsing diagnostics. */
-void read_proto_params(const std::string& filename,
-                       dr_evt::Sim_Params& sp, bool verbose = false);
+void read_proto_params(const std::string &filename, dr_evt::Sim_Params &sp,
+                       bool verbose = false);
 
 /** @brief Read protobuf trace-tool configuration into Trace_Params.
  * @param[in] filename Prototext or binary configuration filename.
  * @param[out] sp Destination trace parameters.
  * @param[in] verbose true to emit parsing diagnostics. */
-void read_proto_params(const std::string& filename,
-                       dr_evt::Trace_Params& sp, bool verbose = false);
+void read_proto_params(const std::string &filename, dr_evt::Trace_Params &sp,
+                       bool verbose = false);
 
 /**@}*/
 } // end of namespace dr_evt

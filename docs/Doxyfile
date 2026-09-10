@@ -16,7 +16,8 @@ INPUT                  = src/ \
                          src/proto/ \
                          src/sim/ \
                          src/trace/ \
-                         src/utils/
+                         src/utils/ \
+                         python/dr_evt_bindings.cpp
 FILE_PATTERNS          = *.hpp *.cpp *.md
 RECURSIVE              = NO
 # INPUT is deliberately limited to project directories above.  Do not list
@@ -41,6 +42,10 @@ EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
 EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
+# Implementation helpers are often kept in anonymous namespaces to give them
+# internal linkage.  Include those functions and variables in the developer
+# reference as well.
+EXTRACT_ANON_NSPACES   = YES
 
 # Source browsing
 SOURCE_BROWSER         = YES

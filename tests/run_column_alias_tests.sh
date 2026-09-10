@@ -41,8 +41,8 @@ echo "--- time_limit column aliases ---"
 
 for alias in time_limit timelimit walltime; do
     cat > "/tmp/alias_tl_${alias}.csv" << EOF
-job_submit_time,num_nodes,queue,${alias}
-0,70,pbatch,200
+job_submit_time,num_nodes,${alias}
+0,70,200
 EOF
 
     $SIMULATOR "/tmp/alias_tl_${alias}.csv" \
@@ -85,8 +85,8 @@ echo "--- actual_run_time column aliases (run_time_mode=actual) ---"
 
 for alias in actual_run_time duration actual_duration run_time; do
     cat > "/tmp/alias_ar_${alias}.csv" << EOF
-job_submit_time,num_nodes,queue,time_limit,${alias}
-0,70,pbatch,200,50
+job_submit_time,num_nodes,time_limit,${alias}
+0,70,200,50
 EOF
 
     $SIMULATOR "/tmp/alias_ar_${alias}.csv" \
@@ -128,8 +128,8 @@ echo ""
 echo "--- Missing time_limit column (should reject clearly) ---"
 
 cat > /tmp/alias_no_time_limit.csv << 'EOF'
-job_submit_time,num_nodes,queue
-0,70,pbatch
+job_submit_time,num_nodes
+0,70
 EOF
 
 ERR_MSG=$($SIMULATOR /tmp/alias_no_time_limit.csv \

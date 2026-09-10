@@ -105,10 +105,10 @@ Jobs finishing before their time_limit.
 
 ### Input Trace (`.csv`)
 ```csv
-job_submit_time,num_nodes,queue,time_limit[,actual_run_time]
-0,70,pbatch,200
-10,50,pbatch,300
-20,20,pbatch,50
+job_submit_time,num_nodes,time_limit[,actual_run_time]
+0,70,200
+10,50,300
+20,20,50
 ```
 
 - `actual_run_time` is optional (defaults to `time_limit` if missing)

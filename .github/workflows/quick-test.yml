@@ -14,6 +14,8 @@ jobs:
   quick-test:
     name: Quick Scheduler Correctness and Trace Schema Check
     runs-on: ubuntu-latest
+    env:
+      CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
 
     steps:
       - name: Checkout repository
@@ -44,12 +46,7 @@ jobs:
 
       - name: Run Scheduler Correctness Tests Only
         run: |
-          echo "Running scheduler-correctness tests with build directory..."
-          unset CMAKE_INSTALL_PREFIX
-          ./tests/run_scheduler_correctness_tests.sh
-          echo ""
           echo "Running scheduler-correctness tests with installed binary..."
-          export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
           ./tests/run_scheduler_correctness_tests.sh
 
       - name: Run Trace Schema Unit Tests

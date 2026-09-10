@@ -8,10 +8,10 @@
 #ifndef DR_EVT_SIM_SCHEDULER_CIRCULAR_FCFS_HPP
 #define DR_EVT_SIM_SCHEDULER_CIRCULAR_FCFS_HPP
 
-#include <stdexcept>
+#include "sim/scheduler_base.hpp"
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
-#include "sim/scheduler_base.hpp"
+#include <stdexcept>
 
 namespace dr_evt {
 
@@ -40,120 +40,129 @@ namespace dr_evt {
  */
 class CircularBufferFCFSScheduler : public SchedulerBase {
 private:
-    struct JobEntry {
-        /// Stable identifier of the Trace job represented by this entry.
-        job_no_t job_id;
-        /// Arrival time used to determine eligibility and FCFS order.
-        sim_time_t submit_time;
-        /// Requested time limit used for reservation and backfill projection.
-        tdiff_t run_time_estimate;
-        /// Nodes requested when this job is started.
-        num_nodes_t nodes_requested;
-        /// True once selected for execution but retained for lazy deletion.
-        bool removed;
+  struct JobEntry {
+    /// Stable identifier of the Trace job represented by this entry.
+    job_no_t job_id;
+    /// Arrival time used to determine eligibility and FCFS order.
+    sim_time_t submit_time;
+    /// Requested time limit used for reservation and backfill projection.
+    tdiff_t run_time_estimate;
+    /// Nodes requested when this job is started.
+    num_nodes_t nodes_requested;
+    /// True once selected for execution but retained for lazy deletion.
+    bool removed;
 
-        JobEntry(job_no_t id, sim_time_t submit, tdiff_t run_time, num_nodes_t nodes)
-            : job_id(id), submit_time(submit), run_time_estimate(run_time),
-              nodes_requested(nodes), removed(false) {}
-    };
+    /** @brief Initialize an unscheduled FCFS queue entry.
+     * @param[in] id Trace job identifier.
+     * @param[in] submit Arrival time.
+     * @param[in] run_time Requested runtime used for planning.
+     * @param[in] nodes Requested node count. */
+    JobEntry(job_no_t id, sim_time_t submit, tdiff_t run_time,
+             num_nodes_t nodes)
+        : job_id(id), submit_time(submit), run_time_estimate(run_time),
+          nodes_requested(nodes), removed(false) {}
+  };
 
-    /// Fixed-capacity FCFS queue, optionally enlarged on overflow.
-    boost::circular_buffer<JobEntry> m_wait_queue;
-    /// Action to take when m_wait_queue reaches capacity.
-    CircularOverflowPolicy m_overflow_policy;
-    /// First queue index with submit_time later than m_current_tracked_time.
-    size_t m_eligible_end_idx;
-    /// Latest time to which arrival eligibility has been synchronized.
-    sim_time_t m_current_tracked_time;
-    /// Removed entries inside the eligible prefix of m_wait_queue.
-    size_t m_removed_count;
+  /// Fixed-capacity FCFS queue, optionally enlarged on overflow.
+  boost::circular_buffer<JobEntry> m_wait_queue;
+  /// Action to take when m_wait_queue reaches capacity.
+  CircularOverflowPolicy m_overflow_policy;
+  /// First queue index with submit_time later than m_current_tracked_time.
+  size_t m_eligible_end_idx;
+  /// Latest time to which arrival eligibility has been synchronized.
+  sim_time_t m_current_tracked_time;
+  /// Removed entries inside the eligible prefix of m_wait_queue.
+  size_t m_removed_count;
 
 public:
-    /**
-     * @brief Construct an FCFS scheduler backed by a circular buffer.
-     * @param[in] initial_capacity Initial wait-queue capacity; zero derives one from the trace.
-     * @param[in] overflow_policy Action to take when that capacity is exhausted.
-     * @copydetails SchedulerBase::SchedulerBase
-     */
-    CircularBufferFCFSScheduler(num_nodes_t total_nodes,
-                                const Trace& job_data,
-                                BackfillPolicy bf_policy,
-                                size_t initial_capacity = 0,
-                                CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW)
-        : SchedulerBase(total_nodes, job_data, bf_policy)
-        , m_wait_queue(initial_capacity != 0 ? initial_capacity : job_data.data().size())
-        , m_overflow_policy(overflow_policy)
-        , m_eligible_end_idx(0)
-        , m_current_tracked_time(0.0)
-        , m_removed_count(0)
-    {}
+  /**
+   * @brief Construct an FCFS scheduler backed by a circular buffer.
+   * @param[in] total_nodes Cluster capacity available for allocations.
+   * @param[in] job_data Trace owning every identifier later enqueued.
+   * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
+   * @param[in] initial_capacity Initial wait-queue capacity; zero derives one
+   * from the trace.
+   * @param[in] overflow_policy Action to take when that capacity is exhausted.
+   * @details @p job_data is retained by non-owning pointer and must outlive
+   * this scheduler.
+   */
+  CircularBufferFCFSScheduler(
+      num_nodes_t total_nodes, const Trace &job_data, BackfillPolicy bf_policy,
+      size_t initial_capacity = 0,
+      CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW)
+      : SchedulerBase(total_nodes, job_data, bf_policy),
+        m_wait_queue(initial_capacity != 0 ? initial_capacity
+                                           : job_data.data().size()),
+        m_overflow_policy(overflow_policy), m_eligible_end_idx(0),
+        m_current_tracked_time(0.0), m_removed_count(0) {}
 
-    /** @copydoc SchedulerBase::insert_job */
-    void insert_job(job_no_t job_id, sim_time_t submit_time,
-                   tdiff_t run_time_estimate, num_nodes_t nodes_requested) override {
-        if (m_wait_queue.full()) {
-            if (m_overflow_policy == CircularOverflowPolicy::ABORT) {
-                throw std::runtime_error(
-                    "CircularBufferFCFSScheduler: wait queue capacity (" +
-                    std::to_string(m_wait_queue.capacity()) + ") exceeded; "
-                    "use --wait_queue_overflow grow or a larger --wait_queue_capacity");
-            }
-            // GROW: doubling matches std::vector's amortized-growth
-            // strategy. set_capacity() copies all existing entries over
-            // (confirmed: it only drops elements when shrinking below
-            // the current size, which never applies here).
-            m_wait_queue.set_capacity(std::max<size_t>(m_wait_queue.capacity() * 2, 1));
-        }
-
-        m_wait_queue.push_back(JobEntry(job_id, submit_time, run_time_estimate, nodes_requested));
-
-        // If this job is already eligible, advance index. Can jump by more
-        // than 1 in a single call: if this new job's submit_time is
-        // already <= current time, the sorted-submit-time invariant means
-        // every entry already in the buffer becomes eligible too.
-        if (submit_time <= m_current_tracked_time) {
-            m_eligible_end_idx = m_wait_queue.size();
-        }
+  /** @copydoc SchedulerBase::insert_job */
+  void insert_job(job_no_t job_id, sim_time_t submit_time,
+                  tdiff_t run_time_estimate,
+                  num_nodes_t nodes_requested) override {
+    if (m_wait_queue.full()) {
+      if (m_overflow_policy == CircularOverflowPolicy::ABORT) {
+        throw std::runtime_error(
+            "CircularBufferFCFSScheduler: wait queue capacity (" +
+            std::to_string(m_wait_queue.capacity()) +
+            ") exceeded; "
+            "use --wait_queue_overflow grow or a larger --wait_queue_capacity");
+      }
+      // GROW: doubling matches std::vector's amortized-growth
+      // strategy. set_capacity() copies all existing entries over
+      // (confirmed: it only drops elements when shrinking below
+      // the current size, which never applies here).
+      m_wait_queue.set_capacity(
+          std::max<size_t>(m_wait_queue.capacity() * 2, 1));
     }
 
-    /** @copydoc SchedulerBase::schedule */
-    std::vector<job_no_t> schedule(
-        num_nodes_t free_nodes,
-        const std::map<job_no_t, sim_time_t>& running_jobs,
-        sim_time_t current_time) override;
+    m_wait_queue.push_back(
+        JobEntry(job_id, submit_time, run_time_estimate, nodes_requested));
 
-    /** @copydoc SchedulerBase::sync_to */
-    void sync_to(sim_time_t current_time) override;
-
-    /** @copydoc SchedulerBase::active_job_count */
-    size_t active_job_count() override {
-        return m_eligible_end_idx - m_removed_count;
+    // If this job is already eligible, advance index. Can jump by more
+    // than 1 in a single call: if this new job's submit_time is
+    // already <= current time, the sorted-submit-time invariant means
+    // every entry already in the buffer becomes eligible too.
+    if (submit_time <= m_current_tracked_time) {
+      m_eligible_end_idx = m_wait_queue.size();
     }
+  }
 
-    /** @copydoc SchedulerBase::get_next_arrival_time */
-    sim_time_t get_next_arrival_time() override {
-        for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
-            if (!m_wait_queue[i].removed) {
-                return m_wait_queue[i].submit_time;
-            }
-        }
-        return std::numeric_limits<sim_time_t>::max();
-    }
+  /** @copydoc SchedulerBase::schedule */
+  std::vector<job_no_t>
+  schedule(num_nodes_t free_nodes,
+           const std::map<job_no_t, sim_time_t> &running_jobs,
+           sim_time_t current_time) override;
 
-    /** @copydoc SchedulerBase::has_eligible_jobs */
-    bool has_eligible_jobs() override {
-        return active_job_count() > 0;
+  /** @copydoc SchedulerBase::sync_to */
+  void sync_to(sim_time_t current_time) override;
+
+  /** @copydoc SchedulerBase::active_job_count */
+  size_t active_job_count() override {
+    return m_eligible_end_idx - m_removed_count;
+  }
+
+  /** @copydoc SchedulerBase::get_next_arrival_time */
+  sim_time_t get_next_arrival_time() override {
+    for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
+      if (!m_wait_queue[i].removed) {
+        return m_wait_queue[i].submit_time;
+      }
     }
+    return std::numeric_limits<sim_time_t>::max();
+  }
+
+  /** @copydoc SchedulerBase::has_eligible_jobs */
+  bool has_eligible_jobs() override { return active_job_count() > 0; }
 
 protected:
-    /** @copydoc SchedulerBase::wait_queue_size */
-    size_t wait_queue_size() const override {
-        return m_wait_queue.size();
-    }
+  /** @copydoc SchedulerBase::wait_queue_size */
+  size_t wait_queue_size() const override { return m_wait_queue.size(); }
 
 private:
-    /** @brief Lazily mark a selected queue entry as removed. */
-    void mark_removed(job_no_t job_id);
+  /** @brief Lazily mark a selected queue entry as removed.
+   * @param[in] job_id Trace job identifier to mark. */
+  void mark_removed(job_no_t job_id);
 };
 
 } // namespace dr_evt

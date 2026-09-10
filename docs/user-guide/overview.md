@@ -119,8 +119,8 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
 
 Integer seconds since 1970-01-01:
 ```text
-0,0,100,10,0,pbatch,100      # Time 0, 100 seconds
-50,100,150,10,0,pbatch,50    # Time 50, 100, 150
+0,0,100,10,0,1,100      # Time 0, 100 seconds, default Queue1
+50,100,150,10,0,1,50    # Time 50, 100, 150, default Queue1
 ```
 
 **Usage**: `--timestamp_format epoch`
@@ -135,7 +135,7 @@ Integer seconds since 1970-01-01:
 
 ISO 8601 format with timezone:
 ```text
-2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,pbatch,100
+2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,0,1,100
 ```
 
 **Usage**: 
@@ -463,10 +463,10 @@ Makespan: 2010 sec
 
 ```bash
 cat > my_test.csv << EOF
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,50,pbatch,100
-10,10,60,10,pbatch,100
-20,20,60,5,pbatch,100
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,50,100
+10,10,60,10,100
+20,20,60,5,100
 EOF
 ```
 

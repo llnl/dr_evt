@@ -18,8 +18,8 @@
 #error "no config"
 #endif
 
-#include <string>
 #include "dr_evt_types.hpp"
+#include <string>
 
 namespace dr_evt {
 /** \addtogroup dr_evt_params
@@ -27,72 +27,76 @@ namespace dr_evt {
 
 /** @brief Configuration for trace inspection and reporting tools. */
 class Trace_Params {
- public:
-    /** @brief Construct trace-tool parameters with project defaults. */
-    Trace_Params();
-    /** @brief Parse trace-tool command-line options.
-     * @param[in,out] argc Argument count.
-     * @param[in,out] argv Argument vector.
-     * @return true when parsing succeeds. */
-    bool getopt(int& argc, char** &argv);
-    /** @brief Print trace-tool usage and terminate.
-     * @param[in] exec Executable name.
-     * @param[in] code Process exit status. */
-    void print_usage(const std::string exec, int code);
-    /** @brief Write the effective configuration to standard output. */
-    void print() const;
-    /** @brief Return the input trace filename. @return Input path. */
-    std::string get_infile() const { return m_infile; }
-    /** @brief Set the primary output filename. @param[in] ofname Output path. */
-    void set_outfile(const std::string& ofname);
-    /** @brief Return the primary output filename. @return Output path. */
-    std::string get_outfile() const { return m_outfile; }
-    /** @brief Return DAT-session output filename. @return Output path. */
-    std::string get_datfile() const { return m_datfile; }
-    /** @brief Return submission-statistics output filename. @return Output path. */
-    std::string get_subfile() const { return m_subfile; }
-    /** @brief Return submission-summary output filename. @return Output path. */
-    std::string get_subsumfile() const { return m_subsumfile; }
-    /** @brief Return resource-history output filename. @return Output path. */
-    std::string get_resource_trace() const { return m_resource_trace; }
-    /** @brief Return resource pool size. @return Node count. */
-    num_nodes_t get_total_nodes() const { return m_total_nodes; }
-    /** @brief Return resource-history capacity. @return Entry capacity. */
-    size_t get_resource_history_capacity() const { return m_resource_history_capacity; }
+public:
+  /** @brief Construct trace-tool parameters with project defaults. */
+  Trace_Params();
+  /** @brief Parse trace-tool command-line options.
+   * @param[in,out] argc Argument count.
+   * @param[in,out] argv Argument vector.
+   * @return true when parsing succeeds. */
+  bool getopt(int &argc, char **&argv);
+  /** @brief Print trace-tool usage and terminate.
+   * @param[in] exec Executable name.
+   * @param[in] code Process exit status. */
+  void print_usage(const std::string exec, int code);
+  /** @brief Write the effective configuration to standard output. */
+  void print() const;
+  /** @brief Return the input trace filename. @return Input path. */
+  std::string get_infile() const { return m_infile; }
+  /** @brief Set the primary output filename. @param[in] ofname Output path. */
+  void set_outfile(const std::string &ofname);
+  /** @brief Return the primary output filename. @return Output path. */
+  std::string get_outfile() const { return m_outfile; }
+  /** @brief Return DAT-session output filename. @return Output path. */
+  std::string get_datfile() const { return m_datfile; }
+  /** @brief Return submission-statistics output filename. @return Output path.
+   */
+  std::string get_subfile() const { return m_subfile; }
+  /** @brief Return submission-summary output filename. @return Output path. */
+  std::string get_subsumfile() const { return m_subsumfile; }
+  /** @brief Return resource-history output filename. @return Output path. */
+  std::string get_resource_trace() const { return m_resource_trace; }
+  /** @brief Return resource pool size. @return Node count. */
+  num_nodes_t get_total_nodes() const { return m_total_nodes; }
+  /** @brief Return resource-history capacity. @return Entry capacity. */
+  size_t get_resource_history_capacity() const {
+    return m_resource_history_capacity;
+  }
 
-    /** @brief Return configured job limit. @return Maximum job count. */
-    num_jobs_t max_num_jobs() const { return m_max_jobs; }
-    /** @brief Report whether a job limit was supplied. @return true when set. */
-    bool is_max_jobs_set() const { return m_is_jobs_set; }
+  /** @brief Return configured job limit. @return Maximum job count. */
+  num_jobs_t max_num_jobs() const { return m_max_jobs; }
+  /** @brief Report whether a job limit was supplied. @return true when set. */
+  bool is_max_jobs_set() const { return m_is_jobs_set; }
 
-    /// Maximum jobs to process.
-    num_jobs_t m_max_jobs;
-    /// Maximum timestamp or time limit expressed as text.
-    std::string m_max_time;
+  /// Maximum jobs to process.
+  num_jobs_t m_max_jobs;
+  /// Maximum timestamp or time limit expressed as text.
+  std::string m_max_time;
 
-    /// Input trace filename.
-    std::string m_infile;
-    /// Primary output filename.
-    std::string m_outfile;
-    std::string m_datfile; ///< Outfile name for detected DAT sessions
-    std::string m_subfile; ///< Outfile name for Submission stats
-    std::string m_subsumfile; ///< Outfile name for submission stat summary
-    std::string m_resource_trace; ///< Optional outfile name for resource-occupancy trace
+  /// Input trace filename.
+  std::string m_infile;
+  /// Primary output filename.
+  std::string m_outfile;
+  std::string m_datfile;    ///< Outfile name for detected DAT sessions
+  std::string m_subfile;    ///< Outfile name for Submission stats
+  std::string m_subsumfile; ///< Outfile name for submission stat summary
+  std::string
+      m_resource_trace; ///< Optional outfile name for resource-occupancy trace
 
-    /// Initial capacity for the resource-history circular buffer (0 =
-    /// size of the job trace). No overflow policy: every entry here is
-    /// always immediately safe to reclaim, so reclaiming when full always
-    /// succeeds - see Trace::m_resource_history's own comment.
-    size_t m_resource_history_capacity;
+  /// Initial capacity for the resource-history circular buffer (0 =
+  /// size of the job trace). No overflow policy: every entry here is
+  /// always immediately safe to reclaim, so reclaiming when full always
+  /// succeeds - see Trace::m_resource_history's own comment.
+  size_t m_resource_history_capacity;
 
-    /// Pool size used only to derive free_nodes for the resource trace -
-    /// the tracer itself does no scheduling and doesn't otherwise need this.
-    num_nodes_t m_total_nodes;
+  /// Pool size used only to derive free_nodes for the resource trace -
+  /// the tracer itself does no scheduling and doesn't otherwise need this.
+  num_nodes_t m_total_nodes;
 
-    /// Whether m_max_jobs was explicitly configured.
-    bool m_is_jobs_set;
-    /// Whether m_max_time was explicitly configured.
-    bool m_is_time_set;
+  /// Whether m_max_jobs was explicitly configured.
+  bool m_is_jobs_set;
+  /// Whether m_max_time was explicitly configured.
+  bool m_is_time_set;
 };
 
 /**@}*/

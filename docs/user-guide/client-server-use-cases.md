@@ -82,7 +82,7 @@ From an allocation that permits `srun`, first build the server and install the
 Python/MPI dependencies:
 
 ```bash
-cmake -S . -B build -DDR_EVT_ENABLE_PROTOBUF=ON -DDR_EVT_ENABLE_GRPC=ON
+cmake -S . -B build -DDR_EVT_ENABLE_GRPC=ON
 cmake --build build --target dr_evt_server-bin
 python3 -m venv .venv-grpc
 .venv-grpc/bin/python -m pip install mpi4py grpcio grpcio-tools protobuf
@@ -187,7 +187,7 @@ exercised.
 `systems.csv` contains `system_id,address,trace` and optional `total_nodes`.
 Its trace is a controller-side arrival source, not a server-side workload.
 `composite_jobs.csv` contains one fragment per row with
-`composite_id,submit_time,system_id,num_nodes,queue,time_limit`; a composite
+`composite_id,submit_time,system_id,num_nodes,q_id,time_limit`; a composite
 ID must name at least two systems.
 
 The coordinator initially sends each system's ordinary trace with

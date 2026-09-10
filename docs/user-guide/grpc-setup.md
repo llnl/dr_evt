@@ -37,11 +37,11 @@ for multi-server and digital-twin deployments.
 
 ## Building client/server support
 
-The gRPC client/server is optional and requires two CMake flags:
+The gRPC client/server is optional. Enabling it automatically enables
+Protobuf support:
 
 ```bash
 cmake .. \
-  -DDR_EVT_ENABLE_PROTOBUF=ON \
   -DDR_EVT_ENABLE_GRPC=ON
 make dr_evt_server-bin dr_evt_client-bin
 make install

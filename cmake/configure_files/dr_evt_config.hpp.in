@@ -25,6 +25,7 @@
 #cmakedefine DR_EVT_HAS_CEREAL 1
 #cmakedefine DR_EVT_HAS_CATCH2 1
 #cmakedefine DR_EVT_HAS_OPENMP 1
+#cmakedefine DR_EVT_HAS_NUMA 1
 #cmakedefine DR_EVT_HAS_STD_FILESYSTEM 1
 #cmakedefine DR_EVT_HAS_PROTOBUF 1
 #cmakedefine DR_EVT_HAS_PROTOBUF_LOG_HANDLER 1

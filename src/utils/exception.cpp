@@ -11,20 +11,14 @@ namespace dr_evt {
 /** \addtogroup dr_evt_utils
  *  @{ */
 
-exception::exception(const std::string msg)
-  : m_message(msg)
-{}
+exception::exception(const std::string msg) : m_message(msg) {}
 
-const char* exception::what() const noexcept
-{
-    return m_message.c_str();
-}
+const char *exception::what() const noexcept { return m_message.c_str(); }
 
-std::ostream& operator<<(std::ostream& os, const exception& e)
-{
-    using std::operator<<;
-    os << e.what();
-    return os;
+std::ostream &operator<<(std::ostream &os, const exception &e) {
+  using std::operator<<;
+  os << e.what();
+  return os;
 }
 
 /**@}*/

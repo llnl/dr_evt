@@ -39,8 +39,7 @@ if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
     print_usage
 fi
 
-# Locate the installed simulator when CMAKE_INSTALL_PREFIX is set, otherwise
-# use the build-tree binary. This is shared with the other test scripts.
+# Locate the installed simulator. This is shared with the other test scripts.
 source "$SCRIPT_DIR/set_simulator_path.sh"
 
 # Check trace file exists

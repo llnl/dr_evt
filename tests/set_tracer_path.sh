@@ -1,18 +1,17 @@
 #!/bin/bash
-# Common function to find tracer - source this in test scripts
+# Common function to find the installed tracer - source this in test scripts.
 
-if [ -n "${CMAKE_INSTALL_PREFIX}" ] && [ -f "${CMAKE_INSTALL_PREFIX}/bin/tracer" ]; then
-    TRACER="${CMAKE_INSTALL_PREFIX}/bin/tracer"
-elif [ -f "./build/tracer" ]; then
-    TRACER="./build/tracer"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-$REPO_ROOT/install}"
+
+if [ -n "${TRACER:-}" ] && [ -x "$TRACER" ]; then
+    : # Explicit tracer path takes precedence.
+elif [ -x "$INSTALL_PREFIX/bin/tracer" ]; then
+    TRACER="$INSTALL_PREFIX/bin/tracer"
 else
-    echo "Error: Tracer not found. Tried:"
-    echo "  - \${CMAKE_INSTALL_PREFIX}/bin/tracer (if CMAKE_INSTALL_PREFIX is set)"
-    echo "  - ./build/tracer (build directory)"
-    echo ""
-    echo "Build and install first:"
-    echo "  cd build && cmake .. && make && make install"
-    echo "Or set TRACER environment variable to the binary path."
+    echo "Error: installed tracer not found or not executable: $INSTALL_PREFIX/bin/tracer"
+    echo "Install the project first, or set CMAKE_INSTALL_PREFIX to its install prefix."
     exit 1
 fi
 

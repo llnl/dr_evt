@@ -177,7 +177,7 @@ def run_one_example(heading, content, tmpdir, index):
         # actually exist on this machine.
         infile_path = os.path.join(tmpdir, os.path.basename(infile))
         with open(infile_path, "w") as f:
-            f.write("job_submit_time,num_nodes,queue,time_limit\n0,10,pbatch,100\n")
+            f.write("job_submit_time,num_nodes,time_limit\n0,10,100\n")
         cmd.append(infile_path)
     cmd += ["--config", config_path]
 

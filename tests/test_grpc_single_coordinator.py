@@ -107,9 +107,9 @@ def run_independent_baseline(simulator, workdir, system_id, jobs):
     input_file = pathlib.Path(workdir) / f"{system_id}.baseline.input.csv"
     simulated_file = pathlib.Path(workdir) / f"{system_id}.baseline.simulated.csv"
     resource_file = pathlib.Path(workdir) / f"{system_id}.baseline.resource.csv"
-    rows = ["job_submit_time,num_nodes,queue,time_limit"]
+    rows = ["job_submit_time,num_nodes,time_limit"]
     rows.extend(
-        f"{job['submit_time']:g},{job['num_nodes']},{job['queue']},{job['limit_time']:g}"
+        f"{job['submit_time']:g},{job['num_nodes']},{job['limit_time']:g}"
         for job in jobs)
     input_file.write_text("\n".join(rows) + "\n", encoding="utf-8")
     command = [

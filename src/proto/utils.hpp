@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef  DR_EVT_PROTO_UTILS_HPP
-#define  DR_EVT_PROTO_UTILS_HPP
+#ifndef DR_EVT_PROTO_UTILS_HPP
+#define DR_EVT_PROTO_UTILS_HPP
 
 #if defined(DR_EVT_HAS_CONFIG)
 #include "dr_evt_config.hpp"
@@ -18,12 +18,12 @@
 #error DR_EVT requires protocol buffer
 #endif
 
-#include <string>
-#include <iostream>
 #include <fstream>
-#include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/message.h>
+#include <google/protobuf/text_format.h>
+#include <iostream>
+#include <string>
 
 #if defined(DR_EVT_HAS_ABSL_LOG_SINK)
 #include "absl/log/log_sink.h"
@@ -40,8 +40,7 @@ namespace dr_evt {
 /// DR_EVT-specific prefix, via Abseil's absl::LogSink registry.
 class ProtoLogSink : public absl::LogSink {
 public:
-  void Send(const absl::LogEntry& entry) override
-  {
+  void Send(const absl::LogEntry &entry) override {
     std::cerr << "DR_EVT proto: "
               << entry.text_message_with_prefix_and_newline();
   }
@@ -54,14 +53,15 @@ class ScopedProtoLogSink {
 public:
   ScopedProtoLogSink() { absl::AddLogSink(&m_sink); }
   ~ScopedProtoLogSink() { absl::RemoveLogSink(&m_sink); }
-  ScopedProtoLogSink(const ScopedProtoLogSink&) = delete;
-  ScopedProtoLogSink& operator=(const ScopedProtoLogSink&) = delete;
+  ScopedProtoLogSink(const ScopedProtoLogSink &) = delete;
+  ScopedProtoLogSink &operator=(const ScopedProtoLogSink &) = delete;
+
 private:
   ProtoLogSink m_sink;
 };
 #endif // DR_EVT_HAS_ABSL_LOG_SINK
 
-template<typename T>
+template <typename T>
 /**
  * @brief Read a protobuf message from binary or text input.
  * @tparam T Protobuf message type.
@@ -70,9 +70,8 @@ template<typename T>
  * @param[out] dr_evt_proto_params Destination message populated on success.
  * @return true when the file was opened and parsed successfully.
  */
-bool read_prototext(const std::string& file_name, const bool is_binary,
-                    T& dr_evt_proto_params)
-{
+bool read_prototext(const std::string &file_name, const bool is_binary,
+                    T &dr_evt_proto_params) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
   std::ifstream input(file_name, std::ios::in | std::ios::binary);
 
@@ -88,15 +87,17 @@ bool read_prototext(const std::string& file_name, const bool is_binary,
   }
   if (is_binary) {
     if (!dr_evt_proto_params.ParseFromIstream(&input)) {
-      std::cerr << "Failed to parse DR_EVT_Params in binary-formatted input file: "
-                << file_name << std::endl;
+      std::cerr
+          << "Failed to parse DR_EVT_Params in binary-formatted input file: "
+          << file_name << std::endl;
       return false;
     }
   } else {
     google::protobuf::io::IstreamInputStream istrm(&input);
     if (!google::protobuf::TextFormat::Parse(&istrm, &dr_evt_proto_params)) {
-      std::cerr << "Failed to parse DR_EVT_Params in text-formatted input file: "
-                << file_name << std::endl;
+      std::cerr
+          << "Failed to parse DR_EVT_Params in text-formatted input file: "
+          << file_name << std::endl;
       return false;
     }
   }

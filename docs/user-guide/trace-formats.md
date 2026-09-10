@@ -78,26 +78,26 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
 
 ### Simulation Mode (scheduler computes start/end times)
 ```text
-job_submit_time,num_nodes,queue,time_limit
-0,10,pbatch,100
-50,10,pbatch,50
-120,10,pbatch,80
+job_submit_time,num_nodes,time_limit
+0,10,100
+50,10,50
+120,10,80
 ```
 
 ### Replay Mode, With Epoch Timestamps
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
-120,150,230,10,pbatch,80
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
+120,150,230,10,80
 ```
 
 ### Replay Mode, With ISO Timestamps
 ```text
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,pbatch,100
-2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,pbatch,50
-2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,pbatch,80
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+2024-01-15T00:00:00,2024-01-15T00:00:00,2024-01-15T00:01:40,10,100
+2024-01-15T00:00:50,2024-01-15T00:01:40,2024-01-15T00:02:30,10,50
+2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,80
 ```
 
 ## Column Descriptions
@@ -165,10 +165,10 @@ for the full design rationale.
 ```bash
 # Create test trace
 cat > test.csv << EOF
-job_submit_time,begin_time,end_time,num_nodes,queue,time_limit
-0,0,100,10,pbatch,100
-50,100,150,10,pbatch,50
-120,150,230,10,pbatch,80
+job_submit_time,begin_time,end_time,num_nodes,time_limit
+0,0,100,10,100
+50,100,150,10,50
+120,150,230,10,80
 EOF
 
 # Run test

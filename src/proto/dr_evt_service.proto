@@ -100,7 +100,9 @@ message InitializeTraceRequest {
 message AppendJobRequest {
     double submit_time = 1;
     uint32 num_nodes = 2;
-    string queue = 3;       // e.g. "pbatch"
+    // Numeric queue ID by default (e.g. "1" for Queue1), or a legacy queue
+    // name (e.g. "pbatch") when DR_EVT_LEGACY_QUEUE_INPUT is enabled.
+    string queue = 3;
     double limit_time = 4;  // user-estimated time limit, in seconds
 }
 
@@ -109,6 +111,7 @@ message AppendJobRequest {
 message JobAppendData {
     double submit_time = 1;
     uint32 num_nodes = 2;
+    // Uses the same compile-time queue representation as AppendJobRequest.
     string queue = 3;
     double limit_time = 4;
 }

@@ -6,7 +6,7 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
-# Find simulator binary (tries CMAKE_INSTALL_PREFIX first, then build dir)
+# Find the installed simulator binary.
 source "$SCRIPT_DIR/set_simulator_path.sh"
 
 TRACE_DIR="tests/test_traces/scheduler_correctness"
@@ -104,7 +104,7 @@ for TEST in "${TESTS[@]}"; do
     fi
 
     # Convert simulator output to comparable format
-    # Simulator output: job_submit_time,begin_time,end_time,num_nodes,exit_status,queue,time_limit
+    # Simulator output: job_submit_time,begin_time,end_time,num_nodes,exit_status,queue-or-q_id,time_limit
     # Expected output: job_id,start_time,end_time
     awk -F, 'NR==1 {print "job_id,start_time,end_time"; next} {print NR-2","$2","$3}' "$SIM_OUT" > "$OUTPUT"
 

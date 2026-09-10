@@ -26,12 +26,12 @@ namespace dr_evt {
  * @return Steady-clock time since its unspecified epoch as double seconds.
  */
 inline double get_time() {
-    using namespace std::chrono;
-    return duration_cast<duration<double>>(
-           steady_clock::now().time_since_epoch()).count();
+  using namespace std::chrono;
+  return duration_cast<duration<double>>(steady_clock::now().time_since_epoch())
+      .count();
 }
 
 /**@}*/
 } // namespace dr_evt
 
-#endif  // DR_EVT_UTILS_TIMER_HPP
+#endif // DR_EVT_UTILS_TIMER_HPP

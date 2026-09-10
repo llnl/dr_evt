@@ -14,16 +14,14 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Resolve an explicitly configured or installed simulator before falling back
+# to the repository build tree.
+source "$SCRIPT_DIR/set_simulator_path.sh"
+
 echo "=========================================="
 echo "Feature Tests (Simulation Mode)"
 echo "=========================================="
 echo ""
-
-if [ ! -f "${SIMULATOR:-./build/simulator}" ]; then
-    echo "Error: ./build/simulator not found"
-    echo "Build first: cd build && cmake .. && make"
-    exit 1
-fi
 
 PASS=0
 FAIL=0
@@ -61,7 +59,7 @@ for test_file in "$TRACE_DIR"/*.csv; do
     SIM_OUT="/tmp/feature_${test_name}.csv"
     SIM_RESOURCES="/tmp/feature_${test_name}_resources.csv"
 
-    ./build/simulator "$test_file" \
+    "$SIMULATOR" "$test_file" \
         --total_nodes 100 \
         --trace_format simple \
         --timestamp_format epoch \

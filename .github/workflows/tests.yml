@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+
 jobs:
   test:
     name: Build and Test
@@ -151,23 +154,12 @@ jobs:
           ls -lh install/bin/simulator
           install/bin/simulator --help || true
 
-      - name: Run Scheduler Correctness Tests (Build Directory)
-        id: scheduler-correctness
-        run: |
-          echo "========================================"
-          echo "Running Scheduler Correctness Tests (34 fixtures) - Build Directory"
-          echo "========================================"
-          # Explicitly unset CMAKE_INSTALL_PREFIX to test build directory fallback
-          unset CMAKE_INSTALL_PREFIX
-          ./tests/run_scheduler_correctness_tests.sh
-
       - name: Run Scheduler Correctness Tests (Installed Binary)
         id: scheduler-correctness-installed
         run: |
           echo "========================================"
           echo "Running Scheduler Correctness Tests (34 fixtures) - Installed Binary"
           echo "========================================"
-          export CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
           ./tests/run_scheduler_correctness_tests.sh
 
       - name: Run Queue Implementation Differential Tests
@@ -319,7 +311,6 @@ jobs:
           echo "Compiler: ${{ matrix.compiler }}"
           echo ""
           echo "Test Results:"
-          echo "  Scheduler correctness - Build (34 fixtures): ${{ steps.scheduler-correctness.outcome }}"
           echo "  Scheduler correctness - Installed (34 fixtures): ${{ steps.scheduler-correctness-installed.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
           echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"

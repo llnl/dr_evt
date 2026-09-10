@@ -204,7 +204,11 @@ cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_GRPC=ON
 cmake .. -Wno-author -Wno-dev -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 
 ```
-`-DAVOID_SYSTEM_GRPC=ON` guarantees the from-source FetchContent build - see the OOM note under "Livermore Computing (LC) HPC systems" below.
+`-DAVOID_SYSTEM_GRPC=ON` skips default system prefixes, but still accepts an
+explicit `gRPC_DIR`, `CMAKE_PREFIX_PATH`, or a non-system
+`CMAKE_INSTALL_PREFIX`. If none contains a complete gRPC package, CMake uses
+FetchContent. See the OOM note under "Livermore Computing (LC) HPC systems"
+below.
 
 **Python bindings:**
 ```bash
@@ -239,7 +243,11 @@ export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
 export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
 ```
 
-The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed libraries (common on HPC systems with multiple compiler toolchains), but force gRPC/BoringSSL/Protobuf and Boost to build from source via FetchContent. That from-source build can OOM on memory-constrained nodes under full parallelism, with output like:
+The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed
+libraries (common on HPC systems with multiple compiler toolchains). They
+still permit dependencies in explicit/local prefixes; dependencies not found
+there are built via FetchContent. A from-source gRPC build can OOM on
+memory-constrained nodes under full parallelism, with output like:
 
 ```
 make[2]: *** [.../boringssl_gtest.dir/build.make:90: .../gtest-all.cc.o] Killed
@@ -261,15 +269,7 @@ cd dr_evt
 # Create build directory
 mkdir build && cd build
 
-# Configure (first run builds Protocol Buffers)
-cmake -DBOOST_ROOT=/path/to/boost \
-      -DCMAKE_INSTALL_PREFIX=/install/path \
-      ..
-
-# Build Protocol Buffers dependency
-make -j4
-
-# Configure DR_EVT (second run builds the simulator)
+# Configure
 cmake -DBOOST_ROOT=/path/to/boost \
       -DCMAKE_INSTALL_PREFIX=/install/path \
       ..
@@ -487,8 +487,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv
 
 **Enable gRPC client/server (optional):**
 ```bash
-cmake -DDR_EVT_ENABLE_PROTOBUF=ON \
-      -DDR_EVT_ENABLE_GRPC=ON \
+cmake -DDR_EVT_ENABLE_GRPC=ON \
       -DBOOST_ROOT=/path/to/boost \
       ..
 make -j4

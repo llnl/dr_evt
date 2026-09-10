@@ -95,9 +95,9 @@ The simulator supports three methods for determining actual job duration, contro
 **Requires:** `actual_run_time` column in trace
 
 ```text
-job_submit_time,num_nodes,queue,time_limit,actual_run_time
-0,80,pbatch,100,87
-10,15,pbatch,20,18
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,80,100,87
+10,15,20,18
 ```
 
 **Behavior:**
@@ -114,9 +114,9 @@ job_submit_time,num_nodes,queue,time_limit,actual_run_time
 **Requires:** Only `time_limit` column
 
 ```text
-job_submit_time,num_nodes,queue,time_limit
-0,80,pbatch,100
-10,15,pbatch,20
+job_submit_time,num_nodes,time_limit
+0,80,100
+10,15,20
 ```
 
 **Behavior:**

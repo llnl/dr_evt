@@ -55,8 +55,8 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
-# Binary location
-${CMAKE_INSTALL_PREFIX}/bin/simulator --help
+# Run from the build directory
+./simulator --help
 ```
 
 **Note**: The plain build shown above only needs Boost - it does not build
@@ -98,8 +98,9 @@ cmake .. -DDR_EVT_ENABLE_GRPC=ON
 # Skip system path search (useful if system install is broken or mismatched by version)
 cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 
-# Force FetchContent download (ignores system install)
-cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
+# Reuse an explicit/local gRPC install, otherwise fall back to FetchContent
+cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON \
+  -DCMAKE_INSTALL_PREFIX=/path/to/local/prefix
 ```
 
 **Python bindings:**
@@ -108,7 +109,7 @@ cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 cmake .. -DDR_EVT_BUILD_PYTHON=ON
 
 # Specify Python executable
-cmake .. -DDR_EVT_BUILD_PYTHON=ON -DPYTHON_EXECUTABLE=/path/to/python3
+cmake .. -DDR_EVT_BUILD_PYTHON=ON -DPython3_EXECUTABLE=/path/to/python3
 ```
 
 **Build type:**
@@ -151,7 +152,11 @@ export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
 export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
 ```
 
-The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed libraries (common on HPC systems with multiple compiler toolchains), but force gRPC/BoringSSL/Protobuf and Boost to build from source via FetchContent. That from-source build can OOM on memory-constrained nodes under full parallelism, with output like:
+The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed
+libraries (common on HPC systems with multiple compiler toolchains). They
+still permit dependencies in explicit/local prefixes; dependencies not found
+there are built via FetchContent. A from-source gRPC build can OOM on
+memory-constrained nodes under full parallelism, with output like:
 
 ```
 make[2]: *** [.../boringssl_gtest.dir/build.make:90: .../gtest-all.cc.o] Killed
@@ -252,7 +257,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 # Or download manually and use:
 cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
 
-# For gRPC, skip system search and force FetchContent:
+# For gRPC, skip system search; use an explicit/local package or FetchContent:
 cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 ```
 
@@ -275,7 +280,7 @@ sudo apt-get install python3-dev
 brew install python3
 
 # Specify Python version explicitly
-cmake .. -DDR_EVT_BUILD_PYTHON=ON -DPYTHON_EXECUTABLE=$(which python3)
+cmake .. -DDR_EVT_BUILD_PYTHON=ON -DPython3_EXECUTABLE=$(which python3)
 ```
 
 ### MPI not found (optional dependency)

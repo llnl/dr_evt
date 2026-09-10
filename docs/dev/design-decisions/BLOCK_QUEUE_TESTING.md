@@ -184,7 +184,7 @@ import random
 random.seed(42)
 num_jobs = 10000
 
-jobs = [['job_submit_time', 'num_nodes', 'queue', 'time_limit']]
+jobs = [['job_submit_time', 'num_nodes', 'time_limit']]
 current_time = 0
 
 for i in range(num_jobs):
@@ -209,7 +209,7 @@ for i in range(num_jobs):
     else:
         time_limit = random.randint(14400, 86400)  # 4-24 hours
     
-    jobs.append([int(current_time), nodes, 0, 'pbatch', time_limit])
+    jobs.append([int(current_time), nodes, time_limit])
 
 with open('tests/test_traces/scale/huge_${num_jobs}jobs.csv', 'w', newline='') as f:
     writer = csv.writer(f)

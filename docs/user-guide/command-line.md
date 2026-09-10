@@ -51,7 +51,9 @@ See [`docs/dev/OUTPUT_TRACE_BUFFERS.md`](../dev/OUTPUT_TRACE_BUFFERS.md) for the
 ### `-o, --outfile FILENAME`
 Output file for simulated job trace.
 
-**Format:** CSV with columns `job_submit_time`, `begin_time`, `end_time`, `num_nodes`, `exit_status`, `queue`, `time_limit`
+**Format:** CSV with columns `job_submit_time`, `begin_time`, `end_time`,
+`num_nodes`, `exit_status`, `q_id`, and `time_limit`. Legacy-input builds emit
+`queue` instead of `q_id`.
 
 **Default:** Derived from input filename (e.g., `jobs.csv` -> `jobs_sim.csv`)
 

@@ -267,9 +267,9 @@ echo "--- Test 5: Scheduler planning always uses time_limit ---"
 # Create a simple trace where using actual_run_time for scheduling would
 # produce a different schedule than using time_limit
 cat > /tmp/scheduler_planning_test.csv <<EOF
-job_submit_time,num_nodes,queue,time_limit,actual_run_time
-0,60,pbatch,1000,10
-5,50,pbatch,100,90
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,60,1000,10
+5,50,100,90
 EOF
 
 # Job 0: time_limit=1000, actual_run_time=10
