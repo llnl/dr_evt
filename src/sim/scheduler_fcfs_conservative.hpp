@@ -68,14 +68,10 @@ private:
 public:
   /** @brief Construct a conservative-backfill FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] job_data Trace owning every identifier later enqueued.
    * @param[in] bf_policy Backfill setting; conservative behavior is implemented
-   * by this class.
-   * @details @p job_data is retained by non-owning pointer and must outlive
-   * this scheduler. */
-  FCFSConservativeScheduler(num_nodes_t total_nodes, const Trace &job_data,
-                            BackfillPolicy bf_policy)
-      : SchedulerBase(total_nodes, job_data, bf_policy), m_eligible_end_idx(0),
+   * by this class. */
+  FCFSConservativeScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy)
+      : SchedulerBase(total_nodes, bf_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0) {}
 
   /** @copydoc SchedulerBase::insert_job */
@@ -91,10 +87,9 @@ public:
   }
 
   /** @copydoc SchedulerBase::schedule */
-  std::vector<job_no_t>
-  schedule(num_nodes_t free_nodes,
-           const std::map<job_no_t, sim_time_t> &running_jobs,
-           sim_time_t current_time) override;
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
 
   /** @copydoc SchedulerBase::sync_to */
   void sync_to(sim_time_t current_time) override;
@@ -130,14 +125,14 @@ private:
    * @brief Calculate the reservation that a candidate must preserve.
    * @param[in] job_index Candidate position in FCFS queue order.
    * @param[in] available_nodes Nodes free at current_time.
-   * @param[in] running_jobs Active jobs and their start times.
+   * @param[in] running_jobs Active jobs with start time, runtime, and nodes.
    * @param[in] current_time Projection time.
    * @return Earliest preserved reservation as sim_time_t.
    */
-  sim_time_t calculate_conservative_window(
-      size_t job_index, num_nodes_t available_nodes,
-      const std::map<job_no_t, sim_time_t> &running_jobs,
-      sim_time_t current_time);
+  sim_time_t calculate_conservative_window(size_t job_index,
+                                           num_nodes_t available_nodes,
+                                           const running_jobs_t &running_jobs,
+                                           sim_time_t current_time);
 };
 
 } // namespace dr_evt

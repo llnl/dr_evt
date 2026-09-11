@@ -29,10 +29,9 @@ namespace dr_evt {
  * boost::circular_buffer has a fixed capacity, unlike std::deque, which
  * grows automatically - a push_back() on a full buffer overwrites the
  * oldest element rather than growing. initial_capacity sets that
- * capacity explicitly (0 defaults to job_data.data().size(), large enough that
- * it can never overflow, since insert_job() is called at most once per
- * entry in job_data over the scheduler's lifetime - see
- * Simulation::submit_job()). A caller may instead choose a smaller
+ * capacity explicitly (0 defaults to the initially known job count, large
+ * enough when each initial job is submitted once). A caller may instead
+ * choose a smaller
  * capacity and let overflow_policy decide what happens if it's
  * exceeded: ABORT throws, ending the simulation; GROW reallocates to a
  * larger capacity via set_capacity(), which copies all existing
@@ -78,21 +77,20 @@ public:
   /**
    * @brief Construct an FCFS scheduler backed by a circular buffer.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] job_data Trace owning every identifier later enqueued.
+   * @param[in] initial_job_count Number of initially known jobs, used when
+   * initial_capacity is zero.
    * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
    * @param[in] initial_capacity Initial wait-queue capacity; zero derives one
-   * from the trace.
+   * from initial_job_count.
    * @param[in] overflow_policy Action to take when that capacity is exhausted.
-   * @details @p job_data is retained by non-owning pointer and must outlive
-   * this scheduler.
    */
   CircularBufferFCFSScheduler(
-      num_nodes_t total_nodes, const Trace &job_data, BackfillPolicy bf_policy,
-      size_t initial_capacity = 0,
+      num_nodes_t total_nodes, size_t initial_job_count,
+      BackfillPolicy bf_policy, size_t initial_capacity = 0,
       CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW)
-      : SchedulerBase(total_nodes, job_data, bf_policy),
+      : SchedulerBase(total_nodes, bf_policy),
         m_wait_queue(initial_capacity != 0 ? initial_capacity
-                                           : job_data.data().size()),
+                                           : initial_job_count),
         m_overflow_policy(overflow_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0) {}
 
@@ -129,10 +127,9 @@ public:
   }
 
   /** @copydoc SchedulerBase::schedule */
-  std::vector<job_no_t>
-  schedule(num_nodes_t free_nodes,
-           const std::map<job_no_t, sim_time_t> &running_jobs,
-           sim_time_t current_time) override;
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
 
   /** @copydoc SchedulerBase::sync_to */
   void sync_to(sim_time_t current_time) override;

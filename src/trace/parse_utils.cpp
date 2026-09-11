@@ -115,7 +115,7 @@ void set_by(unsigned &v, const std::string &str) {
 
 void set_by(double &v, const std::string &str) {
   size_t pos;
-  v = stof(str, &pos);
+  v = stod(str, &pos);
   if (pos != str.size()) {
     throw std::invalid_argument{"Failed to parse a double precision number! " +
                                 str};

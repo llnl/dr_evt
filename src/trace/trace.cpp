@@ -21,7 +21,10 @@
 
 namespace dr_evt {
 
-Trace::Trace(const std::string &fname)
+template <typename Policy> using trace_record_t = typename Policy::record_type;
+
+template <typename Policy>
+BasicTrace<Policy>::BasicTrace(const std::string &fname)
     : m_fname(fname), m_num_reclaimed(0), m_job_store_capacity(0),
       m_job_store_capacity_resolved(false),
       m_job_store_overflow(CircularOverflowPolicy::GROW), m_completed_count(0),
@@ -36,7 +39,9 @@ Trace::Trace(const std::string &fname)
   }
 }
 
-Trace::Trace(const std::string &fname, const std::string &format)
+template <typename Policy>
+BasicTrace<Policy>::BasicTrace(const std::string &fname,
+                               const std::string &format)
     : m_fname(fname), m_dcols(format), m_num_reclaimed(0),
       m_job_store_capacity(0), m_job_store_capacity_resolved(false),
       m_job_store_overflow(CircularOverflowPolicy::GROW), m_completed_count(0),
@@ -51,8 +56,11 @@ Trace::Trace(const std::string &fname, const std::string &format)
   }
 }
 
-Trace::Trace(const std::string &fname, const std::string &format,
-             const std::string &timestamp_format, const std::string &timezone)
+template <typename Policy>
+BasicTrace<Policy>::BasicTrace(const std::string &fname,
+                               const std::string &format,
+                               const std::string &timestamp_format,
+                               const std::string &timezone)
     : m_fname(fname), m_dcols(format, timestamp_format, timezone),
       m_num_reclaimed(0), m_job_store_capacity(0),
       m_job_store_capacity_resolved(false),
@@ -69,7 +77,8 @@ Trace::Trace(const std::string &fname, const std::string &format,
   }
 }
 
-void Trace::resolve_job_store_capacity(num_jobs_t hint) {
+template <typename Policy>
+void BasicTrace<Policy>::resolve_job_store_capacity(num_jobs_t hint) {
   if (m_job_store_capacity_resolved) {
     return;
   }
@@ -87,15 +96,16 @@ void Trace::resolve_job_store_capacity(num_jobs_t hint) {
   m_job_store_capacity_resolved = true;
 }
 
-int Trace::load_data(num_jobs_t n_lines_to_read) {
+template <typename Policy>
+int BasicTrace<Policy>::load_data(num_jobs_t n_lines_to_read) {
   // load() expects a std::vector - load into one, sort it (as before),
   // then transfer into m_data (the circular buffer). Nothing's
   // reclaimable yet at this point (no processing has happened), so if
   // an explicit --job_store_capacity is smaller than the job count,
   // m_job_store_overflow's abort/grow fallback applies here exactly
   // as it would mid-run.
-  std::vector<Job_Record> loaded;
-  int rc = load(m_fname, m_dcols, loaded, n_lines_to_read);
+  std::vector<trace_record_t<Policy>> loaded;
+  int rc = Policy::load_records(m_fname, m_dcols, loaded, n_lines_to_read);
 
 #if LIMIT_VS_EXEC_TIME_ONLY
   print_limit_vs_exec_time(m_dcols.get_cols_to_read(), loaded);
@@ -125,7 +135,8 @@ int Trace::load_data(num_jobs_t n_lines_to_read) {
   return rc;
 }
 
-Trace::Context::Context()
+template <typename Policy>
+BasicTrace<Policy>::Context::Context()
     :
 #if MARK_DAT_PERIOD
       m_pAll_cnt(static_cast<num_jobs_t>(0u)), // On-going pAll job
@@ -135,13 +146,15 @@ Trace::Context::Context()
       m_n_nodes_in_use(static_cast<num_nodes_t>(0u)) {
 }
 
-std::string Trace::Context::to_string() const {
+template <typename Policy>
+std::string BasicTrace<Policy>::Context::to_string() const {
   std::string msg;
   msg = "";
   return msg;
 }
 
-void Trace::process_events_until(const epoch_t &t_sub) {
+template <typename Policy>
+void BasicTrace<Policy>::process_events_until(const epoch_t &t_sub) {
   if (m_ctx.m_evtq.empty()) {
 #if MARK_DAT_PERIOD
     if (m_ctx.m_dat_span > 0.0) {
@@ -167,6 +180,7 @@ void Trace::process_events_until(const epoch_t &t_sub) {
 #endif
 
     if (cur->is_arrival()) {
+      this->on_start(static_cast<const trace_record_t<Policy> &>(job_of_evt));
 #if MARK_DAT_PERIOD
       if (_Is_Exclusive(job_q)) {
         if ((!_Is_Exclusive(m_ctx.m_prev_job_q)) &&
@@ -189,6 +203,7 @@ void Trace::process_events_until(const epoch_t &t_sub) {
       m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
 #endif
     } else {
+      this->on_finish(static_cast<const trace_record_t<Policy> &>(job_of_evt));
 #if MARK_DAT_PERIOD
       if (_Is_Exclusive(job_q)) {
 #if !EVENT_TIME_ORDER
@@ -227,8 +242,9 @@ void Trace::process_events_until(const epoch_t &t_sub) {
   }
 }
 
-void Trace::run_job_trace(const std::string &resource_trace_file,
-                          num_nodes_t total_nodes) {
+template <typename Policy>
+void BasicTrace<Policy>::run_job_trace(const std::string &resource_trace_file,
+                                       num_nodes_t total_nodes) {
   if (m_data.empty()) {
     return;
   }
@@ -278,9 +294,12 @@ void Trace::run_job_trace(const std::string &resource_trace_file,
   write_resource_trace(resource_trace_file, total_nodes);
 }
 
-job_no_t Trace::append_job(sim_time_t current_time, const epoch_t &submit_time,
-                           num_nodes_t num_nodes, job_queue_t queue,
-                           timeout_t limit_time) {
+template <typename Policy>
+job_no_t BasicTrace<Policy>::append_job(sim_time_t current_time,
+                                        const epoch_t &submit_time,
+                                        num_nodes_t num_nodes,
+                                        job_queue_t queue,
+                                        timeout_t limit_time) {
   // In case this is called before load_data() ever runs (genuine
   // streaming, no batch preload at all) - resolve_job_store_capacity()
   // is idempotent (guarded by m_job_store_capacity_resolved), so this
@@ -303,11 +322,13 @@ job_no_t Trace::append_job(sim_time_t current_time, const epoch_t &submit_time,
     m_data.set_capacity(std::max<size_t>(m_data.capacity() * 2, 1));
   }
 
-  m_data.push_back(Job_Record(submit_time, num_nodes, queue, limit_time));
+  m_data.push_back(
+      Policy::make_record(submit_time, num_nodes, queue, limit_time));
   return static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1);
 }
 
-void Trace::check_memory_pressure(size_t batch_size) const {
+template <typename Policy>
+void BasicTrace<Policy>::check_memory_pressure(size_t batch_size) const {
   const size_t available = get_available_memory_bytes();
   if (available == 0) {
     // Unknown (non-Linux, or /proc/meminfo unreadable/lacks
@@ -343,7 +364,7 @@ void Trace::check_memory_pressure(size_t batch_size) const {
 
   const size_t limit_jobs = static_cast<size_t>(
       m_memory_pressure_fraction * static_cast<double>(available) /
-      static_cast<double>(sizeof(Job_Record)));
+      static_cast<double>(sizeof(trace_record_t<Policy>)));
 
   if (projected_jobs > limit_jobs) {
     throw std::runtime_error(
@@ -366,7 +387,9 @@ void Trace::check_memory_pressure(size_t batch_size) const {
   }
 }
 
-void Trace::ensure_batch_capacity(sim_time_t current_time, size_t batch_size) {
+template <typename Policy>
+void BasicTrace<Policy>::ensure_batch_capacity(sim_time_t current_time,
+                                               size_t batch_size) {
   // Same idempotent, load_data()-optional resolution as append_job().
   resolve_job_store_capacity(static_cast<num_jobs_t>(m_data.size()));
 
@@ -417,18 +440,19 @@ void Trace::ensure_batch_capacity(sim_time_t current_time, size_t batch_size) {
   }
 }
 
-std::vector<job_no_t>
-Trace::append_jobs(sim_time_t current_time,
-                   const std::vector<Job_Append_Request> &requests) {
+template <typename Policy>
+std::vector<job_no_t> BasicTrace<Policy>::append_jobs(
+    sim_time_t current_time, const std::vector<Job_Append_Request> &requests) {
   // Input validation is all-or-nothing: check the whole batch's
   // ordering before touching m_data at all.
   for (size_t i = 1; i < requests.size(); ++i) {
     if (requests[i].submit_time < requests[i - 1].submit_time) {
-      throw std::runtime_error(
-          "Trace::append_jobs(): requests must be sorted by submit_time "
-          "(non-decreasing) - request " +
-          std::to_string(i) + " has an earlier submit_time than request " +
-          std::to_string(i - 1));
+      throw std::runtime_error("Trace::append_jobs(): requests "
+                               "must be sorted by submit_time "
+                               "(non-decreasing) - request " +
+                               std::to_string(i) +
+                               " has an earlier submit_time than request " +
+                               std::to_string(i - 1));
     }
   }
 
@@ -440,18 +464,20 @@ Trace::append_jobs(sim_time_t current_time,
   std::vector<job_no_t> job_nos;
   job_nos.reserve(requests.size());
   for (const auto &req : requests) {
-    m_data.push_back(
-        Job_Record(req.submit_time, req.num_nodes, req.queue, req.limit_time));
+    m_data.push_back(Policy::make_record(req.submit_time, req.num_nodes,
+                                         req.queue, req.limit_time));
     job_nos.push_back(
         static_cast<job_no_t>(m_num_reclaimed + m_data.size() - 1));
   }
   return job_nos;
 }
 
-std::vector<job_no_t> Trace::load_next_file(sim_time_t current_time,
-                                            const std::string &fname) {
-  std::vector<Job_Record> loaded;
-  int rc = load(fname, m_dcols, loaded);
+template <typename Policy>
+std::vector<job_no_t>
+BasicTrace<Policy>::load_next_file(sim_time_t current_time,
+                                   const std::string &fname) {
+  std::vector<trace_record_t<Policy>> loaded;
+  int rc = Policy::load_records(fname, m_dcols, loaded, 0);
   if (rc != EXIT_SUCCESS) {
     throw std::runtime_error("Trace::load_next_file(): failed to load '" +
                              fname + "'");
@@ -506,7 +532,8 @@ std::vector<job_no_t> Trace::load_next_file(sim_time_t current_time,
   return job_nos;
 }
 
-void Trace::insert_job(job_no_t job_idx, sim_time_t start_time) {
+template <typename Policy>
+void BasicTrace<Policy>::insert_job(job_no_t job_idx, sim_time_t start_time) {
   auto &job = job_at(job_idx);
 
   // Ensure job has actual_run_time set
@@ -538,7 +565,8 @@ void Trace::insert_job(job_no_t job_idx, sim_time_t start_time) {
   job_at(job_idx).compute_end_time();
 }
 
-void Trace::run_until_exclusive(sim_time_t target_time) {
+template <typename Policy>
+void BasicTrace<Policy>::run_until_exclusive(sim_time_t target_time) {
   // Convert sim_time_t to epoch_t for comparison
   time_t target_sec = static_cast<time_t>(target_time);
   float target_frac = target_time - target_sec;
@@ -548,7 +576,8 @@ void Trace::run_until_exclusive(sim_time_t target_time) {
   process_events_until(target_epoch);
 }
 
-void Trace::run_until_inclusive(sim_time_t target_time) {
+template <typename Policy>
+void BasicTrace<Policy>::run_until_inclusive(sim_time_t target_time) {
   // Process events at and before target_time
   while (!m_ctx.m_evtq.empty()) {
     const auto &event = *m_ctx.m_evtq.begin();
@@ -564,7 +593,7 @@ void Trace::run_until_inclusive(sim_time_t target_time) {
   }
 }
 
-bool Trace::process_single_event() {
+template <typename Policy> bool BasicTrace<Policy>::process_single_event() {
   if (m_ctx.m_evtq.empty()) {
     return false;
   }
@@ -578,9 +607,11 @@ bool Trace::process_single_event() {
   const auto &job = job_at(event.get_job_idx());
 
   if (event.is_arrival()) {
+    this->on_start(static_cast<const trace_record_t<Policy> &>(job));
     // START event: allocate nodes (same logic as process_events_until)
     m_ctx.m_n_nodes_in_use += job.get_num_nodes();
   } else {
+    this->on_finish(static_cast<const trace_record_t<Policy> &>(job));
     // END event: free nodes (same logic as process_events_until)
     m_ctx.m_n_nodes_in_use -= job.get_num_nodes();
   }
@@ -598,8 +629,10 @@ bool Trace::process_single_event() {
   return true;
 }
 
-void Trace::start_resource_trace(const std::string &filename,
-                                 num_nodes_t total_nodes, bool msec) {
+template <typename Policy>
+void BasicTrace<Policy>::start_resource_trace(const std::string &filename,
+                                              num_nodes_t total_nodes,
+                                              bool msec) {
   if (filename.empty()) {
     return;
   }
@@ -619,17 +652,22 @@ void Trace::start_resource_trace(const std::string &filename,
   m_resource_trace_total_nodes = total_nodes;
   m_resource_trace_msec = msec;
 
-  std::string header = "time,free_nodes,allocated_nodes\n";
+  std::string header = "time,free_nodes,allocated_nodes";
+  header += Policy::resource_columns();
+  header += "\n";
   m_resource_trace_ofs << header;
 
   // Baseline row: all nodes free at time 0, matching the convention
   // used elsewhere for this file format.
-  std::string baseline =
-      format_sim_time(0.0, msec) + "," + std::to_string(total_nodes) + ",0\n";
+  const auto baseline_sample = this->sample(epoch_t{}, 0);
+  std::string baseline = format_sim_time(0.0, msec) + "," +
+                         std::to_string(total_nodes) + ",0" +
+                         Policy::resource_values(baseline_sample) + "\n";
   m_resource_trace_ofs << baseline;
 }
 
-void Trace::resolve_resource_history_capacity() {
+template <typename Policy>
+void BasicTrace<Policy>::resolve_resource_history_capacity() {
   if (m_resource_history_capacity_resolved) {
     return;
   }
@@ -652,7 +690,7 @@ void Trace::resolve_resource_history_capacity() {
   m_resource_history_capacity_resolved = true;
 }
 
-void Trace::flush_resource_history() {
+template <typename Policy> void BasicTrace<Policy>::flush_resource_history() {
   if (!m_resource_trace_ofs.is_open() || m_ctx.m_resource_history.empty()) {
     // No file open to receive these - discard. Bounded memory still
     // applies either way; nobody asked for this output.
@@ -664,11 +702,13 @@ void Trace::flush_resource_history() {
   std::string buf;
   buf.reserve(blk_sz + 4096);
 
-  for (const auto &[time, allocated] : m_ctx.m_resource_history) {
-    buf += format_sim_time(convert_epoch<sim_time_t>(time),
+  for (const auto &sample : m_ctx.m_resource_history) {
+    buf += format_sim_time(convert_epoch<sim_time_t>(sample.time),
                            m_resource_trace_msec) +
-           "," + std::to_string(m_resource_trace_total_nodes - allocated) +
-           "," + std::to_string(allocated) + "\n";
+           "," +
+           std::to_string(m_resource_trace_total_nodes - sample.allocated) +
+           "," + std::to_string(sample.allocated) +
+           Policy::resource_values(sample) + "\n";
     if (buf.size() >= blk_sz) {
       m_resource_trace_ofs << buf;
       buf.clear();
@@ -680,7 +720,9 @@ void Trace::flush_resource_history() {
   m_ctx.m_resource_history.clear();
 }
 
-void Trace::record_resource_sample(const epoch_t &time, num_nodes_t allocated) {
+template <typename Policy>
+void BasicTrace<Policy>::record_resource_sample(const epoch_t &time,
+                                                num_nodes_t allocated) {
   resolve_resource_history_capacity();
   if (m_ctx.m_resource_history.full()) {
     // Every entry here is always safe to reclaim (see m_resource_history's
@@ -688,10 +730,11 @@ void Trace::record_resource_sample(const epoch_t &time, num_nodes_t allocated) {
     // in one batch, rather than reclaiming one at a time.
     flush_resource_history();
   }
-  m_ctx.m_resource_history.push_back(std::make_pair(time, allocated));
+  m_ctx.m_resource_history.push_back(this->sample(time, allocated));
 }
 
-Job_Record &Trace::job_at(job_no_t job_no) {
+template <typename Policy>
+Job_Record &BasicTrace<Policy>::job_at(job_no_t job_no) {
   if (job_no < m_num_reclaimed) {
     throw std::runtime_error(
         "Trace::job_at(): job_no=" + std::to_string(job_no) +
@@ -708,11 +751,13 @@ Job_Record &Trace::job_at(job_no_t job_no) {
   return m_data[idx];
 }
 
-const Job_Record &Trace::job_at(job_no_t job_no) const {
-  return const_cast<Trace *>(this)->job_at(job_no);
+template <typename Policy>
+const Job_Record &BasicTrace<Policy>::job_at(job_no_t job_no) const {
+  return const_cast<BasicTrace<Policy> *>(this)->job_at(job_no);
 }
 
-bool Trace::is_front_reclaimable(sim_time_t current_time) const {
+template <typename Policy>
+bool BasicTrace<Policy>::is_front_reclaimable(sim_time_t current_time) const {
   if (m_data.empty()) {
     return false;
   }
@@ -726,8 +771,10 @@ bool Trace::is_front_reclaimable(sim_time_t current_time) const {
   return convert_epoch<sim_time_t>(job.get_end_time()) <= current_time;
 }
 
-void Trace::reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free,
-                               bool handle_overflow) {
+template <typename Policy>
+void BasicTrace<Policy>::reclaim_front_jobs(sim_time_t current_time,
+                                            num_jobs_t min_free,
+                                            bool handle_overflow) {
   // Lazy reclaim: only when actually needed, not proactively the
   // moment a job finishes. Same "only when short of min_free" gating
   // as resource-history's record_resource_sample(); without it, every
@@ -779,7 +826,8 @@ void Trace::reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free,
   }
 }
 
-void Trace::write_job_line(const Job_Record &job) {
+template <typename Policy>
+void BasicTrace<Policy>::write_job_line(const Job_Record &job) {
   if (!job.is_scheduled()) {
     // Rejected-at-submit-time or otherwise never-run: excluded from
     // both the output file and every running stat below - same
@@ -820,7 +868,9 @@ void Trace::write_job_line(const Job_Record &job) {
   m_simulated_trace_ofs << line;
 }
 
-void Trace::start_simulated_trace(const std::string &filename, bool msec) {
+template <typename Policy>
+void BasicTrace<Policy>::start_simulated_trace(const std::string &filename,
+                                               bool msec) {
   if (filename.empty()) {
     return;
   }
@@ -848,7 +898,9 @@ void Trace::start_simulated_trace(const std::string &filename, bool msec) {
   m_simulated_trace_ofs << header;
 }
 
-void Trace::write_simulated_trace(const std::string &filename, bool msec) {
+template <typename Policy>
+void BasicTrace<Policy>::write_simulated_trace(const std::string &filename,
+                                               bool msec) {
   if (filename.empty()) {
     return;
   }
@@ -865,8 +917,10 @@ void Trace::write_simulated_trace(const std::string &filename, bool msec) {
   m_simulated_trace_ofs.close();
 }
 
-void Trace::write_resource_trace(const std::string &filename,
-                                 num_nodes_t total_nodes, bool msec) {
+template <typename Policy>
+void BasicTrace<Policy>::write_resource_trace(const std::string &filename,
+                                              num_nodes_t total_nodes,
+                                              bool msec) {
   if (filename.empty()) {
     return;
   }
@@ -883,12 +937,14 @@ void Trace::write_resource_trace(const std::string &filename,
   m_resource_trace_ofs.close();
 }
 
-std::ostream &Trace::print(std::ostream &os) const {
+template <typename Policy>
+std::ostream &BasicTrace<Policy>::print(std::ostream &os) const {
   dr_evt::print(os, m_data);
   return os;
 }
 
-std::ostream &Trace::print_span(std::ostream &os) const {
+template <typename Policy>
+std::ostream &BasicTrace<Policy>::print_span(std::ostream &os) const {
   if (m_data.empty()) {
     return os;
   }
@@ -922,7 +978,8 @@ std::ostream &Trace::print_span(std::ostream &os) const {
 }
 
 #if MARK_DAT_PERIOD
-std::ostream &Trace::print_DAT(std::ostream &os) {
+template <typename Policy>
+std::ostream &BasicTrace<Policy>::print_DAT(std::ostream &os) {
   for (const auto &dat : m_reserved) {
     os << "DAT: started at " + dr_evt::to_string(dat.first) + " until " +
               dr_evt::to_string(dat.second)
@@ -931,5 +988,8 @@ std::ostream &Trace::print_DAT(std::ostream &os) {
   return os;
 }
 #endif
+
+template class BasicTrace<Standard_Trace_Policy>;
+template class BasicTrace<Pcon_Trace_Policy>;
 
 } // end of namespace dr_evt

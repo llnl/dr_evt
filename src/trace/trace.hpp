@@ -25,6 +25,7 @@
 #include "trace/data_columns.hpp"
 #include "trace/dr_event.hpp"
 #include "trace/job_record.hpp"
+#include "trace/trace_policy.hpp"
 
 namespace dr_evt {
 /** \addtogroup dr_evt_trace
@@ -47,7 +48,7 @@ struct Job_Append_Request {
 };
 
 /** @brief Job store, event queue, and output-trace state for one workload. */
-class Trace {
+template <typename Policy> class BasicTrace : private Policy {
 public:
   /// Circular buffer, front-only reclaim: a job's slot becomes reusable
   /// once safe (see is_front_reclaimable()), same shape as
@@ -67,7 +68,9 @@ public:
   /// inserted once loading finishes), so the buffer stops being full()
   /// after the very first reclaim.
   /// Reclaimable circular store of loaded and streamed job records.
-  using trace_data_t = boost::circular_buffer<Job_Record>;
+  using policy_type = Policy;
+  using trace_data_t = typename Policy::job_store_type;
+  using resource_sample_t = typename Policy::resource_sample_type;
   /// Time intervals reserved for non-batch work when enabled.
   using reserved_t = std::vector<period_t>;
 
@@ -158,7 +161,7 @@ public:
     /// lazily (see Trace::start_resource_trace()) since the natural
     /// default depends on the job trace's size, known only once
     /// loaded, not at Context's own construction time.
-    boost::circular_buffer<std::pair<epoch_t, num_nodes_t>> m_resource_history;
+    boost::circular_buffer<resource_sample_t> m_resource_history;
 
     /** @brief Construct an empty trace-processing context. */
     Context();
@@ -204,17 +207,17 @@ protected:
 public:
   /** @brief Construct a trace using the default input format. @param[in] fname
    * Input path. */
-  Trace(const std::string &fname);
+  BasicTrace(const std::string &fname);
   /** @brief Construct a trace with an explicit input format.
    * @param[in] fname Input path. @param[in] format Trace format name. */
-  Trace(const std::string &fname, const std::string &format);
+  BasicTrace(const std::string &fname, const std::string &format);
   /** @brief Construct a trace with explicit input and timestamp formats.
    * @param[in] fname Input path.
    * @param[in] format Trace format name.
    * @param[in] timestamp_format Timestamp encoding name.
    * @param[in] timezone Default timezone for timestamps without offsets. */
-  Trace(const std::string &fname, const std::string &format,
-        const std::string &timestamp_format, const std::string &timezone);
+  BasicTrace(const std::string &fname, const std::string &format,
+             const std::string &timestamp_format, const std::string &timezone);
 
   /// @brief Allow access to the header information and column filter.
   /// @return Read-only reference to the Data_Columns mapping.
@@ -782,6 +785,14 @@ protected:
   /// @param[in] job Record to write and include in running statistics.
   void write_job_line(const Job_Record &job);
 };
+
+/// Experimental trace carrying Pcon values in both job and resource records.
+using PconTrace = BasicTrace<Pcon_Trace_Policy>;
+/// Normal build: existing compact record layouts and behavior are unchanged.
+using Trace = BasicTrace<Standard_Trace_Policy>;
+
+extern template class BasicTrace<Standard_Trace_Policy>;
+extern template class BasicTrace<Pcon_Trace_Policy>;
 
 /**@}*/
 } // end of namespace dr_evt

@@ -22,14 +22,10 @@ namespace dr_evt {
  */
 class SJFScheduler : public SchedulerBase {
 public:
-  /** @brief Construct a shortest-job-first scheduler over an existing trace.
+  /** @brief Construct a shortest-job-first scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] job_data Trace owning every identifier later enqueued.
-   * @param[in] backfill_policy Rule governing lower-priority candidates.
-   * @details @p job_data is retained by non-owning pointer and must outlive
-   * this scheduler. */
-  SJFScheduler(num_nodes_t total_nodes, const Trace &job_data,
-               BackfillPolicy backfill_policy);
+   * @param[in] backfill_policy Rule governing lower-priority candidates. */
+  SJFScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy);
 
   /** @brief Add an existing trace job to the duration-ordered wait queue.
    * @param[in] job_id Stable Trace identifier.
@@ -40,10 +36,9 @@ public:
                   num_nodes_t nodes) override;
 
   /** @copydoc SchedulerBase::schedule */
-  std::vector<job_no_t>
-  schedule(num_nodes_t free_nodes,
-           const std::map<job_no_t, sim_time_t> &running_jobs,
-           sim_time_t current_time) override;
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
 
   /** @copydoc SchedulerBase::sync_to */
   void sync_to(sim_time_t current_time) override {

@@ -42,13 +42,13 @@ class SchedulerBase;
  * Main simulation class that orchestrates job scheduling simulation
  * with backfilling using discrete event simulation
  */
-class Simulation {
+template <typename TraceType> class BasicSimulation {
 protected:
   /// Simulation parameters
   const Sim_Params &m_params;
 
   /// Job trace data
-  Trace m_trace;
+  TraceType m_trace;
 
   /// Job scheduler (polymorphic - FCFS/SJF/LJF)
   std::unique_ptr<SchedulerBase> m_scheduler;
@@ -70,7 +70,7 @@ protected:
   // queue)
 
   /// Running jobs for streaming mode (job_idx -> start_time)
-  std::map<job_no_t, sim_time_t> m_running_jobs;
+  running_jobs_t m_running_jobs;
 
   /// Queue length statistics for performance analysis
   mutable size_t m_queue_length_sum;
@@ -84,7 +84,7 @@ public:
    * @brief Construct a simulation from immutable configuration.
    * @param[in] params Immutable simulation configuration.
    */
-  Simulation(const Sim_Params &params);
+  BasicSimulation(const Sim_Params &params);
 
   /**
    * @brief Run a complete batch simulation for the configured trace.
@@ -238,10 +238,10 @@ public:
    * @brief Get mutable trace data for streaming-mode access.
    * @return Mutable reference to the simulation Trace.
    */
-  Trace &get_trace() { return m_trace; }
+  TraceType &get_trace() { return m_trace; }
   /** @brief Return read-only access to the simulation trace.
    * @return Read-only reference to the simulation Trace. */
-  const Trace &get_trace() const { return m_trace; }
+  const TraceType &get_trace() const { return m_trace; }
 
   // ========================================================================
   // Monitoring and Statistics API for Python/External Tools
@@ -494,6 +494,12 @@ protected:
   tdiff_t sample_run_time(tdiff_t time_limit, DistributionType dist,
                           double scale, double stddev);
 };
+
+using Simulation = BasicSimulation<Trace>;
+using PconSimulation = BasicSimulation<PconTrace>;
+
+extern template class BasicSimulation<Trace>;
+extern template class BasicSimulation<PconTrace>;
 
 /**@}*/
 } // end of namespace dr_evt
