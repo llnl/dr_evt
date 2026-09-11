@@ -24,18 +24,19 @@
 
 namespace dr_evt {
 
-Simulation::Simulation(const Sim_Params &params)
+template <typename TraceType>
+BasicSimulation<TraceType>::BasicSimulation(const Sim_Params &params)
     : m_params(params), m_trace(params.m_infile, params.m_trace_format,
                                 params.m_timestamp_format, params.m_timezone),
       m_scheduler(create_scheduler(
-          params.m_total_nodes, m_trace, params.m_backfill_policy,
+          params.m_total_nodes, m_trace.data().size(), params.m_backfill_policy,
           params.m_priority_policy, params.m_queue_impl, params.m_block_size,
           params.m_wait_queue_capacity, params.m_wait_queue_overflow)),
       m_current_time(0.0), m_jobs_completed(0), m_jobs_submitted(0),
       m_rng(params.m_seed), m_queue_length_sum(0), m_queue_length_samples(0),
       m_queue_length_peak(0) {}
 
-void Simulation::run() {
+template <typename TraceType> void BasicSimulation<TraceType>::run() {
   if (m_params.m_verbose) {
     std::cout << "Starting simulation..." << std::endl;
   }
@@ -128,7 +129,8 @@ void Simulation::run() {
   }
 }
 
-void Simulation::print_stats(std::ostream &os) const {
+template <typename TraceType>
+void BasicSimulation<TraceType>::print_stats(std::ostream &os) const {
   os << "=== Simulation Statistics ===" << std::endl;
   os << "Total jobs: " << (m_trace.data().size() + m_trace.num_reclaimed())
      << std::endl;
@@ -177,7 +179,8 @@ void Simulation::print_stats(std::ostream &os) const {
   }
 }
 
-num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs) {
+template <typename TraceType>
+num_jobs_t BasicSimulation<TraceType>::initialize_trace(num_jobs_t max_jobs) {
   // Clear any previously-loaded data first, so this method is safe to
   // call more than once (directly, or via run() after an earlier
   // explicit call - run() calls this internally too). Without this,
@@ -217,7 +220,8 @@ num_jobs_t Simulation::initialize_trace(num_jobs_t max_jobs) {
   return static_cast<num_jobs_t>(m_trace.data().size());
 }
 
-void Simulation::determine_one_job_run_time(Job_Record &job) {
+template <typename TraceType>
+void BasicSimulation<TraceType>::determine_one_job_run_time(Job_Record &job) {
   // Scheduler uses time_limit as the best estimator for planning (realistic
   // mode). run_time_mode controls how the job's actual execution length is
   // determined.
@@ -246,19 +250,23 @@ void Simulation::determine_one_job_run_time(Job_Record &job) {
   }
 }
 
-void Simulation::determine_job_run_time() {
+template <typename TraceType>
+void BasicSimulation<TraceType>::determine_job_run_time() {
   for (auto &job : m_trace.data()) {
     determine_one_job_run_time(job);
   }
 }
 
-void Simulation::determine_job_run_time(const std::vector<job_no_t> &job_nos) {
+template <typename TraceType>
+void BasicSimulation<TraceType>::determine_job_run_time(
+    const std::vector<job_no_t> &job_nos) {
   for (job_no_t job_no : job_nos) {
     determine_one_job_run_time(m_trace.job_at(job_no));
   }
 }
 
-void Simulation::run_progressive() {
+template <typename TraceType>
+void BasicSimulation<TraceType>::run_progressive() {
   // Minimal reset, equivalent to initialize_trace()'s own tail - no
   // load_data() call here, since there's no single file to load
   // upfront; each file gets loaded as the driving loop below reaches it.
@@ -330,8 +338,11 @@ void Simulation::run_progressive() {
   advance_to(std::numeric_limits<sim_time_t>::max());
 }
 
-tdiff_t Simulation::sample_run_time(tdiff_t time_limit, DistributionType dist,
-                                    double scale, double stddev) {
+template <typename TraceType>
+tdiff_t BasicSimulation<TraceType>::sample_run_time(tdiff_t time_limit,
+                                                    DistributionType dist,
+                                                    double scale,
+                                                    double stddev) {
   if (time_limit <= 0.0) {
     return 0.0;
   }
@@ -376,7 +387,8 @@ tdiff_t Simulation::sample_run_time(tdiff_t time_limit, DistributionType dist,
   }
 }
 
-void Simulation::write_simulated_trace() {
+template <typename TraceType>
+void BasicSimulation<TraceType>::write_simulated_trace() {
   m_trace.write_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
   if (m_params.m_verbose && !m_params.get_outfile().empty()) {
     std::cout << "Simulated trace written to: " << m_params.get_outfile()
@@ -384,7 +396,9 @@ void Simulation::write_simulated_trace() {
   }
 }
 
-void Simulation::write_resource_trace(const std::string &filename) {
+template <typename TraceType>
+void BasicSimulation<TraceType>::write_resource_trace(
+    const std::string &filename) {
   if (filename.empty()) {
     return;
   }
@@ -403,8 +417,11 @@ void Simulation::write_resource_trace(const std::string &filename) {
 // Public API methods for online/streaming simulation mode
 // Allow external code (e.g., gRPC server) to feed jobs and control simulation
 
-job_no_t Simulation::append_job(sim_time_t submit_time, num_nodes_t num_nodes,
-                                const std::string &queue, tdiff_t limit_time) {
+template <typename TraceType>
+job_no_t BasicSimulation<TraceType>::append_job(sim_time_t submit_time,
+                                                num_nodes_t num_nodes,
+                                                const std::string &queue,
+                                                tdiff_t limit_time) {
   if (submit_time < m_current_time) {
     throw std::runtime_error(
         "Cannot append job with submit_time < current_time. "
@@ -430,8 +447,9 @@ job_no_t Simulation::append_job(sim_time_t submit_time, num_nodes_t num_nodes,
   return job_idx;
 }
 
-std::vector<job_no_t>
-Simulation::append_jobs(const std::vector<Job_Append_Request> &requests) {
+template <typename TraceType>
+std::vector<job_no_t> BasicSimulation<TraceType>::append_jobs(
+    const std::vector<Job_Append_Request> &requests) {
   // Validate every request's submit_time before appending any of them
   // - same precondition append_job() enforces per-job, checked here
   // for the whole batch up front (see this function's own doc
@@ -471,7 +489,9 @@ Simulation::append_jobs(const std::vector<Job_Append_Request> &requests) {
   return job_idxs;
 }
 
-void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time) {
+template <typename TraceType>
+void BasicSimulation<TraceType>::submit_job(job_no_t job_idx,
+                                            sim_time_t submit_time) {
   // Validate preconditions
   if (submit_time < m_current_time) {
     throw std::runtime_error(
@@ -531,7 +551,8 @@ void Simulation::submit_job(job_no_t job_idx, sim_time_t submit_time) {
   m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);
 }
 
-void Simulation::advance_to(sim_time_t target_time) {
+template <typename TraceType>
+void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
   // Validate precondition
   if (target_time < m_current_time) {
     throw std::runtime_error(
@@ -559,7 +580,10 @@ void Simulation::advance_to(sim_time_t target_time) {
       // multiple)
       for (job_no_t job : jobs_to_run) {
         m_trace.insert_job(job, m_current_time);
-        m_running_jobs[job] = m_current_time;
+        const auto &record = m_trace.job_at(job);
+        m_running_jobs[job] = {m_current_time,
+                               static_cast<tdiff_t>(record.get_limit_time()),
+                               record.get_num_nodes()};
         m_jobs_submitted++;
 
         // Records a resource-history sample internally (Trace's own
@@ -695,7 +719,10 @@ void Simulation::advance_to(sim_time_t target_time) {
         // multiple)
         for (job_no_t job : jobs_to_run) {
           m_trace.insert_job(job, m_current_time);
-          m_running_jobs[job] = m_current_time;
+          const auto &record = m_trace.job_at(job);
+          m_running_jobs[job] = {m_current_time,
+                                 static_cast<tdiff_t>(record.get_limit_time()),
+                                 record.get_num_nodes()};
           m_jobs_submitted++;
 
           // Process this START event - records a resource-history
@@ -751,11 +778,14 @@ void Simulation::advance_to(sim_time_t target_time) {
   m_current_time = target_time;
 }
 
-num_nodes_t Simulation::get_nodes_in_use() const {
+template <typename TraceType>
+num_nodes_t BasicSimulation<TraceType>::get_nodes_in_use() const {
   return m_trace.get_nodes_in_use();
 }
 
-Simulation::Backfill_Window Simulation::get_backfill_window() const {
+template <typename TraceType>
+typename BasicSimulation<TraceType>::Backfill_Window
+BasicSimulation<TraceType>::get_backfill_window() const {
   Backfill_Window window{
       m_current_time, get_available_nodes(), get_fcfs_head_shadow_time(), {}};
 
@@ -768,11 +798,11 @@ Simulation::Backfill_Window Simulation::get_backfill_window() const {
   // m_running_jobs stores the actual start time. The scheduler reserves
   // against each job's limit time, so this deliberately does the same.
   std::map<sim_time_t, num_nodes_t> releases_by_time;
-  for (const auto &[job_idx, start_time] : m_running_jobs) {
-    const auto &job = m_trace.job_at(job_idx);
-    const sim_time_t end_time = start_time + job.get_limit_time();
+  for (const auto &[job_idx, job] : m_running_jobs) {
+    (void)job_idx;
+    const sim_time_t end_time = job.start_time + job.run_time;
     if (end_time > m_current_time && end_time <= window.shadow_time) {
-      releases_by_time[end_time] += job.get_num_nodes();
+      releases_by_time[end_time] += job.nodes;
     }
   }
 
@@ -783,7 +813,9 @@ Simulation::Backfill_Window Simulation::get_backfill_window() const {
   return window;
 }
 
-Simulation::Statistics Simulation::get_statistics() const {
+template <typename TraceType>
+typename BasicSimulation<TraceType>::Statistics
+BasicSimulation<TraceType>::get_statistics() const {
   Statistics stats;
 
   // Basic counters
@@ -844,5 +876,8 @@ Simulation::Statistics Simulation::get_statistics() const {
 
   return stats;
 }
+
+template class BasicSimulation<Trace>;
+template class BasicSimulation<PconTrace>;
 
 } // namespace dr_evt

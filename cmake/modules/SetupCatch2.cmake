@@ -1,34 +1,48 @@
-# Download the Catch2 library which consists of a single header file only.
-# Set up the variables CATCH2_INCLUDE_DIR and CATCH2_HEADER.
-# Create a target for download step CATCH2
+# Catch2 v2 is required by the existing unit tests, which use
+# <catch2/catch.hpp> and CATCH_CONFIG_MAIN.
 
-set(DR_EVT_HAS_CATCH2 TRUE)
-set(CATCH2_SOURCE_DIR ${CMAKE_SOURCE_DIR}/external/Catch2)
-set(CATCH2_HEADER catch.hpp)
+# Prefer an existing Catch2 v2 installation when available.
+find_path(
+  CATCH2_INCLUDE_DIR
+  NAMES catch2/catch.hpp
+  HINTS
+    $ENV{CATCH2_ROOT}
+    ${CATCH2_ROOT}
+    ${CMAKE_INSTALL_PREFIX}
+  PATH_SUFFIXES
+    include
+    single_include
+)
 
-find_file(CATCH2 ${CATCH2_HEADER}
-          HINTS ${CATCH2_SOURCE_DIR}
-                $ENV{CATCH2_ROOT} ${CATCH2_ROOT}
-          PATH_SUFFIXES single_include/catch2)
+if (CATCH2_INCLUDE_DIR)
+  message(STATUS "Found Catch2 v2 headers: ${CATCH2_INCLUDE_DIR}")
+else()
+  message(STATUS "Catch2 v2 not found; fetching Catch2 v2.13.10")
 
-if (CATCH2)
-  message(STATUS "Found Catch2: ${CATCH2}")
-  add_custom_target(CATCH2)
-  get_filename_component(CATCH2_DIR ${CATCH2} DIRECTORY)
-  get_filename_component(CATCH2_INCLUDE_DIR ${CATCH2_DIR} DIRECTORY CACHE)
-else ()
-  message(STATUS "Catch2 will be downloaded")
-  ExternalProject_Add(CATCH2
+  include(FetchContent)
+
+  FetchContent_Declare(
+    Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    SOURCE_DIR ${CATCH2_SOURCE_DIR}
-    LOG_DOWNLOAD ON
-    CMAKE_ARGS -DCATCH_BUILD_TESTING:BOOL=OFF -DCATCH_INSTALL_DOCS:BOOL=OFF
-               -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}/catch2
-               -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-               -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
-               -UCATCH_CONFIG_CPP17_BYTE
+    GIT_TAG v2.13.10
+    GIT_SHALLOW TRUE
   )
 
-  set(CATCH2_INCLUDE_DIR ${CATCH2_SOURCE_DIR}/single_include)
-  set(CATCH2_CONTRIB_DIR ${CATCH2_SOURCE_DIR}/contrib)
-endif ()
+  FetchContent_GetProperties(Catch2)
+  if (NOT catch2_POPULATED)
+    FetchContent_Populate(Catch2)
+  endif()
+
+  set(CATCH2_INCLUDE_DIR
+      "${catch2_SOURCE_DIR}/single_include"
+      CACHE PATH "Catch2 include directory"
+      FORCE)
+endif()
+
+if (NOT EXISTS "${CATCH2_INCLUDE_DIR}/catch2/catch.hpp")
+  message(FATAL_ERROR
+    "Catch2 v2 header not found at "
+    "${CATCH2_INCLUDE_DIR}/catch2/catch.hpp")
+endif()
+
+set(DR_EVT_HAS_CATCH2 TRUE)

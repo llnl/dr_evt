@@ -7,29 +7,33 @@ This directory contains GitHub Actions workflows for automated testing.
 ### 1. `tests.yml` - Full Test Suite
 
 **Triggers:**
-- Push to `main`, `develop`, or `feature/*` branches
+- Push to `main` or `develop` branches
 - Pull requests to `main` or `develop`
 - Manual trigger via GitHub UI
 
 **What it runs:**
-- Comprehensive tests (34) - `tests/run_scheduler_correctness_tests.sh`
-- Unit tests (7, 2 known-broken - see `tests/README.md`)
-- Feature tests (3)
-- Replay tests (3)
-- Config tests (4, skipped without `-DDR_EVT_ENABLE_PROTOBUF=ON`)
-- Python API tests (16, requires `-DDR_EVT_BUILD_PYTHON=ON` - not verified
-  as part of this documentation pass, since that build option wasn't set
-  up in the environment used to check these workflows)
-- Streaming API tests (4, requires building the `test_streaming_api`
-  target - also not verified as part of this pass)
-- FCFS/EASY backfill-window gRPC test (1, starts a local server and verifies
-  the combined capacity/shadow/release response)
-- Scale tests (7, optional/`continue-on-error`; 4 working, 3 have
-  known-corrupted input data - see `tests/README.md`)
+- Scheduler correctness tests (34) - `tests/run_scheduler_correctness_tests.sh`
+- Queue implementation differential tests
+- Column alias tests (8)
+- Run-time mode tests (7)
+- Unit tests (7)
+- Feature tests (6)
+- Conservative backfilling tests (2)
+- Replay tests (4)
+- Resource-history tests (5)
+- Job-store tests (6)
+- Config tests, including Pcon `trace_type` coverage
+- Python API tests (16)
+- gRPC client/server tests (2)
+- Append-job tests (C++ + gRPC)
+- FCFS/EASY backfill-window gRPC wire test
+- Progressive-loading tests (C++ + CLI)
+- Queue-input schema test
+- Scale tests (7, optional/`continue-on-error`)
 
 **Matrix:**
 - GCC 11
-- Clang 14 (untested as part of this pass - only GCC was verified)
+- Clang 14
 
 **Duration:** ~5-10 minutes
 
@@ -55,20 +59,28 @@ Total tests referenced by the full suite:
 
 | Category | Count | Verified in this doc pass? |
 |----------|-------|------------------------------|
-| Comprehensive | 34 | Yes - 34/34 pass |
-| Unit | 7 | Yes - 5/7 pass, 2 known-broken |
-| Feature | 6 | Yes - 6/6 pass |
-| Replay | 3 | Yes - 3/3 pass |
-| Config | 4 | No - requires protobuf build |
-| Python API | 16 | No - requires Python bindings build |
-| Streaming API | 4 | No - requires building `test_streaming_api` |
-| FCFS/EASY backfill-window gRPC | 1 | Yes - included in `tests.yml` |
-| Scale | 7 | Yes - 4/7 pass, 3 known-corrupted input |
+| Scheduler correctness | 34 | CI runner |
+| Queue implementation differential | 34 fixtures × 4 implementations | CI runner |
+| Column aliases | 8 | CI runner |
+| Run-time mode | 7 | CI runner |
+| Unit | 7 | CI runner |
+| Feature | 6 | CI runner |
+| Conservative | 2 | CI runner |
+| Replay | 4 | CI runner |
+| Resource history | 5 | CI runner |
+| Job store | 6 | CI runner |
+| Config | 9 | CI runner; includes Pcon `trace_type` coverage |
+| Python API | 16 | CI runner |
+| gRPC client/server | 2 | CI runner |
+| Append-job | 18 C++ + gRPC | CI runner |
+| FCFS/EASY backfill-window gRPC | 1 | CI runner |
+| Progressive loading | 11 C++ + 4 CLI | CI runner |
+| Queue input schema | 1 binary | CI runner |
+| Scale | 7 | CI runner; optional/`continue-on-error` |
 
-This table reflects a single manual verification pass, not a
-continuously re-run check - there's no guarantee these numbers stay
-accurate as the code changes. See `tests/README.md` for the underlying
-detail and known limitations.
+The workflow summary in `tests.yml` is the authoritative CI-oriented list.
+See `docs/TESTING_GUIDE.md` for the fuller test catalog and the distinction
+between individual assertions, fixtures, binaries, and runner-level counts.
 
 ## Status Badges
 
@@ -86,14 +98,23 @@ Run the same tests locally before pushing:
 cd build && cmake .. && make -j4
 cd ..
 
-./tests/run_scheduler_correctness_tests.sh       # scheduler_correctness/ (34 tests)
-./tests/run_unit_tests.sh        # unit/ (7 tests, 2 known-broken)
-./tests/run_feature_tests.sh     # feature/ (3 tests)
-./tests/run_replay_tests.sh      # replay methodology (3 tests)
-./tests/run_configs_tests.sh     # config tests (requires protobuf build)
-./tests/run_python_tests.sh      # Python API (requires -DDR_EVT_BUILD_PYTHON=ON)
-./tests/run_streaming_tests.sh   # C++ streaming API (requires test_streaming_api target)
-./tests/run_backfill_window_grpc_test.sh # FCFS/EASY gRPC backfill-window query
+./tests/run_scheduler_correctness_tests.sh
+./tests/run_fcfs_queue_implementation_tests.sh --correctness
+./tests/run_column_alias_tests.sh
+./tests/run_time_mode_tests.sh
+./tests/run_unit_tests.sh
+./tests/run_feature_tests.sh
+./tests/run_easy_vs_conservative_correctness_tests.sh
+./tests/run_replay_tests.sh
+./tests/run_resource_history_tests.sh
+./tests/run_job_store_tests.sh
+./tests/run_configs_tests.sh
+./tests/run_python_tests.sh
+./tests/run_grpc_tests.sh
+./tests/run_append_job_tests.sh
+./tests/run_backfill_window_grpc_test.sh
+./tests/run_progressive_load_tests.sh
+./tests/run_scale_tests.sh
 ```
 
 There is no `run_correctness_tests.sh` in this checkout - an earlier
@@ -104,8 +125,8 @@ runner is `run_scheduler_correctness_tests.sh`.
 
 ### Build Steps
 
-1. Install dependencies (CMake, Boost, Python, compilers)
-2. Configure CMake with Release build
+1. Install dependencies (CMake, Boost, Protobuf/gRPC, MPI, Python, compilers)
+2. Configure a Release build with Python bindings, Protobuf, and gRPC enabled
 3. Build with all CPU cores (`make -j$(nproc)`). You may cap it to -j2
    as defense-in-depth against the gRPC/BoringSSL FetchContent OOM
    issue; see `docs/getting-started/installation.md`)
@@ -140,8 +161,7 @@ When you add a new test:
 
 ### Workflow fails but tests pass locally
 
-- Check compiler version (CI uses GCC 11 / Clang 14 - only GCC has
-  actually been verified as part of the most recent documentation pass)
+- Check compiler version (CI matrix uses GCC 11 and Clang 14)
 - Check Boost version
 - Run with same flags as CI: `-DCMAKE_BUILD_TYPE=Release`
 
@@ -177,9 +197,6 @@ Potential additions:
 - [ ] Multi-platform testing (macOS, Windows)
 - [ ] Memory leak detection (valgrind)
 - [ ] Static analysis (clang-tidy, cppcheck)
-- [ ] Actually verify the Clang build and the Python/Streaming API test
-      steps, none of which were checked as part of the most recent
-      documentation pass
 
 ## References
 

@@ -94,10 +94,14 @@ public:
    * Complexity: O(B × S) where B = blocks scanned, S = jobs scanned per block
    *             Typically B = 1-2, S = 10-50 due to pre-filtering
    */
-  std::optional<job_no_t>
-  find_and_remove_backfill_candidate(num_nodes_t available_nodes,
-                                     sim_time_t current_time,
-                                     sim_time_t reservation_time);
+  std::optional<job_no_t> find_and_remove_backfill_candidate(
+      num_nodes_t available_nodes, sim_time_t current_time,
+      sim_time_t reservation_time, tdiff_t *run_time = nullptr,
+      num_nodes_t *nodes = nullptr);
+
+  /** Return scheduling fields for an active job without removing it. */
+  bool get_job_info(job_no_t job_id, tdiff_t &run_time,
+                    num_nodes_t &nodes) const;
 
   /**
    * @brief Invoke a callable for every active job in FCFS order.
@@ -301,7 +305,7 @@ template <size_t BlockSize>
 std::optional<job_no_t>
 BlockWaitQueue<BlockSize>::find_and_remove_backfill_candidate(
     num_nodes_t available_nodes, sim_time_t current_time,
-    sim_time_t reservation_time) {
+    sim_time_t reservation_time, tdiff_t *run_time, num_nodes_t *nodes) {
   for (auto &block_info : m_blocks) {
     if (block_info.active_count == 0) {
       m_stats.blocks_skipped_empty++;
@@ -334,6 +338,12 @@ BlockWaitQueue<BlockSize>::find_and_remove_backfill_candidate(
       if (current_time + it->run_time_estimate < reservation_time) {
         // Found a candidate! Remove it immediately (we have the iterator!)
         job_no_t found_job = it->job_id;
+        if (run_time != nullptr) {
+          *run_time = it->run_time_estimate;
+        }
+        if (nodes != nullptr) {
+          *nodes = it->nodes_requested;
+        }
         seq.erase(it); // Erase from all 3 indices (not 4!)
         block_info.active_count--;
         m_active_count--;
@@ -343,6 +353,28 @@ BlockWaitQueue<BlockSize>::find_and_remove_backfill_candidate(
   }
 
   return std::nullopt;
+}
+
+template <size_t BlockSize>
+bool BlockWaitQueue<BlockSize>::get_job_info(job_no_t job_id, tdiff_t &run_time,
+                                             num_nodes_t &nodes) const {
+  if (job_id < m_first_job_id) {
+    return false;
+  }
+  constexpr size_t shift = block_size_shift();
+  const size_t block_idx = (job_id - m_first_job_id) >> shift;
+  if (block_idx >= m_blocks.size()) {
+    return false;
+  }
+  const auto &seq = m_blocks[block_idx].block.template get<0>();
+  for (const auto &job : seq) {
+    if (job.job_id == job_id) {
+      run_time = job.run_time_estimate;
+      nodes = job.nodes_requested;
+      return true;
+    }
+  }
+  return false;
 }
 
 template <size_t BlockSize>

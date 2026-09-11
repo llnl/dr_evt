@@ -14,10 +14,10 @@
 
 namespace dr_evt {
 
-LJFScheduler::LJFScheduler(num_nodes_t total_nodes, const Trace &job_data,
+LJFScheduler::LJFScheduler(num_nodes_t total_nodes,
                            BackfillPolicy backfill_policy)
-    : SchedulerBase(total_nodes, job_data, backfill_policy),
-      m_current_tracked_time(0.0) {}
+    : SchedulerBase(total_nodes, backfill_policy), m_current_tracked_time(0.0) {
+}
 
 void LJFScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
                               tdiff_t run_time, num_nodes_t nodes) {
@@ -68,10 +68,9 @@ LJFScheduler::find_fcfs_head() {
   return fcfs_it;
 }
 
-std::vector<job_no_t>
-LJFScheduler::schedule(num_nodes_t free_nodes,
-                       const std::map<job_no_t, sim_time_t> &running_jobs,
-                       sim_time_t current_time) {
+std::vector<job_no_t> LJFScheduler::schedule(num_nodes_t free_nodes,
+                                             const running_jobs_t &running_jobs,
+                                             sim_time_t current_time) {
   // Update eligibility tracking
   update_eligible_jobs(current_time);
 

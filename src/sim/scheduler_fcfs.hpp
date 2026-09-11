@@ -56,15 +56,12 @@ private:
   size_t m_removed_count;
 
 public:
-  /** @brief Construct an FCFS scheduler over an existing trace.
+  /** @brief Construct an FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] job_data Trace owning every identifier later enqueued.
    * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
-   * @details @p job_data is retained by non-owning pointer and must outlive
-   * this scheduler. */
-  FCFSScheduler(num_nodes_t total_nodes, const Trace &job_data,
-                BackfillPolicy bf_policy)
-      : SchedulerBase(total_nodes, job_data, bf_policy), m_eligible_end_idx(0),
+   */
+  FCFSScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy)
+      : SchedulerBase(total_nodes, bf_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0) {}
 
   /** @copydoc SchedulerBase::insert_job */
@@ -84,10 +81,9 @@ public:
   }
 
   /** @copydoc SchedulerBase::schedule */
-  std::vector<job_no_t>
-  schedule(num_nodes_t free_nodes,
-           const std::map<job_no_t, sim_time_t> &running_jobs,
-           sim_time_t current_time) override;
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
 
   /**
    * Advance m_eligible_end_idx to reflect current_time. Idempotent and

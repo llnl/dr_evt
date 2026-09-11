@@ -110,6 +110,7 @@ jobs:
             -DDR_EVT_BUILD_PYTHON=ON \
             -DDR_EVT_ENABLE_PROTOBUF=ON \
             -DDR_EVT_ENABLE_GRPC=ON \
+            -DDR_EVT_WITH_UNIT_TESTING=ON \
             -DPython3_EXECUTABLE=$PYTHON_EXE
 
       - name: Build

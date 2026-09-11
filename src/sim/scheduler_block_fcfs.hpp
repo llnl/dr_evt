@@ -57,15 +57,12 @@ private:
   size_t m_removed_count;
 
 public:
-  /** @brief Construct a block-indexed FCFS scheduler over an existing trace.
+  /** @brief Construct a block-indexed FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] job_data Trace owning every identifier later enqueued.
    * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
-   * @details @p job_data is retained by non-owning pointer and must outlive
-   * this scheduler. */
-  BlockQueueFCFSScheduler(num_nodes_t total_nodes, const Trace &job_data,
-                          BackfillPolicy bf_policy)
-      : SchedulerBase(total_nodes, job_data, bf_policy), m_wait_queue(),
+   */
+  BlockQueueFCFSScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy)
+      : SchedulerBase(total_nodes, bf_policy), m_wait_queue(),
         m_eligible_end_idx(0), m_current_tracked_time(0.0), m_removed_count(0) {
   }
 
@@ -75,10 +72,9 @@ public:
                   num_nodes_t nodes_requested) override;
 
   /** @copydoc SchedulerBase::schedule */
-  std::vector<job_no_t>
-  schedule(num_nodes_t free_nodes,
-           const std::map<job_no_t, sim_time_t> &running_jobs,
-           sim_time_t current_time) override;
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
 
   /** @copydoc SchedulerBase::sync_to */
   void sync_to(sim_time_t current_time) override;

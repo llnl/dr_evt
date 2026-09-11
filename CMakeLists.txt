@@ -373,10 +373,8 @@ if (DR_EVT_HAS_CEREAL)
 endif (DR_EVT_HAS_CEREAL)
 
 if (DR_EVT_WITH_UNIT_TESTING)
-  add_dependencies(dr_evt CATCH2)
   target_include_directories(dr_evt PUBLIC
-    $<BUILD_INTERFACE:${CATCH2_INCLUDE_DIR}>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/catch2>)
+    $<BUILD_INTERFACE:${CATCH2_INCLUDE_DIR}>)
 endif (DR_EVT_WITH_UNIT_TESTING)
 
 if (DR_EVT_HAS_PROTOBUF)
@@ -567,6 +565,32 @@ set_target_properties(test_append_job_api-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_append_job_api-bin)
+
+# Compile-time policy test: verifies inline Pcon job fields and the expanded
+# resource-history output without changing the standard record layouts.
+add_executable(test_pcon_trace-bin tests/test_pcon_trace.cpp)
+target_include_directories(test_pcon_trace-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(test_pcon_trace-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_pcon_trace-bin PROPERTIES OUTPUT_NAME test_pcon_trace)
+set_target_properties(test_pcon_trace-bin PROPERTIES CMAKE_INSTALL_RPATH
+                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_pcon_trace-bin)
+
+if (DR_EVT_WITH_UNIT_TESTING)
+  add_test(
+    NAME test_trace_type_cli
+    COMMAND ${CMAKE_COMMAND}
+      -DSIMULATOR=$<TARGET_FILE:sim-bin>
+      -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/data/pcon_cli_input.csv
+      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_trace_type_cli.cmake)
+  add_test(
+    NAME test_pcon_trace
+    COMMAND $<TARGET_FILE:test_pcon_trace-bin>)
+endif()
 
 # Progressive/multi-file loading test (--infile_list) - see
 # tests/test_progressive_load.cpp

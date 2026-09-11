@@ -10,6 +10,7 @@ set_full_path(THIS_DIR_HEADERS
     job_stat_texec.hpp
     parse_utils.hpp
     trace.hpp
+    trace_policy.hpp
 )
 
 set_full_path(THIS_DIR_SOURCES
@@ -21,6 +22,7 @@ set_full_path(THIS_DIR_SOURCES
     job_stat_submit.cpp
     parse_utils.cpp
     trace.cpp
+    trace_policy.cpp
 )
 
 # Propagate the files up the tree

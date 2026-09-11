@@ -1,57 +1,157 @@
-BOOST_DIR = /usr/tce/packages/boost/boost-1.69.0-mvapich2-2.3-gcc-8.1.0
-PROTO_DIR = ../../../install
+UNAME_S := $(shell uname -s)
 
-BOOST_INC_DIR = $(BOOST_DIR)/include
-BOOST_LIB_DIR = $(BOOST_DIR)/lib
+PROTOC := $(shell command -v protoc 2>/dev/null)
 
-PROTO_INC_DIR = $(PROTO_DIR)/include
-PROTO_LIB_DIR = $(PROTO_DIR)/lib64
-PROTOC = $(PROTO_DIR)/bin/protoc
-
-CXXFLAGS = -Wall -std=c++17 -m64 -I../.. -I$(BOOST_INC_DIR) -I$(PROTO_INC_DIR)
-
-ifndef PROTO_DIR
-  $(error Set PROTO_DIR variable to the path of the protocol buffer installation)
+ifeq ($(strip $(PROTOC)),)
+  PROTOC := $(CMAKE_INSTALL_PREFIX)/bin/protoc
 endif
 
-# In case of using clang, pick the right std library that is compatible with
-# the one used in building the protocol buffer
-
-ifeq ($(CXX), clang++)
-    #STDLIB = --stdlib=libc++
-    STDLIB = --gcc-toolchain=/usr/tce/packages/gcc/gcc-8.1.0
+ifeq ($(wildcard $(PROTOC)),)
+  $(error protoc not found in PATH or $(CMAKE_INSTALL_PREFIX)/bin)
 endif
 
-LDFLAGS = $(STDLIB) -m64 -Wl,-rpath=$(BOOST_LIB_DIR),--no-undefined -L$(BOOST_LIB_DIR) -lboost_program_options -Wl,-rpath=$(PROTO_LIB_DIR),--no-undefined -L$(PROTO_LIB_DIR) -lprotobuf
+PROTO_DIR := $(abspath $(dir $(PROTOC))/..)
 
-all: $(PROTOC) dr_evt_proto_progopt_test
+# Make pkg-config search the same Protobuf installation as protoc.
+PKG_CONFIG_PATH := $(PROTO_DIR)/lib64/pkgconfig:$(PROTO_DIR)/lib/pkgconfig:$(PKG_CONFIG_PATH)
+export PKG_CONFIG_PATH
 
-$(PROTOC):
-	@echo "Checking if '$(PROTOC)' exists ..."
-	@test -x $(PROTOC) || { echo "'$(PROTOC)' does not exist!"; echo "Set PROTO_DIR to a correct path."; }
-	@exit 1
+PROTO_CFLAGS := $(shell pkg-config --cflags protobuf 2>/dev/null)
+PROTO_LIBS := $(shell pkg-config --libs protobuf 2>/dev/null)
 
-dr_evt_params.pb.cc: $(PROTOC) ../dr_evt_params.proto
+ifeq ($(strip $(PROTO_LIBS)),)
+  $(error pkg-config could not find protobuf under $(PROTO_DIR))
+endif
+
+# BOOST_DIR may be supplied explicitly:
+#   make BOOST_DIR=/path/to/boost
+#
+# Alternatively, honor standard Boost discovery variables if they are
+# already present in the environment or passed to make:
+#   BOOST_ROOT=/path/to/boost
+#   Boost_DIR=/path/to/boost/lib/cmake/Boost-X.Y.Z
+BOOST_DIR ?=
+
+# 1. Prefer an explicitly supplied BOOST_DIR.
+ifeq ($(strip $(BOOST_DIR)),)
+  # 2. Otherwise honor BOOST_ROOT.
+  ifneq ($(strip $(BOOST_ROOT)),)
+    BOOST_DIR := $(BOOST_ROOT)
+  endif
+endif
+
+# 3. Otherwise derive the Boost installation prefix from Boost_DIR.
+# Typical Boost_DIR:
+#   /prefix/lib/cmake/Boost-X.Y.Z
+# so ../../.. resolves to /prefix.
+ifeq ($(strip $(BOOST_DIR)),)
+  ifneq ($(strip $(Boost_DIR)),)
+    BOOST_DIR := $(abspath $(Boost_DIR)/../../..)
+  endif
+endif
+
+# 4. Otherwise try CMAKE_INSTALL_PREFIX.
+ifeq ($(strip $(BOOST_DIR)),)
+  ifneq ($(wildcard $(CMAKE_INSTALL_PREFIX)/include/boost/program_options.hpp),)
+    ifneq ($(strip $(wildcard \
+        $(CMAKE_INSTALL_PREFIX)/lib/libboost_program_options* \
+        $(CMAKE_INSTALL_PREFIX)/lib64/libboost_program_options*)),)
+      BOOST_DIR := $(CMAKE_INSTALL_PREFIX)
+    endif
+  endif
+endif
+
+# 5. On macOS only, try Homebrew.
+ifeq ($(strip $(BOOST_DIR)),)
+  ifeq ($(UNAME_S),Darwin)
+    BREW_BOOST_DIR := $(shell brew --prefix boost 2>/dev/null)
+
+    ifneq ($(wildcard $(BREW_BOOST_DIR)/include/boost/program_options.hpp),)
+      ifneq ($(strip $(wildcard \
+          $(BREW_BOOST_DIR)/lib/libboost_program_options* \
+          $(BREW_BOOST_DIR)/lib64/libboost_program_options*)),)
+        BOOST_DIR := $(BREW_BOOST_DIR)
+      endif
+    endif
+  endif
+endif
+
+# Validate the resolved Boost prefix.
+ifeq ($(strip $(BOOST_DIR)),)
+  $(error Boost program_options not found. Set BOOST_DIR, BOOST_ROOT, or Boost_DIR; CMAKE_INSTALL_PREFIX only contains Boost when DR_EVT built Boost via FetchContent)
+endif
+
+ifeq ($(wildcard $(BOOST_DIR)/include/boost/program_options.hpp),)
+  $(error Boost header boost/program_options.hpp not found under BOOST_DIR=$(BOOST_DIR))
+endif
+
+ifeq ($(strip $(wildcard \
+    $(BOOST_DIR)/lib/libboost_program_options* \
+    $(BOOST_DIR)/lib64/libboost_program_options*)),)
+  $(error libboost_program_options not found under BOOST_DIR=$(BOOST_DIR))
+endif
+
+BOOST_INC_DIR := $(BOOST_DIR)/include
+
+ifneq ($(wildcard $(BOOST_DIR)/lib64/libboost_program_options*),)
+  BOOST_LIB_DIR := $(BOOST_DIR)/lib64
+else
+  BOOST_LIB_DIR := $(BOOST_DIR)/lib
+endif
+
+BOOST_CFLAGS := -I$(BOOST_INC_DIR)
+BOOST_LIBS := -L$(BOOST_LIB_DIR) -lboost_program_options
+
+CXXFLAGS = -Wall -std=c++17 -m64 \
+           -I../.. \
+           $(BOOST_CFLAGS) \
+           $(PROTO_CFLAGS) \
+           -I$(CMAKE_INSTALL_PREFIX)/include
+
+LDFLAGS = -m64 $(BOOST_LIBS) $(PROTO_LIBS)
+
+all: dr_evt_proto_progopt_test
+
+dr_evt_params.pb.cc: ../dr_evt_params.proto
 	$(PROTOC) --proto_path=.. --cpp_out=. dr_evt_params.proto
 
 dr_evt_params.pb.o: dr_evt_params.pb.cc
-	$(CXX) $(CXXFLAGS) $(STDLIB) -c dr_evt_params.pb.cc -o dr_evt_params.pb.o
-
-dr_evt_proto_progopt_test: dr_evt_proto_progopt_test.cpp dr_evt_params.pb.o dr_evt_params.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o dr_evt_proto_progopt_test dr_evt_proto_progopt_test.cpp dr_evt_params.pb.o dr_evt_params.o
+	$(CXX) $(CXXFLAGS) \
+	    -c dr_evt_params.pb.cc \
+	    -o dr_evt_params.pb.o
 
 dr_evt_params.o: ../../params/dr_evt_params.cpp ../../params/dr_evt_params.hpp
-	$(CXX) $(CXXFLAGS) -c ../../params/dr_evt_params.cpp
+	$(CXX) $(CXXFLAGS) \
+	    -c ../../params/dr_evt_params.cpp \
+	    -o dr_evt_params.o
+
+dr_evt_proto_progopt_test: \
+	    dr_evt_proto_progopt_test.cpp \
+	    dr_evt_params.pb.o \
+	    dr_evt_params.o
+	$(CXX) $(CXXFLAGS) \
+	    -o dr_evt_proto_progopt_test \
+	    dr_evt_proto_progopt_test.cpp \
+	    dr_evt_params.pb.o \
+	    dr_evt_params.o \
+	    $(LDFLAGS)
 
 test: dr_evt_proto_progopt_test
 	@echo ----------------------------------------------------
-	./dr_evt_proto_progopt_test --setup-all ../test/dr_evt_params.prototext --input-model model
+	./dr_evt_proto_progopt_test \
+	    --setup-all ../test/dr_evt_params.prototext \
+	    --input-model model
 	@echo ----------------------------------------------------
-	./dr_evt_proto_progopt_test --setup-all ../test/dr_evt_params.prototext --input-model model --setup-sim sim_setup.prototext
+	./dr_evt_proto_progopt_test \
+	    --setup-all ../test/dr_evt_params.prototext \
+	    --input-model model \
+	    --setup-sim sim_setup.prototext
 	@echo ----------------------------------------------------
-	./dr_evt_proto_progopt_test --input-model model --setup-sim sim_setup.prototext
+	./dr_evt_proto_progopt_test \
+	    --input-model model \
+	    --setup-sim sim_setup.prototext
 	@echo ----------------------------------------------------
 
 clean:
 	@rm -f *.o dr_evt_proto_progopt_test
-	@rm -f dr_evt_params.pb.cc  dr_evt_params.pb.h
+	@rm -f dr_evt_params.pb.cc dr_evt_params.pb.h

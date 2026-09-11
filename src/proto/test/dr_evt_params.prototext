@@ -2,6 +2,7 @@ sim_setup {
     seed: 7
     max_jobs: 10
     outfile: "sim_out.txt"
+    trace_type: "pcon"
 }
 trace_setup {
     max_jobs: 10

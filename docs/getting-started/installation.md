@@ -15,6 +15,10 @@
 **[Protocol Buffers](https://developers.google.com/protocol-buffers)**: For `--config` files (`-DDR_EVT_ENABLE_PROTOBUF=ON`) - not needed for a plain build
 - Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
 
+**Catch2 v2**: For the legacy Catch2-based unit tests (`-DDR_EVT_WITH_UNIT_TESTING=ON`)
+- Existing tests use the Catch2 v2 single-header API (`catch2/catch.hpp`)
+- DR_EVT uses an existing compatible Catch2 v2 installation when available; otherwise it fetches pinned Catch2 v2.13.10
+
 **Python 3.7+**: For Python bindings (`-DDR_EVT_BUILD_PYTHON=ON`)
 - Python development headers required: `apt-get install python3-dev`
 - pybind11 auto-downloaded via FetchContent if not found
@@ -111,6 +115,18 @@ cmake .. -DDR_EVT_BUILD_PYTHON=ON
 # Specify Python executable
 cmake .. -DDR_EVT_BUILD_PYTHON=ON -DPython3_EXECUTABLE=/path/to/python3
 ```
+
+**Testing:**
+```bash
+# Register ordinary CTest tests
+cmake .. -DBUILD_TESTING=ON
+
+# Enable the Catch2-based unit-test framework
+cmake .. -DDR_EVT_WITH_UNIT_TESTING=ON
+```
+
+`BUILD_TESTING` controls ordinary CTest registration. `DR_EVT_WITH_UNIT_TESTING`
+enables the separate Catch2-based unit-test framework.
 
 **Build type:**
 ```bash
@@ -211,8 +227,12 @@ pip package - see that page for how to make it importable
 Run tests to verify installation:
 
 ```bash
-# Comprehensive test suite (34 tests)
-cd tests
+# Selected CTest coverage, including the Pcon data model
+cd build
+ctest -R 'test_pcon_trace|test_trace_type_cli' --output-on-failure
+
+# Comprehensive scheduler-correctness suite (34 tests)
+cd ../tests
 ./run_scheduler_correctness_tests.sh
 ```
 

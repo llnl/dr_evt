@@ -51,9 +51,10 @@ sim_time_t BlockQueueFCFSScheduler<BlockSize>::get_next_arrival_time() {
 }
 
 template <size_t BlockSize>
-std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
-    num_nodes_t free_nodes, const std::map<job_no_t, sim_time_t> &running_jobs,
-    sim_time_t current_time) {
+std::vector<job_no_t>
+BlockQueueFCFSScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
+                                             const running_jobs_t &running_jobs,
+                                             sim_time_t current_time) {
   sync_to(current_time);
 
   if (!has_eligible_jobs()) {
@@ -62,32 +63,38 @@ std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
+  running_jobs_t effective_running_jobs = running_jobs;
 
   // Step 1: Start FCFS head(s)
   while (m_eligible_end_idx > 0) {
-    job_no_t head = static_cast<job_no_t>(-1);
+    JobArrival *head = nullptr;
 
     for (size_t i = 0; i < m_eligible_end_idx; ++i) {
       if (!m_job_order[i].removed) {
-        head = m_job_order[i].job_id;
+        head = &m_job_order[i];
         break;
       }
     }
 
-    if (head == static_cast<job_no_t>(-1)) {
+    if (head == nullptr) {
       break;
     }
 
-    const auto &job = m_trace_ptr->job_at(head);
-    num_nodes_t nodes_needed = job.get_num_nodes();
+    tdiff_t head_run_time = 0.0;
+    num_nodes_t nodes_needed = 0;
+    if (!m_wait_queue.get_job_info(head->job_id, head_run_time, nodes_needed)) {
+      throw std::logic_error("active block-queue head is missing");
+    }
 
     if (nodes_needed <= available_nodes) {
-      jobs_to_run.push_back(head);
+      jobs_to_run.push_back(head->job_id);
       available_nodes -= nodes_needed;
-      m_wait_queue.remove(head);
+      m_wait_queue.remove(head->job_id);
+      effective_running_jobs[head->job_id] = {current_time, head_run_time,
+                                              nodes_needed};
 
       for (size_t i = 0; i < m_eligible_end_idx; ++i) {
-        if (m_job_order[i].job_id == head && !m_job_order[i].removed) {
+        if (m_job_order[i].job_id == head->job_id && !m_job_order[i].removed) {
           m_job_order[i].removed = true;
           ++m_removed_count;
           break;
@@ -115,12 +122,10 @@ std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
     return jobs_to_run;
   }
 
-  const auto &head_job = m_trace_ptr->job_at(fcfs_head);
-  num_nodes_t head_nodes = head_job.get_num_nodes();
-
-  std::map<job_no_t, sim_time_t> effective_running_jobs = running_jobs;
-  for (job_no_t job_id : jobs_to_run) {
-    effective_running_jobs[job_id] = current_time;
+  tdiff_t head_run_time = 0.0;
+  num_nodes_t head_nodes = 0;
+  if (!m_wait_queue.get_job_info(fcfs_head, head_run_time, head_nodes)) {
+    throw std::logic_error("active FCFS head is missing from block queue");
   }
 
   m_fcfs_reservation_time = calculate_fcfs_reservation(
@@ -128,23 +133,23 @@ std::vector<job_no_t> BlockQueueFCFSScheduler<BlockSize>::schedule(
 
   // Step 3: Backfill
   while (available_nodes > 0) {
+    tdiff_t backfill_run_time = 0.0;
+    num_nodes_t backfill_nodes = 0;
     auto backfill_candidate = m_wait_queue.find_and_remove_backfill_candidate(
-        available_nodes, current_time, m_fcfs_reservation_time);
+        available_nodes, current_time, m_fcfs_reservation_time,
+        &backfill_run_time, &backfill_nodes);
 
     if (!backfill_candidate.has_value()) {
       break;
     }
 
     job_no_t bf_job = backfill_candidate.value();
-    const auto &bf_job_rec = m_trace_ptr->job_at(bf_job);
-    num_nodes_t bf_nodes = bf_job_rec.get_num_nodes();
-
-    jobs_to_run.push_back(bf_job);
-    available_nodes -= bf_nodes;
-    // Job already removed by find_and_remove_backfill_candidate!
-
     for (size_t i = 0; i < m_job_order.size(); ++i) {
       if (m_job_order[i].job_id == bf_job && !m_job_order[i].removed) {
+        jobs_to_run.push_back(bf_job);
+        available_nodes -= backfill_nodes;
+        effective_running_jobs[bf_job] = {current_time, backfill_run_time,
+                                          backfill_nodes};
         m_job_order[i].removed = true;
         if (i < m_eligible_end_idx) {
           ++m_removed_count;

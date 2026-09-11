@@ -100,6 +100,21 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
     sp.m_priority_policy = PriorityPolicy::FCFS;
   }
 
+  // Trace type (options: "standard" or "pcon", default: STANDARD)
+  if (!cfg.trace_type().empty()) {
+    const std::string type = cfg.trace_type();
+    if (type == "standard") {
+      sp.m_trace_type = TraceType::STANDARD;
+    } else if (type == "pcon") {
+      sp.m_trace_type = TraceType::PCON;
+    } else {
+      throw std::runtime_error("Unknown trace_type in protobuf: " + type +
+                               " (valid: standard, pcon)");
+    }
+  } else {
+    sp.m_trace_type = TraceType::STANDARD;
+  }
+
   // Trace format (options: "simple" or "lassen", default: "simple")
   if (!cfg.trace_format().empty()) {
     std::string format = cfg.trace_format();

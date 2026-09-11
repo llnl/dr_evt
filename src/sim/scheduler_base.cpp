@@ -26,8 +26,7 @@ namespace dr_evt {
 
 sim_time_t SchedulerBase::calculate_fcfs_reservation(
     num_nodes_t nodes_needed, num_nodes_t free_nodes,
-    const std::map<job_no_t, sim_time_t> &running_jobs,
-    sim_time_t current_time) {
+    const running_jobs_t &running_jobs, sim_time_t current_time) {
   if (nodes_needed <= free_nodes) {
     return current_time; // Can start now
   }
@@ -38,14 +37,12 @@ sim_time_t SchedulerBase::calculate_fcfs_reservation(
   std::vector<std::pair<sim_time_t, num_nodes_t>> end_events;
   end_events.reserve(running_jobs.size());
 
-  for (const auto &[job_idx, start_time] : running_jobs) {
-    const auto &job = m_trace_ptr->job_at(job_idx);
-    tdiff_t run_time = get_duration_estimate(job_idx);
-    sim_time_t end_time = start_time + run_time;
-    num_nodes_t nodes = job.get_num_nodes();
+  for (const auto &[job_idx, job] : running_jobs) {
+    (void)job_idx;
+    const sim_time_t end_time = job.start_time + job.run_time;
 
     if (end_time > current_time) {
-      end_events.push_back({end_time, nodes});
+      end_events.push_back({end_time, job.nodes});
     }
   }
 
@@ -86,7 +83,7 @@ const char *queue_impl_name(QueueImplementation impl) {
 } // anonymous namespace
 
 std::unique_ptr<SchedulerBase>
-create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
+create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  BackfillPolicy backfill_policy, PriorityPolicy priority_policy,
                  QueueImplementation queue_impl, size_t block_size,
                  size_t wait_queue_capacity,
@@ -121,37 +118,37 @@ create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
           {2,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<4>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
           {3,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<8>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
           {4,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<16>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
           {5,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<32>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
           {6,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<64>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
           {7,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<128>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
           {8,
            [&]() {
              return std::make_unique<BlockQueueFCFSScheduler<256>>(
-                 total_nodes, job_data, backfill_policy);
+                 total_nodes, backfill_policy);
            }},
       };
 
@@ -164,14 +161,12 @@ create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
 
       return it->second();
     } else if (queue_impl == QueueImplementation::MULTIMAP) {
-      return std::make_unique<FCFSAltScheduler>(total_nodes, job_data,
-                                                backfill_policy);
+      return std::make_unique<FCFSAltScheduler>(total_nodes, backfill_policy);
     } else if (queue_impl == QueueImplementation::DEQUE) {
-      return std::make_unique<FCFSScheduler>(total_nodes, job_data,
-                                             backfill_policy);
+      return std::make_unique<FCFSScheduler>(total_nodes, backfill_policy);
     } else if (queue_impl == QueueImplementation::CIRCULAR) {
       return std::make_unique<CircularBufferFCFSScheduler>(
-          total_nodes, job_data, backfill_policy, wait_queue_capacity,
+          total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
           wait_queue_overflow);
     } else {
       // Defensive: QueueImplementation is a 4-value enum and every
@@ -191,8 +186,7 @@ create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
       std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                 << "' not supported for FCFS_ALT, using multimap\n";
     }
-    return std::make_unique<FCFSAltScheduler>(total_nodes, job_data,
-                                              backfill_policy);
+    return std::make_unique<FCFSAltScheduler>(total_nodes, backfill_policy);
 
   case PriorityPolicy::FCFS_CONSERVATIVE:
     // FCFS with conservative backfilling or no backfilling
@@ -203,7 +197,7 @@ create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
                 << "' not supported for FCFS_CONSERVATIVE, only deque is "
                    "implemented. Using deque.\n";
     }
-    return std::make_unique<FCFSConservativeScheduler>(total_nodes, job_data,
+    return std::make_unique<FCFSConservativeScheduler>(total_nodes,
                                                        backfill_policy);
 
   case PriorityPolicy::SJF:
@@ -212,8 +206,7 @@ create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
       std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                 << "' not supported for SJF, using default multimap\n";
     }
-    return std::make_unique<SJFScheduler>(total_nodes, job_data,
-                                          backfill_policy);
+    return std::make_unique<SJFScheduler>(total_nodes, backfill_policy);
 
   case PriorityPolicy::LJF:
     // LJF only uses multimap (already efficient)
@@ -221,13 +214,11 @@ create_scheduler(num_nodes_t total_nodes, const Trace &job_data,
       std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                 << "' not supported for LJF, using default multimap\n";
     }
-    return std::make_unique<LJFScheduler>(total_nodes, job_data,
-                                          backfill_policy);
+    return std::make_unique<LJFScheduler>(total_nodes, backfill_policy);
 
   default:
     // Default to FCFS with deque
-    return std::make_unique<FCFSScheduler>(total_nodes, job_data,
-                                           backfill_policy);
+    return std::make_unique<FCFSScheduler>(total_nodes, backfill_policy);
   }
 }
 

@@ -23,31 +23,32 @@ namespace dr_evt {
  * Abstract base class for job schedulers.
  * Different implementations for FCFS vs priority-based scheduling.
  */
+struct Running_Job {
+  sim_time_t start_time;
+  tdiff_t run_time;
+  num_nodes_t nodes;
+};
+
+using running_jobs_t = std::map<job_no_t, Running_Job>;
+
 class SchedulerBase {
 protected:
   /// Total nodes available to jobs selected by this scheduler.
   num_nodes_t m_total_nodes;
   /// Backfill rule applied when jobs other than the FCFS head are considered.
   BackfillPolicy m_backfill_policy;
-  /// Raw pointer to the owning Trace, not the job-record container
-  /// directly: reading a job's data by job_no needs Trace::job_at()'s
-  /// translation (job_no - m_num_reclaimed), which only Trace can do -
-  /// m_data's own physical layout shifts as reclaiming advances.
-  const Trace *m_trace_ptr;
   /// Projected earliest start time reserved for the FCFS queue head.
   sim_time_t m_fcfs_reservation_time;
 
 public:
   /**
-   * @brief Construct a scheduler operating on an owning simulation trace.
+   * @brief Construct a scheduler for the supplied cluster capacity.
    * @param[in] total_nodes Total nodes available to schedule.
-   * @param[in] trace Trace containing the jobs identified by insert_job().
    * @param[in] bf_policy Backfilling policy to apply during scheduling.
    */
-  SchedulerBase(num_nodes_t total_nodes, const Trace &trace,
-                BackfillPolicy bf_policy)
+  SchedulerBase(num_nodes_t total_nodes, BackfillPolicy bf_policy)
       : m_total_nodes(total_nodes), m_backfill_policy(bf_policy),
-        m_trace_ptr(&trace), m_fcfs_reservation_time(0) {}
+        m_fcfs_reservation_time(0) {}
 
   /** @brief Destroy a scheduler through its polymorphic base interface. */
   virtual ~SchedulerBase() = default;
@@ -77,16 +78,15 @@ public:
    * records each selected start through Trace::insert_job().
    *
    * @param[in] free_nodes Nodes currently available to allocate.
-   * @param[in] running_jobs Running job identifiers and their start times.
+   * @param[in] running_jobs Running jobs with start time, runtime, and nodes.
    * @param[in] current_time Simulation time at which eligibility is evaluated.
    * @return Vector of existing Trace job identifiers selected to start.
    * @see insert_job()
    * @see Trace::insert_job()
    */
-  virtual std::vector<job_no_t>
-  schedule(num_nodes_t free_nodes,
-           const std::map<job_no_t, sim_time_t> &running_jobs,
-           sim_time_t current_time) = 0;
+  virtual std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                         const running_jobs_t &running_jobs,
+                                         sim_time_t current_time) = 0;
 
   /**
    * @brief Advance this scheduler's internal eligibility tracking.
@@ -171,13 +171,6 @@ protected:
    * @param[in] job_idx Identifier of an existing trace job.
    * @return The job's requested time limit, in tdiff_t.
    */
-  tdiff_t get_duration_estimate(job_no_t job_idx) const {
-    // Scheduler uses time_limit as the best estimator for planning (realistic
-    // mode)
-    const auto &job = m_trace_ptr->job_at(job_idx);
-    return job.get_limit_time();
-  }
-
   /**
    * @brief Project when the first FCFS job can obtain its requested nodes.
    * @details
@@ -187,14 +180,15 @@ protected:
    * backfill candidate can run without delaying that reservation.
    * @param[in] nodes_needed Nodes requested by that job.
    * @param[in] free_nodes Nodes available at current_time.
-   * @param[in] running_jobs Active jobs and their start times.
+   * @param[in] running_jobs Active jobs with the metadata needed to project
+   * release times.
    * @param[in] current_time Time from which to project releases.
    * @return Earliest projected start time for the FCFS head, in sim_time_t.
    */
-  sim_time_t
-  calculate_fcfs_reservation(num_nodes_t nodes_needed, num_nodes_t free_nodes,
-                             const std::map<job_no_t, sim_time_t> &running_jobs,
-                             sim_time_t current_time);
+  sim_time_t calculate_fcfs_reservation(num_nodes_t nodes_needed,
+                                        num_nodes_t free_nodes,
+                                        const running_jobs_t &running_jobs,
+                                        sim_time_t current_time);
 };
 
 /**
@@ -203,10 +197,11 @@ protected:
  * Selects an FCFS implementation when FCFS is requested (including the
  * queue implementation and overflow settings), the conservative FCFS
  * implementation when required by the backfill policy, or the SJF/LJF
- * priority scheduler. The returned object retains a non-owning reference to
- * job_data, which must outlive the scheduler.
+ * priority scheduler. Scheduling fields are copied into each implementation's
+ * wait queue as jobs are submitted; the scheduler does not retain a Trace.
  * @param[in] total_nodes Total nodes available to schedule.
- * @param[in] job_data Trace whose records are scheduled.
+ * @param[in] initial_job_count Number of initially known jobs, used only to
+ * select the default circular-queue capacity.
  * @param[in] backfill_policy Backfilling policy.
  * @param[in] priority_policy Job-selection policy.
  * @param[in] queue_impl Wait-queue implementation for FCFS scheduling.
@@ -217,7 +212,7 @@ protected:
  * @return Owning pointer to a SchedulerBase implementation.
  */
 std::unique_ptr<SchedulerBase> create_scheduler(
-    num_nodes_t total_nodes, const Trace &job_data,
+    num_nodes_t total_nodes, size_t initial_job_count,
     BackfillPolicy backfill_policy, PriorityPolicy priority_policy,
     QueueImplementation queue_impl = QueueImplementation::CIRCULAR,
     size_t block_size = 128, size_t wait_queue_capacity = 0,

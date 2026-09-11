@@ -47,7 +47,8 @@ Use `--resource_trace` to name the resource-usage file explicitly:
     --resource_trace results/resources.csv
 ```
 
-The resource trace records the occupancy after each resource-state change:
+The resource trace records the occupancy after each resource-state change.
+With the default `--trace_type standard`, the format is:
 
 ```text
 time,free_nodes,allocated_nodes
@@ -57,6 +58,16 @@ time,free_nodes,allocated_nodes
 40,20,80
 100,100,0
 ```
+
+With `--trace_type pcon`, the resource trace additionally reports the Pcon
+quantities carried by the experimental Pcon trace model:
+
+```text
+time,free_nodes,allocated_nodes,avgpcon,minpcon,maxpcon
+```
+
+`--trace_type` selects the job/resource data model independently of
+`--trace_format`, which selects how the input file is parsed.
 
 Without `--resource_trace`, DR_EVT writes this output as
 `<outfile>_resources.csv` (for example, `jobs_sim_resources.csv`).

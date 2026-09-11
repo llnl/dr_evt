@@ -65,7 +65,10 @@ Output file for simulated job trace.
 ### `-R, --resource_trace FILENAME`
 Write resource usage trace to file.
 
-**Format:** CSV with columns `time`, `free_nodes`, `allocated_nodes`
+**Standard format:** CSV with columns `time`, `free_nodes`, `allocated_nodes`.
+
+With `--trace_type pcon`, the format is
+`time,free_nodes,allocated_nodes,avgpcon,minpcon,maxpcon`.
 
 **Purpose:** Track cluster resource utilization over time for visualization and analysis.
 
@@ -330,6 +333,23 @@ streaming session) at the moment the very first sample is recorded.
 
 ## Trace Format Options
 
+### `--trace_type TYPE`
+Select the job/resource data model independently of the input trace format.
+
+**Options:**
+- `standard` - Standard DR_EVT job and resource records (default)
+- `pcon` - Experimental records carrying `avgpcon`, `minpcon`, and `maxpcon`
+
+**Default:** `standard`
+
+**Example:**
+```bash
+./build/simulator traces/pcon.csv \
+    --trace_type pcon \
+    --trace_format simple \
+    --timestamp_format epoch
+```
+
 ### `-f, --trace_format FORMAT`
 Input trace format.
 
@@ -337,7 +357,7 @@ Input trace format.
 - `simple` - Simple CSV format (minimal columns)
 - `lassen` - Lassen HPC format (many metadata columns)
 
-**Default:** `lassen`
+**Default:** `simple`
 
 **Example:**
 ```bash
@@ -475,10 +495,9 @@ Load parameters from a Protobuf `.textproto` configuration file.
 
 **Requires:** Simulator built with `-DDR_EVT_ENABLE_PROTOBUF=ON`
 
-**Precedence (highest to lowest):**
-1. Command-line arguments (highest priority)
-2. Config file (`--config`)
-3. Built-in defaults (lowest priority)
+Options are applied in command-line order. When `--config` is encountered,
+the config file is loaded at that point; command-line arguments appearing
+after `--config` override the corresponding config values.
 
 **Example:**
 ```bash

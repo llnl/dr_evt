@@ -36,9 +36,10 @@ void CircularBufferFCFSScheduler::mark_removed(job_no_t job_id) {
   }
 }
 
-std::vector<job_no_t> CircularBufferFCFSScheduler::schedule(
-    num_nodes_t free_nodes, const std::map<job_no_t, sim_time_t> &running_jobs,
-    sim_time_t current_time) {
+std::vector<job_no_t>
+CircularBufferFCFSScheduler::schedule(num_nodes_t free_nodes,
+                                      const running_jobs_t &running_jobs,
+                                      sim_time_t current_time) {
   sync_to(current_time);
 
   // Garbage collection: compact queue if >50% is garbage. Same
@@ -68,6 +69,7 @@ std::vector<job_no_t> CircularBufferFCFSScheduler::schedule(
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
+  running_jobs_t effective_running_jobs = running_jobs;
 
   // Step 1: consume the front of the eligible queue with pop_front()
   // (O(1) on a circular_buffer, same as on a deque) instead of
@@ -77,8 +79,11 @@ std::vector<job_no_t> CircularBufferFCFSScheduler::schedule(
          (m_wait_queue.front().removed ||
           m_wait_queue.front().nodes_requested <= available_nodes)) {
     if (!m_wait_queue.front().removed) {
-      jobs_to_run.push_back(m_wait_queue.front().job_id);
-      available_nodes -= m_wait_queue.front().nodes_requested;
+      const auto &job = m_wait_queue.front();
+      jobs_to_run.push_back(job.job_id);
+      available_nodes -= job.nodes_requested;
+      effective_running_jobs[job.job_id] = {current_time, job.run_time_estimate,
+                                            job.nodes_requested};
     } else {
       --m_removed_count;
     }
@@ -97,11 +102,6 @@ std::vector<job_no_t> CircularBufferFCFSScheduler::schedule(
   // FCFS head is now genuinely at the front and blocked - calculate
   // reservation for backfilling. See FCFSScheduler::schedule() for
   // why effective_running_jobs must include jobs_to_run.
-  std::map<job_no_t, sim_time_t> effective_running_jobs = running_jobs;
-  for (job_no_t job_id : jobs_to_run) {
-    effective_running_jobs[job_id] = current_time;
-  }
-
   m_fcfs_reservation_time = calculate_fcfs_reservation(
       m_wait_queue.front().nodes_requested, available_nodes,
       effective_running_jobs, current_time);

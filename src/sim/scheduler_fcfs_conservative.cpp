@@ -39,8 +39,7 @@ void FCFSConservativeScheduler::mark_removed(job_no_t job_id) {
 
 sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
     size_t backfill_index, num_nodes_t available_nodes,
-    const std::map<job_no_t, sim_time_t> &running_jobs,
-    sim_time_t current_time) {
+    const running_jobs_t &running_jobs, sim_time_t current_time) {
   // For conservative backfilling, we need to ensure the backfill job
   // doesn't delay ANY waiting job that came before it.
   // Calculate reservation time for each job ahead of this one.
@@ -65,9 +64,10 @@ sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
   return earliest_conflict;
 }
 
-std::vector<job_no_t> FCFSConservativeScheduler::schedule(
-    num_nodes_t free_nodes, const std::map<job_no_t, sim_time_t> &running_jobs,
-    sim_time_t current_time) {
+std::vector<job_no_t>
+FCFSConservativeScheduler::schedule(num_nodes_t free_nodes,
+                                    const running_jobs_t &running_jobs,
+                                    sim_time_t current_time) {
   // Sync eligibility tracking
   sync_to(current_time);
 
@@ -96,14 +96,18 @@ std::vector<job_no_t> FCFSConservativeScheduler::schedule(
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
+  running_jobs_t effective_running_jobs = running_jobs;
 
   // Step 1: Start jobs from the front of the queue (FCFS order)
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
           m_wait_queue.front().nodes_requested <= available_nodes)) {
     if (!m_wait_queue.front().removed) {
-      jobs_to_run.push_back(m_wait_queue.front().job_id);
-      available_nodes -= m_wait_queue.front().nodes_requested;
+      const auto &job = m_wait_queue.front();
+      jobs_to_run.push_back(job.job_id);
+      available_nodes -= job.nodes_requested;
+      effective_running_jobs[job.job_id] = {current_time, job.run_time_estimate,
+                                            job.nodes_requested};
     } else {
       --m_removed_count;
     }
@@ -123,11 +127,6 @@ std::vector<job_no_t> FCFSConservativeScheduler::schedule(
 
   // Step 3: Try backfilling based on policy
   // Update effective running jobs to include jobs just started
-  std::map<job_no_t, sim_time_t> effective_running_jobs = running_jobs;
-  for (job_no_t job_id : jobs_to_run) {
-    effective_running_jobs[job_id] = current_time;
-  }
-
   if (m_backfill_policy == BackfillPolicy::EASY) {
     // EASY backfilling: Only consider the head job's reservation
     m_fcfs_reservation_time = calculate_fcfs_reservation(
@@ -180,7 +179,8 @@ std::vector<job_no_t> FCFSConservativeScheduler::schedule(
         ++m_removed_count;
 
         // Update effective running jobs for next iteration
-        effective_running_jobs[job.job_id] = current_time;
+        effective_running_jobs[job.job_id] = {
+            current_time, job.run_time_estimate, job.nodes_requested};
 
         if (available_nodes == 0)
           break;

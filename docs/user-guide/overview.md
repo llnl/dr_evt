@@ -65,6 +65,17 @@ Makespan: 2010 sec
 
 ## Trace File Formats
 
+### Trace Data Models
+
+The simulator supports two trace data models, selected independently of the
+input file format:
+
+- `standard` (default) - standard DR_EVT job and resource records
+- `pcon` - experimental records carrying `avgpcon`, `minpcon`, and `maxpcon`
+
+Use `--trace_type standard` or `--trace_type pcon`. `--trace_type` selects the
+data model, while `--trace_format` selects how the input file is parsed.
+
 ### Simple Format (Recommended for Testing)
 
 Simple input supports both simulation and replay. A replay trace can use this
@@ -274,10 +285,10 @@ Jobs run for exactly their `time_limit`.
 
 ## Command-Line Options
 
-### Required Options
+### System Options
 
 ```bash
---total_nodes N          # Total system nodes (required)
+-n, --total_nodes N      # Total system nodes (default: 795)
 ```
 
 ### Input/Output Options
@@ -295,9 +306,10 @@ Jobs run for exactly their `time_limit`.
 ### Trace Format Options
 
 ```bash
--f, --trace_format FORMAT     # Trace format: simple|lassen (default: simple)
--T, --timestamp_format FORMAT # Timestamp: epoch|iso (default: iso)
--z, --timezone ZONE           # Timezone for ISO timestamps (default: America/Los_Angeles)
+    --trace_type TYPE          # Data model: standard|pcon (default: standard)
+-f, --trace_format FORMAT      # Trace format: simple|lassen (default: simple)
+-T, --timestamp_format FORMAT  # Timestamp: epoch|iso (default: iso)
+-z, --timezone ZONE            # Timezone for ISO timestamps (default: America/Los_Angeles)
 ```
 
 ### Scheduler Options
@@ -571,6 +583,7 @@ not accepted
 ### Creating Custom Traces
 
 ```python
+import random
 import pandas as pd
 
 # Generate synthetic trace
@@ -582,11 +595,9 @@ for i in range(100):
     
     jobs.append({
         'job_submit_time': submit_time,
-        'begin_time': submit_time,  # Will be rescheduled
-        'end_time': submit_time + duration,
         'num_nodes': nodes,
-        'queue': 'pbatch',
-        'time_limit': duration + 100
+        'time_limit': duration + 100,
+        'actual_run_time': duration
     })
 
 df = pd.DataFrame(jobs)

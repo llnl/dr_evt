@@ -120,6 +120,10 @@ For contributors and maintainers:
 - **Backfill:** EASY and CONSERVATIVE (fully implemented)
 - **Priority:** FCFS, an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF, LJF
 
+**Trace Data Models:**
+- **Standard:** Default compact job and resource records
+- **Pcon:** Experimental model carrying `avgpcon`, `minpcon`, and `maxpcon`
+
 **APIs:**
 - **Streaming API:** Online/incremental simulation, including genuinely new jobs (`append_job()`/`append_jobs()`) not just ones already in a preloaded trace
 - **gRPC Service:** Network-exposed streaming API for multi-cluster coordination
@@ -131,9 +135,11 @@ categories (see [Testing Guide](TESTING_GUIDE.md) for the current breakdown and 
 ## About
 
 DR_EVT simulates discrete event-driven HPC job scheduling with:
-- **EASY and CONSERVATIVE backfilling** implementations, verified against
-  an independent Python reference implementation (consistency check, not
-  mathematical ground truth - see Testing Guide)
+- **EASY and CONSERVATIVE backfilling** implementations checked against
+  separately written Python reference implementations (cross-implementation
+  consistency checks, not independently derived mathematical ground truth)
+- **Standard and experimental Pcon trace data models**, with Pcon jobs carrying
+  `avgpcon`, `minpcon`, and `maxpcon` and corresponding Pcon-aware resource traces
 - **gRPC-based online simulation service** enabling coordinated multi-cluster
   simulations in a distributed fashion and digital-twin scheduler interacting in real-time
 - **Replay and simulation modes** for both offline analysis and online operation

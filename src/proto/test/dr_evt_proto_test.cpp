@@ -66,7 +66,11 @@ int main(int argc, char **argv) {
   dr_evt::read_prototext(prototext, is_binary, dr_evt_proto_params);
 
   std::string str;
-  google::protobuf::TextFormat::PrintToString(dr_evt_proto_params, &str);
+  if (!google::protobuf::TextFormat::PrintToString(dr_evt_proto_params, &str)) {
+    std::cerr << "Failed to serialize protobuf message to text" << std::endl;
+    google::protobuf::ShutdownProtobufLibrary();
+    return EXIT_FAILURE;
+  }
   std::cout << str;
 
   google::protobuf::ShutdownProtobufLibrary();
