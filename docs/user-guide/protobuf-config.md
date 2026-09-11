@@ -2,6 +2,10 @@
 
 DR_EVT supports structured configuration files using Protocol Buffers (protobuf) for complex simulation setups.
 
+The simulator's `--config` option parses the `Simulation_Params` message
+directly. Config files therefore contain fields such as `total_nodes` and
+`trace_type` at the top level; do not wrap them in `sim_setup { ... }`.
+
 ## Why Use Protobuf Config?
 
 **Benefits over command-line arguments:**
@@ -63,7 +67,8 @@ job_store_overflow: "grow"      # "abort" | "grow"
 # Resource-history circular buffer (bounds memory for --resource_trace)
 resource_history_capacity: 0    # 0 = 2x loaded jobs, floored at 4096
 
-# Trace Format
+# Trace Data Model and Format
+trace_type: "standard"          # Options: "standard", "pcon"
 trace_format: "simple"          # Options: "simple", "lassen"
 timestamp_format: "epoch"       # Options: "epoch", "iso"
 
@@ -144,13 +149,21 @@ avoid a positional argument entirely (mutually exclusive with one).
 - `"block"` - block-based with multi-index (reference implementation, not
   recommended for performance - see [`../dev/design-decisions/BLOCK_QUEUE.md`](../dev/design-decisions/BLOCK_QUEUE.md))
 
-### Trace Format
+### Trace Data Model and Format
 
 | Field | Type | Default | Options |
 |-------|------|---------|---------|
+| `trace_type` | string | `"standard"` | `"standard"`, `"pcon"` |
 | `trace_format` | string | `"simple"` | `"simple"`, `"lassen"` |
-| `timestamp_format` | string | `"epoch"` | `"epoch"`, `"iso"` |
-| `timezone` | string | `"UTC"` | Any IANA timezone (e.g., `"America/Los_Angeles"`) |
+| `timestamp_format` | string | `"iso"` | `"epoch"`, `"iso"` |
+| `timezone` | string | `"America/Los_Angeles"` | Any IANA timezone (e.g., `"America/Los_Angeles"`) |
+
+`trace_type` selects the job/resource data model independently of
+`trace_format`:
+
+- `"standard"` - normal DR_EVT job and resource records.
+- `"pcon"` - experimental records carrying `avgpcon`, `minpcon`, and
+  `maxpcon`.
 
 **trace_format:**
 - `"simple"` - header-based CSV format. Replay input requires `job_submit_time`, `begin_time`, `end_time`, `num_nodes`, and `time_limit`; optional `q_id` defaults to `1` (`Queue1`). The legacy named `queue` field is used only when built with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`. `exit_status` is an output-only compatibility field and is ignored if present in input.
@@ -213,10 +226,9 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --config sim_config.textproto --
 # Result: Uses 2000 nodes (command-line wins)
 ```
 
-**Precedence (highest to lowest):**
-1. Command-line arguments
-2. Protobuf config file (`--config`)
-3. Built-in defaults
+Options are applied in command-line order. When `--config` is encountered,
+the protobuf file is loaded at that point; command-line arguments appearing
+after `--config` override the corresponding config values.
 
 ## Common Configurations
 
@@ -350,54 +362,43 @@ message Simulation_Params {
 
   // Input/Output
   string infile = 4;
-  // Path to a file listing multiple trace files, one per line -
-  // progressive loading (see docs/dev/OUTPUT_TRACE_BUFFERS.md): each is
-  // loaded in turn as the simulation
-  // reaches it, so job_store_capacity can actually bound memory.
-  // Mutually exclusive with infile - do not set both.
-  string infile_list = 26;
-  string outfile = 5;
-  string resource_trace = 6;
+  string infile_list = 5;
+  string outfile = 6;
+  string resource_trace = 7;
 
   // Enable verbose output for debugging/testing (default: false)
-  bool verbose = 7;
+  bool verbose = 8;
 
   // Scheduling parameters
-  int32 total_nodes = 8;          // default: 795
-  string backfill_policy = 9;     // "easy", "conservative", or "none" (default: "easy")
-  string priority_policy = 10;    // "fcfs", "sjf", or "ljf" (default: "fcfs")
+  uint32 total_nodes = 9;          // default: 795
+  string backfill_policy = 10;     // "easy", "conservative", or "none" (default: "easy")
+  string priority_policy = 11;     // "fcfs", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
 
-  // Trace format
-  string trace_format = 11;       // "simple" or "lassen" (default: "simple")
-  string timestamp_format = 12;   // "epoch" or "iso" (default: "iso")
-  string timezone = 13;           // e.g. "UTC", "America/Los_Angeles"
+  // Trace data model and format
+  string trace_type = 12;          // "standard" or "pcon" (default: "standard")
+  string trace_format = 13;        // "simple" or "lassen" (default: "simple")
+  string timestamp_format = 14;    // "epoch" or "iso" (default: "iso")
+  string timezone = 15;            // default: "America/Los_Angeles"
 
   // Duration simulation
-  string run_time_mode = 14;          // "actual", "distribution", or "limit" (default: "actual")
-  string run_time_distribution = 15;  // "normal", "lognormal", or "uniform" (default: "normal")
-  double run_time_scale = 16;         // default: 1.0
-  double run_time_stddev = 17;        // default: 0.0
+  string run_time_mode = 16;          // "actual", "distribution", or "limit" (default: "actual")
+  string run_time_distribution = 17;  // "normal", "lognormal", or "uniform" (default: "normal")
+  double run_time_scale = 18;         // default: 1.0
+  double run_time_stddev = 19;        // default: 0.0
 
   // Queue implementation (FCFS scheduler only)
-  string queue_impl = 18;         // "circular", "deque", "multimap", or "block" (default: "circular")
-  uint32 block_size = 19;         // power of 2 (default: 128); only used when queue_impl="block"
-  uint64 wait_queue_capacity = 20;  // 0 = size of job trace (default: 0); only used when queue_impl="circular"
-  string wait_queue_overflow = 21;  // "abort" or "grow" (default: "grow"); only used when queue_impl="circular"
+  string queue_impl = 20;           // "circular", "deque", "multimap", or "block"
+  uint32 block_size = 21;           // default: 128
+  uint64 wait_queue_capacity = 22;  // default: 0
+  string wait_queue_overflow = 23;  // "abort" or "grow"
 
-  // Job-record store (field 22, formerly "job_store" - a vector/circular
-  // runtime choice - is reserved, not reused: Trace::m_data is now
-  // unconditionally boost::circular_buffer, with no vector path to
-  // choose between)
-  uint64 job_store_capacity = 23; // 0 = size of job trace (default: 0)
-  string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
-  // Refuse to grow the job store past this fraction of available
-  // memory (Linux only; a no-op elsewhere). Must be > 0.0 and <= 1.0
-  // (e.g. 0.8); 0.0 (default) disables the check. Independent of
-  // job_store_overflow.
-  double memory_pressure_fraction = 27; // default: 0.0 (disabled)
+  // Job-record store
+  uint64 job_store_capacity = 24;         // default: 0
+  string job_store_overflow = 25;         // "abort" or "grow"
+  double memory_pressure_fraction = 26;   // default: 0.0 (disabled)
 
-  // Resource-history circular buffer (bounds memory for --resource_trace)
-  uint64 resource_history_capacity = 25; // 0 = 2x loaded jobs, floored at 4096 (default: 0)
+  // Resource-history circular buffer
+  uint64 resource_history_capacity = 27;  // default: 0
 }
 ```
 

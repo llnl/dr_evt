@@ -1,8 +1,23 @@
 # Input Trace Files
 
-DR_EVT now supports flexible trace file formats with command-line options for format, timestamp style, and timezone.
+DR_EVT supports multiple input formats, trace data models, timestamp styles,
+and timezone handling.
 
 ## Command-Line Options
+
+### Trace Data Model
+```bash
+--trace_type {standard|pcon}
+```
+
+**standard** (default): Standard DR_EVT job and resource records.
+
+**pcon**: Experimental records carrying per-job `avgpcon`, `minpcon`, and
+`maxpcon` values, with corresponding Pcon-aware resource traces.
+
+`--trace_type` is independent of `--trace_format`. For example,
+`--trace_type pcon --trace_format simple` uses the simple CSV parser with the
+Pcon record model.
 
 ### Trace Format
 ```bash
@@ -67,11 +82,11 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator test_trace.csv \
   --total_nodes 100
 ```
 
-### Lassen Format (Default)
+### Lassen Format
 ```bash
 ${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
+  --trace_format lassen \
   --total_nodes 795
-# Uses defaults: simple format, iso timestamps, America/Los_Angeles timezone
 ```
 
 ## Simple Format CSV Structure
@@ -100,6 +115,16 @@ job_submit_time,begin_time,end_time,num_nodes,time_limit
 2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,80
 ```
 
+### Pcon Simulation Mode
+```text
+job_submit_time,num_nodes,time_limit,avgpcon,minpcon,maxpcon
+0,2,3,1.5,2.0,3.0
+0,1,1,0.5,1.0,1.5
+```
+
+Use this form with `--trace_type pcon`. `q_id` remains optional and defaults
+to `1` (`Queue1`).
+
 ## Column Descriptions
 
 ### Simple Format Columns
@@ -114,9 +139,12 @@ determines simulation vs replay mode (see below).
 | `num_nodes` | Number of nodes requested | Both modes |
 | `q_id` | Optional one-based queue ID. If absent, the job uses `1` (`Queue1`). | Both modes |
 | `time_limit` | User-provided time limit (seconds). Accepted column-name aliases: `time_limit`, `timelimit`, `walltime` | Both modes |
-| `begin_time` | Historical start time from trace | Replay mode only - presence of this column (together with `end_time` or `duration`) is what selects replay mode |
-| `end_time` | Historical end time from trace | Replay mode (or use `duration` instead) |
+| `begin_time` | Historical start time from trace | Replay mode only; must appear together with `end_time` |
+| `end_time` | Historical end time from trace | Replay mode only; must appear together with `begin_time` |
 | `duration` | Accepted alias for `actual_run_time` | Simulation mode, only with `--run_time_mode actual` |
+| `avgpcon` | Average Pcon value associated with the job | Pcon trace type |
+| `minpcon` | Minimum Pcon value associated with the job | Pcon trace type |
+| `maxpcon` | Maximum Pcon value associated with the job | Pcon trace type |
 | `exit_status` | Output-only compatibility field. The simulator currently writes `0`. | Generated output only |
 | `actual_run_time` | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Simulation mode, only with `--run_time_mode actual` |
 
@@ -177,8 +205,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator test.csv \
   --timestamp_format epoch \
   --total_nodes 100 \
   --backfill_policy easy \
-  --priority_policy fcfs \
-  --run_time_mode actual
+  --priority_policy fcfs
 ```
 
 Expected output should show:

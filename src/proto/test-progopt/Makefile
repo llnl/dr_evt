@@ -25,22 +25,32 @@ endif
 
 # BOOST_DIR may be supplied explicitly:
 #   make BOOST_DIR=/path/to/boost
+#
+# Alternatively, honor standard Boost discovery variables if they are
+# already present in the environment or passed to make:
+#   BOOST_ROOT=/path/to/boost
+#   Boost_DIR=/path/to/boost/lib/cmake/Boost-X.Y.Z
 BOOST_DIR ?=
 
-# 1. If BOOST_DIR was explicitly supplied, verify it.
-ifneq ($(strip $(BOOST_DIR)),)
-  ifeq ($(wildcard $(BOOST_DIR)/include/boost/program_options.hpp),)
-    $(error Boost header boost/program_options.hpp not found under BOOST_DIR=$(BOOST_DIR))
-  endif
-
-  ifeq ($(strip $(wildcard \
-      $(BOOST_DIR)/lib/libboost_program_options* \
-      $(BOOST_DIR)/lib64/libboost_program_options*)),)
-    $(error libboost_program_options not found under BOOST_DIR=$(BOOST_DIR))
+# 1. Prefer an explicitly supplied BOOST_DIR.
+ifeq ($(strip $(BOOST_DIR)),)
+  # 2. Otherwise honor BOOST_ROOT.
+  ifneq ($(strip $(BOOST_ROOT)),)
+    BOOST_DIR := $(BOOST_ROOT)
   endif
 endif
 
-# 2. Otherwise try CMAKE_INSTALL_PREFIX.
+# 3. Otherwise derive the Boost installation prefix from Boost_DIR.
+# Typical Boost_DIR:
+#   /prefix/lib/cmake/Boost-X.Y.Z
+# so ../../.. resolves to /prefix.
+ifeq ($(strip $(BOOST_DIR)),)
+  ifneq ($(strip $(Boost_DIR)),)
+    BOOST_DIR := $(abspath $(Boost_DIR)/../../..)
+  endif
+endif
+
+# 4. Otherwise try CMAKE_INSTALL_PREFIX.
 ifeq ($(strip $(BOOST_DIR)),)
   ifneq ($(wildcard $(CMAKE_INSTALL_PREFIX)/include/boost/program_options.hpp),)
     ifneq ($(strip $(wildcard \
@@ -51,7 +61,7 @@ ifeq ($(strip $(BOOST_DIR)),)
   endif
 endif
 
-# 3. On macOS only, try Homebrew.
+# 5. On macOS only, try Homebrew.
 ifeq ($(strip $(BOOST_DIR)),)
   ifeq ($(UNAME_S),Darwin)
     BREW_BOOST_DIR := $(shell brew --prefix boost 2>/dev/null)
@@ -66,8 +76,19 @@ ifeq ($(strip $(BOOST_DIR)),)
   endif
 endif
 
+# Validate the resolved Boost prefix.
 ifeq ($(strip $(BOOST_DIR)),)
-  $(error Boost program_options not found. Set BOOST_DIR=/path/to/boost; CMAKE_INSTALL_PREFIX only contains Boost when DR_EVT built Boost via FetchContent)
+  $(error Boost program_options not found. Set BOOST_DIR, BOOST_ROOT, or Boost_DIR; CMAKE_INSTALL_PREFIX only contains Boost when DR_EVT built Boost via FetchContent)
+endif
+
+ifeq ($(wildcard $(BOOST_DIR)/include/boost/program_options.hpp),)
+  $(error Boost header boost/program_options.hpp not found under BOOST_DIR=$(BOOST_DIR))
+endif
+
+ifeq ($(strip $(wildcard \
+    $(BOOST_DIR)/lib/libboost_program_options* \
+    $(BOOST_DIR)/lib64/libboost_program_options*)),)
+  $(error libboost_program_options not found under BOOST_DIR=$(BOOST_DIR))
 endif
 
 BOOST_INC_DIR := $(BOOST_DIR)/include

@@ -67,24 +67,45 @@ int main(int argc, char** argv)
 
     if (!cmd.m_all_setup.empty()) {
         dr_evt_proto::DR_EVT_Params dr_evt_all_setup;
-        dr_evt::read_prototext(cmd.m_all_setup, false, dr_evt_all_setup);
+        if (!dr_evt::read_prototext(cmd.m_all_setup, false, dr_evt_all_setup)) {
+            return EXIT_FAILURE;
+        }
 
         std::string str;
-        google::protobuf::TextFormat::PrintToString(dr_evt_all_setup, &str);
+        if (!google::protobuf::TextFormat::PrintToString(dr_evt_all_setup, &str)) {
+            std::cerr << "Failed to convert DR_EVT_Params to text" << std::endl;
+            return EXIT_FAILURE;
+        }
         std::cout << str;
     } else {
         if (!cmd.m_sim_setup.empty()) {
             dr_evt_proto::DR_EVT_Params::Simulation_Params dr_evt_sim_setup;
-            dr_evt::read_prototext(cmd.m_sim_setup, false, dr_evt_sim_setup);
+            if (!dr_evt::read_prototext(cmd.m_sim_setup, false,
+                                         dr_evt_sim_setup)) {
+                return EXIT_FAILURE;
+            }
             std::string str;
-            google::protobuf::TextFormat::PrintToString(dr_evt_sim_setup, &str);
+            if (!google::protobuf::TextFormat::PrintToString(dr_evt_sim_setup,
+                                                              &str)) {
+                std::cerr << "Failed to convert Simulation_Params to text"
+                          << std::endl;
+                return EXIT_FAILURE;
+            }
             std::cout << str;
         }
         if (!cmd.m_trace_setup.empty()) {
             dr_evt_proto::DR_EVT_Params::Tracing_Params dr_evt_trace_setup;
-            dr_evt::read_prototext(cmd.m_trace_setup, false, dr_evt_trace_setup);
+            if (!dr_evt::read_prototext(cmd.m_trace_setup, false,
+                                         dr_evt_trace_setup)) {
+                return EXIT_FAILURE;
+            }
             std::string str;
-            google::protobuf::TextFormat::PrintToString(dr_evt_trace_setup, &str);
+            if (!google::protobuf::TextFormat::PrintToString(dr_evt_trace_setup,
+                                                              &str)) {
+                std::cerr << "Failed to convert Tracing_Params to text"
+                          << std::endl;
+                return EXIT_FAILURE;
+            }
             std::cout << str;
         }
     }

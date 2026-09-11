@@ -83,10 +83,10 @@ message DR_EVT_Params {
         double memory_pressure_fraction = 26;
 
         // Initial capacity for the resource-history circular buffer. 0
-        // means the size of the job trace. No overflow-policy field:
-        // unlike job_store, every entry here is always immediately safe
-        // to reclaim, so reclaiming when full never needs an abort/grow
-        // fallback.
+        // auto-sizes to twice the number of loaded jobs, with a minimum
+        // capacity of 4096 entries. No overflow-policy field: unlike
+        // job_store, every entry here is always immediately safe to reclaim,
+        // so reclaiming when full never needs an abort/grow fallback.
         uint64 resource_history_capacity = 27; // (default: 0)
     }
 

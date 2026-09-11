@@ -13,6 +13,7 @@ Source code, releases, and issue tracking are available in the
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
 - **Run Time Modes**: Read from trace (actual), sample from distribution, or use time limits
+- **Trace Data Models**: Standard records by default, or experimental Pcon records with `avgpcon`, `minpcon`, and `maxpcon`
 
 ## Build Instructions
 
@@ -96,10 +97,13 @@ Job store:
   -W, --job_store_overflow <mode>      abort|grow when job_store_capacity exceeded (default: grow)
   -m, --check_memory_pressure <fraction>  Refuse to grow the job store past this fraction of available memory (0 < fraction <= 1; disabled unless given)
 
-Trace format:
-  -f, --trace_format <fmt>     simple|lassen (default: simple)
-  -T, --timestamp_format <fmt> epoch|iso (default: iso)
-  -z, --timezone <tz>          Timezone for iso timestamps (default: America/Los_Angeles)
+Trace data model and format:
+      --trace_type <type>       standard|pcon (default: standard)
+                                Select the job/resource data model independently
+                                of the input trace format
+  -f, --trace_format <fmt>      simple|lassen (default: simple)
+  -T, --timestamp_format <fmt>  epoch|iso (default: iso)
+  -z, --timezone <tz>           Timezone for iso timestamps (default: America/Los_Angeles)
 
 Duration/run time modeling:
                                        planning estimate
@@ -255,15 +259,33 @@ make -j4
 
 ### Running Tests
 
-There's no `ctest` integration - tests run as shell scripts against the
-built binaries instead:
+Most regression suites are driven by shell scripts, while selected tests are
+also registered with CTest.
 
 ```bash
-# From the repo root, after building (and installing, or with
-# CMAKE_INSTALL_PREFIX pointed at wherever `make install` put things)
-./tests/run_scheduler_correctness_tests.sh          # scheduler-correctness suite
-./tests/run_append_job_tests.sh     # streaming API (append_job/append_jobs)
-./tests/run_progressive_load_tests.sh  # --infile_list progressive loading
+# Register ordinary CTest tests
+cmake .. -DBUILD_TESTING=ON
+
+# Run the Pcon-focused CTest tests
+ctest -R 'test_pcon_trace|test_trace_type_cli' --output-on-failure
+```
+
+The older Catch2-based unit-test framework is separate. Enable it with:
+
+```bash
+cmake .. -DDR_EVT_WITH_UNIT_TESTING=ON
+```
+
+The existing Catch2 tests use the Catch2 v2 single-header API. If a compatible
+installation is not found, DR_EVT fetches Catch2 v2.13.10.
+
+The larger regression suites continue to run through their shell runners:
+
+```bash
+./tests/run_scheduler_correctness_tests.sh
+./tests/run_append_job_tests.sh
+./tests/run_progressive_load_tests.sh
+./tests/run_configs_tests.sh
 ```
 
 See the [Testing Guide](../TESTING_GUIDE.md) for the full list of test
