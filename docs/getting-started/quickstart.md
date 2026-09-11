@@ -13,7 +13,7 @@ Source code, releases, and issue tracking are available in the
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
 - **Run Time Modes**: Read from trace (actual), sample from distribution, or use time limits
-- **Trace Data Models**: Standard records by default, or experimental Pcon records with `avgpcon`, `minpcon`, and `maxpcon`
+- **Trace Data Models**: Standard records by default, or experimental Pcon records (from Fugaku@RIKEN) with `avgpcon`, `minpcon`, and `maxpcon`
 
 ## Build Instructions
 
