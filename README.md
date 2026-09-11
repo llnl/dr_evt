@@ -31,7 +31,7 @@ retains its wait queue. The simulation coordinates them and writes the job and
 resource traces.
 
 <p align="center">
-  <img src="docs/_static/simulation-internals.png" width="80%" alt="C++ Simulation component: Simulation owns a Scheduler above Trace. Scheduler contains the wait queue; Trace contains the job store, event queue, and resource history, then writes resource and job scheduling traces.">
+  <img src="docs/_static/simulation-internals.png" width="75%" alt="C++ Simulation component: Simulation owns a Scheduler above Trace. Scheduler contains the wait queue; Trace contains the job store, event queue, and resource history, then writes resource and job scheduling traces.">
 </p>
 
 ## Features

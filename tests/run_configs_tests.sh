@@ -190,6 +190,60 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Test 8: trace_type=pcon via protobuf config must behave identically to the
+# equivalent CLI selection, including the Pcon-specific resource columns.
+echo "Test 8: Pcon trace_type config"
+PCON_TRACE="tests/data/pcon_cli_input.csv"
+
+$SIMULATOR "$PCON_TRACE" \
+    --trace_type pcon \
+    --trace_format simple \
+    --timestamp_format epoch \
+    --run_time_mode limit \
+    --total_nodes 4 \
+    --outfile /tmp/cli_pcon.csv \
+    --resource_trace /tmp/cli_pcon_resources.csv
+
+$SIMULATOR "$PCON_TRACE" \
+    --config tests/test_configs/pcon_config.pb \
+    --outfile /tmp/pb_pcon.csv \
+    --resource_trace /tmp/pb_pcon_resources.csv
+
+if diff -q /tmp/cli_pcon.csv /tmp/pb_pcon.csv > /dev/null && \
+   diff -q /tmp/cli_pcon_resources.csv /tmp/pb_pcon_resources.csv > /dev/null; then
+    echo "  ✓ Pcon trace_type config matches CLI"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ Pcon trace_type config differs from CLI"
+    FAIL=$((FAIL + 1))
+fi
+
+# Test 9: invalid trace_type supplied through protobuf config must fail with
+# the same kind of explicit diagnostic as an invalid CLI value.
+echo "Test 9: Invalid trace_type config"
+INVALID_TRACE_TYPE_CONFIG=/tmp/dr_evt_invalid_trace_type.pb
+cat > "$INVALID_TRACE_TYPE_CONFIG" <<'EOF'
+trace_type: "invalid"
+EOF
+
+if $SIMULATOR "$TEST_TRACE" \
+    --config "$INVALID_TRACE_TYPE_CONFIG" \
+    --outfile /tmp/pb_invalid_trace_type.csv \
+    > /tmp/pb_invalid_trace_type.log 2>&1; then
+    echo "  ✗ Invalid trace_type config unexpectedly succeeded"
+    FAIL=$((FAIL + 1))
+else
+    if grep -q "Unknown trace_type in protobuf" /tmp/pb_invalid_trace_type.log; then
+        echo "  ✓ Invalid trace_type config correctly rejected"
+        PASS=$((PASS + 1))
+    else
+        echo "  ✗ Invalid trace_type failed with unexpected error"
+        sed 's/^/     /' /tmp/pb_invalid_trace_type.log
+        FAIL=$((FAIL + 1))
+    fi
+fi
+rm -f "$INVALID_TRACE_TYPE_CONFIG"
+
 echo ""
 echo "=========================================="
 echo "Results: $PASS passed, $FAIL failed"

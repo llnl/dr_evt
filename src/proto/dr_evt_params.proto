@@ -28,72 +28,66 @@ message DR_EVT_Params {
         // bound memory. Mutually exclusive with infile - do not set
         // both. Files must already be sorted by submit_time, both
         // within each file and across the sequence.
-        string infile_list = 26;
-        string outfile = 5;
-        string resource_trace = 6;      // Optional resource usage trace output file
+        string infile_list = 5;
+        string outfile = 6;
+        string resource_trace = 7;      // Optional resource usage trace output file
 
         // Enable verbose output for debugging and testing
         // (default: false for production runs)
-        bool verbose = 7;
+        bool verbose = 8;
 
         // Scheduling parameters
-        uint32 total_nodes = 8;         // System node count (default: 795)
-        string backfill_policy = 9;     // "easy", "conservative", or "none" (default: "easy")
-        string priority_policy = 10;    // "fcfs", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
+        uint32 total_nodes = 9;         // System node count (default: 795)
+        string backfill_policy = 10;     // "easy", "conservative", or "none" (default: "easy")
+        string priority_policy = 11;    // "fcfs", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
 
         // Trace format parameters
-        string trace_format = 11;       // "simple" or "lassen" (default: "simple")
-        string timestamp_format = 12;   // "epoch" or "iso" (default: "iso")
-        string timezone = 13;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
+        string trace_type = 12;         // "standard" or "pcon" (default: "standard")
+        string trace_format = 13;       // "simple" or "lassen" (default: "simple")
+        string timestamp_format = 14;   // "epoch" or "iso" (default: "iso")
+        string timezone = 15;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
 
         // Run time determination parameters
         // Scheduler uses time_limit as the best estimator for planning
-        string run_time_mode = 14;      // "actual", "distribution", or "limit" (default: "actual")
-        string run_time_distribution = 15; // "normal", "lognormal", or "uniform" (default: "normal")
-        double run_time_scale = 16;     // Scale factor (default: 1.0)
-        double run_time_stddev = 17;    // Standard deviation factor (default: 0.0)
+        string run_time_mode = 16;      // "actual", "distribution", or "limit" (default: "actual")
+        string run_time_distribution = 17; // "normal", "lognormal", or "uniform" (default: "normal")
+        double run_time_scale = 18;     // Scale factor (default: 1.0)
+        double run_time_stddev = 19;    // Standard deviation factor (default: 0.0)
 
         // Queue implementation (FCFS scheduler only)
-        string queue_impl = 18;         // "circular", "deque", "multimap", or "block" (default: "circular")
+        string queue_impl = 20;         // "circular", "deque", "multimap", or "block" (default: "circular")
 
         // Block size for block queue implementation (must be power of 2)
-        uint32 block_size = 19;         // 32, 64, 128, or 256 (default: 128)
+        uint32 block_size = 21;         // 32, 64, 128, or 256 (default: 128)
 
         // Initial capacity for circular queue implementation. 0 means
         // the size of the job trace (large enough it can never overflow).
-        uint64 wait_queue_capacity = 20;  // (default: 0)
+        uint64 wait_queue_capacity = 22;  // (default: 0)
 
         // What to do if a circular queue insert would exceed wait_queue_capacity
-        string wait_queue_overflow = 21;  // "abort" or "grow" (default: "grow")
-
-        // Field 22 was "job_store" ("vector" or "circular"), a runtime
-        // choice for Trace::m_data's container - removed once m_data
-        // became unconditionally boost::circular_buffer, with no vector
-        // path left to choose between. Not reused for anything else.
-        reserved 22;
-        reserved "job_store";
+        string wait_queue_overflow = 23;  // "abort" or "grow" (default: "grow")
 
         // Initial capacity for the job-record store (Trace::m_data, a
         // boost::circular_buffer). 0 means the size of the job trace
         // (large enough it can never overflow).
-        uint64 job_store_capacity = 23; // (default: 0)
+        uint64 job_store_capacity = 24; // (default: 0)
 
         // What to do if a job-store insert would exceed job_store_capacity
-        string job_store_overflow = 24; // "abort" or "grow" (default: "grow")
+        string job_store_overflow = 25; // "abort" or "grow" (default: "grow")
         // Before growing the job-record store for a new batch, refuse
         // if doing so would push projected peak usage past this
         // fraction of actual available system memory (Linux only; a
         // no-op elsewhere). Must be > 0.0 and <= 1.0 (e.g. 0.8 for
         // 80%); 0.0 (the default) disables the check entirely.
         // Independent of job_store_overflow.
-        double memory_pressure_fraction = 27;
+        double memory_pressure_fraction = 26;
 
         // Initial capacity for the resource-history circular buffer. 0
         // means the size of the job trace. No overflow-policy field:
         // unlike job_store, every entry here is always immediately safe
         // to reclaim, so reclaiming when full never needs an abort/grow
         // fallback.
-        uint64 resource_history_capacity = 25; // (default: 0)
+        uint64 resource_history_capacity = 27; // (default: 0)
     }
 
     message Tracing_Params {

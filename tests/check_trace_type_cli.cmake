@@ -10,12 +10,16 @@ endif()
 
 set(PCON_OUTPUT "${WORK_DIR}/test_trace_type_pcon.csv")
 set(PCON_RESOURCES "${WORK_DIR}/test_trace_type_pcon_resources.csv")
+set(PCON_AS_STANDARD_OUTPUT "${WORK_DIR}/test_trace_type_pcon_as_standard.csv")
+set(PCON_AS_STANDARD_RESOURCES "${WORK_DIR}/test_trace_type_pcon_as_standard_resources.csv")
 set(STANDARD_OUTPUT "${WORK_DIR}/test_trace_type_standard.csv")
 set(STANDARD_RESOURCES "${WORK_DIR}/test_trace_type_standard_resources.csv")
 
 file(REMOVE
   "${PCON_OUTPUT}"
   "${PCON_RESOURCES}"
+  "${PCON_AS_STANDARD_OUTPUT}"
+  "${PCON_AS_STANDARD_RESOURCES}"
   "${STANDARD_OUTPUT}"
   "${STANDARD_RESOURCES}")
 
@@ -49,8 +53,45 @@ if (PCON_HEADER_POS EQUAL -1)
     "Pcon resource trace does not contain Pcon columns:\n${PCON_CONTENTS}")
 endif()
 
-# The same Pcon-shaped input must fail under the default standard trace type:
-# standard parsing must not silently acquire knowledge of experimental fields.
+# The standard parser intentionally ignores extra columns it does not know
+# about. Therefore the same Pcon-shaped CSV is valid standard input, but the
+# experimental columns must not affect standard resource output.
+execute_process(
+  COMMAND "${SIMULATOR}"
+    --trace_format simple
+    --timestamp_format epoch
+    --run_time_mode limit
+    --total_nodes 4
+    --outfile "${PCON_AS_STANDARD_OUTPUT}"
+    --resource_trace "${PCON_AS_STANDARD_RESOURCES}"
+    "${INPUT}"
+  RESULT_VARIABLE PCON_AS_STANDARD_RESULT
+  OUTPUT_VARIABLE PCON_AS_STANDARD_STDOUT
+  ERROR_VARIABLE PCON_AS_STANDARD_STDERR)
+
+if (NOT PCON_AS_STANDARD_RESULT EQUAL 0)
+  message(FATAL_ERROR
+    "Pcon-shaped input failed under default standard trace type (${PCON_AS_STANDARD_RESULT})\n"
+    "stdout:\n${PCON_AS_STANDARD_STDOUT}\n"
+    "stderr:\n${PCON_AS_STANDARD_STDERR}")
+endif()
+
+file(READ "${PCON_AS_STANDARD_RESOURCES}" PCON_AS_STANDARD_CONTENTS)
+string(FIND "${PCON_AS_STANDARD_CONTENTS}"
+  "time,free_nodes,allocated_nodes\n"
+  PCON_AS_STANDARD_HEADER_POS)
+if (PCON_AS_STANDARD_HEADER_POS EQUAL -1)
+  message(FATAL_ERROR
+    "Default standard resource trace has an unexpected header:\n"
+    "${PCON_AS_STANDARD_CONTENTS}")
+endif()
+string(FIND "${PCON_AS_STANDARD_CONTENTS}" "avgpcon" PCON_AS_STANDARD_PCON_POS)
+if (NOT PCON_AS_STANDARD_PCON_POS EQUAL -1)
+  message(FATAL_ERROR
+    "Default standard resource trace unexpectedly contains Pcon columns:\n"
+    "${PCON_AS_STANDARD_CONTENTS}")
+endif()
+
 # Use a standard-shaped temporary input to verify default dispatch separately.
 set(STANDARD_INPUT "${WORK_DIR}/test_trace_type_standard_input.csv")
 file(WRITE "${STANDARD_INPUT}"

@@ -318,9 +318,10 @@ For issues or questions:
 
 Planned features:
 - Checkpoint/restart capability for long-running simulations
-- Simulation warmup: exclude jobs in accounting that ran before the intended
-  simulation window (the input trace may start days earlier) so accounting
-  begins from a realistic, warmed-up resource state rather than an empty system.
+- Simulation warmup: allow jobs to run before the intended simulation window
+  such that the simulation accounting begins from a realistic, warmed-up
+  resource state rather than an empty system. The input trace may start days
+  earlier, but warmup jobs should excluded from tracing.
 - Multi-file output: split output traces across multiple files with a
   configurable per-file record limit, for long-running digital twin
   simulations.
