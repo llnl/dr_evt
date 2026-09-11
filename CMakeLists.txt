@@ -589,6 +589,9 @@ if (DR_EVT_WITH_UNIT_TESTING)
       -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/data/pcon_cli_input.csv
       -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_trace_type_cli.cmake)
+  add_test(
+    NAME test_pcon_trace
+    COMMAND $<TARGET_FILE:test_pcon_trace-bin>)
 endif()
 
 # Progressive/multi-file loading test (--infile_list) - see
