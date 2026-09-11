@@ -46,6 +46,14 @@ enum class CircularOverflowPolicy {
   GROW   ///< Reallocate a larger queue and retain existing entries.
 };
 
+/**
+ * @brief Job-trace data model selection.
+ */
+enum class TraceType {
+  STANDARD, ///< Standard job/resource records (default).
+  PCON      ///< Experimental inline Pcon job/resource records.
+};
+
 /** @brief Complete configuration for a Simulation run or streaming session. */
 class Sim_Params {
 public:
@@ -134,6 +142,8 @@ public:
   size_t m_resource_history_capacity;
   /// Total nodes available to the simulated scheduler.
   num_nodes_t m_total_nodes;
+  /// Job-trace data model: standard or experimental Pcon.
+  TraceType m_trace_type;
   /// Input trace format name, such as "simple" or "lassen".
   std::string m_trace_format;
   /// Input timestamp format name, such as "epoch" or "iso".

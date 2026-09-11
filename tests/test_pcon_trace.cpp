@@ -39,6 +39,8 @@ int main() {
                 sizeof(std::pair<dr_evt::epoch_t, dr_evt::num_nodes_t>));
   static_assert(std::is_same_v<dr_evt::Trace::trace_data_t,
                                boost::circular_buffer<dr_evt::Job_Record>>);
+  static_assert(sizeof(dr_evt::Trace::trace_data_t::value_type) ==
+                sizeof(dr_evt::Job_Record));
 
   {
     std::ofstream input(input_path);
@@ -78,6 +80,7 @@ int main() {
   try {
     dr_evt::Sim_Params params;
     params.m_infile = simulation_input_path;
+    params.m_trace_type = dr_evt::TraceType::PCON;
     params.m_total_nodes = 4;
     params.m_trace_format = "simple";
     params.m_timestamp_format = "epoch";

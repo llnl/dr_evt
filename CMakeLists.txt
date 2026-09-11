@@ -416,19 +416,6 @@ set_target_properties(sim-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 list(APPEND DR_EVT_EXEC_TARGETS sim-bin)
 
-# Pcon-enabled simulator. This is a separate executable so the standard
-# simulator retains the compact standard record and resource-sample types.
-add_executable(pcon-sim-bin src/pcon_sim.cpp)
-target_include_directories(pcon-sim-bin PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(pcon-sim-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-set_target_properties(pcon-sim-bin PROPERTIES OUTPUT_NAME pcon_simulator)
-set_target_properties(pcon-sim-bin PROPERTIES CMAKE_INSTALL_RPATH
-                      "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-list(APPEND DR_EVT_EXEC_TARGETS pcon-sim-bin)
-
 # add executable tracer
 add_executable( trace-bin src/trace.cpp )
 target_include_directories(trace-bin PUBLIC
@@ -593,6 +580,16 @@ set_target_properties(test_pcon_trace-bin PROPERTIES OUTPUT_NAME test_pcon_trace
 set_target_properties(test_pcon_trace-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_pcon_trace-bin)
+
+if (DR_EVT_WITH_UNIT_TESTING)
+  add_test(
+    NAME test_trace_type_cli
+    COMMAND ${CMAKE_COMMAND}
+      -DSIMULATOR=$<TARGET_FILE:sim-bin>
+      -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/data/pcon_cli_input.csv
+      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_trace_type_cli.cmake)
+endif()
 
 # Progressive/multi-file loading test (--infile_list) - see
 # tests/test_progressive_load.cpp

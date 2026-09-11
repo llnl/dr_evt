@@ -111,14 +111,16 @@ struct Pcon_Trace_Policy {
            std::to_string(sample.pcon.maxpcon);
   }
   void on_start(const record_type &job) {
-    m_current.avgpcon += job.pcon().avgpcon;
-    m_current.minpcon += job.pcon().minpcon;
-    m_current.maxpcon += job.pcon().maxpcon;
+    const auto &pcon = job.pcon();
+    m_current.avgpcon += pcon.avgpcon;
+    m_current.minpcon += pcon.minpcon;
+    m_current.maxpcon += pcon.maxpcon;
   }
   void on_finish(const record_type &job) {
-    m_current.avgpcon -= job.pcon().avgpcon;
-    m_current.minpcon -= job.pcon().minpcon;
-    m_current.maxpcon -= job.pcon().maxpcon;
+    const auto &pcon = job.pcon();
+    m_current.avgpcon -= pcon.avgpcon;
+    m_current.minpcon -= pcon.minpcon;
+    m_current.maxpcon -= pcon.maxpcon;
   }
 
 private:

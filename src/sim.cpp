@@ -11,6 +11,42 @@
 #include <cstdlib>
 #include <iostream>
 
+namespace {
+
+template <typename SimulationType>
+void run_simulation(const dr_evt::Sim_Params &cfg) {
+  SimulationType sim(cfg);
+  sim.run();
+
+  // Write simulated trace
+  sim.write_simulated_trace();
+
+  // Write resource trace (if --resource_trace specified or default location)
+  std::string resource_file = cfg.get_resource_trace();
+  if (resource_file.empty()) {
+    // Default: derive from output file
+    resource_file = cfg.get_outfile();
+    if (!resource_file.empty()) {
+      // Replace .csv with _resources.csv
+      size_t pos = resource_file.rfind(".csv");
+      if (pos != std::string::npos) {
+        resource_file = resource_file.substr(0, pos) + "_resources.csv";
+      } else {
+        resource_file += "_resources.csv";
+      }
+    }
+  }
+  if (!resource_file.empty()) {
+    sim.write_resource_trace(resource_file);
+  }
+
+  // Print statistics
+  std::cout << std::endl;
+  sim.print_stats(std::cout);
+}
+
+} // namespace
+
 /** @brief Run the command-line scheduling simulator.
  * @param[in] argc Number of command-line arguments.
  * @param[in] argv Command-line argument vector.
@@ -28,34 +64,11 @@ int main(int argc, char **argv) {
 
   try {
     // Create and run simulation
-    dr_evt::Simulation sim(cfg);
-    sim.run();
-
-    // Write simulated trace
-    sim.write_simulated_trace();
-
-    // Write resource trace (if --resource_trace specified or default location)
-    std::string resource_file = cfg.get_resource_trace();
-    if (resource_file.empty()) {
-      // Default: derive from output file
-      resource_file = cfg.get_outfile();
-      if (!resource_file.empty()) {
-        // Replace .csv with _resources.csv
-        size_t pos = resource_file.rfind(".csv");
-        if (pos != std::string::npos) {
-          resource_file = resource_file.substr(0, pos) + "_resources.csv";
-        } else {
-          resource_file += "_resources.csv";
-        }
-      }
+    if (cfg.m_trace_type == dr_evt::TraceType::PCON) {
+      run_simulation<dr_evt::PconSimulation>(cfg);
+    } else {
+      run_simulation<dr_evt::Simulation>(cfg);
     }
-    if (!resource_file.empty()) {
-      sim.write_resource_trace(resource_file);
-    }
-
-    // Print statistics
-    std::cout << std::endl;
-    sim.print_stats(std::cout);
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << std::endl;
     rc = EXIT_FAILURE;

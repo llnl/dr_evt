@@ -24,6 +24,8 @@
 
 namespace dr_evt {
 
+static constexpr int OPT_TRACE_TYPE = 1000;
+
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
 /** @brief Long-option table for the simulator CLI. */
@@ -46,6 +48,7 @@ static const struct option sim_longopts[] = {
     {"job_store_overflow", required_argument, 0, 'W'},
     {"check_memory_pressure", required_argument, 0, 'm'},
     {"resource_history_capacity", required_argument, 0, 'H'},
+    {"trace_type", required_argument, 0, OPT_TRACE_TYPE},
     {"trace_format", required_argument, 0, 'f'},
     {"timestamp_format", required_argument, 0, 'T'},
     {"timezone", required_argument, 0, 'z'},
@@ -72,6 +75,7 @@ Sim_Params::Sim_Params()
       m_job_store_overflow(CircularOverflowPolicy::GROW),
       m_memory_pressure_fraction(0.0), m_resource_history_capacity(0),
       m_total_nodes(dr_evt::total_nodes),
+      m_trace_type(TraceType::STANDARD),
       m_trace_format("simple"),  // Default to simple format
       m_timestamp_format("iso"), // Default to ISO/human-readable timestamps
       m_timezone("America/Los_Angeles"),    // Default timezone
@@ -245,6 +249,20 @@ void Sim_Params::getopt(int &argc, char **&argv) {
     case 'H': /* --resource_history_capacity */
     {
       m_resource_history_capacity = std::stoull(optarg);
+    } break;
+    case OPT_TRACE_TYPE: /* --trace_type */
+    {
+      std::string type(optarg);
+      if (type.empty() || type == "standard") {
+        m_trace_type = TraceType::STANDARD;
+      } else if (type == "pcon") {
+        m_trace_type = TraceType::PCON;
+      } else {
+        std::cerr << "Unknown trace type: " << type << std::endl;
+        std::cerr << "Valid options: 'standard' (default), 'pcon'"
+                  << std::endl;
+        print_usage(argv[0], 1);
+      }
     } break;
     case 'f': /* --trace_format */
     {
@@ -504,6 +522,15 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        immediately safe to reclaim, so reclaiming on a full buffer\n"
          "        always succeeds.\n"
          "\n"
+         "    --trace_type {standard|pcon}\n"
+         "        Job-trace data model (default: standard).\n"
+         "        standard: standard job records and resource-history "
+         "samples.\n"
+         "        pcon: experimental records with avgpcon, minpcon, and\n"
+         "        maxpcon stored inline in each Pcon job record.\n"
+         "        This is independent of --trace_format, which controls the\n"
+         "        input-file parser/layout.\n"
+         "\n"
          "    -f, --trace_format {simple|lassen}\n"
          "        Trace file format (default: simple).\n"
          "        simple: CSV, columns looked up by name in the header row.\n"
@@ -624,6 +651,13 @@ void Sim_Params::print() const {
     msg += "SJF";
   else
     msg += "LJF";
+  msg += "\n";
+
+  msg += " - trace_type: ";
+  if (m_trace_type == TraceType::STANDARD)
+    msg += "STANDARD";
+  else
+    msg += "PCON";
   msg += "\n";
 
   msg += " - trace_format: " + m_trace_format + "\n";
