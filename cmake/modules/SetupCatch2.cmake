@@ -1,8 +1,6 @@
 # Catch2 v2 is required by the existing unit tests, which use
 # <catch2/catch.hpp> and CATCH_CONFIG_MAIN.
 
-set(DR_EVT_HAS_CATCH2 TRUE)
-
 # Prefer an existing Catch2 v2 installation when available.
 find_path(
   CATCH2_INCLUDE_DIR
@@ -37,5 +35,14 @@ else()
 
   set(CATCH2_INCLUDE_DIR
       "${catch2_SOURCE_DIR}/single_include"
-      CACHE PATH "Catch2 include directory")
+      CACHE PATH "Catch2 include directory"
+      FORCE)
 endif()
+
+if (NOT EXISTS "${CATCH2_INCLUDE_DIR}/catch2/catch.hpp")
+  message(FATAL_ERROR
+    "Catch2 v2 header not found at "
+    "${CATCH2_INCLUDE_DIR}/catch2/catch.hpp")
+endif()
+
+set(DR_EVT_HAS_CATCH2 TRUE)
