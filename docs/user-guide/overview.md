@@ -647,6 +647,8 @@ grep "Average wait time" results/*.txt | \
 - [CLI Options](command-line.md) - Complete command-line reference
 - [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE specifications
 - [Streaming API](../api/STREAMING_API.md) - Online simulation API
+- [Fugaku Power-Usage Experiment](fugaku-power-experiment.md) - Progressive
+  loading and power-usage plots for a large real workload
 
 ## Support
 

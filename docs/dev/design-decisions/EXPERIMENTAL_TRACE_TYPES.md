@@ -21,11 +21,11 @@ simulation types once at startup. The trace-type choice is therefore not made
 for each job.
 
 The standard trace continues to store `Job_Record` directly. It does not add a
-Pcon pointer, vector, variant, optional field, discriminator, or other
-Pcon-specific per-job storage.
+power-usage pointer, vector, variant, optional field, discriminator, or other
+power-usage-specific per-job storage.
 
-The Pcon trace instead stores `Pcon_Job_Record`, which derives from
-`Job_Record` and carries three Pcon values inline:
+The power-usage trace instead stores `Pcon_Job_Record`, which derives from
+`Job_Record` and carries three power-usage values inline:
 
 ```text
 avgpcon
@@ -50,20 +50,20 @@ The trace data model is selected with:
 in-memory job/resource data model; the latter chooses the input trace parser
 and layout, such as `simple` or `lassen`.
 
-For a simple Pcon scheduling trace, the input includes the normal scheduling
-columns plus:
+For a simple power-usage scheduling trace, the input includes the normal
+scheduling columns plus:
 
 ```text
 avgpcon,minpcon,maxpcon
 ```
 
-The Pcon resource trace adds those aggregate columns to the standard resource
-history:
+The power-usage resource trace adds those aggregate columns to the standard
+resource history:
 
 ```text
 time,free_nodes,allocated_nodes,avgpcon,minpcon,maxpcon
 ```
 
-Selecting the standard trace type does not add Pcon fields to `Job_Record` or
-to the standard resource-history sample, and introduces no per-job
+Selecting the standard trace type does not add power-usage fields to
+`Job_Record` or to the standard resource-history sample, and introduces no per-job
 experimental allocation or dynamic container.

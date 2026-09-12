@@ -13,11 +13,11 @@ and timezone handling.
 **standard** (default): Standard DR_EVT job and resource records.
 
 **pcon**: Experimental records carrying per-job `avgpcon`, `minpcon`, and
-`maxpcon` values, with corresponding Pcon-aware resource traces.
+`maxpcon` values, with corresponding power-usage resource traces.
 
 `--trace_type` is independent of `--trace_format`. For example,
 `--trace_type pcon --trace_format simple` uses the simple CSV parser with the
-Pcon record model.
+power-usage record model.
 
 ### Trace Format
 ```bash
@@ -115,7 +115,7 @@ job_submit_time,begin_time,end_time,num_nodes,time_limit
 2024-01-15T00:02:00,2024-01-15T00:02:30,2024-01-15T00:03:50,10,80
 ```
 
-### Pcon Simulation Mode
+### Power-Usage Simulation Mode
 ```text
 job_submit_time,num_nodes,time_limit,avgpcon,minpcon,maxpcon
 0,2,3,1.5,2.0,3.0
@@ -123,7 +123,10 @@ job_submit_time,num_nodes,time_limit,avgpcon,minpcon,maxpcon
 ```
 
 Use this form with `--trace_type pcon`. `q_id` remains optional and defaults
-to `1` (`Queue1`).
+to `1` (`Queue1`). The `avgpcon`, `minpcon`, and `maxpcon` columns are required
+and recognized only when `--trace_type pcon` is selected. With the default
+`--trace_type standard`, they are treated as unrecognized extra columns and
+ignored.
 
 ## Column Descriptions
 
@@ -142,9 +145,9 @@ determines simulation vs replay mode (see below).
 | `begin_time` | Historical start time from trace | Replay mode only; must appear together with `end_time` |
 | `end_time` | Historical end time from trace | Replay mode only; must appear together with `begin_time` |
 | `duration` | Accepted alias for `actual_run_time` | Simulation mode, only with `--run_time_mode actual` |
-| `avgpcon` | Average Pcon value associated with the job | Pcon trace type |
-| `minpcon` | Minimum Pcon value associated with the job | Pcon trace type |
-| `maxpcon` | Maximum Pcon value associated with the job | Pcon trace type |
+| `avgpcon` | Average power usage associated with the job | Required only with `--trace_type pcon`; ignored in standard mode |
+| `minpcon` | Minimum power usage associated with the job | Required only with `--trace_type pcon`; ignored in standard mode |
+| `maxpcon` | Maximum power usage associated with the job | Required only with `--trace_type pcon`; ignored in standard mode |
 | `exit_status` | Output-only compatibility field. The simulator currently writes `0`. | Generated output only |
 | `actual_run_time` | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Simulation mode, only with `--run_time_mode actual` |
 
@@ -219,3 +222,5 @@ Expected output should show:
 - [User Guide](overview.md) - Complete usage guide with trace formats
 - [Testing Guide](../TESTING_GUIDE.md) - Test suite and validation
 - [Quick Start](../getting-started/quickstart.md) - Getting started guide
+- [Fugaku Power-Usage Experiment](fugaku-power-experiment.md) - Large-scale
+  power-usage input and progressive loading example

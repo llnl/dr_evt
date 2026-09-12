@@ -6,6 +6,7 @@ This directory contains test traces for the DR_EVT job scheduler simulator.
 
 ```
 test_traces/
+├── pcon_cli_input.csv             # Power-usage trace-type CLI/config fixture
 ├── scheduler_correctness/        # Scheduler correctness tests (34 tests)
 │   ├── *.csv                    # Input traces (simulation mode)
 │   ├── *.expected_output.csv    # Expected job schedule

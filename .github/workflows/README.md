@@ -22,7 +22,8 @@ This directory contains GitHub Actions workflows for automated testing.
 - Replay tests (4)
 - Resource-history tests (5)
 - Job-store tests (6)
-- Config tests, including Pcon `trace_type` coverage
+- Config tests, including power-usage `trace_type` coverage
+- Dedicated power-usage CTest tests (2)
 - Python API tests (16)
 - gRPC client/server tests (2)
 - Append-job tests (C++ + gRPC)
@@ -69,7 +70,8 @@ Total tests referenced by the full suite:
 | Replay | 4 | CI runner |
 | Resource history | 5 | CI runner |
 | Job store | 6 | CI runner |
-| Config | 9 | CI runner; includes Pcon `trace_type` coverage |
+| Config | 9 | CI runner; includes power-usage `trace_type` coverage |
+| Power-usage CTest | 2 | CI runner; policy/storage and CLI dispatch coverage |
 | Python API | 16 | CI runner |
 | gRPC client/server | 2 | CI runner |
 | Append-job | 18 C++ + gRPC | CI runner |

@@ -145,4 +145,5 @@ Try these modifications:
 1. **Add more jobs** - What happens with 10 jobs?
 2. **Change resources** - Use `--total_nodes 50` - does Job 1 still backfill?
 3. **Different durations** - Make Job 1 duration 100 instead of 30
-4. **Real trace** - Try one of the test traces in `tests/test_traces/correctness/`
+4. **Real trace** - Try one of the test traces in
+   `tests/test_traces/scheduler_correctness/`

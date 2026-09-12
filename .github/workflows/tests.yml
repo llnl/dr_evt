@@ -245,9 +245,15 @@ jobs:
         id: config
         run: |
           echo "========================================"
-          echo "Running Config Tests (7 tests)"
+          echo "Running Config Tests (9 tests)"
           echo "========================================"
           ./tests/run_configs_tests.sh
+
+      - name: Run Power-Usage CTest Tests
+        id: pcon-ctest
+        run: |
+          cd build
+          ctest -R '^(test_pcon_trace|test_trace_type_cli)$' --output-on-failure
 
       - name: Run Python API Tests
         id: python-api
@@ -322,7 +328,8 @@ jobs:
           echo "  Replay (4 tests): ${{ steps.replay.outcome }}"
           echo "  Resource History (5 tests): ${{ steps.resource-history.outcome }}"
           echo "  Job Store (6 tests): ${{ steps.job-store.outcome }}"
-          echo "  Config (7 tests): ${{ steps.config.outcome }}"
+          echo "  Config (9 tests): ${{ steps.config.outcome }}"
+          echo "  Power-usage CTest tests (2 tests): ${{ steps.pcon-ctest.outcome }}"
           echo "  Python API (16 tests): ${{ steps.python-api.outcome }}"
           echo "  Append-Job (18 C++ + gRPC): ${{ steps.append-job.outcome }}"
           echo "  Backfill Window gRPC (included in Append-Job count): ${{ steps.backfill-window.outcome }}"

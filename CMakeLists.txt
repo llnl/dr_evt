@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.24)
 
 project(DR_EVT CXX)
 
+# Resolve the platform's install layout before any install or RPATH variable
+# is used. The cached CMAKE_INSTALL_LIBDIR value is also inherited by
+# dependencies added with FetchContent.
+include(GNUInstallDirs)
+
 # Prevent in-source builds
 if (PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
   message(FATAL_ERROR
@@ -181,9 +186,6 @@ if("${isSystemDir}" STREQUAL "-1")
     set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 endif("${isSystemDir}" STREQUAL "-1")
 
-# Get installation directories -- these get used in various places;
-# best to just make them available
-include(GNUInstallDirs)
 include(ExternalProject)
 include(SetupCXX)
 
@@ -584,7 +586,7 @@ if (DR_EVT_WITH_UNIT_TESTING)
     NAME test_trace_type_cli
     COMMAND ${CMAKE_COMMAND}
       -DSIMULATOR=$<TARGET_FILE:sim-bin>
-      -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/data/pcon_cli_input.csv
+      -DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/tests/test_traces/pcon_cli_input.csv
       -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_trace_type_cli.cmake)
   add_test(
@@ -1000,14 +1002,14 @@ if(DR_EVT_HAS_PYBIND11)
     SUFFIX "${PYTHON_MODULE_EXTENSION}"
   )
 
-  # Install Python module to CMAKE_INSTALL_PREFIX/lib/python instead of system site-packages
-  # to avoid permission errors when Python3_SITELIB is read-only (e.g., Anaconda system install)
-  set(DR_EVT_PYTHON_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib/python)
+  # Keep the Python module in this installation's selected library directory
+  # instead of a system site-packages directory, which may be read-only.
+  set(DR_EVT_PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python")
 
   install(TARGETS dr_evt_python
     LIBRARY DESTINATION ${DR_EVT_PYTHON_INSTALL_DIR} COMPONENT Python
   )
 
-  message(STATUS "Python module will be installed to: ${DR_EVT_PYTHON_INSTALL_DIR}")
-  message(STATUS "Add to PYTHONPATH: export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH")
+  message(STATUS "Python module will be installed to: ${CMAKE_INSTALL_PREFIX}/${DR_EVT_PYTHON_INSTALL_DIR}")
+  message(STATUS "Add to PYTHONPATH: export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/${DR_EVT_PYTHON_INSTALL_DIR}:$PYTHONPATH")
 endif()

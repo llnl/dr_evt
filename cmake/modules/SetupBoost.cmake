@@ -73,21 +73,51 @@ if (EXISTS "${CMAKE_BINARY_DIR}/_deps/boost-build")
     endforeach()
     unset(DR_EVT_BOOST_COMPONENT_UPPER)
 endif()
-# Prefer a Boost package installed by a previous `cmake --install` into this
-# project's nonempty prefix. HINTS remains usable with NO_DEFAULT_PATH, so
-# this also works when AVOID_SYSTEM_BOOST is enabled; FetchContent remains the
-# fallback. Do not add an empty prefix, which could otherwise undermine an
-# explicit no-system-search configuration.
+# Build the complete list of user-selected prefixes. Explicit Boost roots take
+# precedence, followed by CMAKE_PREFIX_PATH and finally this project's install
+# prefix. HINTS remains usable with NO_DEFAULT_PATH, so these prefixes are
+# still searched when AVOID_SYSTEM_BOOST is enabled.
 set(DR_EVT_BOOST_INSTALL_HINTS)
-if (CMAKE_INSTALL_PREFIX)
-    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${CMAKE_INSTALL_PREFIX}")
-endif()
 if (DEFINED Boost_ROOT)
     list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${Boost_ROOT}")
 endif()
 if (DEFINED BOOST_ROOT)
     list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${BOOST_ROOT}")
 endif()
+if (CMAKE_PREFIX_PATH)
+    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${CMAKE_PREFIX_PATH}")
+endif()
+if (DEFINED ENV{CMAKE_PREFIX_PATH} AND NOT "$ENV{CMAKE_PREFIX_PATH}" STREQUAL "")
+    cmake_path(CONVERT "$ENV{CMAKE_PREFIX_PATH}" TO_CMAKE_PATH_LIST
+        DR_EVT_BOOST_ENV_PREFIX_PATH NORMALIZE)
+    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${DR_EVT_BOOST_ENV_PREFIX_PATH}")
+endif()
+if (CMAKE_INSTALL_PREFIX)
+    list(APPEND DR_EVT_BOOST_INSTALL_HINTS "${CMAKE_INSTALL_PREFIX}")
+endif()
+list(REMOVE_DUPLICATES DR_EVT_BOOST_INSTALL_HINTS)
+
+# FindBoost's MODULE mode does not consume find_package HINTS. Supply
+# conventional include, lib, and lib64 locations explicitly so prefixes that
+# do not provide BoostConfig.cmake are also honored with system paths disabled.
+set(DR_EVT_BOOST_INCLUDE_HINTS)
+set(DR_EVT_BOOST_LIBRARY_HINTS)
+if (DEFINED BOOST_INCLUDEDIR)
+    list(APPEND DR_EVT_BOOST_INCLUDE_HINTS ${BOOST_INCLUDEDIR})
+endif()
+if (DEFINED BOOST_LIBRARYDIR)
+    list(APPEND DR_EVT_BOOST_LIBRARY_HINTS ${BOOST_LIBRARYDIR})
+endif()
+foreach(DR_EVT_BOOST_PREFIX IN LISTS DR_EVT_BOOST_INSTALL_HINTS)
+    list(APPEND DR_EVT_BOOST_INCLUDE_HINTS
+        "${DR_EVT_BOOST_PREFIX}/include" "${DR_EVT_BOOST_PREFIX}")
+    list(APPEND DR_EVT_BOOST_LIBRARY_HINTS
+        "${DR_EVT_BOOST_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+        "${DR_EVT_BOOST_PREFIX}/lib"
+        "${DR_EVT_BOOST_PREFIX}/lib64")
+endforeach()
+list(REMOVE_DUPLICATES DR_EVT_BOOST_INCLUDE_HINTS)
+list(REMOVE_DUPLICATES DR_EVT_BOOST_LIBRARY_HINTS)
 set(DR_EVT_BOOST_COMPONENTS
     regex
     filesystem
@@ -110,18 +140,44 @@ if (NOT Boost_FOUND)
     if (POLICY CMP0167)
         cmake_policy(SET CMP0167 OLD)
     endif()
-    if (CMAKE_INSTALL_PREFIX AND NOT DEFINED Boost_ROOT AND NOT DEFINED BOOST_ROOT)
-        set(Boost_ROOT "${CMAKE_INSTALL_PREFIX}")
+    if (DEFINED BOOST_INCLUDEDIR)
+        set(DR_EVT_HAD_BOOST_INCLUDEDIR TRUE)
+        set(DR_EVT_SAVED_BOOST_INCLUDEDIR "${BOOST_INCLUDEDIR}")
+    else()
+        set(DR_EVT_HAD_BOOST_INCLUDEDIR FALSE)
     endif()
-    if (CMAKE_INSTALL_PREFIX AND NOT DEFINED BOOST_LIBRARYDIR)
-        set(BOOST_LIBRARYDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    if (DEFINED BOOST_LIBRARYDIR)
+        set(DR_EVT_HAD_BOOST_LIBRARYDIR TRUE)
+        set(DR_EVT_SAVED_BOOST_LIBRARYDIR "${BOOST_LIBRARYDIR}")
+    else()
+        set(DR_EVT_HAD_BOOST_LIBRARYDIR FALSE)
     endif()
+    set(BOOST_INCLUDEDIR "${DR_EVT_BOOST_INCLUDE_HINTS}")
+    set(BOOST_LIBRARYDIR "${DR_EVT_BOOST_LIBRARY_HINTS}")
     find_package(Boost MODULE QUIET COMPONENTS ${DR_EVT_BOOST_COMPONENTS}
     )
+    if (DR_EVT_HAD_BOOST_INCLUDEDIR)
+        set(BOOST_INCLUDEDIR "${DR_EVT_SAVED_BOOST_INCLUDEDIR}")
+    else()
+        unset(BOOST_INCLUDEDIR)
+    endif()
+    if (DR_EVT_HAD_BOOST_LIBRARYDIR)
+        set(BOOST_LIBRARYDIR "${DR_EVT_SAVED_BOOST_LIBRARYDIR}")
+    else()
+        unset(BOOST_LIBRARYDIR)
+    endif()
     cmake_policy(POP)
 endif()
 unset(DR_EVT_BOOST_COMPONENTS)
 unset(DR_EVT_BOOST_INSTALL_HINTS)
+unset(DR_EVT_BOOST_ENV_PREFIX_PATH)
+unset(DR_EVT_BOOST_INCLUDE_HINTS)
+unset(DR_EVT_BOOST_LIBRARY_HINTS)
+unset(DR_EVT_BOOST_PREFIX)
+unset(DR_EVT_SAVED_BOOST_INCLUDEDIR)
+unset(DR_EVT_SAVED_BOOST_LIBRARYDIR)
+unset(DR_EVT_HAD_BOOST_INCLUDEDIR)
+unset(DR_EVT_HAD_BOOST_LIBRARYDIR)
 
 if(NOT Boost_FOUND)
     # If Boost is missing, install it via FetchContent

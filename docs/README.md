@@ -21,6 +21,7 @@ docs/
 │   ├── protobuf-config.md         # Protobuf config file format
 │   ├── trace-formats.md           # Input trace files
 │   ├── output-traces.md           # Output trace files
+│   ├── fugaku-power-experiment.md # Fugaku power-usage simulation
 │   ├── grpc-setup.md              # Client/server build/setup
 │   └── client-server-use-cases.md # Client/server deployment examples
 ├── dev/                             # Developer documentation
@@ -59,8 +60,9 @@ docs/
 2. [Command-Line Options](user-guide/command-line.md) - All options
 3. [Input Trace Files](user-guide/trace-formats.md) - Input trace file formats
 4. [Output Trace Files](user-guide/output-traces.md) - Simulated-job and resource-trace outputs
-5. [Client/Server Setup](user-guide/grpc-setup.md) - Network client/server setup
-6. [Client/Server Use Cases](user-guide/client-server-use-cases.md) - Bare-metal, container, and multi-server deployment patterns
+5. [Fugaku Power-Usage Experiment](user-guide/fugaku-power-experiment.md) - Progressive simulation and power-usage plotting
+6. [Client/Server Setup](user-guide/grpc-setup.md) - Network client/server setup
+7. [Client/Server Use Cases](user-guide/client-server-use-cases.md) - Bare-metal, container, and multi-server deployment patterns
 
 ### For Researchers
 1. [Test Summary](TESTING_GUIDE.md#test-summary) - ✓ All tests pass
