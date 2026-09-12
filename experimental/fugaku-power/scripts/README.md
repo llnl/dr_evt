@@ -31,9 +31,9 @@ python3 experimental/fugaku-power/scripts/python_reference_scheduler.py \
   TRACE.csv --nodes 142167 --outdir OUTPUT_DIR
 ```
 
-The implementation is intended as a readable reference. It can run the full
-April trace on a sufficiently large node, but measured substantially higher
-memory use and runtime than C++; prefer C++ for routine full-trace runs.
+The implementation is intended as a readable reference. See the
+[implementation-scaling results](../../../docs/user-guide/fugaku-power-experiment.md#simulator-implementation-scaling)
+for measured Python and C++ performance.
 
 ### `analysis/plot_resource_trace.py`
 

@@ -60,26 +60,7 @@ recorded allocation. The April simulation below uses the measured maximum for
 ## Scripts
 
 See [scripts/README.md](scripts/README.md) for the complete script inventory,
-requirements, and commands. The main experiment tools are:
-
-- `scripts/trace_tools/create_scheduling_trace.py`: convert source Parquet
-  data into replay CSV traces.
-- `scripts/trace_tools/create_traces_without_times.py`: derive simulation
-  inputs by removing historical start/end times.
-- `scripts/trace_tools/split_progressive_trace.py`: split one sorted CSV into
-  safe progressive-loading batches and write its `--infile_list` file.
-- `scripts/python_reference_scheduler.py`: experiment-specific copy of the
-  Python EASY scheduler with `duration` and power-usage resource tracking.
-- `scripts/analysis/replay_power_trace.py`: replay historical start/end times
-  without scheduling and produce a power-aware resource trace.
-- `scripts/analysis/plot_resource_trace.py`: create the node-allocation and
-  power-usage figures from a six-column resource trace.
-- `scripts/analysis/plot_simulator_implementation_scaling.py`: compare
-  measured Python-reference and C++ simulator wall-time and memory scaling as
-  cumulative batches are added.
-
-The repository's shared `scripts/python_reference_scheduler.py` remains
-unchanged.
+requirements, and commands.
 
 ## April 2024 Simulation
 
@@ -205,16 +186,9 @@ python3 experimental/fugaku-power/scripts/python_reference_scheduler.py \
   --outdir /tmp/dr_evt_fugaku_power/reference
 ```
 
-It intentionally favors clarity over performance. It completed the full
-420,450-job April trace on LLNL's Dane system, but used 14.25 GiB and took
-425.97 seconds, versus 169.0 MiB and 220.09 seconds for C++. Prefer the C++
-simulator for routine full-trace runs. On a combined 928,736-job March-April
-input, Python used 50.88 GiB and took 849.63 seconds; C++ used 298.8 MiB and
-took 353.70 seconds.
-
-The memory values are peak resident set size (peak RSS) from
-`/usr/bin/time -v`: the maximum physical memory held by the process, not the
-input-file size or total virtual address space.
+It intentionally favors clarity over performance. The measured Python and C++
+results are reported in the
+[Fugaku Power-Usage Experiment](../../docs/user-guide/fugaku-power-experiment.md#simulator-implementation-scaling).
 
 Replay the real Fugaku log's historical start/end times separately to compare
 observed resource use with the simulated schedule. The replay input is not
@@ -242,19 +216,8 @@ The replay figures are `fugaku-replay-node-allocation.png` and
 use the same fixed axes rectangle, so their elapsed-day axes align when the
 figures are stacked vertically.
 
-The full April replay processed 420,450 jobs at 533,015 unique resource
-timestamps over 39.446 days. Peak allocation was 142,167 nodes (89.427% of
-the published capacity), and peak aggregate average power usage was
-14,625,141.205 W. The native C++ replay also completed all 420,450 records
-without a crash in 3.29 seconds with 87.2 MiB peak RSS and independently found
-the same 142,167-node peak from its event-level resource trace.
-
-The replay is a historical baseline, not an expected match for DR_EVT's
-schedule. An exact match would require DR_EVT to reproduce Fugaku's production
-scheduler, policies, constraints, and runtime environment exactly. Here the
-142,167-node simulation instead spans 33.585 days, reaches that configured
-limit, and peaks at 15,648,631.199 W aggregate average power usage. It
-completed in 296.183 seconds with 144.6 MiB peak RSS on `dane.llnl.gov`.
+Replay and simulation measurements, interpretation, and plots are reported in
+the [Fugaku Power-Usage Experiment](../../docs/user-guide/fugaku-power-experiment.md).
 
 ## Data Notes
 

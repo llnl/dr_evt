@@ -39,8 +39,7 @@ static const struct option trace_longopts[] = {
 
 Trace_Params::Trace_Params()
     : m_max_jobs(10u), m_max_time(dr_evt::max_tstamp), m_datfile("out-dat.txt"),
-      m_subfile("out-stat_submission.txt"),
-      m_subsumfile("out-stat_submission_summary.txt"),
+      m_subfile(), m_subsumfile(),
       m_resource_history_capacity(0), m_total_nodes(dr_evt::total_nodes),
       m_is_jobs_set(false), m_is_time_set(false) {}
 
@@ -110,8 +109,6 @@ bool Trace_Params::getopt(int &argc, char **&argv) {
     }
     m_infile = argv[optind];
   }
-  set_outfile(m_outfile);
-
   if (!m_is_jobs_set && m_is_time_set) {
     m_max_jobs = std::numeric_limits<decltype(m_max_jobs)>::max();
   }
@@ -139,13 +136,16 @@ void Trace_Params::print_usage(const std::string exec, int code) {
          "        Specify the maximum number of jobs to run.\n"
          "\n"
          "    -o, --outfile\n"
-         "        Specify the output file name for simulation.\n"
+         "        Optionally write a CSV per-job analysis report.\n"
+         "        No job report is written when this option is omitted.\n"
          "\n"
          "    -s, --subfile\n"
-         "        Specify the output file name for submission stats.\n"
+         "        Optionally write hourly submission statistics.\n"
+         "        No detailed statistics are written when omitted.\n"
          "\n"
          "    -m, --subsumf\n"
-         "        Specify the output file name for submission stats summary.\n"
+         "        Optionally write submission statistics summarized by\n"
+         "        hour of week. No summary is written when omitted.\n"
          "\n"
          "    -t, --max_time\n"
          "        Specify the upper limit of simulation time to run.\n"
@@ -191,13 +191,6 @@ void Trace_Params::print() const {
 
 void Trace_Params::set_outfile(const std::string &ofname) {
   m_outfile = ofname;
-  if (m_outfile.empty()) {
-    if (!m_infile.empty()) {
-      m_outfile = dr_evt::get_default_ofname_from_ifname(m_infile);
-    } else {
-      m_outfile = "trace_out.txt";
-    }
-  }
 }
 
 } // end of namespace dr_evt

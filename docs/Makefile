@@ -29,7 +29,7 @@ doxygen:
 	@if command -v $(DOXYGEN) >/dev/null 2>&1; then \
 		cd .. && $(DOXYGEN) docs/$(DOXYFILE); \
 	else \
-		echo "Doxygen is not installed; skipping the C++ API reference."; \
+		echo "Doxygen is not installed; skipping the C++ Development API Reference."; \
 	fi
 
 # Build HTML documentation

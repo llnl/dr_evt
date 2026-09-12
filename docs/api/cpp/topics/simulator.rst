@@ -6,7 +6,10 @@ advancement, scheduling, statistics, and output generation.
 
 .. only:: doxygen
 
-   .. doxygenclass:: dr_evt::Simulation
+   .. doxygentypedef:: dr_evt::Simulation
+      :project: dr_evt
+
+   .. doxygenclass:: dr_evt::BasicSimulation
       :project: dr_evt
       :members:
       :protected-members:

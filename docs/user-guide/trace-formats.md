@@ -3,91 +3,16 @@
 DR_EVT supports multiple input formats, trace data models, timestamp styles,
 and timezone handling.
 
-## Command-Line Options
+Use `--trace_format` to select the CSV parser and `--trace_type` to select the
+job and resource data model. These options are independent. Their syntax and
+defaults are in [Command-Line Options](command-line.md#trace-format-options).
 
-### Trace Data Model
-```bash
---trace_type {standard|pcon}
-```
+The `standard` data model contains scheduling and resource fields. The `pcon`
+model adds per-job `avgpcon`, `minpcon`, and `maxpcon` values and corresponding
+resource-trace columns.
 
-**standard** (default): Standard DR_EVT job and resource records.
-
-**pcon**: Experimental records carrying per-job `avgpcon`, `minpcon`, and
-`maxpcon` values, with corresponding power-usage resource traces.
-
-`--trace_type` is independent of `--trace_format`. For example,
-`--trace_type pcon --trace_format simple` uses the simple CSV parser with the
-power-usage record model.
-
-### Trace Format
-```bash
---trace_format {simple|lassen}
-```
-
-**simple** (default): Minimal CSV format for testing
-- The parser detects the mode from which columns are present - see [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md) for the full design
-- **Simulation mode** (no `begin_time`/`end_time` columns): `job_submit_time, num_nodes, time_limit` required; `q_id` and `actual_run_time` are optional (`actual_run_time` is needed only for `--run_time_mode actual`)
-- **Replay mode** (`begin_time` and `end_time` present): `job_submit_time, begin_time, end_time, num_nodes, time_limit` required; `q_id` is optional. Times are historical actuals, replayed exactly, not computed by the scheduler.
-- Column order doesn't matter - the parser reads the header row and looks up columns by name
-
-**lassen**: LLNL Lassen 33-column format
-- Full HPC trace format
-- Backward compatible with existing traces
-
-### Timestamp Format
-```bash
---timestamp_format {epoch|iso}
-```
-
-**epoch**: Unix epoch seconds (integers)
-- Example: `0`, `100`, `1234567890`
-- Fast to parse, no timezone issues
-- Best for synthetic test traces
-
-**iso** (default): Human-readable timestamps
-- Example: `2024-01-15T10:30:00`, `2024-01-15 10:30:00`
-- Requires timezone specification
-- Used by real HPC traces
-
-### Timezone
-```bash
---timezone TIMEZONE
-```
-
-Only used when `--timestamp_format=iso`
-
-Examples:
-- `--timezone UTC`
-- `--timezone America/New_York`
-- `--timezone America/Los_Angeles` (default)
-- `--timezone Europe/London`
-
-## Usage Examples
-
-### Simple Test Trace with Epoch Times
-```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator test_trace.csv \
-  --trace_format simple \
-  --timestamp_format epoch \
-  --total_nodes 100 \
-  --backfill_policy easy
-```
-
-### Simple Trace with ISO Timestamps
-```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator test_trace.csv \
-  --trace_format simple \
-  --timestamp_format iso \
-  --timezone UTC \
-  --total_nodes 100
-```
-
-### Lassen Format
-```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator lassen_trace.csv \
-  --trace_format lassen \
-  --total_nodes 795
-```
+Timestamps may be Unix epoch seconds or ISO 8601 strings. ISO input and output
+use the timezone selected by `--timezone`.
 
 ## Simple Format CSV Structure
 
@@ -151,13 +76,9 @@ determines simulation vs replay mode (see below).
 | `exit_status` | Output-only compatibility field. The simulator currently writes `0`. | Generated output only |
 | `actual_run_time` | The job's real, historical run time (seconds); used by `--run_time_mode actual`. Accepted column-name aliases: `actual_run_time`, `duration`, `actual_duration`, `run_time` | Simulation mode, only with `--run_time_mode actual` |
 
-**Column-name aliases**: `time_limit` and `actual_run_time` are each detected
-under several accepted header names (listed above), so an existing trace
-can be reused as-is without editing its header - slow to do by hand on a
-large file. Only one alias per column is expected to actually be present
-in a given file; if more than one is, the first match in the order listed
-wins. This applies to the "simple" format only; the "lassen" format is
-defined by fixed column position rather than header name (see below).
+`time_limit` and `actual_run_time` accept the aliases listed above. If multiple
+aliases for one field are present, the first listed match is used. Lassen
+input uses fixed column positions instead of header names.
 
 **Ignored input columns**: input fields not used by the selected trace format
 are ignored. In particular, `exit_status` is accepted only so a generated
@@ -166,6 +87,8 @@ to affect scheduling or replay. In the default ID-input build, `queue` is
 ignored; `q_id` is optional and defaults to `1` (`Queue1`). Legacy named
 `queue` input is available only with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`; in
 that build `q_id` is ignored and an absent `queue` also defaults to `Queue1`.
+Numeric `q_id` values are site-neutral and do not imply legacy queue behavior
+such as `pAll` dedicated-allocation-time detection.
 
 **TODO — user-defined queue names:** Allow users to define the accepted input
 queue names and preserve those names in output.
@@ -179,8 +102,8 @@ queue names and preserve those names in output.
 - Exactly one of `begin_time` or `end_time` present is rejected as an
   ambiguous trace format
 
-See [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md)
-for the full design rationale.
+For implementation details, see
+[Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md).
 
 ### Lassen Format
 33-column format specific to LLNL HPC traces. Columns used:
@@ -191,35 +114,9 @@ for the full design rationale.
 - Column 30: `queue`
 - Column 32: `time_limit`
 
-## Testing
-
-```bash
-# Create test trace
-cat > test.csv << EOF
-job_submit_time,begin_time,end_time,num_nodes,time_limit
-0,0,100,10,100
-50,100,150,10,50
-120,150,230,10,80
-EOF
-
-# Run test
-${CMAKE_INSTALL_PREFIX}/bin/simulator test.csv \
-  --trace_format simple \
-  --timestamp_format epoch \
-  --total_nodes 100 \
-  --backfill_policy easy \
-  --priority_policy fcfs
-```
-
-Expected output should show:
-- Job 0 starts at 0, ends at 100
-- Job 1 starts at 100, ends at 150
-- Job 2 starts at 150, ends at 230
-- Sequential execution (no overlap with 10 nodes each in 100-node system)
-
 ## See Also
 
-- [User Guide](overview.md) - Complete usage guide with trace formats
+- [User Guide](overview.md) - User guide overview
 - [Testing Guide](../TESTING_GUIDE.md) - Test suite and validation
 - [Quick Start](../getting-started/quickstart.md) - Getting started guide
 - [Fugaku Power-Usage Experiment](fugaku-power-experiment.md) - Large-scale

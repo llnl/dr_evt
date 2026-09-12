@@ -132,6 +132,7 @@ else
 
     $TRACER --infile "$replay_input" \
         --total_nodes 500 \
+        --datfile /tmp/rh_tracer_default_dat.txt \
         --outfile /tmp/rh_tracer_default_out.csv \
         --resource_trace "$tracer_default_res" \
         --subfile /tmp/rh_tracer_default_sub.csv \
@@ -141,6 +142,7 @@ else
     $TRACER --infile "$replay_input" \
         --total_nodes 500 \
         --resource_history_capacity $TINY_CAPACITY \
+        --datfile /tmp/rh_tracer_tiny_dat.txt \
         --outfile /tmp/rh_tracer_tiny_out.csv \
         --resource_trace "$tracer_tiny_res" \
         --subfile /tmp/rh_tracer_tiny_sub.csv \
@@ -171,6 +173,7 @@ echo "Testing: tracer rejects simulation-format input upfront"
 set +e
 misuse_output=$($TRACER --infile "tests/test_traces/feature/huge_2000jobs.csv" \
     --total_nodes 500 \
+    --datfile /tmp/rh_misuse_dat.txt \
     --outfile /tmp/rh_misuse_out.csv \
     --resource_trace /tmp/rh_misuse_resources.csv \
     --subfile /tmp/rh_misuse_sub.csv \

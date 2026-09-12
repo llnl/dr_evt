@@ -1,9 +1,8 @@
 src/utils
 ---------
 
-This page intentionally exposes only public utility APIs with API-level
-documentation. Template adapters, serialization internals, and utility
-declarations without public documentation remain source-only.
+This page exposes documented utilities, including the serializable random
+engine and seed helpers used by simulation run-time sampling.
 
 .. raw:: html
 
@@ -13,6 +12,24 @@ declarations without public documentation remain source-only.
      <span class="api-search-status" aria-live="polite"></span>
    </div>
    <div id="cpp-utils-content" class="api-search-content">
+
+Random-number generation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+With ``DR_EVT_THREAD_PRIVATE_RNG`` enabled, ``RNGen::sample()`` uses a separate
+engine for each OpenMP thread when callers provide thread-local distribution
+objects. The stored distribution used by ``operator()`` and ``pull()`` remains
+shared. Without that build option, all draws require external synchronization.
+Do not seed, reconfigure, serialize, or directly access engines concurrently
+with sampling.
+
+.. doxygengroup:: dr_evt_rng
+   :project: dr_evt
+   :members:
+   :protected-members:
+
+Other utilities
+~~~~~~~~~~~~~~~
 
 .. doxygenfunction:: dr_evt::get_available_memory_bytes
    :project: dr_evt

@@ -46,7 +46,7 @@ int load(const std::string &fname, const Data_Columns &dcols,
 /// operations both support (empty(), front(), range-based iteration). */
 template <typename JobContainer>
 std::ostream &print(std::ostream &os, const JobContainer &data) {
-  os << "no.\t" + Job_Record::get_header_str() << std::endl;
+  os << "no.," + Job_Record::get_header_str() << std::endl;
 
   if (data.empty()) {
     return os;
@@ -69,7 +69,7 @@ std::ostream &print(std::ostream &os, const JobContainer &data) {
       continue;
     }
 #endif
-    buf += std::to_string(++cnt) + '\t' + job.to_string() + '\n';
+    buf += std::to_string(++cnt) + ',' + job.to_string() + '\n';
     if (buf_cnt == lines_to_buf) {
       os << buf;
       buf_cnt = 1ul;

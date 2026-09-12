@@ -7,8 +7,8 @@ maintainer-facing build guidance. It is separate from the user documentation.
 
 - [Wait Queues](WAIT_QUEUES.md) — Queue selection, end-to-end performance,
   and the circular and block queue guides.
-- [Job Lifecycle](JOB_LIFECYCLE.md) — How a job moves through the trace,
-  scheduler, and event queue.
+- [Simulation Pipeline and Job Lifecycle](JOB_LIFECYCLE.md) — How input moves
+  through the job store, scheduler, event loop, resource accounting, and output.
 - [Simulation vs. Replay Modes](design-decisions/SIMULATION_VS_REPLAY_MODES.md)
   — The two execution models and their trade-offs.
 - [Timezone Offset Support](design-decisions/TIMEZONE_SUPPORT.md) — ISO 8601
@@ -24,8 +24,9 @@ Important decisions worth preserving in the repository:
 - Breaking changes and migration guides
 - Terminology changes and rationale
 
-### [Job lifecycle](JOB_LIFECYCLE.md)
-How a new job moves through the Trace job store, scheduler wait queue, and
-scheduled start/end event queue. This is the companion explanation for the
-Doxygen comments on `append_job`, `submit_job`, and the two `insert_job`
-methods.
+### [Simulation pipeline and job lifecycle](JOB_LIFECYCLE.md)
+
+How batch, progressive, and live inputs move through the job store, scheduler,
+event loop, resource accounting, and output. This is the companion explanation
+for the Doxygen comments on `append_job`, `submit_job`, and the two
+`insert_job` methods.

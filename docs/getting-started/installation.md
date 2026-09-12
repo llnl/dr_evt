@@ -12,9 +12,6 @@
 
 ### Optional (for full features)
 
-**[Protocol Buffers](https://developers.google.com/protocol-buffers)**: For `--config` files (`-DDR_EVT_ENABLE_PROTOBUF=ON`) - not needed for a plain build
-- Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
-
 **Catch2 v2**: For the legacy Catch2-based unit tests (`-DDR_EVT_WITH_UNIT_TESTING=ON`)
 - Existing tests use the Catch2 v2 single-header API (`catch2/catch.hpp`)
 - DR_EVT uses an existing compatible Catch2 v2 installation when available; otherwise it fetches pinned Catch2 v2.13.10
@@ -28,11 +25,18 @@
 - **Manual install**: `apt-get install libgrpc++-dev protobuf-compiler-grpc` (Ubuntu/Debian)
 - **Important**: gRPC includes its own Protobuf. If gRPC is enabled, you don't need separate Protobuf install.
 
+**[Protocol Buffers](https://developers.google.com/protocol-buffers)**: For `--config` files without gRPC (`-DDR_EVT_ENABLE_PROTOBUF=ON`) - not needed for a plain build
+- Auto-downloaded if not found, or use `-DPROTOBUF_ROOT=<path>`
+
 **MPI**: For multi-client/server test harness only (optional even with gRPC)
 - Install: `apt-get install libopenmpi-dev openmpi-bin`
 - Install the Python MPI binding for the launcher: `python3 -m pip install mpi4py`
 
-### Protocol Buffers & gRPC Details
+### gRPC and Protocol Buffers
+
+Enable gRPC directly when the client/server interface is needed. This selects
+the Protobuf version supplied with gRPC and avoids mixing incompatible gRPC and
+standalone Protobuf installations.
 
 **Protobuf usage:** Configuration file parsing ([proto3 syntax](https://developers.google.com/protocol-buffers/docs/proto3))
 - Not built at all unless requested - pass `-DDR_EVT_ENABLE_PROTOBUF=ON` (or `-DDR_EVT_ENABLE_GRPC=ON`, which implies it) to enable
@@ -54,14 +58,20 @@ Protobuf-only build → standalone Protobuf installation
 git clone https://github.com/LLNL/dr_evt.git
 cd dr_evt
 
-# Build
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
+# Configure, build, and install
+export CMAKE_INSTALL_PREFIX=/path/to/install
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}"
+cmake --build build -j$(nproc)
+cmake --install build
 
-# Run from the build directory
-./simulator --help
+# Run the installed executable
+${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 ```
+
+Livermore Computing users should follow the
+[LC HPC system build instructions](#livermore-computing-lc-hpc-systems) below.
 
 **Note**: The plain build shown above only needs Boost - it does not build
 Protobuf or gRPC (both are opt-in, see below). If Boost isn't found on your
@@ -91,14 +101,6 @@ cmake .. -DAVOID_SYSTEM_BOOST=ON
 `CMAKE_PREFIX_PATH` remains active with `AVOID_SYSTEM_BOOST=ON`; only default
 system locations are excluded.
 
-**Protobuf (standalone, when gRPC not used):**
-```bash
-cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
-
-# Skip system paths (useful if system install is broken or mismatched by version)
-cmake .. -DDR_EVT_ENABLE_PROTOBUF=ON -DAVOID_SYSTEM_PROTOBUF=ON
-```
-
 **gRPC:**
 ```bash
 # Enable gRPC support (auto-enables Protobuf)
@@ -110,6 +112,14 @@ cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON
 # Reuse an explicit/local gRPC install, otherwise fall back to FetchContent
 cmake .. -DDR_EVT_ENABLE_GRPC=ON -DAVOID_SYSTEM_GRPC=ON \
   -DCMAKE_INSTALL_PREFIX=/path/to/local/prefix
+```
+
+**Protobuf (standalone, only when gRPC is not used):**
+```bash
+cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
+
+# Skip system paths (useful if system install is broken or mismatched by version)
+cmake .. -DDR_EVT_ENABLE_PROTOBUF=ON -DAVOID_SYSTEM_PROTOBUF=ON
 ```
 
 **Python bindings:**
@@ -144,18 +154,21 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 
 **Complete example with all features:**
 ```bash
-mkdir build && cd build
-cmake .. \
+export CMAKE_INSTALL_PREFIX=/path/to/install
+cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}" \
   -DDR_EVT_ENABLE_GRPC=ON \
   -DDR_EVT_BUILD_PYTHON=ON \
   -DBOOST_ROOT=/opt/homebrew/opt/boost
-make -j$(nproc)
+cmake --build build -j$(nproc)
+cmake --install build
 ```
-(if gRPC isn't installed, this falls back to the same from-source
-build discussed under "Livermore Computing (LC) HPC systems" below)
+(if gRPC isn't installed, this falls back to the same from-source build
+described in [Livermore Computing (LC) HPC systems](#livermore-computing-lc-hpc-systems))
 
-**Livermore Computing (LC) HPC systems:**
+### Livermore Computing (LC) HPC systems
+
 ```bash
 mkdir build && cd build
 cmake .. \
@@ -199,66 +212,26 @@ cmake -DCMAKE_INSTALL_PREFIX=/path/to/install ..
 make install
 ```
 
-## Python Environment
+## Python environments
 
-`scripts/python_reference_scheduler.py` - the reference EASY-backfilling
-implementation the C++ simulator's comprehensive test suite is checked
-against (see [Testing Guide](../TESTING_GUIDE.md)) - has no third-party
-dependencies at all; it only imports from the Python 3 standard library
-(`csv`, `dataclasses`, `heapq`, etc.). No virtualenv or `pip install` is
-needed to run it.
-
-A separate `docs/requirements.txt` exists, but it's for building this
-Sphinx documentation site itself (`sphinx`, `myst-parser`, etc.) - unrelated
-to running or testing the simulator. Create and activate a dedicated virtual
-environment before installing those documentation dependencies:
-
-```bash
-python3 -m venv .venv-docs
-source .venv-docs/bin/activate
-python -m pip install -r docs/requirements.txt
-make -C docs html
-```
-
-`make install` in `docs/` uses the active Python environment; it does not
-create a virtual environment itself.
-
-If you're building the optional [Python bindings](../api/PYTHON_API.md)
-(`-DDR_EVT_BUILD_PYTHON=ON`), that's a compiled extension module, not a
-pip package - see that page for how to make it importable
-(`PYTHONPATH`), not a `pip install` step.
+The Python reference scheduler uses only the standard library. The optional
+compiled bindings and their import path are documented in the
+[Python API](../api/PYTHON_API.md). Documentation dependencies and local
+Sphinx build commands are maintained in
+[Documentation Development](../README.md).
 
 ## Verification
 
-Run tests to verify installation:
+Run CTest to verify the features enabled in the current build:
 
 ```bash
-# Selected CTest coverage, including the power-usage data model
 cd build
-ctest -R 'test_pcon_trace|test_trace_type_cli' --output-on-failure
-
-# Comprehensive scheduler-correctness suite (34 tests)
-cd ../tests
-./run_scheduler_correctness_tests.sh
+ctest --output-on-failure
 ```
 
-Should see:
-```
-🎉 ALL TESTS PASSED!
-Passed:  34
-Failed:  0
-Missing: 0
-Total:   34
-```
-
-(An earlier version of this document referenced `./test_all.sh` - no such
-script exists, the actual name is `run_scheduler_correctness_tests.sh` - and a
-`scripts/verify_against_analytical.py` step claiming "verified against
-analytical oracles" - that script was an unused remnant of an abandoned
-test-suite design and has been removed; "34 tests pass" means the C++
-simulator matches a from-scratch Python reference implementation, not
-independently-verified analytical ground truth. See
-`docs/TESTING_GUIDE.md` for what that distinction means.)
+The [Test Suite README](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#build-and-run)
+lists focused regression runners and prerequisites. The
+[Testing Guide](../TESTING_GUIDE.md) explains the validation methodology.
 
 ## Troubleshooting
 

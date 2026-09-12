@@ -89,6 +89,9 @@ public:
    * @param[in] available_nodes Resources currently available.
    * @param[in] current_time Current simulation time.
    * @param[in] reservation_time FCFS head reservation time.
+   * @param[out] run_time Optional destination for the selected job's estimated
+   * run time.
+   * @param[out] nodes Optional destination for the selected job's node count.
    * @return Optional job_no_t: selected-and-removed job ID, or std::nullopt.
    *
    * Complexity: O(B × S) where B = blocks scanned, S = jobs scanned per block

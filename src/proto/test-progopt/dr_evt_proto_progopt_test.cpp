@@ -12,105 +12,103 @@
  * includes the input for each of Simulation_Params, and Tracing_Params
  */
 
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <tuple>
-#include <list>
-#include <functional>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include "proto/dr_evt_params.pb.h"
 #include "params/dr_evt_params.hpp"
+#include "proto/dr_evt_params.pb.h"
+#include <fstream>
+#include <functional>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/text_format.h>
+#include <iostream>
+#include <list>
+#include <string>
+#include <tuple>
 
 namespace dr_evt {
 
-template<typename T>
-bool read_prototext(const std::string& file_name,
-                    const bool is_binary,
-                    T& dr_evt_proto_params)
-{
-    GOOGLE_PROTOBUF_VERIFY_VERSION;
-    std::ifstream input(file_name, std::ios::in | std::ios::binary);
+template <typename T>
+bool read_prototext(const std::string &file_name, const bool is_binary,
+                    T &dr_evt_proto_params) {
+  GOOGLE_PROTOBUF_VERIFY_VERSION;
+  std::ifstream input(file_name, std::ios::in | std::ios::binary);
 
-    if (!input) {
-        std::cerr << file_name << ": File not found!" << std::endl;
-        return false;
+  if (!input) {
+    std::cerr << file_name << ": File not found!" << std::endl;
+    return false;
+  }
+  if (is_binary) {
+    if (!dr_evt_proto_params.ParseFromIstream(&input)) {
+      std::cerr
+          << "Failed to parse DR_EVT_Params in binary-formatted input file: "
+          << file_name << std::endl;
+      return false;
     }
-    if (is_binary) {
-        if (!dr_evt_proto_params.ParseFromIstream(&input)) {
-          std::cerr << "Failed to parse DR_EVT_Params in binary-formatted input file: "
-                    << file_name << std::endl;
-          return false;
-        }
-    } else {
-        google::protobuf::io::IstreamInputStream istrm(&input);
-        if (!google::protobuf::TextFormat::Parse(&istrm, &dr_evt_proto_params)) {
-          std::cerr << "Failed to parse DR_EVT_Params in text-formatted input file: "
-                    << file_name << std::endl;
-          return false;
-        }
+  } else {
+    google::protobuf::io::IstreamInputStream istrm(&input);
+    if (!google::protobuf::TextFormat::Parse(&istrm, &dr_evt_proto_params)) {
+      std::cerr
+          << "Failed to parse DR_EVT_Params in text-formatted input file: "
+          << file_name << std::endl;
+      return false;
     }
-    return true;
+  }
+  return true;
 }
 
 } // end of namespace dr_evt
 
-int main(int argc, char** argv)
-{
-    dr_evt::cmd_line_opts cmd;
-    bool ok = cmd.parse_cmd_line(argc, argv);
-    if (!ok) return EXIT_FAILURE;
-    if (!cmd.m_is_set) return EXIT_SUCCESS;
+int main(int argc, char **argv) {
+  dr_evt::cmd_line_opts cmd;
+  bool ok = cmd.parse_cmd_line(argc, argv);
+  if (!ok)
+    return EXIT_FAILURE;
+  if (!cmd.m_is_set)
+    return EXIT_SUCCESS;
 
-    cmd.show();
+  cmd.show();
 
-    if (!cmd.m_all_setup.empty()) {
-        dr_evt_proto::DR_EVT_Params dr_evt_all_setup;
-        if (!dr_evt::read_prototext(cmd.m_all_setup, false, dr_evt_all_setup)) {
-            return EXIT_FAILURE;
-        }
-
-        std::string str;
-        if (!google::protobuf::TextFormat::PrintToString(dr_evt_all_setup, &str)) {
-            std::cerr << "Failed to convert DR_EVT_Params to text" << std::endl;
-            return EXIT_FAILURE;
-        }
-        std::cout << str;
-    } else {
-        if (!cmd.m_sim_setup.empty()) {
-            dr_evt_proto::DR_EVT_Params::Simulation_Params dr_evt_sim_setup;
-            if (!dr_evt::read_prototext(cmd.m_sim_setup, false,
-                                         dr_evt_sim_setup)) {
-                return EXIT_FAILURE;
-            }
-            std::string str;
-            if (!google::protobuf::TextFormat::PrintToString(dr_evt_sim_setup,
-                                                              &str)) {
-                std::cerr << "Failed to convert Simulation_Params to text"
-                          << std::endl;
-                return EXIT_FAILURE;
-            }
-            std::cout << str;
-        }
-        if (!cmd.m_trace_setup.empty()) {
-            dr_evt_proto::DR_EVT_Params::Tracing_Params dr_evt_trace_setup;
-            if (!dr_evt::read_prototext(cmd.m_trace_setup, false,
-                                         dr_evt_trace_setup)) {
-                return EXIT_FAILURE;
-            }
-            std::string str;
-            if (!google::protobuf::TextFormat::PrintToString(dr_evt_trace_setup,
-                                                              &str)) {
-                std::cerr << "Failed to convert Tracing_Params to text"
-                          << std::endl;
-                return EXIT_FAILURE;
-            }
-            std::cout << str;
-        }
+  if (!cmd.m_all_setup.empty()) {
+    dr_evt_proto::DR_EVT_Params dr_evt_all_setup;
+    if (!dr_evt::read_prototext(cmd.m_all_setup, false, dr_evt_all_setup)) {
+      return EXIT_FAILURE;
     }
 
-    google::protobuf::ShutdownProtobufLibrary();
+    std::string str;
+    if (!google::protobuf::TextFormat::PrintToString(dr_evt_all_setup, &str)) {
+      std::cerr << "Failed to convert DR_EVT_Params to text" << std::endl;
+      return EXIT_FAILURE;
+    }
+    std::cout << str;
+  } else {
+    if (!cmd.m_sim_setup.empty()) {
+      dr_evt_proto::DR_EVT_Params::Simulation_Params dr_evt_sim_setup;
+      if (!dr_evt::read_prototext(cmd.m_sim_setup, false, dr_evt_sim_setup)) {
+        return EXIT_FAILURE;
+      }
+      std::string str;
+      if (!google::protobuf::TextFormat::PrintToString(dr_evt_sim_setup,
+                                                       &str)) {
+        std::cerr << "Failed to convert Simulation_Params to text" << std::endl;
+        return EXIT_FAILURE;
+      }
+      std::cout << str;
+    }
+    if (!cmd.m_trace_setup.empty()) {
+      dr_evt_proto::DR_EVT_Params::Tracing_Params dr_evt_trace_setup;
+      if (!dr_evt::read_prototext(cmd.m_trace_setup, false,
+                                  dr_evt_trace_setup)) {
+        return EXIT_FAILURE;
+      }
+      std::string str;
+      if (!google::protobuf::TextFormat::PrintToString(dr_evt_trace_setup,
+                                                       &str)) {
+        std::cerr << "Failed to convert Tracing_Params to text" << std::endl;
+        return EXIT_FAILURE;
+      }
+      std::cout << str;
+    }
+  }
 
-    return EXIT_SUCCESS;
+  google::protobuf::ShutdownProtobufLibrary();
+
+  return EXIT_SUCCESS;
 }

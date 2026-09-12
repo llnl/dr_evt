@@ -6,9 +6,6 @@ DR_EVT supports a configured IANA/POSIX timezone for ISO timestamps that do
 not contain an offset. Numeric offsets embedded in timestamps are recognized,
 but that path still has correctness and integration work described below.
 
-The old Protobuf/CMake build blocker previously documented here has been
-resolved and is unrelated to the remaining timezone work.
-
 ## Current User-Facing Behavior
 
 The `--timezone` option supplies the timezone used to interpret ISO timestamps
@@ -55,7 +52,8 @@ UTC normalization with round-trip local-time output.
 
 ## Existing Coverage
 
-`tests/test_traces/unit/timezone_handling.csv` exercises three timestamps with
+[`tests/test_traces/unit/timezone_handling.csv`](https://github.com/LLNL/dr_evt/blob/main/tests/test_traces/unit/timezone_handling.csv)
+exercises three timestamps with
 different numeric offsets through the unit-test runner. Its expected result
 captures the current behavior, but there are no direct unit tests for
 `parse_time_with_timezone()`, invalid offsets, fractional seconds, or
@@ -72,8 +70,3 @@ captures the current behavior, but there are no direct unit tests for
 5. Add direct tests and correct the timezone fixture's UTC expectations.
 6. Update the user guide once the supported embedded-offset behavior is fixed
    and tested.
-
----
-
-**Updated**: 2026-09-11
-**Status**: Configured timezone support available; embedded-offset support incomplete

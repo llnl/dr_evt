@@ -28,20 +28,20 @@ FCFS head job starts, second job becomes new FCFS head but is blocked (too large
 2. Job 1 starts (FCFS head) → 40 nodes free
 3. Job 2 becomes new FCFS head
 4. Job 2 CAN start now (needs 30, have 40)
-5. **Job 2 backfills at t=50**
+5. **Job 2 starts at t=50**
 
 ### Expected Schedule
 ```
 Job 0: [0, 50]
 Job 1: [50, 150]  (was FCFS head at t=10, starts when Job 0 completes)
-Job 2: [50, 90]   (backfills at t=50 - doesn't delay Job 1)
+Job 2: [50, 90]   (starts after Job 1 in the same scheduling pass)
 ```
 
 ## What This Tests
 
 1. **FCFS head transition**: Job 1 was head, starts at t=50, Job 2 becomes new head
-2. **Backfilling past blocked FCFS head**: Even though Job 2 is now FCFS head, it backfills immediately
-3. **Simultaneous completion + FCFS start + backfill**: All at t=50
+2. **Cascading FCFS starts**: Job 2 becomes the head and starts immediately
+3. **Simultaneous completion and two FCFS starts**: All at t=50
 4. **Resource state recording**: Must record after completion, after Job 1 starts, after Job 2 starts
 
 ## Expected Resource Events at t=50
@@ -53,10 +53,4 @@ t=50: Job 1 starts → 60 used, 40 free
 t=50: Job 2 starts → 90 used, 10 free
 ```
 
-## Edge Case
-This tests a subtle aspect of EASY backfilling:
-- When FCFS head starts and a new job becomes head
-- That new head can **immediately backfill** if resources are available
-- It doesn't have to wait for next event
-
-**THIS IS THE BUG**: C++ might record after Job 0 completes and after Job 1 starts, but fail to record after Job 2 backfills.
+The fixture requires the state after job 2 starts to be recorded separately.

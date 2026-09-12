@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 
 #include "common.hpp"
 #include "params/trace_params.hpp"
@@ -46,9 +47,14 @@ int process_trace(const dr_evt::Trace_Params &cfg) {
   std::cout << "Trace ";
   trace.print_span(std::cout);
 
-  std::ofstream of_trace(cfg.get_outfile());
-  trace.print(of_trace);
-  of_trace.close();
+  if (!cfg.get_outfile().empty()) {
+    std::ofstream of_trace(cfg.get_outfile());
+    if (!of_trace) {
+      throw std::runtime_error("Failed to open per-job output file: " +
+                               cfg.get_outfile());
+    }
+    trace.print(of_trace);
+  }
 
 #if MARK_DAT_PERIOD
   std::ofstream of_dat(cfg.get_datfile());
@@ -56,18 +62,30 @@ int process_trace(const dr_evt::Trace_Params &cfg) {
   of_dat.close();
 #endif
 
-  Job_Stat_Submit stat_sub;
-  stat_sub.process(trace);
-  std::ofstream of_stat_sub(cfg.get_subfile());
-  stat_sub.print(of_stat_sub);
-  of_stat_sub.close();
-  std::cout << "Number of weeks: " + std::to_string(stat_sub.get_num_weeks()) +
-                   "\n";
+  if (!cfg.get_subfile().empty() || !cfg.get_subsumfile().empty()) {
+    Job_Stat_Submit stat_sub;
+    stat_sub.process(trace);
+    std::cout << "Number of weeks: " +
+                     std::to_string(stat_sub.get_num_weeks()) + "\n";
 
-  const auto sub_summary = stat_sub.get_summary();
-  std::ofstream of_sub_summary(cfg.get_subsumfile());
-  stat_sub.print_summary(of_sub_summary, sub_summary);
-  of_sub_summary.close();
+    if (!cfg.get_subfile().empty()) {
+      std::ofstream of_stat_sub(cfg.get_subfile());
+      if (!of_stat_sub) {
+        throw std::runtime_error("Failed to open submission-statistics file: " +
+                                 cfg.get_subfile());
+      }
+      stat_sub.print(of_stat_sub);
+    }
+
+    if (!cfg.get_subsumfile().empty()) {
+      std::ofstream of_sub_summary(cfg.get_subsumfile());
+      if (!of_sub_summary) {
+        throw std::runtime_error("Failed to open submission-summary file: " +
+                                 cfg.get_subsumfile());
+      }
+      stat_sub.print_summary(of_sub_summary);
+    }
+  }
 
   return rc;
 }

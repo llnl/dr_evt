@@ -145,6 +145,12 @@ void parse_and_check(const std::string &format, bool replay,
 #else
   assert(records.front().get_queue() ==
          (selected_queue_present ? Queue2 : Queue1));
+  // Numeric queue IDs are site-neutral. In particular, q_id=2 must not
+  // inherit the legacy pAll queue's exclusive/DAT semantics.
+  if (_Is_Exclusive(records.front().get_queue())) {
+    throw std::runtime_error(
+        "numeric q_id was treated as a legacy exclusive queue");
+  }
 #endif
   if (replay) {
     assert(records.front().get_begin_time().first == 1);
@@ -155,6 +161,12 @@ void parse_and_check(const std::string &format, bool replay,
 } // namespace
 
 int main() {
+#if DR_EVT_LEGACY_QUEUE_INPUT
+  if (!_Is_Exclusive(Queue2)) {
+    throw std::runtime_error(
+        "legacy pAll queue is not classified as exclusive");
+  }
+#endif
   for (const std::string format : {"simple", "lassen"}) {
     for (const bool replay : {false, true}) {
       parse_and_check(format, replay, true);

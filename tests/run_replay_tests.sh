@@ -30,6 +30,8 @@ echo ""
 
 PASS=0
 FAIL=0
+OPTIONAL_OUTPUT_DIR=$(mktemp -d "/tmp/dr-evt-replay-optional.XXXXXXXX")
+trap 'rm -rf -- "$OPTIONAL_OUTPUT_DIR"' EXIT INT TERM
 
 # Exercise the internal replay reclamation boundaries before the CLI-level
 # simulation/replay comparisons below.
@@ -88,20 +90,80 @@ for test_base in "${REPLAY_TESTS[@]}"; do
     fi
 
     # Step 2: Replay the job trace - tracer only, no scheduler involved
-    replay_resource_output="/tmp/replay_rep_${test_base}_resources.csv"
+    default_output_dir="${OPTIONAL_OUTPUT_DIR}/default-${test_base}"
+    mkdir -p "$default_output_dir"
+    replay_resource_output="$default_output_dir/replay-resources.csv"
 
-    $TRACER --infile "$sim_job_output" \
-        --total_nodes 100 \
-        --resource_trace "$replay_resource_output" \
-        --outfile "/tmp/replay_rep_${test_base}_tracer_out.csv" \
-        --subfile "/tmp/replay_rep_${test_base}_sub.csv" \
-        --subsumf "/tmp/replay_rep_${test_base}_subsum.csv" \
-        > /dev/null 2>&1
+    (cd "$default_output_dir" && \
+        $TRACER --infile "$sim_job_output" \
+            --total_nodes 100 \
+            --datfile /dev/null \
+            --resource_trace "$replay_resource_output") \
+            > /dev/null 2>&1
 
     if [ ! -f "$replay_resource_output" ]; then
         echo "  ✗ Replay failed"
         FAIL=$((FAIL + 1))
         continue
+    fi
+
+    default_file_set=$(find "$default_output_dir" -maxdepth 1 -type f \
+        -printf '%f\n' | sort)
+    if [ "$default_file_set" != "replay-resources.csv" ]; then
+        echo "  ✗ Unexpected default output-file set"
+        echo "$default_file_set" | sed 's/^/       /'
+        FAIL=$((FAIL + 1))
+        continue
+    fi
+
+    # One fixture also verifies the inverse: every optional report is
+    # produced when explicitly requested. This is an integration behavior,
+    # not merely a command-line parsing default.
+    if [ "$test_base" = "01_backfill_allowed" ]; then
+        explicit_output_dir="$OPTIONAL_OUTPUT_DIR/explicit"
+        mkdir -p "$explicit_output_dir"
+        explicit_job_output="$explicit_output_dir/jobs.csv"
+        explicit_resource_output="$explicit_output_dir/resources.csv"
+        explicit_sub_output="$explicit_output_dir/submissions.csv"
+        explicit_summary_output="$explicit_output_dir/submission-summary.csv"
+        expected_output_dir="$REPO_ROOT/tests/test_traces/replay"
+
+        (cd "$explicit_output_dir" && \
+            $TRACER --infile "$sim_job_output" \
+                --total_nodes 100 \
+                --datfile /dev/null \
+                --outfile "$explicit_job_output" \
+                --resource_trace "$explicit_resource_output" \
+                --subfile "$explicit_sub_output" \
+                --subsumf "$explicit_summary_output") \
+                > /dev/null 2>&1
+
+        explicit_file_set=$(find "$explicit_output_dir" -maxdepth 1 -type f \
+            -printf '%f\n' | sort)
+        expected_file_set=$(printf '%s\n' jobs.csv resources.csv \
+            submission-summary.csv submissions.csv)
+        if [ "$explicit_file_set" != "$expected_file_set" ]; then
+            echo "  ✗ Unexpected explicitly enabled output-file set"
+            echo "$explicit_file_set" | sed 's/^/       /'
+            FAIL=$((FAIL + 1))
+            continue
+        fi
+
+        reports_match=1
+        diff -u "$expected_output_dir/optional_reports.expected_jobs.csv" \
+            "$explicit_job_output" || reports_match=0
+        diff -u "$expected_output_dir/optional_reports.expected_resources.csv" \
+            "$explicit_resource_output" || reports_match=0
+        diff -u "$expected_output_dir/optional_reports.expected_submissions.csv" \
+            "$explicit_sub_output" || reports_match=0
+        diff -u \
+            "$expected_output_dir/optional_reports.expected_submission_summary.csv" \
+            "$explicit_summary_output" || reports_match=0
+        if [ "$reports_match" -ne 1 ]; then
+            echo "  ✗ Optional replay report content differs from expected"
+            FAIL=$((FAIL + 1))
+            continue
+        fi
     fi
 
     # Step 3: Compare resource traces
