@@ -101,7 +101,11 @@ enum job_queue_t : std::uint16_t {
 #define _Is_Batch(_q) ((_q) == Queue1)
 /** @brief Test whether a queue identifier denotes an exclusive queue.
  * @param[in] _q Queue identifier to test. */
+#if DR_EVT_LEGACY_QUEUE_INPUT
 #define _Is_Exclusive(_q) ((_q) == Queue2)
+#else
+#define _Is_Exclusive(_q) (false)
+#endif
 #else
 enum job_queue_t : std::uint16_t {
   QueueUnknown = 0,
@@ -127,7 +131,11 @@ enum job_queue_t : std::uint16_t {
    (_q) == Queue5)
 /** @brief Test whether a queue identifier denotes an exclusive queue.
  * @param[in] _q Queue identifier to test. */
+#if DR_EVT_LEGACY_QUEUE_INPUT
 #define _Is_Exclusive(_q) ((_q) == Queue6)
+#else
+#define _Is_Exclusive(_q) (false)
+#endif
 #endif
 
 /// CSV substring range stored as [start position, length].

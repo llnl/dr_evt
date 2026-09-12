@@ -597,6 +597,12 @@ list(APPEND DR_EVT_UNIT_TEST_TARGETS test_replay_reclamation-bin)
 
 if (DR_EVT_WITH_UNIT_TESTING)
   add_test(
+    NAME test_rngen
+    COMMAND $<TARGET_FILE:t_rngen-bin> 42)
+  add_test(
+    NAME test_state_rngen
+    COMMAND $<TARGET_FILE:t_state_rngen-bin>)
+  add_test(
     NAME test_trace_type_cli
     COMMAND ${CMAKE_COMMAND}
       -DSIMULATOR=$<TARGET_FILE:sim-bin>
@@ -609,6 +615,7 @@ if (DR_EVT_WITH_UNIT_TESTING)
   add_test(
     NAME test_replay_reclamation
     COMMAND $<TARGET_FILE:test_replay_reclamation-bin>)
+  set_tests_properties(test_rngen test_state_rngen PROPERTIES LABELS "unit;rng")
 endif()
 
 # Progressive/multi-file loading test (--infile_list) - see

@@ -87,6 +87,8 @@ to affect scheduling or replay. In the default ID-input build, `queue` is
 ignored; `q_id` is optional and defaults to `1` (`Queue1`). Legacy named
 `queue` input is available only with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`; in
 that build `q_id` is ignored and an absent `queue` also defaults to `Queue1`.
+Numeric `q_id` values are site-neutral and do not imply legacy queue behavior
+such as `pAll` dedicated-allocation-time detection.
 
 **TODO — user-defined queue names:** Allow users to define the accepted input
 queue names and preserve those names in output.

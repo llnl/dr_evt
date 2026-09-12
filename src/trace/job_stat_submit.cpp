@@ -12,6 +12,7 @@
 #include "trace/job_stat_submit.hpp"
 #include <cassert>
 #include <cmath>
+#include <limits>
 
 namespace dr_evt {
 
@@ -163,8 +164,8 @@ std::ostream &Job_Stat_Submit::print(std::ostream &os) const {
     const auto &week = m_tsubmit[i];
     for (size_t j = 0ul; j < week.size(); ++j, ++cnt) {
       const auto &hour = week[j];
-      str += std::to_string(cnt) + '\t' + std::to_string(hour.num_jobs()) +
-             '\t' + std::to_string(hour.availability()) + '\n';
+      str += std::to_string(cnt) + ',' + std::to_string(hour.num_jobs()) +
+             ',' + std::to_string(hour.availability()) + '\n';
     }
     os << str;
   }
@@ -174,7 +175,7 @@ std::ostream &Job_Stat_Submit::print(std::ostream &os) const {
 Job_Stat_Submit::Summary::Summary()
     : m_tot_submit(static_cast<num_jobs_t>(0u)),
       m_num_blocked(static_cast<num_jobs_t>(0u)),
-      m_min_submit(static_cast<num_jobs_t>(0u)),
+      m_min_submit(std::numeric_limits<num_jobs_t>::max()),
       m_max_submit(static_cast<num_jobs_t>(0u)),
       m_avg_submit(static_cast<Summary::avg_submit_t>(0.0)),
       m_avg_submit_unscaled(static_cast<Summary::avg_submit_t>(0.0)),
@@ -183,17 +184,17 @@ Job_Stat_Submit::Summary::Summary()
       m_std_avail(static_cast<avail_t>(0.0)) {}
 
 std::string Job_Stat_Submit::Summary::header_str() {
-  return "hr\ttot_sub\tnum_blocked\tmin_sub\tmax_sub"
-         "\tavg_sub\tstd_sub\tavg_sub_us\tavg_avail\tstd_avail\n";
+  return "hr,tot_sub,num_blocked,min_sub,max_sub"
+         ",avg_sub,std_sub,avg_sub_us,avg_avail,std_avail\n";
 }
 
 std::string Job_Stat_Submit::Summary::to_string() const {
   using std::to_string;
-  return to_string(m_tot_submit) + '\t' + to_string(m_num_blocked) + '\t' +
-         to_string(m_min_submit) + '\t' + to_string(m_max_submit) + '\t' +
-         to_string(m_avg_submit) + '\t' + to_string(m_std_submit) + '\t' +
-         to_string(m_avg_submit_unscaled) + '\t' + to_string(m_avg_avail) +
-         '\t' + to_string(m_std_avail) + '\n';
+  return to_string(m_tot_submit) + ',' + to_string(m_num_blocked) + ',' +
+         to_string(m_min_submit) + ',' + to_string(m_max_submit) + ',' +
+         to_string(m_avg_submit) + ',' + to_string(m_std_submit) + ',' +
+         to_string(m_avg_submit_unscaled) + ',' + to_string(m_avg_avail) +
+         ',' + to_string(m_std_avail) + '\n';
 }
 
 Job_Stat_Submit::summary_week_t Job_Stat_Submit::get_summary() const {
@@ -237,6 +238,7 @@ Job_Stat_Submit::summary_week_t Job_Stat_Submit::get_summary() const {
         static_cast<num_jobs_t>(num_weeks - sum.m_num_blocked);
 
     if (num_weeks_effective == static_cast<num_jobs_t>(0u)) {
+      sum.m_min_submit = static_cast<num_jobs_t>(0u);
       sum.m_avg_submit = static_cast<Summary::avg_submit_t>(0.0);
     } else {
       sum.m_avg_submit = static_cast<Summary::avg_submit_t>(
@@ -307,7 +309,7 @@ Job_Stat_Submit::print_summary(std::ostream &os,
 
   for (size_t s = 0ul; s < summary.size(); ++s) {
     auto &sum = summary[s];
-    os << std::to_string(s) + '\t' + sum.to_string();
+    os << std::to_string(s) + ',' + sum.to_string();
   }
   return os;
 }

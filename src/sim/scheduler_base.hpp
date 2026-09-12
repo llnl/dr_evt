@@ -167,11 +167,6 @@ protected:
   virtual size_t wait_queue_size() const = 0;
 
   /**
-   * @brief Look up the time-limit estimate used for reservation planning.
-   * @param[in] job_idx Identifier of an existing trace job.
-   * @return The job's requested time limit, in tdiff_t.
-   */
-  /**
    * @brief Project when the first FCFS job can obtain its requested nodes.
    * @details
    * Starts with currently free nodes and applies estimated release times

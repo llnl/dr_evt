@@ -43,16 +43,20 @@ public:
   void print() const;
   /** @brief Return the input trace filename. @return Input path. */
   std::string get_infile() const { return m_infile; }
-  /** @brief Set the primary output filename. @param[in] ofname Output path. */
+  /** @brief Set the optional per-job analysis output filename.
+   * @param[in] ofname Output path, or an empty string to disable the report.
+   */
   void set_outfile(const std::string &ofname);
-  /** @brief Return the primary output filename. @return Output path. */
+  /** @brief Return the optional per-job analysis output filename.
+   * @return Output path, or an empty string when the report is disabled. */
   std::string get_outfile() const { return m_outfile; }
   /** @brief Return DAT-session output filename. @return Output path. */
   std::string get_datfile() const { return m_datfile; }
-  /** @brief Return submission-statistics output filename. @return Output path.
-   */
+  /** @brief Return the optional detailed submission-statistics filename.
+   * @return Output path, or an empty string when the report is disabled. */
   std::string get_subfile() const { return m_subfile; }
-  /** @brief Return submission-summary output filename. @return Output path. */
+  /** @brief Return the optional submission-summary filename.
+   * @return Output path, or an empty string when the report is disabled. */
   std::string get_subsumfile() const { return m_subsumfile; }
   /** @brief Return resource-history output filename. @return Output path. */
   std::string get_resource_trace() const { return m_resource_trace; }
@@ -75,11 +79,11 @@ public:
 
   /// Input trace filename.
   std::string m_infile;
-  /// Primary output filename.
+  /// Optional per-job analysis output filename; empty disables the report.
   std::string m_outfile;
   std::string m_datfile;    ///< Outfile name for detected DAT sessions
-  std::string m_subfile;    ///< Outfile name for Submission stats
-  std::string m_subsumfile; ///< Outfile name for submission stat summary
+  std::string m_subfile;    ///< Optional detailed submission-statistics file.
+  std::string m_subsumfile; ///< Optional submission-summary file.
   std::string
       m_resource_trace; ///< Optional outfile name for resource-occupancy trace
 
