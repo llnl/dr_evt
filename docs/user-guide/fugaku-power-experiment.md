@@ -231,6 +231,19 @@ real-log replay spans 39.446 days, peaks at 142,167 nodes, and reaches
 14,625,141.205 W. The replay is the historical baseline against which the
 simulated behavior is compared.
 
+The historical curve also contains three conspicuous low-allocation troughs
+near elapsed days 11.4, 15.8, and 19.0. Using 30,000 allocated nodes as a
+visual threshold, their approximate spans are April 15 10:08 to April 16 00:58,
+April 19 18:23 to 23:55, and April 23 00:26 to 05:21 PDT; their minima are 1,138,
+13,513, and 17,938 nodes, respectively. The job log alone does not establish
+that these were system downtimes: allocation never reaches zero, and 1,073,
+311, and 769 jobs begin during the respective windows. They could reflect
+reduced availability, maintenance, production scheduling constraints, or the
+workload mix. This simulation used a constant 142,167-node pool and no
+maintenance or time-varying-capacity input, so it cannot reproduce any
+externally imposed capacity reductions. Low-allocation periods in the
+simulation are instead consequences of its workload and scheduling decisions.
+
 The submission timestamps are identical in the two inputs and span 33.515
 days. The difference in overall duration is a queue-drain effect, not a
 six-day job runtime. In particular, the job that finished last historically
