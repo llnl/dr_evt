@@ -5,8 +5,9 @@
 
 DR_EVT is a high-performance HPC job scheduler simulator supporting EASY and
 CONSERVATIVE backfilling algorithms. **Uniquely supports online simulation via
-gRPC**, enabling coordinated multi-cluster simulations where distributed schedulers
-interact in real-time.
+gRPC**, enabling [coordinated multi-cluster simulations](docs/user-guide/client-server-use-cases.md)
+where distributed schedulers interact in real-time.
+Another use case is the [Fugaku Power-Usage Simulation Experiment](docs/user-guide/fugaku-power-experiment.md).
 
 **[📚 Read the Full Documentation on ReadTheDocs →](https://dr-evt.readthedocs.io/)**
 
@@ -16,7 +17,7 @@ Clients and digital-twin controllers can open independent gRPC sessions to any
 number of server processes. Each server creates an isolated simulation for
 every session; neither the number of clients nor the number of servers is
 fixed. A server can handle multiple concurrent sessions.
-Simulation` is the shared scheduling core. C++ and Python use it directly;
+`Simulation` is the shared scheduling core. C++ and Python use it directly;
 the gRPC server hosts the same core remotely.
 Containerization option is offered for the remote client/server deployment.
 MPI can optionally serve as a coordination harness for gRPC client/server testing.
@@ -31,7 +32,7 @@ retains its wait queue. The simulation coordinates them and writes the job and
 resource traces.
 
 <p align="center">
-  <img src="docs/_static/simulation-internals.png" width="75%" alt="C++ Simulation component: Simulation owns a Scheduler above Trace. Scheduler contains the wait queue; Trace contains the job store, event queue, and resource history, then writes resource and job scheduling traces.">
+  <img src="docs/_static/simulation-internals.png" width="72%" alt="C++ Simulation component: Simulation owns a Scheduler above Trace. Scheduler contains the wait queue; Trace contains the job store, event queue, and resource history, then writes resource and job scheduling traces.">
 </p>
 
 ## Features
@@ -57,13 +58,13 @@ resource traces.
 - **Protocol Buffer Configuration**: Structured configuration files for complex simulations
 
 ### Testing & Validation
-- **Comprehensive Test Suite**: 114 tests (114/114 passing as of 2026-09-07)
+- **Comprehensive Test Suite**: 115 tests (115/115 passing as of 2026-09-12)
   - 34 comprehensive tests (EASY backfilling correctness)
   - 7 unit tests (I/O and format validation)
   - 6 feature tests (policy comparisons)
   - 2 conservative tests (CONSERVATIVE vs EASY behavioral differences)
   - 7 scale tests (10-2000 jobs)
-  - 4 replay tests (determinism verification)
+  - 5 replay tests (resource equivalence and reclamation safety)
   - 5 resource-history and 6 job-store tests
   - 18 append-job/backfill-window tests and 14 progressive-loading tests
   - 9 protobuf configuration tests and 2 dedicated power-usage CTest tests
