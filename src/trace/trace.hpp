@@ -57,12 +57,12 @@ public:
   /// otherwise be reclaimed. No compaction, no removed flag:
   /// out-of-order completions (backfilling) just sit in place until
   /// every job ahead of them (by job_no) has also been reclaimed - see
-  /// OUT_TRACE_STREAMING.md.
+  /// OUTPUT_TRACE_BUFFERS.md.
   ///
   /// Reclaiming a slot makes it reusable within this buffer's fixed,
   /// already-allocated capacity - it does not free memory back to the
   /// OS. In batch mode (the only mode today - see
-  /// OUT_TRACE_STREAMING.md), load_data() sizes capacity to the whole
+  /// OUTPUT_TRACE_BUFFERS.md), load_data() sizes capacity to the whole
   /// trace before the run starts, so this essentially fires at most
   /// once per run: size() only shrinks afterward (nothing new is ever
   /// inserted once loading finishes), so the buffer stops being full()
@@ -95,6 +95,16 @@ protected:
   CircularOverflowPolicy
       m_job_store_overflow; ///< Fallback when the front isn't safe to reclaim
                             ///< and the buffer's full
+  /// Number of processed departures between opportunistic completed-prefix
+  /// flushes. Zero follows the current job-store capacity.
+  size_t m_job_flush_interval;
+  /// Departures processed since the last capacity, explicit, or interval
+  /// flush. This is trace-level state, not a per-job flag.
+  size_t m_departures_since_job_flush;
+  /// Permanent half-open replay job range whose start/end events have been
+  /// inserted. This prevents an end_time alone from making a not-yet-enqueued
+  /// replay record appear committed.
+  size_t m_replay_jobs_enqueued;
   double m_memory_pressure_fraction =
       0.0; ///< 0.0 = disabled; see set_memory_pressure_fraction()
 
@@ -203,6 +213,12 @@ protected:
   std::ofstream m_simulated_trace_ofs;
   /// Whether simulated-job-trace timestamps are rendered in milliseconds.
   bool m_simulated_trace_msec;
+  /// Permanent number of the next job whose schedule output/statistics have
+  /// not yet been consumed. This is the output cursor across front reclamation,
+  /// explicit flushes, and the final write.
+  size_t m_next_job_to_write;
+  /// Accumulates complete schedule lines during one record-count flush.
+  std::string m_simulated_trace_buffer;
 
 public:
   /** @brief Construct a trace using the default input format. @param[in] fname
@@ -294,6 +310,18 @@ public:
     m_job_store_overflow = policy;
   }
 
+  /**
+   * @brief Set the periodic completed-job flush interval in records.
+   * @param[in] interval Number of processed departures per flush; zero uses
+   *        the current job-store capacity.
+   * @details Capacity pressure and explicit/final flushes take precedence and
+   * reset the interval. The interval never changes job eligibility: only the
+   * completed contiguous front prefix can be written and reclaimed.
+   */
+  void set_job_flush_interval(size_t interval) {
+    m_job_flush_interval = interval;
+  }
+
   /// @brief Configure the optional job-store memory-pressure limit.
   /// Enable/disable (and tune) the memory-pressure check that
   /// ensure_batch_capacity() (used by both append_jobs() and
@@ -348,12 +376,10 @@ public:
    * insertion point (unlike insert_job()/submit_job(), which both
    * operate on a job already sitting in a preloaded m_data via
    * job_at()). Follows the same order established for this in
-   * OUT_TRACE_STREAMING.md: check full(), try reclaim_front_jobs()
+   * OUTPUT_TRACE_BUFFERS.md: check full(), try reclaim_front_jobs()
    * first, and only fall back to growing if nothing was reclaimable.
-   * @param[in] current_time Current simulated time, for the reclaim
-   *        attempt's is_front_reclaimable() check - not the new job's
-   *        own submit_time (see below), though the two are typically
-   *        equal for a genuinely live arrival.
+   * @param[in] current_time Current simulated time at a drained processing
+   *        boundary, used by the reclaimability check.
    * @param[in] submit_time The new job's own submit_time attribute.
    * @param[in] num_nodes Number of nodes the job requests.
    * @param[in] queue Which queue the job was submitted to.
@@ -380,7 +406,7 @@ public:
    * which load()'s output (what a real file read produces) can -
    * routing that through this struct would silently drop it. See
    * Trace::load_next_file() instead, which takes Job_Record directly;
-   * see OUT_TRACE_STREAMING.md for the full reasoning. This function
+   * see OUTPUT_TRACE_BUFFERS.md for the full reasoning. This function
    * still exists for genuine streaming, where a Job_Record doesn't
    * exist yet - only the caller's raw values do.
    *
@@ -418,8 +444,8 @@ public:
    * exists as a batch call at all rather than a loop over
    * append_job() the caller could already write themselves.
    *
-   * @param[in] current_time Current simulated time, for the batch-wide
-   *        reclaim attempt's is_front_reclaimable() check.
+   * @param[in] current_time Current simulated time at a drained processing
+   *        boundary, used by the reclaimability check.
    * @param[in] requests The new jobs' own data, in submit_time order.
    * @return Each new job's job_no, in the same order as requests.
    *         Simulation::append_jobs() immediately enqueues each one.
@@ -455,8 +481,8 @@ public:
    * across the file sequence - first call is exempt, nothing to
    * compare against yet).
    *
-   * @param[in] current_time Current simulated time, for the batch-wide
-   *        reclaim attempt's is_front_reclaimable() check.
+   * @param[in] current_time Current simulated time at a drained processing
+   *        boundary, used by the reclaimability check.
    * @param[in] fname Path to this file - same trace format as any other
    *        input file (--infile), not the network-facing
    *        Job_Append_Request shape.
@@ -607,6 +633,19 @@ public:
    */
   void write_simulated_trace(const std::string &filename, bool msec = false);
 
+  /**
+   * @brief Explicitly write and reclaim the completed front prefix.
+   *
+   * This is the non-capacity-pressure trigger for long-running callers that
+   * want to spread output work across the run. Every record is written at most
+   * once through the permanent output cursor, complete lines are emitted in
+   * blocks, and the underlying stream is flushed before return. Records whose
+   * end_time is later than current_time remain resident and stop the front
+   * sweep. The caller must first process every event through current_time.
+   * @param[in] current_time Fully processed simulation time boundary.
+   */
+  void flush_completed_jobs(sim_time_t current_time);
+
 #if MARK_DAT_PERIOD
   std::ostream &print_DAT(std::ostream &os);
 #endif
@@ -679,13 +718,11 @@ protected:
   void resolve_job_store_capacity(num_jobs_t hint);
 
   /// @brief Test whether the front job-store slot is safe to reclaim.
-  /// True if the front-most job's slot can be reclaimed right now:
-  /// rejected (submit_time == unscheduled_sentinel(), will never
-  /// resolve - skip immediately) or genuinely finished
-  /// (end_time <= current_time). False (still running or still
-  /// waiting) means the sweep must stop here - no compaction, so
-  /// nothing later in the buffer can be reclaimed either.
-  /// @param[in] current_time Current simulation time.
+  /// True when the front record is rejected, or its end_time is no later than
+  /// current_time, its replay events (if any) have been enqueued, and no event
+  /// at or before current_time remains queued. Together these form the local
+  /// committed-time/GVT-style boundary for the record.
+  /// @param[in] current_time Fully processed simulation time boundary.
   /// @return `true` when the front slot may be discarded.
   bool is_front_reclaimable(sim_time_t current_time) const;
 
@@ -695,10 +732,15 @@ protected:
   /// that same condition on entry (not proactive - lazy reclaim, same
   /// as resource-history's record_resource_sample()): a no-op if
   /// already enough room. min_free defaults to 1, matching every
-  /// existing single-job caller (append_job(), insert_job()) exactly;
+  /// existing single-job caller (append_job()) exactly;
   /// append_jobs() passes the whole batch's size, since "enough room
   /// for one more" isn't the right question when appending several at
   /// once.
+  ///
+  /// Reclamation is lazy: completion alone does not run a sweep. A sweep is
+  /// invoked at record-insertion boundaries when space is needed, or by the
+  /// explicit flush_completed_jobs() API. This avoids a reclaim decision on
+  /// every completion while preserving bounded progressive/streaming storage.
   ///
   /// handle_overflow (default true) controls whether *this function*
   /// applies m_job_store_overflow (grow-or-abort) if still full()
@@ -711,12 +753,25 @@ protected:
   /// fire too would risk an extra, unnecessarily-small intermediate
   /// grow (or, for abort, a misleading single-job-shaped message) in a
   /// case only the batch caller can size and word correctly.
-  /// @param[in] current_time Current simulation time.
+  /// @param[in] current_time Fully processed simulation time boundary.
   /// @param[in] min_free Minimum number of free slots required.
   /// @param[in] handle_overflow Whether to apply the configured fallback if
   /// reclamation cannot provide enough space.
   void reclaim_front_jobs(sim_time_t current_time, num_jobs_t min_free = 1,
                           bool handle_overflow = true);
+
+  /// Return the configured periodic interval, resolving zero to the current
+  /// circular-buffer capacity (with a one-record floor).
+  size_t effective_job_flush_interval() const;
+
+  /// Account for processed departures and perform an interval-triggered sweep
+  /// at a fully drained event-time boundary.
+  void maybe_flush_completed_jobs(sim_time_t current_time,
+                                  size_t departures_processed);
+
+  /// Write and remove the completed contiguous front prefix. `sync` requests
+  /// an ostream flush for an explicit API boundary. Returns records removed.
+  size_t flush_completed_jobs_impl(sim_time_t current_time, bool sync);
 
   /// Shared by append_jobs() and load_next_file(): ensures
   /// m_data has room for batch_size more entries, reclaiming first
@@ -784,6 +839,10 @@ protected:
   /// go through.
   /// @param[in] job Record to write and include in running statistics.
   void write_job_line(const Job_Record &job);
+
+  /// Write and clear the schedule lines accumulated by one reclaim/final-write
+  /// operation. If sync is true, also flush the underlying ostream buffer.
+  void flush_simulated_trace_buffer(bool sync);
 };
 
 /// Experimental trace carrying Pcon values in both job and resource records.

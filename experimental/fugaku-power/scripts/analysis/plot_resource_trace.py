@@ -20,6 +20,17 @@ REQUIRED_COLUMNS = (
     "maxpcon",
 )
 
+# Keep the actual plotting rectangle identical between separately saved
+# figures.  tight_layout() adjusts this rectangle from tick-label widths, so
+# the node and power plots otherwise have slightly different day-axis widths.
+FIGURE_SIZE = (11, 4.5)
+PLOT_MARGINS = {
+    "left": 0.10,
+    "right": 0.98,
+    "bottom": 0.14,
+    "top": 0.90,
+}
+
 
 def read_trace(path, max_points):
     with path.open(newline="") as stream:
@@ -51,38 +62,51 @@ def read_trace(path, max_points):
     return rows, sampled
 
 
-def save_plots(sampled, output_dir, total_nodes):
+def save_plots(sampled, output_dir, total_nodes, mode):
     start = sampled[0][0]
     days = [(row[0] - start) / 86400.0 for row in sampled]
 
-    fig, axis = plt.subplots(figsize=(11, 4.5))
+    if mode == "replay":
+        qualifier = "historical"
+        time_label = "replay"
+        filename_prefix = "fugaku-replay-"
+        node_reference_label = (
+            f"replay maximum reference ({total_nodes:,} nodes)")
+    else:
+        qualifier = "simulated"
+        time_label = "simulation"
+        filename_prefix = "fugaku-"
+        node_reference_label = (
+            f"configured simulation limit ({total_nodes:,} nodes)")
+
+    fig, axis = plt.subplots(figsize=FIGURE_SIZE)
     axis.plot(days, [row[1] for row in sampled], linewidth=0.7,
               color="#1f77b4")
     axis.axhline(total_nodes, color="#555555", linestyle="--", linewidth=0.8,
-                 label=f"capacity ({total_nodes:,} nodes)")
-    axis.set(xlabel="Elapsed simulation time (days)",
+                 label=node_reference_label)
+    axis.set(xlabel=f"Elapsed {time_label} time (days)",
              ylabel="Allocated nodes",
-             title="Fugaku simulated node allocation")
+             title=f"Fugaku {qualifier} node allocation")
     axis.grid(alpha=0.25)
     axis.legend(loc="upper right")
-    fig.tight_layout()
-    fig.savefig(output_dir / "fugaku-node-allocation.png", dpi=180)
+    fig.subplots_adjust(**PLOT_MARGINS)
+    fig.savefig(output_dir / f"{filename_prefix}node-allocation.png", dpi=180)
     plt.close(fig)
 
-    fig, axis = plt.subplots(figsize=(11, 4.5))
+    fig, axis = plt.subplots(figsize=FIGURE_SIZE)
     axis.plot(days, [row[3] for row in sampled], linewidth=0.65,
               label="minimum power usage")
     axis.plot(days, [row[2] for row in sampled], linewidth=0.65,
               label="average power usage")
     axis.plot(days, [row[4] for row in sampled], linewidth=0.65,
               label="maximum power usage")
-    axis.set(xlabel="Elapsed simulation time (days)",
+    axis.set(xlabel=f"Elapsed {time_label} time (days)",
              ylabel="Aggregate power usage (W)",
-             title="Fugaku simulated power usage")
+             title=f"Fugaku {qualifier} power usage")
     axis.grid(alpha=0.25)
     axis.legend(loc="upper right")
-    fig.tight_layout()
-    fig.savefig(output_dir / "fugaku-power-usage.png", dpi=180)
+    fig.subplots_adjust(**PLOT_MARGINS)
+    fig.savefig(output_dir / f"{filename_prefix}power-usage.png", dpi=180)
     plt.close(fig)
 
 
@@ -92,11 +116,14 @@ def main():
     parser.add_argument("--output-dir", type=Path, default=Path.cwd())
     parser.add_argument("--total-nodes", type=int, default=158976)
     parser.add_argument("--max-points", type=int, default=50000)
+    parser.add_argument(
+        "--mode", choices=("simulation", "replay"), default="simulation",
+        help="Select plot labels and output filenames (default: simulation)")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows, sampled = read_trace(args.resource_trace, args.max_points)
-    save_plots(sampled, args.output_dir, args.total_nodes)
+    save_plots(sampled, args.output_dir, args.total_nodes, args.mode)
 
     peak_nodes = max(row[1] for row in rows)
     print(f"samples={len(rows)} plotted={len(sampled)}")

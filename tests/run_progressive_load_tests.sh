@@ -7,7 +7,7 @@
 # the actual getopt() parsing path (Sim_Params::getopt(), the
 # --infile_list list-file reading, the positional-argument validation
 # change) that the C++-level test doesn't cover - see
-# docs/dev/design-decisions/OUT_TRACE_STREAMING.md.
+# docs/dev/OUTPUT_TRACE_BUFFERS.md.
 
 set -e
 

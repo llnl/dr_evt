@@ -72,7 +72,9 @@ def plot(rows, output):
     memory_axis.set_yscale("log")
     time_axis.grid(alpha=0.25)
 
-    lines = time_axis.lines + memory_axis.lines
+    # Match the legend's top-to-bottom order to the visual ordering of the
+    # curves: the memory series sit above the wall-time series in this data.
+    lines = memory_axis.lines + time_axis.lines
     time_axis.legend(lines, [line.get_label() for line in lines],
                      loc="upper left")
 

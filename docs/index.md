@@ -30,9 +30,9 @@ user-guide/command-line
 user-guide/protobuf-config
 user-guide/trace-formats
 user-guide/output-traces
-user-guide/fugaku-power-experiment
 user-guide/grpc-setup
 user-guide/client-server-use-cases
+user-guide/fugaku-power-experiment
 ```
 
 ```{toctree}

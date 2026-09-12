@@ -26,6 +26,8 @@ Replay mode tests verify that replaying a simulation produces identical resource
 - **Resource accounting**: `tracer` derives occupancy identically to `simulator`, from the same begin/end times
 - **Event ordering**: Same event order as the original run
 - **Determinism**: Replay is deterministic given the same input
+- **Safe job-store reclamation**: completed records are written exactly once
+  and reclaimed only after their replay events and earlier records are safe
 
 ### What This Doesn't Test
 
@@ -60,10 +62,23 @@ diff sim_resources.csv replay_resources.csv
 
 ## Test Cases
 
-The replay test runner (`run_replay_tests.sh`) uses several correctness tests as inputs:
+Before the CLI comparisons, the replay runner executes
+`test_replay_reclamation`. That binary exercises:
+
+- explicit partial and repeated flushes;
+- periodic flushing without reclaiming events that have not been enqueued;
+- the default capacity-sized flush interval;
+- final output when no earlier flush occurred;
+- multiple departures at the same timestamp;
+- out-of-order completion and contiguous-front-prefix blocking; and
+- exactly-once schedule output across reclamation and final output.
+
+The runner then uses four scheduler-correctness fixtures as CLI inputs:
+
 - 01_backfill_allowed
 - 05_multiple_backfills
 - 13_consecutive_fcfs
+- 21_sustained_high_load
 
 These are small, verified-correct simulations that make good replay test cases.
 
@@ -117,19 +132,17 @@ If replay crashes but simulation works:
 
 To add a new replay test:
 
-1. Choose a correctness test as input (small, verified correct)
-2. Add to `REPLAY_TESTS` array in `run_replay_tests.sh`
-3. Run: `./tests/run_replay_tests.sh`
+1. Add a reclamation boundary to `test_replay_reclamation.cpp`, or choose a
+   small, verified correctness fixture for a new CLI comparison.
+2. For a CLI comparison, add its basename to the `REPLAY_TESTS` array in
+   `run_replay_tests.sh`.
+3. Build/install the test binaries and run `./tests/run_replay_tests.sh`.
 
 ## Current Status
 
-✓ Replay test infrastructure created
-- 3-step test methodology implemented
-- Uses verified correctness tests as input
-- Compares resource traces automatically
+✓ Five runner-level replay tests passing
+- One reclamation-boundary binary
+- Four three-step simulation/replay resource comparisons
+- Resource traces compared automatically
 
-Ready for:
-- Running replay tests
-- Adding more test cases
-
-Last updated: 2026-08-28
+Last updated: 2026-09-12

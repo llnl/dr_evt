@@ -581,6 +581,20 @@ set_target_properties(test_pcon_trace-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_pcon_trace-bin)
 
+# Replay job-store reclamation test: committed-time boundaries, output
+# ordering, and all lazy/explicit flush paths for the standard Trace policy
+# used by the standalone tracer.
+add_executable(test_replay_reclamation-bin tests/test_replay_reclamation.cpp)
+target_include_directories(test_replay_reclamation-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(test_replay_reclamation-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+set_target_properties(test_replay_reclamation-bin PROPERTIES
+  OUTPUT_NAME test_replay_reclamation
+  CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_replay_reclamation-bin)
+
 if (DR_EVT_WITH_UNIT_TESTING)
   add_test(
     NAME test_trace_type_cli
@@ -592,6 +606,9 @@ if (DR_EVT_WITH_UNIT_TESTING)
   add_test(
     NAME test_pcon_trace
     COMMAND $<TARGET_FILE:test_pcon_trace-bin>)
+  add_test(
+    NAME test_replay_reclamation
+    COMMAND $<TARGET_FILE:test_replay_reclamation-bin>)
 endif()
 
 # Progressive/multi-file loading test (--infile_list) - see

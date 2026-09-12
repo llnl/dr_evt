@@ -157,6 +157,18 @@ sim.advance_to(100.0);  // Process job 0's END event at t=100
 // Job 0 has completed
 ```
 
+### `flush_completed_jobs()`
+
+Writes and reclaims the completed contiguous front prefix at the simulation's
+current time. This provides an explicit output/checkpoint boundary for a long
+streaming session without closing the schedule file. Jobs that are unfinished,
+still have pending events, or sit behind such a job remain resident.
+
+```cpp
+sim.advance_to(checkpoint_time);
+sim.flush_completed_jobs();
+```
+
 ### `run_until_exclusive(target_time)`
 
 Advances simulation to just before `target_time`, excluding events at that exact time.

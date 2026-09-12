@@ -95,6 +95,7 @@ Scheduling policy:
 Job store:
   -K, --job_store_capacity <size>      Initial job-record store capacity (default: 0 = size of trace)
   -W, --job_store_overflow <mode>      abort|grow when job_store_capacity exceeded (default: grow)
+      --job_flush_interval <records>   Completed-job flush interval (default: 0 = job-store capacity)
   -m, --check_memory_pressure <fraction>  Refuse to grow the job store past this fraction of available memory (0 < fraction <= 1; disabled unless given)
 
 Trace data model and format:

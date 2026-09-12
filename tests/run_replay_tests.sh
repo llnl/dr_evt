@@ -31,6 +31,23 @@ echo ""
 PASS=0
 FAIL=0
 
+# Exercise the internal replay reclamation boundaries before the CLI-level
+# simulation/replay comparisons below.
+RECLAMATION_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_replay_reclamation"
+
+echo "Testing: replay job-store reclamation boundaries"
+if [ ! -x "$RECLAMATION_BIN" ]; then
+    echo "  ✗ FAIL - installed test_replay_reclamation binary not found"
+    echo "    Expected: $RECLAMATION_BIN"
+    FAIL=$((FAIL + 1))
+elif "$RECLAMATION_BIN"; then
+    echo "  ✓ PASS - replay reclamation boundaries"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ FAIL - replay reclamation boundaries"
+    FAIL=$((FAIL + 1))
+fi
+
 # Use several scheduler-correctness fixtures as replay test inputs
 REPLAY_TESTS=(
     "01_backfill_allowed"

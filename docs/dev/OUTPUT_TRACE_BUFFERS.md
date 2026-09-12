@@ -12,7 +12,7 @@ rather than retaining a pointer to a separate, fixed-layout job vector.
 
 | Buffer | Contents | When entries can be released | What happens when full |
 | --- | --- | --- | --- |
-| `Trace::m_data` | Job records used for scheduling, statistics, and the simulated-job trace | After the job's departure event has been processed, or immediately for a rejected job | Reclaim eligible records from the front, then grow or abort according to `--job_store_overflow` |
+| `Trace::m_data` | Job records used for scheduling, statistics, and the simulated-job trace | After the departure event has been processed and the schedule row has been consumed, or immediately for a rejected job | Write and reclaim the eligible front prefix; grow or abort if insertion still lacks space |
 | `Trace::m_resource_history` | Finalized `(time, free_nodes, allocated_nodes)` resource samples for `--resource_trace` | Immediately after the sample is recorded | Flush samples to the resource-trace file and clear the buffer |
 
 The buffers are independent of the scheduler's circular FCFS wait queue. The
@@ -37,17 +37,36 @@ therefore hold a `Trace` reference and use `job_at()` rather than indexing the
 buffer directly.
 
 Before a record is discarded, `write_job_line()` consumes it for the simulated
-job trace and accumulates the summary statistics. The same function is used by
-both reclamation and the final flush, so each scheduled job is written and
-counted exactly once.
+job trace and accumulates the summary statistics. A permanent job-number cursor
+tracks the next row to write across physical `pop_front()` operations. The same
+function is used by reclamation and final output, so each scheduled job is
+written and counted exactly once without adding a flag to every `Job_Record`.
 
 ## Reclamation rules
 
-Reclamation is lazy: it occurs only when new capacity is needed, rather than on
-every simulated completion.
+Reclamation follows the same idea as a local Global Virtual Time (GVT)
+boundary: completion makes a record eligible, but the record is not discarded
+until all earlier records are also eligible and its output consumer has
+advanced. `end_time <= current_time` supplies the time test; event-queue and
+replay-enqueue boundaries ensure the corresponding departure accounting has
+actually happened.
 
-- A job record becomes reclaimable after its departure event has run. In
-  practice, the check is `end_time <= current_time`.
+Reclamation is lazy and batched. It is not attempted after every completion.
+It is triggered by:
+
+- insertion pressure when the job store needs space;
+- an explicit `flush_completed_jobs()` call;
+- final output; or
+- `--job_flush_interval` processed departures.
+
+The interval is measured in records, not bytes. Its default value `0` follows
+the current job-store capacity, which normally means capacity pressure is the
+first reason to flush. Any other flush trigger resets the interval. One trigger
+writes the whole completed contiguous front prefix as one output block.
+
+- A job record becomes reclaimable after its departure event has run. The
+  time-side check is `end_time <= current_time`; a pending event at the boundary
+  prevents reclamation.
 - A permanently unschedulable job is marked with
   `Job_Record::unscheduled_sentinel()` and can be reclaimed without waiting for
   an end time that will never exist.
@@ -57,7 +76,9 @@ every simulated completion.
 
 For job records, the insertion order is reclaim first, then grow or abort only
 if the required room is still unavailable. This permits a completed job's slot
-to be reused without increasing capacity.
+to be reused without increasing capacity. The standalone replay tool does not
+enable periodic reclamation because its later `print()`, `print_span()`, and
+submission-statistics passes still consume the resident records.
 
 ## Loading and streaming jobs
 

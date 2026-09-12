@@ -7,8 +7,15 @@ set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX:-"$REPO_ROOT/install"}
+if [[ "$INSTALL_PREFIX" != /* ]]; then
+    INSTALL_PREFIX="$REPO_ROOT/${INSTALL_PREFIX#./}"
+fi
 PORT=${DR_EVT_COMPOSITE_TEST_PORT:-55100}
-RUN_DIR=${DR_EVT_COMPOSITE_TEST_RUN_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/dr-evt-composite.XXXXXX")}
+if [ -n "${DR_EVT_COMPOSITE_TEST_RUN_DIR:-}" ]; then
+    RUN_DIR=$DR_EVT_COMPOSITE_TEST_RUN_DIR
+elif ! RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/dr-evt-composite.XXXXXX" 2>/dev/null); then
+    RUN_DIR=$(mktemp -d "/tmp/dr-evt-composite.XXXXXX")
+fi
 SERVER="$INSTALL_PREFIX/bin/dr_evt_server"
 MPI_TEST="$INSTALL_PREFIX/bin/tests/test_grpc_multi_client_server"
 

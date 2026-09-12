@@ -276,6 +276,18 @@ What to do if an insert would exceed `--job_store_capacity`.
     --job_store_capacity 500 --job_store_overflow abort
 ```
 
+### `--job_flush_interval RECORDS`
+
+Write and reclaim the completed contiguous front prefix after this many
+additional departures. This batches schedule output and reclamation without
+checking and removing a record after every completion. Capacity pressure,
+`Trace::flush_completed_jobs()`, and final output are independent flush reasons
+and reset the interval.
+
+**Default:** `0`, meaning the current job-store circular-buffer capacity. Thus
+the default normally waits until space is needed; set a smaller record count to
+spread output I/O through a long streaming run.
+
 ### `-m, --check_memory_pressure FRACTION`
 Before growing the job-record store for a new batch (`--infile_list`
 progressive loading, or a batch appended via the streaming API), refuse

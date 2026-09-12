@@ -9,7 +9,7 @@ DR_EVT has tests organized by purpose:
 - **Unit (7)** - Basic I/O and format tests
 - **Feature (6)** - Policy, mode, output-format, and rejection tests
 - **Scale (7)** - Larger job counts than comprehensive's ceiling
-- **Replay (4)** - Verify replay reproduces simulation
+- **Replay (5)** - Verify replay resource equivalence and reclamation safety
 - **Resource History (5)** - Resource-history circular buffer, flush overhead
 - **Job Store (6)** - Job-record circular buffer, capacity sizing correctness
 - **Append-Job (18)** - Streaming insertion (append_job/append_jobs), FCFS/EASY backfill-window query + submit_job()/advance_to() correctness
@@ -165,9 +165,13 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 - CONSERVATIVE reduces utilization by 8.08 percentage points (87.13% vs 95.20%)
 - CONSERVATIVE increases makespan by 9.3% but provides fairness guarantee
 
-### 6. Replay Tests (4 tests)
+### 6. Replay Tests (5 tests)
 
-**Purpose:** Verify replay mode reproduces simulation resource usage
+**Purpose:** Verify replay mode reproduces simulation resource usage and that
+job-store reclamation respects replay event/output boundaries.
+
+**Location:** `tests/test_replay_reclamation.cpp` and four CLI comparisons in
+`tests/run_replay_tests.sh`
 
 **Documentation:** [REPLAY_TESTS.md](REPLAY_TESTS.md)
 
@@ -178,7 +182,12 @@ Note: Streaming API / MPI feeder tests (`test_batch_vs_streaming.cpp`, `mpi_job_
 2. Replay job trace → generates new resource trace
 3. Compare: must match exactly
 
-**Status:** ✅ 4/4 passing (100%)
+The reclamation binary covers explicit and periodic flushing, the default
+capacity-sized interval, final output, equal-time departures, out-of-order
+completion, front-prefix blocking, and exactly-once output. It counts as one
+runner-level test; the other four tests are CLI simulation/replay comparisons.
+
+**Status:** ✅ 5/5 passing (100%)
 
 ### 7. Resource History Tests (5 tests)
 
@@ -196,7 +205,7 @@ See "Resource History Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md
 
 **Purpose:** Verify the job-record circular buffer (`Trace::m_data`, `--job_store_capacity`) produces identical output and stats regardless of the requested initial capacity, correctly excludes rejected jobs without stalling, aborts cleanly when capacity can't be satisfied, and measures the cost of a too-small initial capacity
 
-**Note:** in the batch mode that exists today, a too-small capacity forces reallocation *during loading*, not repeated reclaiming *during the run* - see "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for why, and [docs/dev/design-decisions/OUT_TRACE_STREAMING.md](../docs/dev/design-decisions/OUT_TRACE_STREAMING.md) for the full reasoning.
+**Note:** in single-file batch mode, a too-small capacity forces reallocation *during loading*; see "Job Store Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) and [output-trace buffers](../docs/dev/OUTPUT_TRACE_BUFFERS.md) for the full reasoning.
 
 **Location:** `test_traces/feature/`
 
@@ -259,16 +268,16 @@ See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) f
 | Feature | 6 | ✅ 6/6 | Policies, modes, millisecond output, and rejection handling |
 | Conservative | 2 | ✅ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
 | Scale | 7 | ✅ 7/7 | Larger job counts |
-| Replay | 4 | ✅ 4/4 | Determinism verification |
+| Replay | 5 | ✅ 5/5 | Resource equivalence and reclamation safety |
 | Resource History | 5 | ✅ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 18 | ✅ 18/18 | Streaming insertion (single+batch), backfill-window query + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✅ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
 | Config | 9 | ✅ 9/9 | Protobuf config parity with CLI, including power-usage trace types, and the doc's own examples actually run |
 | Power-usage CTest | 2 | ✅ 2/2 | Compile-time policy/storage behavior and CLI trace-type dispatch |
-| **TOTAL** | **114** | **114/114** all passing | - |
+| **TOTAL** | **115** | **115/115** all passing | - |
 
-**Status as of:** 2026-09-03 (verified by running all test scripts)
+**Status as of:** 2026-09-12 (verified by running all test scripts)
 
 Note: Some tests show "SKIP" when expected output files are missing. This occurs for:
 1. **Differential tests** - Comparing different queue implementations (circular/deque/multimap/block) against each other, not against fixed expected outputs
@@ -532,7 +541,7 @@ diff /tmp/output.csv tests/test_traces/scheduler_correctness/01_backfill_allowed
 | Unit | 7 | ✓ 7/7 | Basic I/O and format tests |
 | Feature | 6 | ✓ 6/6 | Policy comparisons, modes, millisecond output, and rejection handling |
 | Conservative | 2 | ✓ 2/2 | CONSERVATIVE backfilling correctness & equivalence |
-| Replay | 4 | ✓ 4/4 | Resource trace matching |
+| Replay | 5 | ✓ 5/5 | Resource equivalence and reclamation safety |
 | Scale | 7 | ✓ 7/7 | Large-scale tests |
 | Resource History | 5 | ✓ 5/5 | Resource-history circular buffer, flush overhead |
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
@@ -540,7 +549,7 @@ diff /tmp/output.csv tests/test_traces/scheduler_correctness/01_backfill_allowed
 | Progressive Loading | 14 | ✓ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
 | Config | 9 | ✓ 9/9 | Protobuf config parity with CLI, including power-usage trace types, and the doc's own examples actually run |
 | Power-usage CTest | 2 | ✓ 2/2 | Compile-time policy/storage behavior and CLI trace-type dispatch |
-| **Total** | **114** | **114/114** | All tests passing as of 2026-09-07 |
+| **Total** | **115** | **115/115** | All tests passing as of 2026-09-12 |
 
 ## Prerequisites
 

@@ -47,6 +47,7 @@ template <typename TraceType> void BasicSimulation<TraceType>::run() {
   // starts, well after load.
   m_trace.set_job_store_capacity(m_params.m_job_store_capacity);
   m_trace.set_job_store_overflow(m_params.m_job_store_overflow);
+  m_trace.set_job_flush_interval(m_params.m_job_flush_interval);
   m_trace.set_memory_pressure_fraction(m_params.m_memory_pressure_fraction);
 
   if (!m_params.m_infile_list.empty()) {
@@ -397,6 +398,11 @@ void BasicSimulation<TraceType>::write_simulated_trace() {
 }
 
 template <typename TraceType>
+void BasicSimulation<TraceType>::flush_completed_jobs() {
+  m_trace.flush_completed_jobs(m_current_time);
+}
+
+template <typename TraceType>
 void BasicSimulation<TraceType>::write_resource_trace(
     const std::string &filename) {
   if (filename.empty()) {
@@ -430,6 +436,14 @@ job_no_t BasicSimulation<TraceType>::append_job(sim_time_t submit_time,
         " but current_time=" + std::to_string(m_current_time));
   }
 
+  // Online callers need not invoke run() first. Open incremental outputs before
+  // this insertion can reclaim a completed record from a full job store.
+  m_trace.set_job_flush_interval(m_params.m_job_flush_interval);
+  m_trace.set_resource_history_capacity(m_params.m_resource_history_capacity);
+  m_trace.start_resource_trace(m_params.get_resource_trace(),
+                               m_params.m_total_nodes, m_params.m_msec_output);
+  m_trace.start_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
+
   time_t sec = static_cast<time_t>(submit_time);
   float frac = submit_time - sec;
   epoch_t submit_epoch = {sec, frac};
@@ -450,6 +464,13 @@ job_no_t BasicSimulation<TraceType>::append_job(sim_time_t submit_time,
 template <typename TraceType>
 std::vector<job_no_t> BasicSimulation<TraceType>::append_jobs(
     const std::vector<Job_Append_Request> &requests) {
+  // Same one-time, idempotent setup as append_job(), once for this batch.
+  m_trace.set_job_flush_interval(m_params.m_job_flush_interval);
+  m_trace.set_resource_history_capacity(m_params.m_resource_history_capacity);
+  m_trace.start_resource_trace(m_params.get_resource_trace(),
+                               m_params.m_total_nodes, m_params.m_msec_output);
+  m_trace.start_simulated_trace(m_params.get_outfile(), m_params.m_msec_output);
+
   // Validate every request's submit_time before appending any of them
   // - same precondition append_job() enforces per-job, checked here
   // for the whole batch up front (see this function's own doc
