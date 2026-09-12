@@ -13,7 +13,7 @@ Source code, releases, and issue tracking are available in the
 - **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
 - **Conservative Backfilling**: All jobs get reservations
 - **Run Time Modes**: Read from trace (actual), sample from distribution, or use time limits
-- **Trace Data Models**: Standard records by default, or experimental Pcon records (from Fugaku@RIKEN) with `avgpcon`, `minpcon`, and `maxpcon`
+- **Trace Data Models**: Standard records by default, or experimental power-usage records (from Fugaku@RIKEN) with `avgpcon`, `minpcon`, and `maxpcon`
 
 ## Build Instructions
 
@@ -235,6 +235,9 @@ for how the parser picks a mode.
 # On macOS with Homebrew
 cmake .. -DBOOST_ROOT=/opt/homebrew/opt/boost
 
+# Or search a dependency prefix, including with AVOID_SYSTEM_BOOST=ON
+cmake .. -DCMAKE_PREFIX_PATH=/path/to/dependencies -DAVOID_SYSTEM_BOOST=ON
+
 # Or set environment variable
 export BOOST_ROOT=/path/to/boost
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -266,7 +269,7 @@ also registered with CTest.
 # Register ordinary CTest tests
 cmake .. -DBUILD_TESTING=ON
 
-# Run the Pcon-focused CTest tests
+# Run the power-usage-focused CTest tests
 ctest -R 'test_pcon_trace|test_trace_type_cli' --output-on-failure
 ```
 
@@ -343,7 +346,7 @@ Planned features:
 - Simulation warmup: allow jobs to run before the intended simulation window
   such that the simulation accounting begins from a realistic, warmed-up
   resource state rather than an empty system. The input trace may start days
-  earlier, but warmup jobs should excluded from tracing.
+  earlier, but warmup jobs should be excluded from tracing.
 - Multi-file output: split output traces across multiple files with a
   configurable per-file record limit, for long-running digital twin
   simulations.

@@ -30,6 +30,7 @@ user-guide/command-line
 user-guide/protobuf-config
 user-guide/trace-formats
 user-guide/output-traces
+user-guide/fugaku-power-experiment
 user-guide/grpc-setup
 user-guide/client-server-use-cases
 ```
@@ -87,6 +88,7 @@ Complete guide for running simulations:
 
 - **[User Guide](user-guide/overview.md)** - Complete usage manual
 - **[Command-Line Options](user-guide/command-line.md)** - All available options
+- **[Fugaku Power-Usage Experiment](user-guide/fugaku-power-experiment.md)** - Progressive simulation and resource plots for the April 2024 Fugaku trace
 
 ### Algorithm and Testing
 
@@ -122,7 +124,7 @@ For contributors and maintainers:
 
 **Trace Data Models:**
 - **Standard:** Default compact job and resource records
-- **Pcon:** Experimental model carrying `avgpcon`, `minpcon`, and `maxpcon`
+- **Power usage:** Experimental model carrying `avgpcon`, `minpcon`, and `maxpcon`
 
 **APIs:**
 - **Streaming API:** Online/incremental simulation, including genuinely new jobs (`append_job()`/`append_jobs()`) not just ones already in a preloaded trace
@@ -138,8 +140,8 @@ DR_EVT simulates discrete event-driven HPC job scheduling with:
 - **EASY and CONSERVATIVE backfilling** implementations checked against
   separately written Python reference implementations (cross-implementation
   consistency checks, not independently derived mathematical ground truth)
-- **Standard and experimental Pcon trace data models**, with Pcon jobs carrying
-  `avgpcon`, `minpcon`, and `maxpcon` and corresponding Pcon-aware resource traces
+- **Standard and experimental power-usage trace data models**, with power-usage
+  jobs carrying `avgpcon`, `minpcon`, and `maxpcon` and corresponding resource traces
 - **gRPC-based online simulation service** enabling coordinated multi-cluster
   simulations in a distributed fashion and digital-twin scheduler interacting in real-time
 - **Replay and simulation modes** for both offline analysis and online operation

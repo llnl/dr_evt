@@ -59,8 +59,8 @@ time,free_nodes,allocated_nodes
 100,100,0
 ```
 
-With `--trace_type pcon`, the resource trace additionally reports the Pcon
-quantities carried by the experimental Pcon trace model:
+With `--trace_type pcon`, the resource trace additionally reports the
+quantities carried by the experimental power-usage trace model:
 
 ```text
 time,free_nodes,allocated_nodes,avgpcon,minpcon,maxpcon
@@ -85,3 +85,5 @@ when the configured `--resource_history_capacity` is full; see
 - [Input Trace Files](trace-formats.md) - accepted input formats and columns
 - [Command-Line Options](command-line.md) - `--outfile`, `--resource_trace`,
   and `--resource_history_capacity`
+- [Fugaku Power-Usage Experiment](fugaku-power-experiment.md) - Plotting node
+  and power-usage resource curves

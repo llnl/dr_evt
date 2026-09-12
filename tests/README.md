@@ -236,7 +236,7 @@ See "Progressive Loading Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE
 
 ---
 
-### 11. Config Tests (7 tests)
+### 11. Config Tests (9 tests)
 
 **Purpose:** Verify protobuf config files behave identically to the equivalent CLI options (hand-crafted fixtures under `tests/test_configs/`), and separately, that every example shown in `docs/user-guide/protobuf-config.md` actually parses and runs - the hand-crafted fixtures above can never expose a bug in the documentation's own prose examples, since they're written to already avoid one; this test caught two real ones (a fictional `sim_setup { ... }` wrapping every doc example, and several "Run with" instructions missing the required positional trace-file argument)
 
@@ -244,7 +244,7 @@ See "Progressive Loading Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE
 
 **Runner:** `./tests/run_configs_tests.sh`
 
-**Status:** ✅ 7/7 passing (100%)
+**Status:** ✅ 9/9 passing (100%)
 
 See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) for how it works.
 
@@ -264,8 +264,9 @@ See "Configuration Tests" in [docs/TESTING_GUIDE.md](../docs/TESTING_GUIDE.md) f
 | Job Store | 6 | ✅ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 18 | ✅ 18/18 | Streaming insertion (single+batch), backfill-window query + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✅ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
-| Config | 7 | ✅ 7/7 | Protobuf config parity with CLI, and the doc's own examples actually run |
-| **TOTAL** | **110** | **110/110** all passing | - |
+| Config | 9 | ✅ 9/9 | Protobuf config parity with CLI, including power-usage trace types, and the doc's own examples actually run |
+| Power-usage CTest | 2 | ✅ 2/2 | Compile-time policy/storage behavior and CLI trace-type dispatch |
+| **TOTAL** | **114** | **114/114** all passing | - |
 
 **Status as of:** 2026-09-03 (verified by running all test scripts)
 
@@ -537,8 +538,9 @@ diff /tmp/output.csv tests/test_traces/scheduler_correctness/01_backfill_allowed
 | Job Store | 6 | ✓ 6/6 | Job-record circular buffer, capacity sizing |
 | Append-Job | 18 | ✓ 18/18 | Streaming insertion (single+batch), backfill-window query + submit_job()/advance_to() |
 | Progressive Loading | 14 | ✓ 14/14 | --infile_list, bounding job-store memory, --check_memory_pressure |
-| Config | 7 | ✓ 7/7 | Protobuf config parity with CLI, and the doc's own examples actually run |
-| **Total** | **110** | **110/110** | All tests passing as of 2026-09-07 |
+| Config | 9 | ✓ 9/9 | Protobuf config parity with CLI, including power-usage trace types, and the doc's own examples actually run |
+| Power-usage CTest | 2 | ✓ 2/2 | Compile-time policy/storage behavior and CLI trace-type dispatch |
+| **Total** | **114** | **114/114** | All tests passing as of 2026-09-07 |
 
 ## Prerequisites
 

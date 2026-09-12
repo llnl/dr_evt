@@ -191,9 +191,9 @@ else
 fi
 
 # Test 8: trace_type=pcon via protobuf config must behave identically to the
-# equivalent CLI selection, including the Pcon-specific resource columns.
-echo "Test 8: Pcon trace_type config"
-PCON_TRACE="tests/data/pcon_cli_input.csv"
+# equivalent CLI selection, including the power-usage resource columns.
+echo "Test 8: power-usage trace_type config"
+PCON_TRACE="tests/test_traces/pcon_cli_input.csv"
 
 $SIMULATOR "$PCON_TRACE" \
     --trace_type pcon \
@@ -211,10 +211,10 @@ $SIMULATOR "$PCON_TRACE" \
 
 if diff -q /tmp/cli_pcon.csv /tmp/pb_pcon.csv > /dev/null && \
    diff -q /tmp/cli_pcon_resources.csv /tmp/pb_pcon_resources.csv > /dev/null; then
-    echo "  ✓ Pcon trace_type config matches CLI"
+    echo "  ✓ Power-usage trace_type config matches CLI"
     PASS=$((PASS + 1))
 else
-    echo "  ✗ Pcon trace_type config differs from CLI"
+    echo "  ✗ Power-usage trace_type config differs from CLI"
     FAIL=$((FAIL + 1))
 fi
 

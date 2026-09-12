@@ -57,7 +57,7 @@ resource traces.
 - **Protocol Buffer Configuration**: Structured configuration files for complex simulations
 
 ### Testing & Validation
-- **Comprehensive Test Suite**: 110 tests (110/110 passing as of 2026-09-07)
+- **Comprehensive Test Suite**: 114 tests (114/114 passing as of 2026-09-07)
   - 34 comprehensive tests (EASY backfilling correctness)
   - 7 unit tests (I/O and format validation)
   - 6 feature tests (policy comparisons)
@@ -66,7 +66,7 @@ resource traces.
   - 4 replay tests (determinism verification)
   - 5 resource-history and 6 job-store tests
   - 18 append-job/backfill-window tests and 14 progressive-loading tests
-  - 7 protobuf configuration tests
+  - 9 protobuf configuration tests and 2 dedicated power-usage CTest tests
 - **Dual Validation**: C++ verified against independent Python reference implementations
   - EASY: scripts/python_reference_scheduler.py
   - CONSERVATIVE: scripts/python_conservative_scheduler.py
@@ -180,12 +180,17 @@ client/server build          → gRPC ON, Protobuf enabled automatically
 **Boost:**
 ```bash
 cmake .. -Wno-author -Wno-dev -DBOOST_ROOT=/path/to/boost
+# or search one or more dependency prefixes
+cmake .. -Wno-author -Wno-dev -DCMAKE_PREFIX_PATH=/path/to/dependencies
 # or use environment variable
 export BOOST_ROOT=/path/to/boost
 
 # Skip system paths (useful if system install is broken or mismatched by version)
 cmake .. -Wno-author -Wno-dev -DAVOID_SYSTEM_BOOST=ON
 ```
+
+`CMAKE_PREFIX_PATH` remains active with `AVOID_SYSTEM_BOOST=ON`; only default
+system locations are excluded.
 
 **Protobuf (standalone, when gRPC not used):**
 ```bash
@@ -239,8 +244,9 @@ make install
 
 # Set up environment
 export CMAKE_INSTALL_PREFIX=$(realpath ../install)
+export DR_EVT_INSTALL_LIBDIR=lib  # Use the configured CMAKE_INSTALL_LIBDIR value (often lib64 on HPC systems)
 export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
-export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
+export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/${DR_EVT_INSTALL_LIBDIR}/python:$PYTHONPATH
 ```
 
 The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed

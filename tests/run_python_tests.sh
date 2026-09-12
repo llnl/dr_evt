@@ -18,7 +18,8 @@ echo ""
 
 # Check if Python bindings are installed
 INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-./install}"
-PYTHON_MODULE=$(find "$INSTALL_PREFIX/lib/python" -name "dr_evt*.so" 2>/dev/null | head -1)
+PYTHON_MODULE=$(find "$INSTALL_PREFIX/lib/python" "$INSTALL_PREFIX/lib64/python" \
+    -name "dr_evt*.so" 2>/dev/null | head -1)
 
 if [ -z "$PYTHON_MODULE" ]; then
     echo "✗ Error: Python module not found"

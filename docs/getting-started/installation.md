@@ -79,12 +79,17 @@ cmake .. -Wno-author -Wno-dev -DDR_EVT_BUILD_PYTHON=ON
 **Boost:**
 ```bash
 cmake .. -DBOOST_ROOT=/path/to/boost
+# or search one or more dependency prefixes
+cmake .. -DCMAKE_PREFIX_PATH=/path/to/dependencies
 # or use environment variable
 export BOOST_ROOT=/path/to/boost
 
 # Skip system paths (useful if system install is broken or mismatched by version)
 cmake .. -DAVOID_SYSTEM_BOOST=ON
 ```
+
+`CMAKE_PREFIX_PATH` remains active with `AVOID_SYSTEM_BOOST=ON`; only default
+system locations are excluded.
 
 **Protobuf (standalone, when gRPC not used):**
 ```bash
@@ -164,8 +169,9 @@ make install
 
 # Set up environment
 export CMAKE_INSTALL_PREFIX=$(realpath ../install)
+export DR_EVT_INSTALL_LIBDIR=lib  # Use the configured CMAKE_INSTALL_LIBDIR value (often lib64 on HPC systems)
 export PATH=${CMAKE_INSTALL_PREFIX}/bin:$PATH
-export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/lib/python:$PYTHONPATH
+export PYTHONPATH=${CMAKE_INSTALL_PREFIX}/${DR_EVT_INSTALL_LIBDIR}/python:$PYTHONPATH
 ```
 
 The `AVOID_SYSTEM_*` options prevent ABI mismatches with system-installed
@@ -227,7 +233,7 @@ pip package - see that page for how to make it importable
 Run tests to verify installation:
 
 ```bash
-# Selected CTest coverage, including the Pcon data model
+# Selected CTest coverage, including the power-usage data model
 cd build
 ctest -R 'test_pcon_trace|test_trace_type_cli' --output-on-failure
 
