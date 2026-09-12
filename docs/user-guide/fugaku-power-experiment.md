@@ -29,6 +29,10 @@ April 2024 F-DATA Fugaku workload. It produces one resource curve for
 allocated nodes and a second curve for the aggregate minimum, average, and
 maximum power-usage indicators of running jobs.
 
+All calendar dates and times on this page that refer to the Fugaku traces are
+shown in Japan Standard Time (JST, UTC+09:00). Elapsed durations are independent
+of time zone.
+
 The experiment-specific scripts and full reproduction notes are kept in
 [experimental/fugaku-power](../../experimental/fugaku-power/README.md).
 
@@ -233,8 +237,8 @@ simulated behavior is compared.
 
 The historical curve also contains three conspicuous low-allocation troughs
 near elapsed days 11.4, 15.8, and 19.0. Using 30,000 allocated nodes as a
-visual threshold, their approximate spans are April 15 10:08 to April 16 00:58,
-April 19 18:23 to 23:55, and April 23 00:26 to 05:21 PDT; their minima are 1,138,
+visual threshold, their approximate spans are April 16 02:08 to 16:58,
+April 20 10:23 to 15:55, and April 23 16:26 to 21:21 JST; their minima are 1,138,
 13,513, and 17,938 nodes, respectively. The job log alone does not establish
 that these were system downtimes: allocation never reaches zero, and 1,073,
 311, and 769 jobs begin during the respective windows. They could reflect
@@ -252,7 +256,7 @@ DR_EVT started that same job after 15.7 hours and therefore completed it much
 earlier. The last-submitted job also started immediately in simulation but
 waited 23.7 hours in the historical record.
 
-The verified timings are shown below in Pacific Daylight Time. The heavier
+The verified timings are shown below in Japan Standard Time. The heavier
 divider separates the historical last-finishing job from the last-submitted
 job.
 
@@ -269,34 +273,34 @@ job.
   </thead>
   <tbody>
     <tr>
-      <td rowspan="2">Historical last-finishing job<br>Submitted Apr 29, 19:32</td>
+      <td rowspan="2">Historical last-finishing job<br>Submitted Apr 30, 11:32</td>
       <td>Replay</td>
-      <td>May 12, 02:56</td>
-      <td>May 13, 10:38</td>
+      <td>May 12, 18:56</td>
+      <td>May 14, 02:38</td>
       <td>12.309 days</td>
       <td>31.7 h</td>
     </tr>
     <tr>
       <td>Simulation</td>
-      <td>Apr 30, 11:13</td>
-      <td>May 1, 18:54</td>
+      <td>May 1, 03:13</td>
+      <td>May 2, 10:54</td>
       <td>15.7 h</td>
       <td>31.7 h</td>
     </tr>
   </tbody>
   <tbody style="border-top: 3px solid #7f8c8d;">
     <tr>
-      <td rowspan="2">Last-submitted job<br>Submitted May 7, 11:29</td>
+      <td rowspan="2">Last-submitted job<br>Submitted May 8, 03:29</td>
       <td>Replay</td>
-      <td>May 8, 11:11</td>
-      <td>May 8, 12:51</td>
+      <td>May 9, 03:11</td>
+      <td>May 9, 04:51</td>
       <td>23.7 h</td>
       <td>1.67 h</td>
     </tr>
     <tr>
       <td>Simulation</td>
-      <td>May 7, 11:29</td>
-      <td>May 7, 13:09</td>
+      <td>May 8, 03:29</td>
+      <td>May 8, 05:09</td>
       <td>0</td>
       <td>1.67 h</td>
     </tr>
