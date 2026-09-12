@@ -328,6 +328,7 @@ Jobs run for exactly their `time_limit`.
 ```bash
 -K, --job_store_capacity SIZE     # Initial job-record store capacity (default: 0 = size of trace)
 -W, --job_store_overflow POLICY   # abort|grow if job_store_capacity exceeded (default: grow)
+    --job_flush_interval RECORDS  # Completed-job flush interval (default: 0 = job-store capacity)
 -m, --check_memory_pressure FRACTION  # Refuse to grow the job store past FRACTION of available memory (0 < FRACTION <= 1; disabled unless given)
 ```
 

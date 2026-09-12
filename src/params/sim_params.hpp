@@ -134,6 +134,9 @@ public:
   size_t m_job_store_capacity;
   /// Overflow action for the trace job store.
   CircularOverflowPolicy m_job_store_overflow;
+  /// Completed-job output/reclamation interval; zero follows job-store
+  /// capacity. Capacity pressure and explicit/final flushes override it.
+  size_t m_job_flush_interval;
   /// Fraction of available system memory that triggers append rejection; zero
   /// disables it.
   double m_memory_pressure_fraction;

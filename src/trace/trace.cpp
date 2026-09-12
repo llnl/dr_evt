@@ -27,12 +27,16 @@ template <typename Policy>
 BasicTrace<Policy>::BasicTrace(const std::string &fname)
     : m_fname(fname), m_num_reclaimed(0), m_job_store_capacity(0),
       m_job_store_capacity_resolved(false),
-      m_job_store_overflow(CircularOverflowPolicy::GROW), m_completed_count(0),
+      m_job_store_overflow(CircularOverflowPolicy::GROW),
+      m_job_flush_interval(0), m_departures_since_job_flush(0),
+      m_replay_jobs_enqueued(0),
+      m_completed_count(0),
       m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
       m_default_timezone("+00:00"), m_resource_history_capacity(0),
       m_resource_history_capacity_resolved(false),
       m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)),
-      m_resource_trace_msec(false), m_simulated_trace_msec(false) {
+      m_resource_trace_msec(false), m_simulated_trace_msec(false),
+      m_next_job_to_write(0) {
   if (!m_dcols.check_header(fname)) {
     std::string err = "Failed to initialize data columns";
     throw std::runtime_error{err.c_str()};
@@ -44,12 +48,16 @@ BasicTrace<Policy>::BasicTrace(const std::string &fname,
                                const std::string &format)
     : m_fname(fname), m_dcols(format), m_num_reclaimed(0),
       m_job_store_capacity(0), m_job_store_capacity_resolved(false),
-      m_job_store_overflow(CircularOverflowPolicy::GROW), m_completed_count(0),
+      m_job_store_overflow(CircularOverflowPolicy::GROW),
+      m_job_flush_interval(0), m_departures_since_job_flush(0),
+      m_replay_jobs_enqueued(0),
+      m_completed_count(0),
       m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
       m_default_timezone("+00:00"), m_resource_history_capacity(0),
       m_resource_history_capacity_resolved(false),
       m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)),
-      m_resource_trace_msec(false), m_simulated_trace_msec(false) {
+      m_resource_trace_msec(false), m_simulated_trace_msec(false),
+      m_next_job_to_write(0) {
   if (!m_dcols.check_header(fname)) {
     std::string err = "Failed to initialize data columns";
     throw std::runtime_error{err.c_str()};
@@ -64,13 +72,17 @@ BasicTrace<Policy>::BasicTrace(const std::string &fname,
     : m_fname(fname), m_dcols(format, timestamp_format, timezone),
       m_num_reclaimed(0), m_job_store_capacity(0),
       m_job_store_capacity_resolved(false),
-      m_job_store_overflow(CircularOverflowPolicy::GROW), m_completed_count(0),
+      m_job_store_overflow(CircularOverflowPolicy::GROW),
+      m_job_flush_interval(0), m_departures_since_job_flush(0),
+      m_replay_jobs_enqueued(0),
+      m_completed_count(0),
       m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
       m_default_timezone("+00:00"), // Default to UTC
       m_resource_history_capacity(0),
       m_resource_history_capacity_resolved(false),
       m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)),
-      m_resource_trace_msec(false), m_simulated_trace_msec(false) {
+      m_resource_trace_msec(false), m_simulated_trace_msec(false),
+      m_next_job_to_write(0) {
   if (!m_dcols.check_header(fname)) {
     std::string err = "Failed to initialize data columns";
     throw std::runtime_error{err.c_str()};
@@ -164,6 +176,7 @@ void BasicTrace<Policy>::process_events_until(const epoch_t &t_sub) {
     return;
   }
 
+  size_t departures_processed = 0;
   auto it = m_ctx.m_evtq.begin();
   while (it != m_ctx.m_evtq.end()) {
     auto cur = it++;
@@ -204,6 +217,7 @@ void BasicTrace<Policy>::process_events_until(const epoch_t &t_sub) {
 #endif
     } else {
       this->on_finish(static_cast<const trace_record_t<Policy> &>(job_of_evt));
+      ++departures_processed;
 #if MARK_DAT_PERIOD
       if (_Is_Exclusive(job_q)) {
 #if !EVENT_TIME_ORDER
@@ -225,20 +239,16 @@ void BasicTrace<Policy>::process_events_until(const epoch_t &t_sub) {
       m_ctx.m_n_nodes_in_use -= job_of_evt.get_num_nodes();
 #endif
     }
-    const bool was_departure = !cur->is_arrival();
     const epoch_t event_time = t; // copy: erase() below invalidates t
     m_ctx.m_evtq.erase(cur);      // Remove processed event from the queue
     record_resource_sample(event_time, m_ctx.m_n_nodes_in_use);
 #if MARK_DAT_PERIOD
     m_ctx.m_prev_job_q = job_q;
 #endif
-    if (was_departure) {
-      // Same reasoning as process_single_event(): only a departure
-      // can newly unblock the front.
-      sim_time_t current_time =
-          static_cast<sim_time_t>(event_time.first) + event_time.second;
-      reclaim_front_jobs(current_time);
-    }
+  }
+  if (departures_processed != 0) {
+    maybe_flush_completed_jobs(convert_epoch<sim_time_t>(t_sub),
+                               departures_processed);
   }
 }
 
@@ -272,20 +282,27 @@ void BasicTrace<Policy>::run_job_trace(const std::string &resource_trace_file,
 
   start_resource_trace(resource_trace_file, total_nodes);
 
-  for (num_jobs_t i = static_cast<num_jobs_t>(0u); i < m_data.size(); ++i) {
-    const auto &job = m_data[i]; // A new job submission
-    auto t_sub = job.get_submit_time();
+  // Reclamation changes circular-buffer positions, not permanent job numbers.
+  // Capture the permanent half-open range once and resolve every record through
+  // job_at(); never retain a reference across process_events_until().
+  const job_no_t first_job = static_cast<job_no_t>(m_num_reclaimed);
+  const job_no_t jobs_end =
+      static_cast<job_no_t>(m_num_reclaimed + m_data.size());
+  for (job_no_t job_no = first_job; job_no < jobs_end; ++job_no) {
+    const auto t_sub = job_at(job_no).get_submit_time();
     process_events_until(t_sub);
+    auto &job = job_at(job_no);
 
 #if MARK_DAT_PERIOD
-    m_data[i].set_busy_nodes(m_ctx.m_n_nodes_in_use,
-                             (m_ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u)));
+    job.set_busy_nodes(m_ctx.m_n_nodes_in_use,
+                       (m_ctx.m_pAll_cnt > static_cast<num_jobs_t>(0u)));
 #else
-    m_data[i].set_busy_nodes(m_ctx.m_n_nodes_in_use);
+    job.set_busy_nodes(m_ctx.m_n_nodes_in_use);
 #endif
     // Add the events created by this submission
-    m_ctx.m_evtq.emplace(i, job.get_begin_time(), arrival);
-    m_ctx.m_evtq.emplace(i, job.get_end_time(), departure);
+    m_ctx.m_evtq.emplace(job_no, job.get_begin_time(), arrival);
+    m_ctx.m_evtq.emplace(job_no, job.get_end_time(), departure);
+    m_replay_jobs_enqueued = static_cast<size_t>(job_no) + 1;
   }
   // Process all the remaiing events. Use any time later than any timestamp
   // in the trace for flushing.
@@ -306,7 +323,7 @@ job_no_t BasicTrace<Policy>::append_job(sim_time_t current_time,
   // is a no-op if load_data() already resolved it.
   resolve_job_store_capacity(static_cast<num_jobs_t>(m_data.size()));
 
-  // Point-of-need order established in OUT_TRACE_STREAMING.md: try
+  // Point-of-need order established in OUTPUT_TRACE_BUFFERS.md: try
   // reclaiming first, only grow if that wasn't enough.
   // reclaim_front_jobs() no-ops internally if there's already at
   // least 1 free slot (its min_free default), so no external full()
@@ -606,6 +623,7 @@ template <typename Policy> bool BasicTrace<Policy>::process_single_event() {
   // Process this event using replay engine's accounting logic
   const auto &job = job_at(event.get_job_idx());
 
+  const bool is_departure = !event.is_arrival();
   if (event.is_arrival()) {
     this->on_start(static_cast<const trace_record_t<Policy> &>(job));
     // START event: allocate nodes (same logic as process_events_until)
@@ -617,13 +635,21 @@ template <typename Policy> bool BasicTrace<Policy>::process_single_event() {
   }
   record_resource_sample(event.get_time(), m_ctx.m_n_nodes_in_use);
 
-  if (!event.is_arrival()) {
-    // A job just finished - its slot (or one ahead of it, by job_no)
-    // may now be safe to reclaim. Only departures can possibly unblock
-    // the front; checking on arrivals too would just be wasted work.
-    sim_time_t current_time = static_cast<sim_time_t>(event.get_time().first) +
-                              event.get_time().second;
-    reclaim_front_jobs(current_time);
+  // A group of events at one timestamp is the local committed-time boundary:
+  // do not reclaim between peers that may still refer to the same records.
+  const bool timestamp_drained =
+      m_ctx.m_evtq.empty() ||
+      event.get_time() < m_ctx.m_evtq.begin()->get_time();
+  if (is_departure && m_simulated_trace_ofs.is_open()) {
+    const size_t interval = effective_job_flush_interval();
+    if (m_departures_since_job_flush < interval) {
+      ++m_departures_since_job_flush;
+    }
+  }
+  if (m_simulated_trace_ofs.is_open() && timestamp_drained &&
+      m_departures_since_job_flush >= effective_job_flush_interval()) {
+    flush_completed_jobs_impl(convert_epoch<sim_time_t>(event.get_time()),
+                              /*sync=*/false);
   }
 
   return true;
@@ -762,13 +788,54 @@ bool BasicTrace<Policy>::is_front_reclaimable(sim_time_t current_time) const {
     return false;
   }
   const auto &job = m_data.front();
-  // Rejected (submit_time == unscheduled_sentinel()): will never
-  // resolve, skip immediately rather than block the sweep forever.
+  // Rejected (submit_time == unscheduled_sentinel()): will never resolve, so
+  // it can be skipped once a capacity/explicit-flush boundary reaches it.
   if (job.get_submit_time() == Job_Record::unscheduled_sentinel()) {
     return true;
   }
-  // Genuinely finished.
+  if (m_dcols.get_trace_mode() == TraceMode::REPLAY &&
+      m_num_reclaimed >= m_replay_jobs_enqueued) {
+    return false;
+  }
+  // Do not rely solely on the caller's time: if an event at or before that
+  // boundary is still queued, resource accounting has not been fully drained.
+  // This also handles several departures sharing exactly one timestamp.
+  if (!m_ctx.m_evtq.empty() &&
+      convert_epoch<sim_time_t>(m_ctx.m_evtq.begin()->get_time()) <=
+          current_time) {
+    return false;
+  }
   return convert_epoch<sim_time_t>(job.get_end_time()) <= current_time;
+}
+
+template <typename Policy>
+size_t BasicTrace<Policy>::effective_job_flush_interval() const {
+  if (m_job_flush_interval != 0) {
+    return m_job_flush_interval;
+  }
+  return std::max<size_t>(m_data.capacity(), 1);
+}
+
+template <typename Policy>
+void BasicTrace<Policy>::maybe_flush_completed_jobs(
+    sim_time_t current_time, size_t departures_processed) {
+  // Periodic reclamation is meaningful only when the schedule-output consumer
+  // is active. The standalone tracer intentionally retains its replay records
+  // for print(), print_span(), and Job_Stat_Submit after run_job_trace().
+  if (!m_simulated_trace_ofs.is_open()) {
+    return;
+  }
+  const size_t interval = effective_job_flush_interval();
+  if (departures_processed >= interval -
+                                  std::min(interval,
+                                           m_departures_since_job_flush)) {
+    m_departures_since_job_flush = interval;
+  } else {
+    m_departures_since_job_flush += departures_processed;
+  }
+  if (m_departures_since_job_flush >= interval) {
+    flush_completed_jobs_impl(current_time, /*sync=*/false);
+  }
 }
 
 template <typename Policy>
@@ -793,11 +860,24 @@ void BasicTrace<Policy>::reclaim_front_jobs(sim_time_t current_time,
   if (m_data.capacity() >= m_data.size() + min_free) {
     return;
   }
+  const size_t reclaimed_before = m_num_reclaimed;
   while (m_data.capacity() < m_data.size() + min_free &&
          is_front_reclaimable(current_time)) {
-    write_job_line(m_data.front());
+    if (m_next_job_to_write == m_num_reclaimed) {
+      write_job_line(m_data.front());
+      ++m_next_job_to_write;
+    } else if (m_next_job_to_write < m_num_reclaimed) {
+      throw std::logic_error(
+          "Trace: scheduled-job output cursor fell behind reclaimed records");
+    }
     m_data.pop_front();
     ++m_num_reclaimed;
+  }
+  if (m_num_reclaimed != reclaimed_before) {
+    // Capacity pressure is already a flush reason; do one output write for the
+    // reclaimed group and restart the optional periodic interval from here.
+    flush_simulated_trace_buffer(false);
+    m_departures_since_job_flush = 0;
   }
   // No compaction: if still short of min_free and the front isn't
   // reclaimable, that's exactly the case m_job_store_overflow exists
@@ -865,7 +945,18 @@ void BasicTrace<Policy>::write_job_line(const Job_Record &job) {
   }
 #endif
   line += format_sim_time(job.get_limit_time(), m_simulated_trace_msec) + "\n";
-  m_simulated_trace_ofs << line;
+  m_simulated_trace_buffer += line;
+}
+
+template <typename Policy>
+void BasicTrace<Policy>::flush_simulated_trace_buffer(bool sync) {
+  if (m_simulated_trace_ofs.is_open() && !m_simulated_trace_buffer.empty()) {
+    m_simulated_trace_ofs << m_simulated_trace_buffer;
+    m_simulated_trace_buffer.clear();
+  }
+  if (sync && m_simulated_trace_ofs.is_open()) {
+    m_simulated_trace_ofs.flush();
+  }
 }
 
 template <typename Policy>
@@ -911,10 +1002,44 @@ void BasicTrace<Policy>::write_simulated_trace(const std::string &filename,
     // call is already gone.
     start_simulated_trace(filename, msec);
   }
+  size_t job_no = m_num_reclaimed;
   for (const auto &job : m_data) {
-    write_job_line(job);
+    if (job_no == m_next_job_to_write) {
+      write_job_line(job);
+      ++m_next_job_to_write;
+    } else if (job_no > m_next_job_to_write) {
+      throw std::logic_error(
+          "Trace: scheduled-job output cursor has a missing record");
+    }
+    ++job_no;
   }
+  flush_simulated_trace_buffer(true);
   m_simulated_trace_ofs.close();
+}
+
+template <typename Policy>
+void BasicTrace<Policy>::flush_completed_jobs(sim_time_t current_time) {
+  flush_completed_jobs_impl(current_time, /*sync=*/true);
+}
+
+template <typename Policy>
+size_t BasicTrace<Policy>::flush_completed_jobs_impl(sim_time_t current_time,
+                                                     bool sync) {
+  const size_t reclaimed_before = m_num_reclaimed;
+  while (is_front_reclaimable(current_time)) {
+    if (m_next_job_to_write == m_num_reclaimed) {
+      write_job_line(m_data.front());
+      ++m_next_job_to_write;
+    } else if (m_next_job_to_write < m_num_reclaimed) {
+      throw std::logic_error(
+          "Trace: scheduled-job output cursor fell behind reclaimed records");
+    }
+    m_data.pop_front();
+    ++m_num_reclaimed;
+  }
+  flush_simulated_trace_buffer(sync);
+  m_departures_since_job_flush = 0;
+  return m_num_reclaimed - reclaimed_before;
 }
 
 template <typename Policy>

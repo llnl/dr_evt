@@ -63,6 +63,7 @@ wait_queue_overflow: "grow"       # "abort" | "grow"; only used when queue_impl=
 # docs/dev/OUTPUT_TRACE_BUFFERS.md for the design)
 job_store_capacity: 0           # 0 = size of job trace
 job_store_overflow: "grow"      # "abort" | "grow"
+job_flush_interval: 0           # 0 = current job-store capacity
 
 # Resource-history circular buffer (bounds memory for --resource_trace)
 resource_history_capacity: 0    # 0 = 2x loaded jobs, floored at 4096
@@ -128,6 +129,7 @@ avoid a positional argument entirely (mutually exclusive with one).
 | `wait_queue_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
 | `job_store_capacity` | uint64 | `0` | `0` = size of job trace; only actually bounds memory with `infile_list` - `infile` (single-file) always grows to fit the whole trace regardless |
 | `job_store_overflow` | string | `"grow"` | `"abort"`, `"grow"` |
+| `job_flush_interval` | uint64 | `0` | Completed-job flush interval in records; `0` follows the current job-store capacity |
 | `memory_pressure_fraction` | double | `0.0` (disabled) | Refuse to grow the job store past this fraction of available memory (Linux only; must be `> 0.0` and `<= 1.0`, e.g. `0.8`); independent of `job_store_overflow` |
 | `resource_history_capacity` | uint64 | `0` | `0` = 2x loaded jobs, floored at 4096 |
 
@@ -399,6 +401,7 @@ message Simulation_Params {
 
   // Resource-history circular buffer
   uint64 resource_history_capacity = 27;  // default: 0
+  uint64 job_flush_interval = 28;          // default: 0
 }
 ```
 

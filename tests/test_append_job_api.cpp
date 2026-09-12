@@ -113,7 +113,7 @@ void test_append_with_empty_trace() {
 }
 
 // Test 2: reclaim-before-grow at the actual insertion point (append_job(),
-// not load_data() - see OUT_TRACE_STREAMING.md's "Reclaim at the point
+// not load_data() - see OUTPUT_TRACE_BUFFERS.md's "Reclaim at the point
 // of need" section for why load_data() itself never needs this).
 // Forces capacity=1 so a second append can only succeed by reclaiming
 // the first (already-finished) job's slot, not by growing.

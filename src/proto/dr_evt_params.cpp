@@ -287,6 +287,11 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
     sp.m_resource_history_capacity = cfg.resource_history_capacity();
   }
 
+  // Zero preserves Sim_Params' default: follow the current job-store capacity.
+  if (cfg.job_flush_interval() > 0) {
+    sp.m_job_flush_interval = cfg.job_flush_interval();
+  }
+
   // Handle defaults
   if (!sp.m_is_time_set) {
     sp.m_max_time = dr_evt::max_sim_time;

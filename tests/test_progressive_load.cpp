@@ -11,7 +11,7 @@
  * simulation reaches each, instead of one big file loaded whole - so
  * --job_store_capacity can actually bound memory (single-file mode
  * always grows to fit the whole trace regardless of this setting; see
- * docs/dev/design-decisions/OUT_TRACE_STREAMING.md).
+ * docs/dev/OUTPUT_TRACE_BUFFERS.md).
  *
  * Covers Trace::load_next_file() (the per-file loader) directly, and
  * Simulation::run_progressive() (the driving loop: load a file, submit

@@ -23,7 +23,7 @@ message DR_EVT_Params {
         string infile = 4;
         // Path to a file listing multiple trace files, one per line -
         // progressive loading (see docs/dev/design-decisions/
-        // OUT_TRACE_STREAMING.md): each is loaded in turn as the
+        // OUTPUT_TRACE_BUFFERS.md): each is loaded in turn as the
         // simulation reaches it, so job_store_capacity can actually
         // bound memory. Mutually exclusive with infile - do not set
         // both. Files must already be sorted by submit_time, both
@@ -88,6 +88,12 @@ message DR_EVT_Params {
         // job_store, every entry here is always immediately safe to reclaim,
         // so reclaiming when full never needs an abort/grow fallback.
         uint64 resource_history_capacity = 27; // (default: 0)
+
+        // Number of processed job departures between opportunistic writes and
+        // reclamation of the completed front prefix. 0 follows the current
+        // job-store capacity. Capacity pressure and explicit/final flushes
+        // remain independent triggers.
+        uint64 job_flush_interval = 28; // (default: 0)
     }
 
     message Tracing_Params {

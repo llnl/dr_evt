@@ -221,7 +221,7 @@ jobs:
         id: replay
         run: |
           echo "========================================"
-          echo "Running Replay Tests (4 tests)"
+          echo "Running Replay Tests (5 tests)"
           echo "========================================"
           ./tests/run_replay_tests.sh
 
@@ -325,7 +325,7 @@ jobs:
           echo "  Unit (7 tests): ${{ steps.unit.outcome }}"
           echo "  Feature (6 tests): ${{ steps.feature.outcome }}"
           echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
-          echo "  Replay (4 tests): ${{ steps.replay.outcome }}"
+          echo "  Replay (5 tests): ${{ steps.replay.outcome }}"
           echo "  Resource History (5 tests): ${{ steps.resource-history.outcome }}"
           echo "  Job Store (6 tests): ${{ steps.job-store.outcome }}"
           echo "  Config (9 tests): ${{ steps.config.outcome }}"

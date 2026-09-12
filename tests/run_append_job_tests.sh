@@ -6,7 +6,7 @@
 # seen before, as opposed to submit_job()/insert_job() (covered by
 # run_streaming_tests.sh), which both only operate on a job already
 # sitting in a preloaded m_data. See
-# docs/dev/design-decisions/OUT_TRACE_STREAMING.md for the design.
+# docs/dev/OUTPUT_TRACE_BUFFERS.md for the design.
 #
 # This verifies:
 # 1. (C++ API) A trace with zero preloaded jobs, then jobs appended one
@@ -24,7 +24,25 @@
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_ROOT="$SCRIPT_DIR/.."
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX:-$REPO_ROOT/install}"
+if [[ "$INSTALL_PREFIX" != /* ]]; then
+    INSTALL_PREFIX="$REPO_ROOT/${INSTALL_PREFIX#./}"
+fi
+
+if ! RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dr-evt-append-job.XXXXXXXX" 2>/dev/null)"; then
+    RUN_DIR="$(mktemp -d "/tmp/dr-evt-append-job.XXXXXXXX")"
+fi
+SERVER_PID=""
+
+cleanup() {
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    rm -rf -- "$RUN_DIR"
+}
+trap cleanup EXIT INT TERM
 
 cd "$REPO_ROOT"
 
@@ -43,19 +61,19 @@ echo "Testing: append_job_api (C++ level)"
 # separate install() rule for DR_EVT_UNIT_TEST_TARGETS), not directly
 # under bin/ like the main simulator/tracer/dr_evt_server/dr_evt_client
 # binaries - check there first.
-APPEND_API_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_append_job_api"
+APPEND_API_BIN="$INSTALL_PREFIX/bin/tests/test_append_job_api"
 
 if [ ! -x "$APPEND_API_BIN" ]; then
     echo "  ✗ FAIL - installed test_append_job_api binary not found"
     echo "    Expected: $APPEND_API_BIN"
     FAIL=$((FAIL + 1))
 else
-    if "$APPEND_API_BIN" > /tmp/append_job_api_out.txt 2>&1; then
+    if "$APPEND_API_BIN" > "$RUN_DIR/append_job_api_out.txt" 2>&1; then
         echo "  ✓ PASS"
         PASS=$((PASS + 1))
     else
         echo "  ✗ FAIL"
-        sed 's/^/    /' /tmp/append_job_api_out.txt
+        sed 's/^/    /' "$RUN_DIR/append_job_api_out.txt"
         FAIL=$((FAIL + 1))
     fi
 fi
@@ -64,22 +82,24 @@ fi
 echo ""
 echo "Testing: grpc_streaming_api (over the actual gRPC wire)"
 
-SERVER="${CMAKE_INSTALL_PREFIX:-./install}/bin/dr_evt_server"
-GRPC_TEST_BIN="${CMAKE_INSTALL_PREFIX:-./install}/bin/tests/test_grpc_streaming_api"
-EMPTY_TRACE="tests/test_traces/feature/empty_trace.csv"
+SERVER="$INSTALL_PREFIX/bin/dr_evt_server"
+GRPC_TEST_BIN="$INSTALL_PREFIX/bin/tests/test_grpc_streaming_api"
+EMPTY_TRACE="$REPO_ROOT/tests/test_traces/feature/empty_trace.csv"
 
 if [ ! -x "$SERVER" ] || [ ! -x "$GRPC_TEST_BIN" ]; then
     echo "  ⚠ SKIP - dr_evt_server and/or test_grpc_streaming_api not found"
     echo "    (build with -DDR_EVT_ENABLE_GRPC=ON to include this test)"
 else
     PORT=53201
-    "$SERVER" "127.0.0.1:${PORT}" > /tmp/append_job_grpc_server.log 2>&1 &
+    (cd "$RUN_DIR" && exec "$SERVER" "127.0.0.1:${PORT}") \
+        > "$RUN_DIR/append_job_grpc_server.log" 2>&1 &
     SERVER_PID=$!
     sleep 1
 
     GRPC_OUT=$("$GRPC_TEST_BIN" "127.0.0.1:${PORT}" "$EMPTY_TRACE" 2>&1) || true
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
+    SERVER_PID=""
 
     if echo "$GRPC_OUT" | grep -q "^PASSED$"; then
         echo "  ✓ PASS"
@@ -87,7 +107,7 @@ else
     else
         echo "  ✗ FAIL"
         echo "     Server log:"
-        sed 's/^/       /' /tmp/append_job_grpc_server.log
+        sed 's/^/       /' "$RUN_DIR/append_job_grpc_server.log"
         echo "     Client output:"
         echo "$GRPC_OUT" | sed 's/^/       /'
         FAIL=$((FAIL + 1))

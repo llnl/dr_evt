@@ -19,7 +19,7 @@ This directory contains GitHub Actions workflows for automated testing.
 - Unit tests (7)
 - Feature tests (6)
 - Conservative backfilling tests (2)
-- Replay tests (4)
+- Replay tests (5: one reclamation-boundary binary and four CLI comparisons)
 - Resource-history tests (5)
 - Job-store tests (6)
 - Config tests, including power-usage `trace_type` coverage
@@ -67,7 +67,7 @@ Total tests referenced by the full suite:
 | Unit | 7 | CI runner |
 | Feature | 6 | CI runner |
 | Conservative | 2 | CI runner |
-| Replay | 4 | CI runner |
+| Replay | 5 | CI runner; reclamation safety plus resource equivalence |
 | Resource history | 5 | CI runner |
 | Job store | 6 | CI runner |
 | Config | 9 | CI runner; includes power-usage `trace_type` coverage |

@@ -28,7 +28,7 @@ The copy adds two Fugaku behaviors:
 
 ```bash
 python3 experimental/fugaku-power/scripts/python_reference_scheduler.py \
-  TRACE.csv --nodes 158976 --outdir OUTPUT_DIR
+  TRACE.csv --nodes 142167 --outdir OUTPUT_DIR
 ```
 
 The implementation is intended as a readable reference. It can run the full
@@ -43,10 +43,31 @@ and power-usage PNG figures.
 
 ```bash
 python3 experimental/fugaku-power/scripts/analysis/plot_resource_trace.py \
-  RESOURCE_TRACE.csv --total-nodes 158976 --output-dir docs/_static
+  RESOURCE_TRACE.csv --total-nodes 142167 --output-dir docs/_static
 ```
 
 Use `--max-points` to control plot downsampling; the default is 50,000.
+Use `--mode replay` for historical replay input. It changes the titles and
+writes `fugaku-replay-node-allocation.png` and
+`fugaku-replay-power-usage.png`. Both figures use fixed, identical plot
+margins so their elapsed-day axes align vertically.
+
+### `analysis/replay_power_trace.py`
+
+Replays the `begin_time` and `end_time` intervals from the real Fugaku
+operational log exactly as recorded, without running a scheduler. The input is
+not simulator output. Use the native `tracer` replay documented in the parent
+README to establish the node high-water mark. This helper independently
+replays the same intervals and writes a six-column resource trace containing
+allocated nodes and the aggregate power-usage fields needed for the historical
+plots:
+
+```bash
+python3 experimental/fugaku-power/scripts/analysis/replay_power_trace.py \
+  f-data/traces/24_04_scheduling_trace.csv \
+  /tmp/dr_evt_fugaku_power/24_04_replay_resources.csv \
+  --total-nodes 142167
+```
 
 ### `analysis/plot_simulator_implementation_scaling.py`
 
@@ -66,7 +87,10 @@ python3 experimental/fugaku-power/scripts/analysis/plot_simulator_implementation
 
 Splits one submit-time-sorted simulation CSV into header-preserving batches and
 writes an absolute-path list suitable for `simulator --infile_list`. Jobs
-with the same `job_submit_time` remain in the same batch.
+with the same `job_submit_time` remain in the same batch. Splitting changes
+only how the simulator loads the input: concatenating the batches recovers the
+same jobs and ordering as the original CSV. In the documented April experiment,
+420,450 jobs were split into nine pieces solely to test progressive loading.
 
 ```bash
 python3 experimental/fugaku-power/scripts/trace_tools/split_progressive_trace.py \
@@ -83,7 +107,7 @@ Run them from the external F-DATA directory so their relative input and output
 paths resolve there:
 
 ```bash
-cd /p/vast1/f-data/RIKEN
+cd f-data
 ```
 
 ### `trace_tools/create_scheduling_trace.py`

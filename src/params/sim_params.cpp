@@ -25,6 +25,7 @@
 namespace dr_evt {
 
 static constexpr int OPT_TRACE_TYPE = 1000;
+static constexpr int OPT_JOB_FLUSH_INTERVAL = 1001;
 
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
@@ -46,6 +47,7 @@ static const struct option sim_longopts[] = {
     {"wait_queue_overflow", required_argument, 0, 'G'},
     {"job_store_capacity", required_argument, 0, 'K'},
     {"job_store_overflow", required_argument, 0, 'W'},
+    {"job_flush_interval", required_argument, 0, OPT_JOB_FLUSH_INTERVAL},
     {"check_memory_pressure", required_argument, 0, 'm'},
     {"resource_history_capacity", required_argument, 0, 'H'},
     {"trace_type", required_argument, 0, OPT_TRACE_TYPE},
@@ -73,6 +75,7 @@ Sim_Params::Sim_Params()
       m_wait_queue_overflow(CircularOverflowPolicy::GROW),
       m_job_store_capacity(0), // 0 = size of job trace (never overflows)
       m_job_store_overflow(CircularOverflowPolicy::GROW),
+      m_job_flush_interval(0),
       m_memory_pressure_fraction(0.0), m_resource_history_capacity(0),
       m_total_nodes(dr_evt::total_nodes),
       m_trace_type(TraceType::STANDARD),
@@ -229,6 +232,9 @@ void Sim_Params::getopt(int &argc, char **&argv) {
         print_usage(argv[0], 1);
       }
     } break;
+    case OPT_JOB_FLUSH_INTERVAL: /* --job_flush_interval */
+      m_job_flush_interval = std::stoull(optarg);
+      break;
     case 'm': /* --check_memory_pressure */
     {
       double fraction = 0.0;
@@ -419,7 +425,7 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        with the positional trace-file argument and -i/--infile - "
          "do\n"
          "        not provide both. See\n"
-         "        docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
+         "        docs/dev/OUTPUT_TRACE_BUFFERS.md.\n"
          "\n"
          "    -j, --max_jobs\n"
          "        Specify the maximum number of jobs to run.\n"
@@ -490,7 +496,7 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        capacity is set to fit the whole trace during loading\n"
          "        regardless of this setting - use --infile_list for a\n"
          "        capacity that can actually bound memory; see\n"
-         "        docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
+         "        docs/dev/OUTPUT_TRACE_BUFFERS.md.\n"
          "        Default: 0, meaning the size of the job trace - large\n"
          "        enough it never needs to grow.\n"
          "\n"
@@ -499,6 +505,13 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        (default: grow). abort: end the simulation with an error.\n"
          "        grow: reallocate to a larger capacity, copying existing\n"
          "        entries over.\n"
+         "\n"
+         "    --job_flush_interval RECORDS\n"
+         "        Opportunistically write and reclaim the completed front\n"
+         "        prefix after this many additional job departures. The\n"
+         "        default is 0, meaning the current job-store capacity.\n"
+         "        Capacity pressure, an explicit flush, and final output\n"
+         "        remain independent flush triggers and reset this interval.\n"
          "\n"
          "    -m, --check_memory_pressure FRACTION\n"
          "        Before growing the job-record store for a new batch\n"
@@ -512,7 +525,7 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        of whether that is set to abort or grow. Disabled by\n"
          "        default (no argument means disabled - this option must\n"
          "        be given a value to take effect at all).\n"
-         "        See docs/dev/design-decisions/OUT_TRACE_STREAMING.md.\n"
+         "        See docs/dev/OUTPUT_TRACE_BUFFERS.md.\n"
          "\n"
          "    -H, --resource_history_capacity SIZE\n"
          "        Initial capacity of the resource-history circular buffer\n"
@@ -628,6 +641,7 @@ void Sim_Params::print() const {
   msg += " - infile: " + m_infile + "\n";
   msg += " - outfile: " + m_outfile + "\n";
   msg += " - total_nodes: " + to_string(m_total_nodes) + "\n";
+  msg += " - job_flush_interval: " + to_string(m_job_flush_interval) + "\n";
   msg += " - is_jobs_set: " + string{m_is_jobs_set ? "true" : "false"} + "\n";
   msg += " - is_time_set: " + string{m_is_time_set ? "true" : "false"} + "\n";
 

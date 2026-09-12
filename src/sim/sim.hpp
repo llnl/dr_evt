@@ -110,6 +110,13 @@ public:
   void write_simulated_trace();
 
   /**
+   * @brief Write and reclaim the completed front prefix at current time.
+   * @details This is an explicit streaming checkpoint. It does not close the
+   * schedule output, and it never reclaims an unfinished or pending record.
+   */
+  void flush_completed_jobs();
+
+  /**
    * @brief Write resource-allocation history to a CSV file.
    * @param[in] filename Destination CSV path.
    */

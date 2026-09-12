@@ -21,7 +21,7 @@
 # sit at the front when it's safe - not necessarily the rejected job,
 # if there is one) drops size() below capacity() for good, and the
 # buffer never becomes full() again for the rest of the run. See
-# docs/dev/design-decisions/OUT_TRACE_STREAMING.md for the full
+# docs/dev/OUTPUT_TRACE_BUFFERS.md for the full
 # reasoning and the direct verification behind it.
 #
 # So the "small capacity" tests below aren't testing repeated

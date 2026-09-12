@@ -79,11 +79,14 @@ are both circular buffers. Resource samples are flushed to the resource trace
 when the configured `--resource_history_capacity` is full; see
 [Command-Line Options](command-line.md) and the
 [Circular Queue design notes](../dev/design-decisions/CIRCULAR_QUEUE.md).
+Completed job rows are written before their records are reclaimed. By default,
+`--job_flush_interval 0` uses the job-store capacity as its record-count batch;
+space pressure, explicit flush, and final output can flush sooner.
 
 ## See also
 
 - [Input Trace Files](trace-formats.md) - accepted input formats and columns
 - [Command-Line Options](command-line.md) - `--outfile`, `--resource_trace`,
-  and `--resource_history_capacity`
+  `--job_flush_interval`, and `--resource_history_capacity`
 - [Fugaku Power-Usage Experiment](fugaku-power-experiment.md) - Plotting node
   and power-usage resource curves

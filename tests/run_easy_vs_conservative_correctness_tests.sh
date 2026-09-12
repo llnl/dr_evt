@@ -45,8 +45,12 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TRACE="$SCRIPT_DIR/test_traces/feature/easy_vs_conservative_test.csv"
 EXPECTED_EASY="$SCRIPT_DIR/test_traces/feature/easy_vs_conservative_expected_easy.csv"
 EXPECTED_CONS="$SCRIPT_DIR/test_traces/feature/easy_vs_conservative_expected_conservative.csv"
-OUTDIR="$ROOT_DIR/test_output/easy_vs_conservative"
 NODES=100
+
+if ! OUTDIR="$(mktemp -d "${TMPDIR:-/tmp}/dr-evt-easy-vs-conservative.XXXXXXXX" 2>/dev/null)"; then
+    OUTDIR="$(mktemp -d "/tmp/dr-evt-easy-vs-conservative.XXXXXXXX")"
+fi
+trap 'rm -rf -- "$OUTDIR"' EXIT INT TERM
 
 cd "$ROOT_DIR"
 
@@ -67,9 +71,6 @@ echo ""
 echo "Scenario: 100 nodes, 6 jobs"
 echo "Testing fundamental behavioral difference"
 echo ""
-
-# Create output directory
-mkdir -p "$OUTDIR"
 
 # Verify files exist
 if [ ! -f "$TRACE" ]; then
@@ -112,7 +113,8 @@ echo "=== Comparing Results Against Expected ==="
 echo ""
 
 # Compare using Python
-python3 << 'PYTHON_SCRIPT'
+python3 - "$OUTDIR/easy.csv" "$OUTDIR/conservative.csv" \
+    "$EXPECTED_EASY" "$EXPECTED_CONS" << 'PYTHON_SCRIPT'
 import csv
 import sys
 
@@ -129,10 +131,10 @@ def read_schedule(filename):
     return jobs
 
 # Read schedules
-easy_actual = read_schedule('test_output/easy_vs_conservative/easy.csv')
-cons_actual = read_schedule('test_output/easy_vs_conservative/conservative.csv')
-easy_expected = read_schedule('tests/test_traces/feature/easy_vs_conservative_expected_easy.csv')
-cons_expected = read_schedule('tests/test_traces/feature/easy_vs_conservative_expected_conservative.csv')
+easy_actual = read_schedule(sys.argv[1])
+cons_actual = read_schedule(sys.argv[2])
+easy_expected = read_schedule(sys.argv[3])
+cons_expected = read_schedule(sys.argv[4])
 
 print("EASY Backfilling Results:")
 print("-" * 70)
@@ -218,8 +220,4 @@ else:
 PYTHON_SCRIPT
 
 echo ""
-echo "Test complete. Output files:"
-echo "  - $OUTDIR/easy.csv"
-echo "  - $OUTDIR/conservative.csv"
-echo "  - $OUTDIR/easy.log"
-echo "  - $OUTDIR/conservative.log"
+echo "Test complete. Temporary outputs will be removed from: $OUTDIR"

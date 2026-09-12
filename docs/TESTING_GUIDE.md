@@ -288,12 +288,17 @@ Generated via `scripts/generators/generate_scale_expected_outputs.py`.
 ## Replay Tests
 
 **Location:** `tests/run_replay_tests.sh`
-**Purpose:** Verify replay mode reproduces resource usage from simulation
+**Purpose:** Verify replay mode reproduces resource usage from simulation and
+that completed job records are written and reclaimed only at safe replay
+boundaries
 
 **How it works:**
-1. Run simulation mode → generates job schedule + resource trace
-2. Feed schedule back as replay mode input
-3. Compare resource traces → must match exactly
+1. Run `test_replay_reclamation`, which covers explicit, periodic,
+   capacity-sized, and final flushes; equal-time departures; out-of-order
+   completion/front-prefix blocking; and exactly-once output.
+2. Run simulation mode → generates job schedule + resource trace.
+3. Feed the schedule back to `tracer` as replay-mode input.
+4. Compare resource traces → they must match exactly.
 
 **How to run:**
 ```bash
@@ -302,6 +307,7 @@ cd build
 ```
 
 **Tests hardcoded in script:**
+- `test_replay_reclamation` (one binary with multiple boundary scenarios)
 - `scheduler_correctness/01_backfill_allowed.csv`
 - `scheduler_correctness/05_multiple_backfills.csv`
 - `scheduler_correctness/13_consecutive_fcfs.csv`
@@ -635,7 +641,7 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Feature** | 6 | 6 | 0 | Policy comparisons, output formats, and rejection handling |
 | **Conservative** | 2 | 2 | 0 | CONSERVATIVE backfilling |
 | **Scale** | 7 | 7 | 0 | Performance testing |
-| **Replay** | 4 | 4 | 0 | Resource verification |
+| **Replay** | 5 | 5 | 0 | Resource equivalence and reclamation safety |
 | **Resource History** | 5 | 5 | 0 | Resource-history circular buffer, flush overhead |
 | **Job Store** | 6 | 6 | 0 | Job-record circular buffer, capacity sizing |
 | **Append-Job** | 18 | 18 | 0 | Streaming insertion (append_job/append_jobs), FCFS/EASY backfill-window query + submit_job()/advance_to() |
@@ -645,7 +651,7 @@ Tests"). See [`reference/terminology.md`](reference/terminology.md) for
 | **Config** | 7 | 7 | 0 | Protobuf validation |
 | **Queue Impl** | 34 | 34 | 0 | Wait-queue data structure consistency (circular/deque/multimap/block) |
 | **Column Aliases** | 8 | 8 | 0 | time_limit/actual_run_time accepted column-name variants |
-| **TOTAL** | 157+ | 157+ | 0 | Complete test suite |
+| **TOTAL** | 158+ | 158+ | 0 | Complete test suite |
 
 **All tests passing as of Sept 3, 2026**
 
