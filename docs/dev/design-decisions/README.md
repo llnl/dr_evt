@@ -10,6 +10,7 @@ This directory contains architectural decisions and design rationales for DR_EVT
 
 - **[Simulation vs Replay Modes](SIMULATION_VS_REPLAY_MODES.md)** - Why we have two distinct operating modes and how they differ
 - **[Timezone Support](TIMEZONE_SUPPORT.md)** - How timezone handling works for ISO timestamp traces
+- **[Experimental Trace Types](EXPERIMENTAL_TRACE_TYPES.md)** - How specialized trace records avoid overhead in the standard data model
 
 ```{toctree}
 :maxdepth: 1
@@ -17,6 +18,7 @@ This directory contains architectural decisions and design rationales for DR_EVT
 CIRCULAR_QUEUE
 SIMULATION_VS_REPLAY_MODES
 TIMEZONE_SUPPORT
+EXPERIMENTAL_TRACE_TYPES
 ```
 
 ## Purpose

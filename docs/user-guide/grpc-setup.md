@@ -6,7 +6,9 @@ a client and server. See [Client/Server Use Cases](client-server-use-cases.md)
 for bare-metal, container, multi-server, and synchronized-system patterns;
 MPI is documented there only as an optional test harness. See also
 the [Client/Server Reference](../CLIENT_SERVER_GUIDE.md) for the service
-definition, dependency resolution, and testing.
+definition and the
+[examples, use cases, and tests](../CLIENT_SERVER_GUIDE.md#examples-use-cases-and-tests)
+for concrete implementations and validation.
 
 ## Client/server session
 
@@ -37,23 +39,8 @@ for multi-server and digital-twin deployments.
 
 ## Building client/server support
 
-The gRPC client/server is optional. Enabling it automatically enables
-Protobuf support:
-
-```bash
-cmake .. \
-  -DDR_EVT_ENABLE_GRPC=ON
-make dr_evt_server-bin dr_evt_client-bin
-make install
-```
-
-You do **not** need to install gRPC/Protobuf system packages first: if
-they aren't found via `find_package`, the build automatically falls
-back to fetching and building gRPC's own source tree (slower the first
-time, but works without root/sudo access - the common case on shared
-HPC/cluster environments). See the full guide's
-[Dependency resolution](../CLIENT_SERVER_GUIDE.md#dependency-resolution)
-section for exactly what's tried and in what order.
+The gRPC client/server is optional. Follow the gRPC build instructions in
+[Installation](../getting-started/installation.md#cmake-configuration-options).
 
 ## Starting a server
 
@@ -98,7 +85,9 @@ An application can generate those messages from a live digital twin, a
 database, another simulator, or any other source--no input trace is
 needed. `dr_evt_client` merely demonstrates that sequence and prints
 final statistics; it is a reference for writing your own client against
-the same `.proto` service. See the full guide for what each RPC
+the same `.proto` service. Its
+[C++ source](https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_client.cpp)
+is a complete usage example. See the full guide for what each RPC
 corresponds to in the in-process [streaming API](../api/STREAMING_API.md).
 
 ## Session identity and completion
@@ -202,7 +191,9 @@ client/server specifically, but addresses the same underlying concern.
 ## See Also
 
 - [Client/Server Use Cases](client-server-use-cases.md) - bare-metal, container, multi-server, and synchronized-system patterns
-- [Client/Server Reference](../CLIENT_SERVER_GUIDE.md) - service definition, dependency resolution, and testing
+- [Client/Server Reference](../CLIENT_SERVER_GUIDE.md) - service definition and wire protocol
+- [Client/server examples and tests](../CLIENT_SERVER_GUIDE.md#examples-use-cases-and-tests) - runnable examples, use cases, and exact test references
 - [Streaming API](../api/STREAMING_API.md) - the in-process API the gRPC service wraps
 - [Command-Line Options](command-line.md) - CLI configuration options for the plain `simulator` binary
 - [Python API](../api/PYTHON_API.md) - Python bindings (in-process, no network - not the same thing as a Python gRPC client)
+- [Distributed client/server tests](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests) - exact gRPC and MPI commands and fixtures

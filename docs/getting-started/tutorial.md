@@ -23,7 +23,7 @@ EOF
 ## Step 2: Run the Simulation
 
 ```bash
-./build/simulator my_first_trace.csv \
+${CMAKE_INSTALL_PREFIX}/bin/simulator my_first_trace.csv \
   --total_nodes 100 \
   --trace_format simple \
   --timestamp_format epoch \
@@ -46,6 +46,8 @@ Total nodes: 100
 Average wait time: 26.67 sec
 Average turnaround time: 86.67 sec
 Makespan: 150 sec
+Average queue length: 0 jobs
+Peak queue length: 1 jobs
 ```
 
 ## Step 4: Analyze Results
@@ -105,36 +107,10 @@ In this example, Job 1 **backfilled**:
 
 This is **EASY backfilling** - it improves system utilization without delaying the waiting job.
 
-## Common Variations
-
-### Without Backfilling (Pure FCFS)
-
-```bash
-./build/simulator my_first_trace.csv \
-  --backfill_policy none \
-  --total_nodes 100
-```
-
-Result: Job 1 would wait until Job 0 completes, even though resources are available.
-
-### Different Priority Policies
-
-```bash
-# Shortest Job First
-./build/simulator my_first_trace.csv \
-  --priority_policy sjf \
-  --total_nodes 100
-
-# Longest Job First
-./build/simulator my_first_trace.csv \
-  --priority_policy ljf \
-  --total_nodes 100
-```
-
 ## Next Steps
 
 - [Command-Line Options](../user-guide/command-line.md) - All available options
-- [User Guide](../user-guide/overview.md) - Complete guide with trace formats and scheduling policies
+- [Input Trace Files](../user-guide/trace-formats.md) - Input schemas
 - [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE specifications
 - [Testing Guide](../TESTING_GUIDE.md) - How we verify correctness
 

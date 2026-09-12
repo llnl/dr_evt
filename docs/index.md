@@ -60,8 +60,7 @@ CLIENT_SERVER_GUIDE
 dev/README
 dev/WAIT_QUEUES
 dev/JOB_LIFECYCLE
-dev/design-decisions/SIMULATION_VS_REPLAY_MODES
-dev/design-decisions/TIMEZONE_SUPPORT
+dev/design-decisions/README
 dev/READTHEDOCS_SETUP
 ```
 
@@ -71,83 +70,3 @@ dev/READTHEDOCS_SETUP
 
 reference/terminology
 ```
-
-## Documentation
-
-### Getting Started
-
-Start here if you're new to DR_EVT:
-
-- **[Quick Start](getting-started/quickstart.md)** - Get up and running in 5 minutes
-- **[Installation](getting-started/installation.md)** - Build and install DR_EVT
-- **[Basic Tutorial](getting-started/tutorial.md)** - Your first simulation
-
-### User Guide
-
-Complete guide for running simulations:
-
-- **[User Guide](user-guide/overview.md)** - Complete usage manual
-- **[Command-Line Options](user-guide/command-line.md)** - All available options
-- **[Fugaku Power-Usage Experiment](user-guide/fugaku-power-experiment.md)** - Progressive simulation and resource plots for the April 2024 Fugaku trace
-
-### Algorithm and Testing
-
-- **[Backfilling Algorithms](BACKFILLING_ALGORITHMS.md)** - EASY and CONSERVATIVE algorithms with diagrams
-- **[Testing Guide](TESTING_GUIDE.md)** - Complete test catalog, how to run tests, test patterns, and verification methodology
-
-### APIs
-
-- **[Streaming API](api/STREAMING_API.md)** - Online/incremental simulation API
-- **[C++ API Reference](api/CPP_API.md)** - Generated reference organized by source directory
-- **[Python API](api/PYTHON_API.md)** - Python bindings reference
-- **[gRPC Client/Server Guide and API](CLIENT_SERVER_GUIDE.md)** - Network-exposed streaming API, including the MPI-based multi-client/multi-server test harness
-
-### Development
-
-For contributors and maintainers:
-
-- **[Developer Notes](dev/README.md)** - Design decision index and development resources
-
-## Quick Links
-
-- [GitHub Repository](https://github.com/LLNL/dr_evt)
-- [Report Issues](https://github.com/LLNL/dr_evt/issues)
-- [License](../LICENSE)
-
-## Project Status
-
-**Version:** 1.0
-
-**Scheduling Policies:**
-- **Backfill:** EASY and CONSERVATIVE (fully implemented)
-- **Priority:** FCFS, an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF, LJF
-
-**Trace Data Models:**
-- **Standard:** Default compact job and resource records
-- **Power usage:** Experimental model carrying `avgpcon`, `minpcon`, and `maxpcon`
-
-**APIs:**
-- **Streaming API:** Online/incremental simulation, including genuinely new jobs (`append_job()`/`append_jobs()`) not just ones already in a preloaded trace
-- **gRPC Service:** Network-exposed streaming API for multi-cluster coordination
-- **Python Bindings:** Batch mode and the core streaming/monitoring API; some `Sim_Params` fields and `Simulation` methods (including `append_job()`/`append_jobs()`) aren't bound yet - see [Python API](api/PYTHON_API.md#missing-parameters-in-python-bindings)
-
-**Test Suite:** 150+ tests across scheduler_correctness/unit/feature/append-job/progressive-loading/config/gRPC/scale/replay
-categories (see [Testing Guide](TESTING_GUIDE.md) for the current breakdown and how to run them).
-
-## About
-
-DR_EVT simulates discrete event-driven HPC job scheduling with:
-- **EASY and CONSERVATIVE backfilling** implementations checked against
-  separately written Python reference implementations (cross-implementation
-  consistency checks, not independently derived mathematical ground truth)
-- **Standard and experimental power-usage trace data models**, with power-usage
-  jobs carrying `avgpcon`, `minpcon`, and `maxpcon` and corresponding resource traces
-- **gRPC-based online simulation service** enabling coordinated multi-cluster
-  simulations in a distributed fashion and digital-twin scheduler interacting in real-time
-- **Replay and simulation modes** for both offline analysis and online operation
-- **Streaming API** for incremental job submission and online scheduling decisions
-- **Real HPC trace support** (Lassen format) plus simpler CSV format
-- **Comprehensive test suite** covering correctness, differential comparisons,
-  and large-scale scenarios
-
-Developed at Lawrence Livermore National Laboratory.

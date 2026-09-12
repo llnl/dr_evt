@@ -8,6 +8,10 @@
 #ifndef DR_EVT_UTILS_SEED_HPP
 #define DR_EVT_UTILS_SEED_HPP
 
+/** @file seed.hpp
+ * @brief Helpers for constructing reproducible `std::seed_seq` inputs.
+ */
+
 #include <array>
 #include <functional>
 #include <math.h>
@@ -39,17 +43,19 @@ struct hash<array<T, N>> {
 } // namespace std
 
 namespace dr_evt {
-/** \addtogroup dr_evt_utils
+/** \addtogroup dr_evt_rng
  *  @{ */
 
 /**
+ * @brief Sequence of 32-bit-compatible words accepted by `std::seed_seq`.
+ *
  * The seed_seq constructor takes an initialization list of any integer type.
  * However, we choose to use seed_seq::result_type (uint_least32_t), which is
  * the type of values `seed_seq::param()` returns.
  * The idea behind this decision is to keep the information carried in the input
  * as intact as possible. seed_seq copies the input into the internal sequence,
  * which is made of elements of at least 32 bits. How it does that depends on
- * the implementation, and may loose information if an input element relies on
+ * the implementation, and may lose information if an input element relies on
  * a representation that requires more than 32 bits.
  * Users can use multiple 32-bit elements to represent such an item by using
  * `make_seed_seq_input()` provided below.

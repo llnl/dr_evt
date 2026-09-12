@@ -6,7 +6,10 @@ output. Resource history is a separate circular buffer from the job store.
 
 .. only:: doxygen
 
-   .. doxygenclass:: dr_evt::Trace
+   .. doxygentypedef:: dr_evt::Trace
+      :project: dr_evt
+
+   .. doxygenclass:: dr_evt::BasicTrace
       :project: dr_evt
       :members:
 

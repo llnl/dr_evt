@@ -56,6 +56,11 @@ STRIP_CODE_COMMENTS    = NO
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = NO
+# Include the optional serialization API in the generated reference. Cereal is
+# enabled in supported builds, but Doxygen does not read the generated CMake
+# configuration header.
+PREDEFINED             = DR_EVT_HAS_CEREAL=1 \
+                         "ENABLE_CUSTOM_CEREAL(x)="
 
 # Diagrams
 HAVE_DOT               = YES
@@ -84,6 +89,7 @@ WARNINGS               = YES
 WARN_IF_UNDOCUMENTED   = YES
 WARN_IF_DOC_ERROR      = YES
 WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = YES
 
 # Sphinx owns the narrative documentation and Doxygen supplies its C++ API.
 USE_MDFILE_AS_MAINPAGE =

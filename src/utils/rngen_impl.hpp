@@ -8,6 +8,10 @@
 #ifndef DR_EVT_UTILS_RNGEN_IMPL_HPP
 #define DR_EVT_UTILS_RNGEN_IMPL_HPP
 
+/** @file rngen_impl.hpp
+ * @brief Template definitions for the serializable RNGen utility.
+ */
+
 #include "utils/exception.hpp"
 #include "utils/omp_diagnostics.hpp"
 #include <algorithm>   // std::max
@@ -21,26 +25,36 @@
 #endif
 
 namespace dr_evt {
-/** \addtogroup dr_evt_utils
- *  @{ */
 
 template <template <typename> typename D, typename V>
-inline RNGen<D, V>::RNGen() : m_sseq_used(false) {
+inline RNGen<D, V>::RNGen()
+    : m_seed(generator_type::default_seed), m_sseq_used(false) {
 #if DR_EVT_THREAD_PRIVATE_RNG
   m_num_threads = omp_get_max_threads();
 #endif // DR_EVT_THREAD_PRIVATE_RNG
+  initialize_engines();
+}
+
+template <template <typename> typename D, typename V>
+inline RNGen<D, V>::RNGen(unsigned seed) : m_seed(seed), m_sseq_used(false) {
+#if DR_EVT_THREAD_PRIVATE_RNG
+  m_num_threads = omp_get_max_threads();
+#endif // DR_EVT_THREAD_PRIVATE_RNG
+  initialize_engines();
 }
 
 template <template <typename> typename D, typename V>
 inline void RNGen<D, V>::set_seed(unsigned seed) {
   m_sseq_used = false;
   m_seed = seed;
+  initialize_engines();
 }
 
 template <template <typename> typename D, typename V>
 inline void RNGen<D, V>::set_seed() {
   m_sseq_used = false;
   m_seed = std::chrono::system_clock::now().time_since_epoch().count();
+  initialize_engines();
 }
 
 template <template <typename> typename D, typename V>
@@ -48,10 +62,11 @@ inline void RNGen<D, V>::use_seed_seq(const dr_evt::seed_seq_param_t &p) {
   m_sseq_used = true;
   m_sseq_param.clear();
   m_sseq_param.assign(p.begin(), p.end());
+  initialize_engines();
 }
 
 template <template <typename> typename D, typename V>
-inline void RNGen<D, V>::param(const param_type &p) {
+inline void RNGen<D, V>::initialize_engines() {
 #if DR_EVT_THREAD_PRIVATE_RNG
   m_gen.resize(m_num_threads);
   assert(m_gen.size() <=
@@ -99,6 +114,11 @@ inline void RNGen<D, V>::param(const param_type &p) {
     m_gen.seed(m_seed);
   }
 #endif // DR_EVT_THREAD_PRIVATE_RNG
+}
+
+template <template <typename> typename D, typename V>
+inline void RNGen<D, V>::param(const param_type &p) {
+  initialize_engines();
   m_distribution.param(p);
   m_distribution.reset();
 }
@@ -114,6 +134,17 @@ inline typename RNGen<D, V>::result_type RNGen<D, V>::operator()() {
   return m_distribution(*(m_gen[omp_get_thread_num()]));
 #else
   return m_distribution(m_gen);
+#endif // DR_EVT_THREAD_PRIVATE_RNG
+}
+
+template <template <typename> typename D, typename V>
+template <typename Distribution>
+inline typename Distribution::result_type
+RNGen<D, V>::sample(Distribution &distribution) {
+#if DR_EVT_THREAD_PRIVATE_RNG
+  return distribution(*(m_gen[omp_get_thread_num()]));
+#else
+  return distribution(m_gen);
 #endif // DR_EVT_THREAD_PRIVATE_RNG
 }
 
@@ -313,6 +344,5 @@ inline size_t RNGen<D, V>::engine_byte_size() const {
 #endif // DR_EVT_THREAD_PRIVATE_RNG
 }
 
-/**@}*/
 } // namespace dr_evt
 #endif // DR_EVT_UTILS_RNGEN_IMPL_HPP

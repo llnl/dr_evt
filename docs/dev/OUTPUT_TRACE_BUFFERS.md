@@ -161,8 +161,9 @@ point for a future optimistic or parallel simulation horizon.
   writing
 - `src/sim/simulation.{hpp,cpp}`: streaming and progressive-run entry points
 - `src/utils/system_memory.hpp`: Linux available-memory lookup
-- `tests/test_append_job_api.cpp`: single and batched append behavior,
+- [`tests/test_append_job_api.cpp`](https://github.com/LLNL/dr_evt/blob/main/tests/test_append_job_api.cpp): single and batched append behavior,
   including reclaim-before-grow and all-or-nothing capacity failures
-- `tests/test_grpc_streaming_api.cpp`: gRPC streaming API
-- `tests/test_progressive_load.cpp` and `tests/run_progressive_load_tests.sh`:
+- [`tests/test_grpc_streaming_api.cpp`](https://github.com/LLNL/dr_evt/blob/main/tests/test_grpc_streaming_api.cpp): gRPC streaming API
+- [`tests/test_progressive_load.cpp`](https://github.com/LLNL/dr_evt/blob/main/tests/test_progressive_load.cpp)
+  and [`tests/run_progressive_load_tests.sh`](https://github.com/LLNL/dr_evt/blob/main/tests/run_progressive_load_tests.sh):
   multi-file loading and memory-pressure behavior

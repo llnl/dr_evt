@@ -71,4 +71,5 @@ t=0: J2 starts → 95 used, 5 free
 t=0: J3 starts → 100 used, 0 free
 ```
 
-**THIS IS THE BUG**: If C++ processes J2 and J3 backfills in a loop and only records once, it would miss the intermediate state and jump from "90 used" to "100 used", losing the "95 used" event.
+The fixture requires the intermediate 95-node state as well as the final
+100-node state.

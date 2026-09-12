@@ -1,427 +1,97 @@
 # Protocol Buffer Configuration
 
-DR_EVT supports structured configuration files using Protocol Buffers (protobuf) for complex simulation setups.
+A Protobuf-enabled build can read simulator settings from a text-format
+configuration file. Build instructions are in
+[Installation](../getting-started/installation.md#cmake-configuration-options),
+and option behavior is defined in
+[Command-Line Options](command-line.md).
 
-The simulator's `--config` option parses the `Simulation_Params` message
-directly. Config files therefore contain fields such as `total_nodes` and
-`trace_type` at the top level; do not wrap them in `sim_setup { ... }`.
+## Fields
 
-## Why Use Protobuf Config?
+Configuration field names match the long command-line names with the leading
+`--` removed, except that the configuration field corresponding to
+`--check_memory_pressure` is named `memory_pressure_fraction`:
 
-**Benefits over command-line arguments:**
-- ✅ **Reproducible**: Configuration files can be versioned and shared
-- ✅ **Complex setups**: Manage many parameters in one file
-- ✅ **Type-safe**: Protobuf validates types and required fields
-- ✅ **Documented**: Schema defines all available options
-- ✅ **Composable**: Override config with command-line arguments
+| Group | Fields |
+|---|---|
+| Input and output | `infile`, `infile_list`, `outfile`, `resource_trace` |
+| Limits | `max_jobs`, `max_time`, `total_nodes` |
+| Scheduling | `backfill_policy`, `priority_policy`, `queue_impl`, `block_size` |
+| Queue storage | `wait_queue_capacity`, `wait_queue_overflow` |
+| Job storage | `job_store_capacity`, `job_store_overflow`, `job_flush_interval`, `memory_pressure_fraction` |
+| Resource history | `resource_history_capacity` |
+| Trace handling | `trace_type`, `trace_format`, `timestamp_format`, `timezone` |
+| Runtime model | `run_time_mode`, `run_time_distribution`, `run_time_scale`, `run_time_stddev` |
+| Other | `seed`, `verbose` |
 
-## Configuration File Format
+See [Command-Line Options](command-line.md) for accepted values, defaults, and
+interactions. Input schemas are documented in
+[Input Trace Files](trace-formats.md), and generated files in
+[Output Trace Files](output-traces.md).
 
-Configuration files use Protocol Buffer text format (`.textproto` extension).
+## File format
 
-### Basic Example
+The file contains fields from the `Simulation_Params` message at the top
+level:
 
-`sim_config.textproto`:
 ```text
 infile: "trace.csv"
 outfile: "results.csv"
+resource_trace: "resources.csv"
 total_nodes: 1000
-
 backfill_policy: "easy"
 priority_policy: "fcfs"
-```
-
-Run with:
-```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator --config sim_config.textproto trace.csv
-```
-
-### Complete Example
-
-`advanced_config.textproto`:
-```text
-# Input/Output
-infile: "workload.csv"
-outfile: "schedule_output.csv"
-resource_trace: "node_availability.csv"
-
-# System Configuration
-total_nodes: 2000
-seed: 42
-
-# Scheduling Policies
-backfill_policy: "easy"        # Options: "easy", "conservative", "none"
-priority_policy: "fcfs"         # Options: "fcfs", "sjf", "ljf"
-
-# Queue Implementation (FCFS scheduler only)
-queue_impl: "circular"          # Options: "circular", "deque", "multimap", "block"
-wait_queue_capacity: 0            # 0 = size of job trace; only used when queue_impl="circular"
-wait_queue_overflow: "grow"       # "abort" | "grow"; only used when queue_impl="circular"
-
-# Job-record store (Trace::m_data, a boost::circular_buffer bounding
-# memory via front-only eviction - see
-# docs/dev/OUTPUT_TRACE_BUFFERS.md for the design)
-job_store_capacity: 0           # 0 = size of job trace
-job_store_overflow: "grow"      # "abort" | "grow"
-job_flush_interval: 0           # 0 = current job-store capacity
-
-# Resource-history circular buffer (bounds memory for --resource_trace)
-resource_history_capacity: 0    # 0 = 2x loaded jobs, floored at 4096
-
-# Trace Data Model and Format
-trace_type: "standard"          # Options: "standard", "pcon"
-trace_format: "simple"          # Options: "simple", "lassen"
-timestamp_format: "epoch"       # Options: "epoch", "iso"
-
-# Simulation Limits
-max_jobs: 100000
-max_time: 86400                 # Stop after 86400 seconds (24 hours)
-
-# Duration Simulation
-run_time_mode: "distribution"   # Options: "actual", "distribution", "limit"
-run_time_distribution: "normal" # Options: "normal", "lognormal", "uniform"
-run_time_scale: 0.8             # Jobs run for 80% of time_limit on average
-run_time_stddev: 0.1            # Standard deviation: 10%
-
-# Output Options
-verbose: false
-```
-
-Run with:
-```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator workload.csv --config advanced_config.textproto
-```
-
-Note the positional trace-file argument is still required, matching
-`infile`'s own value inside the config - the positional argument always
-wins over whatever `infile` is set to (by `-i`/`--infile` or a config
-file), so it must be given on the command line even though the config
-already sets it. See [`--infile_list`](command-line.md) if you'd rather
-avoid a positional argument entirely (mutually exclusive with one).
-
-## Configuration Options Reference
-
-### Input/Output Parameters
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `infile` | string | Input trace file path (required, unless `infile_list` is set instead) |
-| `infile_list` | string | Path to a file listing multiple trace files, one per line - progressive loading, so `job_store_capacity` can actually bound memory (`infile` always grows to fit the whole trace regardless). Mutually exclusive with `infile` - do not set both. Files must already be sorted by `submit_time`, both within each file and across the sequence. See [`command-line.md`](command-line.md)'s `--infile_list` and `docs/dev/OUTPUT_TRACE_BUFFERS.md`. |
-| `outfile` | string | Output schedule file path (default: `stdout`) |
-| `resource_trace` | string | Node availability trace (optional) |
-
-### System Configuration
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `total_nodes` | int32 | Required | Total compute nodes in system |
-| `seed` | int32 | Random | Random seed for reproducibility |
-
-### Scheduling Policies
-
-| Field | Type | Default | Options |
-|-------|------|---------|---------|
-| `backfill_policy` | string | `"easy"` | `"easy"`, `"conservative"`, `"none"` |
-| `priority_policy` | string | `"fcfs"` | `"fcfs"`, `"sjf"`, `"ljf"` |
-| `queue_impl` | string | `"circular"` | `"circular"`, `"deque"`, `"multimap"`, `"block"` |
-| `block_size` | uint32 | `128` | Power of 2; only used when `queue_impl="block"` |
-| `wait_queue_capacity` | uint64 | `0` | `0` = size of job trace; only used when `queue_impl="circular"` |
-| `wait_queue_overflow` | string | `"grow"` | `"abort"`, `"grow"`; only used when `queue_impl="circular"` |
-| `job_store_capacity` | uint64 | `0` | `0` = size of job trace; only actually bounds memory with `infile_list` - `infile` (single-file) always grows to fit the whole trace regardless |
-| `job_store_overflow` | string | `"grow"` | `"abort"`, `"grow"` |
-| `job_flush_interval` | uint64 | `0` | Completed-job flush interval in records; `0` follows the current job-store capacity |
-| `memory_pressure_fraction` | double | `0.0` (disabled) | Refuse to grow the job store past this fraction of available memory (Linux only; must be `> 0.0` and `<= 1.0`, e.g. `0.8`); independent of `job_store_overflow` |
-| `resource_history_capacity` | uint64 | `0` | `0` = 2x loaded jobs, floored at 4096 |
-
-**backfill_policy:**
-- `"easy"` - EASY backfilling (only first queued job gets reservation)
-- `"conservative"` - Conservative backfilling (all queued jobs get reservations)
-- `"none"` - No backfilling
-
-**priority_policy:**
-- `"fcfs"` - First-Come-First-Served (arrival order)
-- `"sjf"` - Shortest Job First (by run time estimate)
-- `"ljf"` - Longest Job First (by run time estimate)
-
-**queue_impl** (FCFS scheduler only - SJF/LJF always use multimap):
-- `"circular"` - boost::circular_buffer-based (default; measured 14-28% faster
-  than `deque` - see [`../dev/design-decisions/CIRCULAR_QUEUE.md`](../dev/design-decisions/CIRCULAR_QUEUE.md))
-- `"deque"` - std::deque-based (simple, well-tested fallback)
-- `"multimap"` - std::multimap-based (for differential testing)
-- `"block"` - block-based with multi-index (reference implementation, not
-  recommended for performance - see [`../dev/design-decisions/BLOCK_QUEUE.md`](../dev/design-decisions/BLOCK_QUEUE.md))
-
-### Trace Data Model and Format
-
-| Field | Type | Default | Options |
-|-------|------|---------|---------|
-| `trace_type` | string | `"standard"` | `"standard"`, `"pcon"` |
-| `trace_format` | string | `"simple"` | `"simple"`, `"lassen"` |
-| `timestamp_format` | string | `"iso"` | `"epoch"`, `"iso"` |
-| `timezone` | string | `"America/Los_Angeles"` | Any IANA timezone (e.g., `"America/Los_Angeles"`) |
-
-`trace_type` selects the job/resource data model independently of
-`trace_format`:
-
-- `"standard"` - normal DR_EVT job and resource records.
-- `"pcon"` - experimental records carrying `avgpcon`, `minpcon`, and
-  `maxpcon`.
-
-**trace_format:**
-- `"simple"` - header-based CSV format. Replay input requires `job_submit_time`, `begin_time`, `end_time`, `num_nodes`, and `time_limit`; optional `q_id` defaults to `1` (`Queue1`). The legacy named `queue` field is used only when built with `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`. `exit_status` is an output-only compatibility field and is ignored if present in input.
-- `"lassen"` - 33-column LLNL HPC trace format
-
-**timestamp_format:**
-- `"epoch"` - Integer seconds since Unix epoch (1970-01-01)
-- `"iso"` - ISO 8601 format (e.g., `"2024-01-15T08:00:00"`)
-
-### Simulation Limits
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `max_jobs` | int32 | Unlimited | Stop after processing N jobs |
-| `max_time` | double | Unlimited | Stop after N seconds simulation time |
-
-### Run Time Simulation
-
-Control how a job's actual, observed execution length is determined in simulation mode:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `run_time_mode` | string | `"actual"` | How to determine the job's actual run time |
-| `run_time_distribution` | string | `"normal"` | Statistical distribution for sampling |
-| `run_time_scale` | double | `1.0` | Scale factor for run times |
-| `run_time_stddev` | double | `0.0` | Standard deviation (for distributions) |
-
-**run_time_mode:**
-- `"actual"` - Read job's actual run time from trace's `actual_run_time` column (default, most realistic)
-- `"distribution"` - Sample from statistical distribution around `time_limit × run_time_scale`
-- `"limit"` - Jobs run for exactly `time_limit` (debugging only, unrealistic)
-
-**run_time_distribution:**
-- `"normal"` - Normal distribution: mean=`time_limit × run_time_scale`, stddev=`run_time_stddev`
-- `"lognormal"` - Log-normal distribution with median=`time_limit × run_time_scale`
-- `"uniform"` - Uniform distribution: [0, `time_limit × run_time_scale`]
-
-**Example: Realistic Run Time Variation**
-```text
-run_time_mode: "distribution"
-run_time_distribution: "normal"
-run_time_scale: 0.8          # Jobs run for 80% of time_limit on average
-run_time_stddev: 0.1          # ±10% variation
-```
-
-### Output Options
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `verbose` | bool | `false` | Print detailed scheduling events |
-
-## Command-Line Override
-
-Command-line arguments override protobuf config values:
-
-```bash
-# Config file says total_nodes: 1000
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --config sim_config.textproto --total_nodes 2000
-
-# Result: Uses 2000 nodes (command-line wins)
-```
-
-Options are applied in command-line order. When `--config` is encountered,
-the protobuf file is loaded at that point; command-line arguments appearing
-after `--config` override the corresponding config values.
-
-## Common Configurations
-
-### Production Replay
-
-Replay exactly what happened on a real system:
-
-`replay.textproto`:
-```text
-infile: "production_trace.csv"
-outfile: "results.csv"
-
-total_nodes: 2048
-run_time_mode: "actual"  # Use actual run times from trace
-
-backfill_policy: "easy"
-priority_policy: "fcfs"
-
-trace_format: "lassen"
-timestamp_format: "iso"
-timezone: "America/Los_Angeles"
-```
-
-### What-If Analysis
-
-Simulate how system would behave with different policy:
-
-`what_if.textproto`:
-```text
-infile: "production_trace.csv"
-outfile: "what_if_results.csv"
-
-total_nodes: 2048
-
-# Simulation mode with realistic variation
-run_time_mode: "distribution"
-run_time_distribution: "normal"
-run_time_scale: 0.85
-run_time_stddev: 0.15
-
-# Try conservative backfilling instead of EASY
-backfill_policy: "conservative"
-priority_policy: "fcfs"
-
 trace_format: "simple"
 timestamp_format: "epoch"
 ```
 
-### Capacity Planning
+Do not wrap the fields in `simulation_params { ... }`. The authoritative
+schema is
+[`src/proto/dr_evt_params.proto`](https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_params.proto).
 
-Test if system can handle increased load:
+## Running with a configuration
 
-`capacity_test.textproto`:
-```text
-infile: "synthetic_high_load.csv"
-outfile: "capacity_results.csv"
+For single-file input, the simulator still requires the positional trace path.
+It takes precedence over the `infile` field:
 
-# Test with fewer nodes
-total_nodes: 1500
-
-run_time_mode: "limit"
-
-backfill_policy: "easy"
-priority_policy: "fcfs"
-
-# Stop after 7 days simulation time
-max_time: 604800
-
-verbose: true
+```bash
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
+  --config sim_config.textproto
 ```
 
-### Performance Testing
-
-Benchmark different queue implementations:
-
-`circular_queue_test.textproto` (default, typically fastest):
-```text
-infile: "large_scale_10k_jobs.csv"
-outfile: "circular_queue_results.csv"
-
-total_nodes: 1000
-
-backfill_policy: "easy"
-priority_policy: "fcfs"
-
-# queue_impl defaults to "circular" - explicit here for clarity.
-# wait_queue_capacity/wait_queue_overflow are optional; omitting them
-# defaults to a capacity sized to the job trace, which can never
-# overflow.
-queue_impl: "circular"
-
-run_time_mode: "limit"
-
-trace_format: "simple"
-timestamp_format: "epoch"
-```
-
-`block_queue_test.textproto` (reference implementation, not recommended
-for performance):
-```text
-infile: "large_scale_10k_jobs.csv"
-outfile: "block_queue_results.csv"
-
-total_nodes: 1000
-
-backfill_policy: "easy"
-priority_policy: "fcfs"
-
-# Use block queue with a 128-job block size
-queue_impl: "block"
-block_size: 128
-
-run_time_mode: "limit"
-
-trace_format: "simple"
-timestamp_format: "epoch"
-```
-
-## Protocol Buffer Schema
-
-The full schema is defined in `src/proto/dr_evt_params.proto`:
+For progressive input, set `infile_list` in the configuration and omit the
+positional path:
 
 ```text
-message Simulation_Params {
-  // Random seed (default: system clock-dependent if unset)
-  uint32 seed = 1;
-
-  // Simulation limits
-  uint32 max_jobs = 2;
-  double max_time = 3;
-
-  // Input/Output
-  string infile = 4;
-  string infile_list = 5;
-  string outfile = 6;
-  string resource_trace = 7;
-
-  // Enable verbose output for debugging/testing (default: false)
-  bool verbose = 8;
-
-  // Scheduling parameters
-  uint32 total_nodes = 9;          // default: 795
-  string backfill_policy = 10;     // "easy", "conservative", or "none" (default: "easy")
-  string priority_policy = 11;     // "fcfs", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
-
-  // Trace data model and format
-  string trace_type = 12;          // "standard" or "pcon" (default: "standard")
-  string trace_format = 13;        // "simple" or "lassen" (default: "simple")
-  string timestamp_format = 14;    // "epoch" or "iso" (default: "iso")
-  string timezone = 15;            // default: "America/Los_Angeles"
-
-  // Duration simulation
-  string run_time_mode = 16;          // "actual", "distribution", or "limit" (default: "actual")
-  string run_time_distribution = 17;  // "normal", "lognormal", or "uniform" (default: "normal")
-  double run_time_scale = 18;         // default: 1.0
-  double run_time_stddev = 19;        // default: 0.0
-
-  // Queue implementation (FCFS scheduler only)
-  string queue_impl = 20;           // "circular", "deque", "multimap", or "block"
-  uint32 block_size = 21;           // default: 128
-  uint64 wait_queue_capacity = 22;  // default: 0
-  string wait_queue_overflow = 23;  // "abort" or "grow"
-
-  // Job-record store
-  uint64 job_store_capacity = 24;         // default: 0
-  string job_store_overflow = 25;         // "abort" or "grow"
-  double memory_pressure_fraction = 26;   // default: 0.0 (disabled)
-
-  // Resource-history circular buffer
-  uint64 resource_history_capacity = 27;  // default: 0
-  uint64 job_flush_interval = 28;          // default: 0
-}
+infile_list: "traces/file_list.txt"
+job_store_capacity: 50000
 ```
 
-This mirrors `src/proto/dr_evt_params.proto`'s actual `Simulation_Params` message -
-check that file directly if this drifts out of sync again.
+```bash
+${CMAKE_INSTALL_PREFIX}/bin/simulator --config progressive.textproto
+```
+
+Options are applied from left to right. Arguments after `--config` override
+the configuration file:
+
+```bash
+${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
+  --config sim_config.textproto \
+  --total_nodes 2000
+```
 
 ## Validation
 
-Protobuf validates:
-- **Type checking**: `total_nodes` must be integer, not string
-- **Required fields**: Missing required fields cause errors
-- **Enum values**: Invalid policy names are rejected
+Unknown fields, invalid value types, unsupported option values, and conflicting
+input selections are rejected with an error.
 
-Example error:
-```
-Error parsing config file: Unknown field "totalnodes" (did you mean "total_nodes"?)
-```
+The documented examples and CLI/config equivalence are exercised by
+[`tests/test_protobuf_config_doc_examples.py`](https://github.com/LLNL/dr_evt/blob/main/tests/test_protobuf_config_doc_examples.py)
+and
+[`tests/run_configs_tests.sh`](https://github.com/LLNL/dr_evt/blob/main/tests/run_configs_tests.sh).
 
-## See Also
+## See also
 
-- [CLI Options](command-line.md) - Command-line alternatives to protobuf config
-- [User Guide Overview](overview.md) - Trace formats and simulation modes
-- [Quick Start](../getting-started/quickstart.md) - Basic usage examples
+- [Command-Line Options](command-line.md)
+- [Input Trace Files](trace-formats.md)
+- [Output Trace Files](output-traces.md)

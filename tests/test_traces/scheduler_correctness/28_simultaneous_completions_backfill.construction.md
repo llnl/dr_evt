@@ -53,4 +53,4 @@ t=100: Job 4 starts → 40 used, 60 free
 t=100: Job 5 starts → 60 used, 40 free
 ```
 
-**THIS IS THE BUG**: C++ might only record 1-2 of these states instead of all 6.
+The fixture requires all six intermediate resource states to be recorded.

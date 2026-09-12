@@ -1,7 +1,7 @@
 :orphan:
 
-C++ API reference moved
+C++ Development API Reference moved
 =======================
 
 The generated C++ API is now organized into separate responsibility and source
-directory pages. See the `C++ API Reference landing page <CPP_API.html>`_.
+directory pages. See the `C++ Development API Reference landing page <CPP_API.html>`_.

@@ -30,9 +30,11 @@ not shared between sessions.
 :::{figure} ../_static/client-server-architecture.svg
 :alt: Workload sources feed client processes and digital-twin controllers, which open independent gRPC sessions to server processes. Each session has an isolated simulation, scheduler state, and nodes.
 :width: 100%
+:align: center
 :::
 
-`python/grpc_multi_server.py` demonstrates this arrangement. It reads the
+[`python/grpc_multi_server.py`](https://github.com/LLNL/dr_evt/blob/main/python/grpc_multi_server.py)
+demonstrates this arrangement. It reads the
 sample CSV on the client, partitions rows among repeated `--server` options,
 and prints one statistics row per server. The CSV is only a convenient source
 of example arrivals: servers do not load it and require no prior knowledge of
@@ -53,7 +55,8 @@ server a contiguous range instead.
 
 ## Optional: MPI test and experiment launcher
 
-`python/grpc_mpi_launcher.py` starts one client on rank 0 and one server on
+[`python/grpc_mpi_launcher.py`](https://github.com/LLNL/dr_evt/blob/main/python/grpc_mpi_launcher.py)
+starts one client on rank 0 and one server on
 each remaining MPI rank. It discovers server addresses through MPI, passes
 them to the root client, and stops the servers when the client finishes. It is
 useful for test orchestration or controlled experiments; production deployments
@@ -62,7 +65,7 @@ normally start independent bare-metal processes or containers instead.
 ```bash
 python3 -m pip install mpi4py grpcio grpcio-tools protobuf
 mpirun -np 4 python3 python/grpc_mpi_launcher.py \
-  --server-binary /path/to/dr_evt_server --base-port 50051 -- \
+  --server-binary ${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server --base-port 50051 -- \
   --jobs /shared/jobs.csv --total-nodes 1000
 ```
 
@@ -76,34 +79,13 @@ Use your MPI launcher's host or hostfile options to distribute ranks across
 nodes. Ranks must resolve one another's hostnames, selected TCP ports must be
 reachable, and the server binary must be available on every server node.
 
-### Test-only Slurm validation
-
-From an allocation that permits `srun`, first build the server and install the
-Python/MPI dependencies:
-
-```bash
-cmake -S . -B build -DDR_EVT_ENABLE_GRPC=ON
-cmake --build build --target dr_evt_server-bin
-python3 -m venv .venv-grpc
-.venv-grpc/bin/python -m pip install mpi4py grpcio grpcio-tools protobuf
-```
-
-Then run one client rank and one server rank on a single allocated node:
-
-```bash
-srun -N 1 -n 2 .venv-grpc/bin/python python/grpc_mpi_launcher.py \
-  --server-binary ./build/dr_evt_server --base-port 50151 -- \
-  --jobs tests/test_traces/grpc/trace_a.csv --total-nodes 100
-```
-
-For multiple nodes, request enough nodes and choose `-n` as one client plus
-the requested servers--for example, `srun -N 2 -n 3` for one client and two
-servers. The job path needs to be accessible only to the client rank. This is
-an MPI testing workflow, not a required runtime architecture.
+Test and Slurm validation commands are in the
+[distributed client/server tests section](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests).
 
 ## Synchronized independent systems
 
-`python/grpc_sync_coordinator.py` is a small experiment controller for
+[`python/grpc_sync_coordinator.py`](https://github.com/LLNL/dr_evt/blob/main/python/grpc_sync_coordinator.py)
+is a small experiment controller for
 multiple independent schedulers. It reads one ordinary-job trace per system
 and a long-form composite-job trace, streams ordinary jobs to their servers,
 advances all servers to each composite event time, then submits the composite
@@ -142,41 +124,13 @@ rollback guarantee.
 
 ![Single-coordinator composite-stream procedure](../_static/single-coordinator-procedure.svg)
 
-### Timing exercised by the single-coordinator fixture
-
-`tests/test_grpc_single_coordinator.py` is a one-client, two-server integration
-test. The coordinator reads both ordinary traces and the composite stream; the
-two ordinary streams use synchronized timestamps and differ only in requested
-node counts. For each server, it also builds an independent seven-arrival
-baseline with `simulator` and byte-compares the gRPC session's simulated-job
-and resource traces with that baseline. This verifies scheduling and resource
-accounting, not only the final job counts.
-
-| Test case | Step | Server 1 timing | Server 2 timing | Composite timing | Relation exercised |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Initial ordinary batch | `tn_s1 = 10` | `tn_s2 = 10` | `ta = tc = 10` | `tn_s1 = tn_s2 = ta = tc` |
-| 2 | Equal-time next batch | `t0_s1 = 10` | `t0_s2 = 10` | Previous `tc = 10` | `t0_s1 = t0_s2 = tc`; a second `AdvanceTo(tc)` evaluates it |
-| 3 | Later ordinary arrival and strict-boundary event | `tn_s1 = ta_s1 = 20` | `tn_s2 = ta_s2 = 20` | `tc = 25` | `tn = ta < tc` |
-| 4 | Final ordinary batch | `t0_s1 = 30` | `t0_s2 = 30` | Previous `tc = 25` | `tc < t0_s1` and `tc < t0_s2` |
-
-In short, the fixture guarantees these ordering cases:
-
-1. `tn = ta = tc` for the initial batch.
-2. `t0 = tc` after composite evaluation, followed by a second
-   `AdvanceTo(tc)`.
-3. `tn = ta < tc` for the strict-boundary composite event.
-4. `tc < t0` for the later ordinary batch.
-
-Thus the fixture covers the equal-time and strict forms of the per-system
-boundaries above. It does not yet cover the interior timing case
-`tn < ta < tc`, or every distributed timing permutation: both systems use the
-same timestamps, so a staggered case such as `tn_s1 < tc < t0_s2` is not
-exercised.
+The coordinator's integration-test coverage is documented in the
+[distributed client/server tests section](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests).
 
 ```bash
 # Start one server for each address in systems.csv.
-./build/dr_evt_server 127.0.0.1:50061
-./build/dr_evt_server 127.0.0.1:50062
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server 127.0.0.1:50061
+${CMAKE_INSTALL_PREFIX}/bin/dr_evt_server 127.0.0.1:50062
 
 .venv-grpc/bin/python python/grpc_sync_coordinator.py \
   --systems python/examples/sync_systems.csv \

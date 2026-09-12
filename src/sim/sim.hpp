@@ -18,6 +18,7 @@
 #include <deque>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <memory> // unique_ptr
 #include <random>
 #include <unordered_map>
@@ -28,6 +29,7 @@
 #include "sim/scheduler_base.hpp"
 #include "trace/dr_event.hpp"
 #include "trace/trace.hpp"
+#include "utils/rngen.hpp"
 
 namespace dr_evt {
 
@@ -63,8 +65,8 @@ protected:
   num_jobs_t m_jobs_completed;
   num_jobs_t m_jobs_submitted; ///< Jobs submitted during the current run.
 
-  /// Random number generator for duration sampling
-  std::mt19937 m_rng;
+  /// Serializable random-number engine used for duration sampling.
+  RNGen<> m_rng;
 
   // NOTE: Wait queue now owned by scheduler (m_scheduler maintains internal
   // queue)
@@ -72,12 +74,14 @@ protected:
   /// Running jobs for streaming mode (job_idx -> start_time)
   running_jobs_t m_running_jobs;
 
-  /// Queue length statistics for performance analysis
-  mutable size_t m_queue_length_sum;
-  mutable size_t
-      m_queue_length_samples; ///< Number of queue-length observations.
-  mutable size_t
-      m_queue_length_peak; ///< Largest observed waiting-queue length.
+  // Output statistics only; the scheduler never consults these values.
+  /// Sum of the waiting-job counts observed by arriving jobs.
+  size_t m_queue_length_sum;
+  size_t m_queue_length_samples; ///< Number of arriving-job observations.
+  size_t m_queue_length_peak;    ///< Largest observed waiting-queue length.
+
+  /// Accepted arrivals not yet observed at their simulation timestamps.
+  std::map<sim_time_t, size_t> m_pending_queue_arrivals;
 
 public:
   /**
@@ -489,6 +493,14 @@ protected:
    * advance drains outstanding work. REPLAY input is not supported.
    */
   void run_progressive();
+
+  /**
+   * @brief Record what each job arriving now sees ahead of it in the queue.
+   * @details The scheduler must already be synchronized to current_time. For
+   * several jobs with the same timestamp, input order defines their
+   * observations: if n earlier jobs are waiting, they observe n, n+1, ... .
+   */
+  void record_queue_arrivals(sim_time_t current_time);
 
   /**
    * @brief Sample a job duration from the configured distribution.

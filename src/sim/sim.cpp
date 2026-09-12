@@ -353,7 +353,7 @@ tdiff_t BasicSimulation<TraceType>::sample_run_time(tdiff_t time_limit,
     double mean = time_limit * scale;
     double sd = time_limit * stddev;
     std::normal_distribution<double> normal_dist(mean, sd);
-    double run_time = normal_dist(m_rng);
+    double run_time = m_rng.sample(normal_dist);
     // A real HPC scheduler kills a job at its stated time_limit -
     // it can never actually run longer than that. Cap here so a
     // wide-tailed sample can't silently let a job run past its own
@@ -367,7 +367,7 @@ tdiff_t BasicSimulation<TraceType>::sample_run_time(tdiff_t time_limit,
     std::lognormal_distribution<double> lognormal_dist(mu, sigma);
     // Always >= 0 by construction; still cap at time_limit for the
     // same reason as NORMAL above - a real job cannot run past it.
-    return std::min(time_limit, lognormal_dist(m_rng));
+    return std::min(time_limit, m_rng.sample(lognormal_dist));
   }
 
   case DistributionType::UNIFORM: {
@@ -380,7 +380,7 @@ tdiff_t BasicSimulation<TraceType>::sample_run_time(tdiff_t time_limit,
     // direct function of the caller's own scale/stddev choice -
     // exceeding time_limit here only happens if the caller
     // deliberately set scale + stddev > 1.0.
-    return std::max(0.0, uniform_dist(m_rng));
+    return std::max(0.0, m_rng.sample(uniform_dist));
   }
 
   default:
@@ -570,6 +570,30 @@ void BasicSimulation<TraceType>::submit_job(job_no_t job_idx,
 #endif
 
   m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);
+  ++m_pending_queue_arrivals[submit_time];
+}
+
+template <typename TraceType>
+void BasicSimulation<TraceType>::record_queue_arrivals(
+    sim_time_t current_time) {
+  auto arrivals = m_pending_queue_arrivals.find(current_time);
+  if (arrivals == m_pending_queue_arrivals.end()) {
+    return;
+  }
+
+  const size_t count = arrivals->second;
+  const size_t active_after_sync = m_scheduler->active_job_count();
+  if (active_after_sync < count) {
+    throw std::logic_error(
+        "scheduler queue contains fewer jobs than arrived at current time");
+  }
+
+  size_t jobs_already_waiting = active_after_sync - count;
+  for (size_t i = 0; i < count; ++i) {
+    m_queue_length_sum += jobs_already_waiting + i;
+    ++m_queue_length_samples;
+  }
+  m_pending_queue_arrivals.erase(arrivals);
 }
 
 template <typename TraceType>
@@ -583,8 +607,11 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
         " but current_time=" + std::to_string(m_current_time));
   }
 
-  // Before entering the main loop: check if any jobs are eligible at
-  // current_time (initially 0) This handles the case where jobs submit at t=0
+  // Before entering the main loop, account for jobs submitted at the current
+  // time and check whether any are eligible. This handles t=0 initially and
+  // jobs appended at the current time by a streaming caller.
+  m_scheduler->sync_to(m_current_time);
+  record_queue_arrivals(m_current_time);
   if (m_scheduler->has_eligible_jobs()) {
     // Call scheduler to evaluate newly arriving jobs
     while (true) {
@@ -619,9 +646,6 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
   size_t active_count = m_scheduler->active_job_count();
   sim_time_t next_arrival = m_scheduler->get_next_arrival_time();
 
-  // Sample queue length for statistics
-  m_queue_length_sum += active_count;
-  m_queue_length_samples++;
   m_queue_length_peak = std::max(m_queue_length_peak, active_count);
 
   // Continue while: (1) jobs waiting to be scheduled, OR (2) events pending
@@ -661,6 +685,7 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
       // stale relative to m_current_time, since nothing else
       // would sync it before the queries below.
       m_scheduler->sync_to(m_current_time);
+      record_queue_arrivals(m_current_time);
 
       // Process ALL events at current_time before calling scheduler
       // This ensures END events are processed before START events created by
@@ -705,6 +730,7 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
       // sync_to() call would already cover this in practice, but
       // this doesn't rely on that.
       m_scheduler->sync_to(m_current_time);
+      record_queue_arrivals(m_current_time);
 
       // jobs_at_next_arrival already collected during wait_queue scan
       // TODO: Pass jobs_at_next_arrival to scheduler for efficient evaluation
@@ -769,9 +795,7 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
     active_count = m_scheduler->active_job_count();
     next_arrival = m_scheduler->get_next_arrival_time();
 
-    // Sample queue length for statistics
-    m_queue_length_sum += active_count;
-    m_queue_length_samples++;
+    // Peak queue length after all events and scheduling at this timestamp.
     m_queue_length_peak = std::max(m_queue_length_peak, active_count);
   }
 

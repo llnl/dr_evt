@@ -75,9 +75,8 @@ Sim_Params::Sim_Params()
       m_wait_queue_overflow(CircularOverflowPolicy::GROW),
       m_job_store_capacity(0), // 0 = size of job trace (never overflows)
       m_job_store_overflow(CircularOverflowPolicy::GROW),
-      m_job_flush_interval(0),
-      m_memory_pressure_fraction(0.0), m_resource_history_capacity(0),
-      m_total_nodes(dr_evt::total_nodes),
+      m_job_flush_interval(0), m_memory_pressure_fraction(0.0),
+      m_resource_history_capacity(0), m_total_nodes(dr_evt::total_nodes),
       m_trace_type(TraceType::STANDARD),
       m_trace_format("simple"),  // Default to simple format
       m_timestamp_format("iso"), // Default to ISO/human-readable timestamps
@@ -265,8 +264,7 @@ void Sim_Params::getopt(int &argc, char **&argv) {
         m_trace_type = TraceType::PCON;
       } else {
         std::cerr << "Unknown trace type: " << type << std::endl;
-        std::cerr << "Valid options: 'standard' (default), 'pcon'"
-                  << std::endl;
+        std::cerr << "Valid options: 'standard' (default), 'pcon'" << std::endl;
         print_usage(argv[0], 1);
       }
     } break;

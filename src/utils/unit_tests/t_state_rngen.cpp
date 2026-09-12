@@ -331,6 +331,31 @@ int main(int argc, char **argv)
                                          Cereal, StreamVec, sstr, false);
     CHECK_RESULT;
   }
+
+  SECTION("Caller-supplied distributions use the serialized RNGen engine") {
+    dr_evt::RNGen<> original(42u);
+    dr_evt::RNGen<> restored;
+    std::vector<char> buffer;
+
+    // Advance the stream before taking the snapshot.
+    std::normal_distribution<double> warmup(100.0, 10.0);
+    static_cast<void>(original.sample(warmup));
+
+    ok = save_to_streamvec(Bits, original, buffer) &&
+         load_from_streamvec(Bits, restored, buffer);
+
+    std::normal_distribution<double> normal_a(100.0, 10.0);
+    std::normal_distribution<double> normal_b(100.0, 10.0);
+    std::lognormal_distribution<double> lognormal_a(4.0, 0.5);
+    std::lognormal_distribution<double> lognormal_b(4.0, 0.5);
+    std::uniform_real_distribution<double> uniform_a(10.0, 20.0);
+    std::uniform_real_distribution<double> uniform_b(10.0, 20.0);
+
+    ok = ok && original.sample(normal_a) == restored.sample(normal_b) &&
+         original.sample(lognormal_a) == restored.sample(lognormal_b) &&
+         original.sample(uniform_a) == restored.sample(uniform_b);
+    CHECK_RESULT;
+  }
 #if !defined(DR_EVT_HAS_CATCH2)
   return 0;
 #endif

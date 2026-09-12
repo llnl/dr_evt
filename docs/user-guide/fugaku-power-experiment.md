@@ -33,181 +33,11 @@ All calendar dates and times on this page that refer to the Fugaku traces are
 shown in Japan Standard Time (JST, UTC+09:00). Elapsed durations are independent
 of time zone.
 
-The experiment-specific scripts and full reproduction notes are kept in
-[experimental/fugaku-power](../../experimental/fugaku-power/README.md).
+## Replay and simulation comparison
 
-## Input
-
-The simulation input used locally is:
-
-```text
-f-data/traces_no_times/24_04_scheduling_trace.csv
-```
-
-It contains 420,450 jobs and these columns:
-
-```text
-job_submit_time,time_limit,num_nodes,duration,avgpcon,minpcon,maxpcon,exit_status
-```
-
-First, the historical production trace is replayed to measure its maximum
-resource use: 142,167 allocated nodes. The simulation is then run with
-`--total_nodes 142167`. This is an observed workload high-water mark, not the
-machine's published 158,976-node capacity; neither trace stores total system
-capacity.
-
-## Replay the Historical Trace First
-
-Measure the maximum allocation from the real Fugaku start/end times before
-choosing the simulator size:
-
-```bash
-RESULTS=/tmp/dr_evt_fugaku_power
-mkdir -p "$RESULTS"
-TRACER=/path/to/tracer
-
-"$TRACER" \
-  f-data/traces/24_04_scheduling_trace.csv \
-  --total_nodes 142167 \
-  --resource_trace "$RESULTS/24_04_replay_nodes.csv" \
-  --outfile "$RESULTS/24_04_replayed_jobs.csv" \
-  --subfile "$RESULTS/24_04_replay_submissions.csv" \
-  --subsumf "$RESULTS/24_04_replay_submission_summary.csv"
-
-awk -F, 'NR > 1 && $3 > max { max = $3 } END { print max }' \
-  "$RESULTS/24_04_replay_nodes.csv"
-```
-
-This replay processes 420,450 logged jobs and finds a maximum allocation of
-142,167 nodes. `--total_nodes` only derives the replay output's `free_nodes`
-column; it does not constrain historical allocation. The measured maximum is
-used by the simulation command below.
-
-## Run the Simulation
-
-For this 420,450-job trace, passing the CSV directly is the simplest approach
-and uses a modest amount of memory on the tested system:
-
-```bash
-SIMULATOR=/path/to/simulator
-
-"$SIMULATOR" \
-  f-data/traces_no_times/24_04_scheduling_trace.csv \
-  --trace_type pcon \
-  --trace_format simple \
-  --timestamp_format epoch \
-  --run_time_mode actual \
-  --total_nodes 142167 \
-  --outfile "$RESULTS/24_04_simulated.csv" \
-  --resource_trace "$RESULTS/24_04_resources.csv"
-```
-
-The options have the following experiment-specific roles:
-
-| Option | Purpose |
-|---|---|
-| `--trace_type pcon` | Reads and tracks the three power-usage input fields. |
-| `--run_time_mode actual` | Uses `duration` as actual runtime while retaining `time_limit` for scheduling. |
-| `--total_nodes 142167` | Uses the peak found by replaying the real April operational log. |
-
-## Optional Progressive Loading
-
-The single-file path loads every job before simulation. To reduce memory use,
-progressive mode accepts a list of sorted CSV batches, loads each batch when
-the simulation reaches it, and reclaims eligible completed records.
-
-Prepare batches without splitting jobs that share a submission timestamp:
-
-```bash
-BATCH_DIR="$RESULTS/24_04_batches"
-
-python3 experimental/fugaku-power/scripts/trace_tools/split_progressive_trace.py \
-  f-data/traces_no_times/24_04_scheduling_trace.csv \
-  "$BATCH_DIR" \
-  --rows-per-file 50000
-```
-
-The command writes `$BATCH_DIR/file_list.txt`, with one absolute CSV path per
-line. Every file is internally sorted, and the sequence is nondecreasing by
-`job_submit_time`. For this experiment, the splitter divided the original
-420,450-job April CSV into nine ordered pieces. Those nine files collectively
-contain exactly the same jobs as the single input file; they are not nine
-different workloads. The split exists only to test progressive loading. Run
-the resulting batches with:
-
-```bash
-"$SIMULATOR" \
-  --infile_list "$BATCH_DIR/file_list.txt" \
-  --trace_type pcon \
-  --trace_format simple \
-  --timestamp_format epoch \
-  --run_time_mode actual \
-  --total_nodes 142167 \
-  --job_store_capacity 50000 \
-  --job_store_overflow grow \
-  --check_memory_pressure 0.8 \
-  --outfile "$RESULTS/24_04_simulated.csv" \
-  --resource_trace "$RESULTS/24_04_resources.csv"
-```
-
-A capacity of 50,000 is not a strict upper bound with `grow`. Use
-`--job_store_overflow abort` to make it strict, then reduce batch size or
-increase capacity if a batch cannot fit with outstanding records.
-
-Progressive input must be simulation format. The files under
-`f-data/traces/` are derived from the real Fugaku operational log and contain
-its recorded start and end times. They are suitable for historical replay
-analysis, but replay mode is rejected by
-`--infile_list`.
-
-## Plot the Resource Trace
-
-```bash
-MPLCONFIGDIR=/tmp/matplotlib-cache \
-python3 experimental/fugaku-power/scripts/analysis/plot_resource_trace.py \
-  "$RESULTS/24_04_resources.csv" \
-  --total-nodes 142167 \
-  --output-dir docs/_static
-```
-
-This creates:
-
-- `fugaku-node-allocation.png`: allocated nodes over elapsed simulation time,
-  with the configured 142,167-node simulation limit marked.
-- `fugaku-power-usage.png`: aggregate `minpcon`, `avgpcon`, and `maxpcon` for
-  jobs running at each resource sample.
-
-The power-usage resource columns are sums across running jobs. Despite their field
-names, the plotted resource-level values are not per-node minima, means, or
-maxima.
-
-## Plot the Historical Replay
-
-The replay input is derived from the real Fugaku operational log, not from a
-DR_EVT simulation. The simulation computes new start times; the replay instead
-uses the log's recorded `begin_time` and `end_time` values without invoking a
-scheduler. The native replay above establishes the node high-water mark. Run
-the power-aware replay helper over the same recorded intervals to add aggregate
-power-usage columns for the comparable plots:
-
-```bash
-python3 experimental/fugaku-power/scripts/analysis/replay_power_trace.py \
-  f-data/traces/24_04_scheduling_trace.csv \
-  "$RESULTS/24_04_replay_resources.csv" \
-  --total-nodes 142167
-
-MPLCONFIGDIR=/tmp/matplotlib-cache \
-python3 experimental/fugaku-power/scripts/analysis/plot_resource_trace.py \
-  "$RESULTS/24_04_replay_resources.csv" \
-  --total-nodes 142167 \
-  --mode replay \
-  --output-dir docs/_static
-```
-
-This produces `fugaku-replay-node-allocation.png` and
-`fugaku-replay-power-usage.png`. The simulation and replay plotting paths use
-the same fixed figure size and axes rectangle. Consequently, the day axes of
-the node-allocation and power-usage figures align when stacked vertically.
+The exact input paths, commands, trace-preparation steps, and plotting commands
+are maintained in the repository's
+[experimental/fugaku-power README](https://github.com/LLNL/dr_evt/blob/main/experimental/fugaku-power/README.md).
 
 The full April replay processed 420,450 logged job records corresponding to
 the records used as simulation input. It preserved their real start/end times
@@ -249,16 +79,15 @@ externally imposed capacity reductions. Low-allocation periods in the
 simulation are instead consequences of its workload and scheduling decisions.
 
 The submission timestamps are identical in the two inputs and span 33.515
-days. The difference in overall duration is a queue-drain effect, not a
-six-day job runtime. In particular, the job that finished last historically
-waited 12.309 days before starting, although its runtime was only 1.320 days.
+days. The longer replay duration comes from queueing after submission. The job
+that finished last historically waited 12.309 days before starting and ran for
+1.320 days.
 DR_EVT started that same job after 15.7 hours and therefore completed it much
 earlier. The last-submitted job also started immediately in simulation but
 waited 23.7 hours in the historical record.
 
-The verified timings are shown below in Japan Standard Time. The heavier
-divider separates the historical last-finishing job from the last-submitted
-job.
+The timings are shown below in Japan Standard Time. The heavier divider
+separates the historical last-finishing job from the last-submitted job.
 
 <table class="docutils align-default">
   <thead>
@@ -311,10 +140,10 @@ job.
 
 ### Historical replay and simulation
 
-The native C++ replay of all 420,450 real-log records completed without a
-crash in 3.29 seconds with 87.2 MiB peak RSS. Its 840,901 event-level resource
-samples found the same 142,167-node peak as the power-aware replay script,
-which combines simultaneous events into 533,015 unique timestamps.
+The native C++ replay of all 420,450 real-log records took 3.29 seconds and
+used 87.2 MiB peak RSS. Its 840,901 event-level resource samples found the same
+142,167-node peak as the power-aware replay script, which combines simultaneous
+events into 533,015 unique timestamps.
 
 The single-file simulation then used that measured peak as
 `--total_nodes 142167`. On `dane.llnl.gov` it completed all 420,450 jobs in
@@ -332,15 +161,15 @@ The single-file simulation then used that measured peak as
 | Average turnaround time | 14,811.2 seconds |
 | Peak queue length | 6,797 jobs |
 
-### Earlier loading-mode comparison
+### Loading-mode comparison
 
 Single-file and nine-batch progressive runs completed successfully on LLNL's
-Dane system (`dane.llnl.gov`) on September 11, 2026. Both runs processed the
+Dane system (`dane.llnl.gov`). Both runs processed the
 same 420,450 April jobs: one read the original CSV as a whole, while the other
 read the same data split into nine ordered pieces to exercise progressive
 loading. Only the input-loading mode changed; all simulation options were
-identical. These earlier runs used the published 158,976-node capacity, so
-their timing and queue statistics are a separate baseline from the
+identical. These runs used the published 158,976-node capacity, so their
+timing and queue statistics are a separate baseline from the
 142,167-node simulation above.
 
 Peak resident set size (peak RSS) is the largest amount of physical memory
@@ -386,10 +215,6 @@ The common output and scheduling results were:
 | Average turnaround time | 12,991.1 seconds |
 | Peak queue length | 4,022 jobs |
 
-The simulator's separately reported average queue length differed slightly:
-361.249 jobs for single-file input and 361.254 jobs for progressive input.
-This did not affect either output trace.
-
 ### Simulator Implementation Scaling
 
 The Python reference scheduler and C++ simulator were also run on cumulative
@@ -413,13 +238,10 @@ and simulation options on the LLNL Dane system.
 | 9 | 420,450 | 425.97 s | 220.09 s | 14.25 GiB | 169.0 MiB |
 | March + April | 928,736 | 849.63 s | 353.70 s | 50.88 GiB | 298.8 MiB |
 
-Python completed the entire nine-batch trace, so no failure threshold was
-reached within this dataset. The full Python run required 7.10 minutes and
-14.25 GiB, versus 3.67 minutes and 169.0 MiB for C++. Python was therefore
+The full Python run required 7.10 minutes and 14.25 GiB, versus 3.67 minutes
+and 169.0 MiB for C++. Python was therefore
 feasible on Dane, while C++ was 1.94 times faster and used 86.3 times less
-memory. The April prefix series ended because all nine April batches had been
-included, not because Python encountered a resource limit. The raw
-measurements are in
+memory. The raw measurements are in
 [`simulator_implementation_scaling.csv`](../../experimental/fugaku-power/simulator_implementation_scaling.csv).
 
 The larger two-month input also completed in both implementations. Python
@@ -456,13 +278,3 @@ final simulation time.
 :alt: Historically replayed aggregate minimum, average, and maximum Fugaku power usage over 39.446 days.
 :width: 100%
 :::
-
-## Reference Scheduler
-
-An adapted copy of the readable Python EASY reference scheduler is included at
-`experimental/fugaku-power/scripts/python_reference_scheduler.py`. It
-understands the Fugaku `duration` and power-usage fields and can generate the same
-six resource columns for manageable subsets. The full April workload should
-use the C++ simulator because the reference implementation prioritizes clarity
-over large-trace performance. Use progressive input when reducing memory is
-more important than minimizing preparation steps.

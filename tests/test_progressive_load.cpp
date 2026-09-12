@@ -69,6 +69,8 @@ void test_progressive_matches_single_file() {
   std::cout << "\n=== Test 1: progressive matches single-file schedule ==="
             << std::endl;
 
+  std::string progressive_stats;
+  std::string combined_stats;
   {
     auto params = make_progressive_params({PART1, PART2, PART3});
     params.set_outfile("/tmp/test_progressive_out.csv");
@@ -76,6 +78,9 @@ void test_progressive_matches_single_file() {
     sim.run();
     sim.write_simulated_trace();
     assert(sim.get_trace().completed_count() == 6);
+    std::ostringstream stats;
+    sim.print_stats(stats);
+    progressive_stats = stats.str();
   }
   {
     Sim_Params params;
@@ -89,10 +94,93 @@ void test_progressive_matches_single_file() {
     sim.run();
     sim.write_simulated_trace();
     assert(sim.get_trace().completed_count() == 6);
+    std::ostringstream stats;
+    sim.print_stats(stats);
+    combined_stats = stats.str();
   }
 
   assert(slurp("/tmp/test_progressive_out.csv") ==
          slurp("/tmp/test_progressive_combined_out.csv"));
+  if (progressive_stats != combined_stats) {
+    std::cerr << "Progressive and single-file statistics differ:\n"
+              << "--- progressive ---\n"
+              << progressive_stats << "--- single file ---\n"
+              << combined_stats;
+    throw std::runtime_error(
+        "input partitioning changed simulation statistics");
+  }
+
+  // Repeat the statistics comparison with a queued workload. The ordinary
+  // progressive fixture never has a waiting job, so an extra zero-valued
+  // sample at each file boundary would otherwise go undetected.
+  constexpr const char *queue_part1 =
+      "/tmp/test_progressive_queue_stats_part1.csv";
+  constexpr const char *queue_part2 =
+      "/tmp/test_progressive_queue_stats_part2.csv";
+  constexpr const char *queue_combined =
+      "/tmp/test_progressive_queue_stats_combined.csv";
+  {
+    std::ofstream out(queue_part1);
+    out << "job_submit_time,num_nodes,time_limit\n"
+        << "0,100,10\n"
+        << "1,100,10\n";
+  }
+  {
+    std::ofstream out(queue_part2);
+    out << "job_submit_time,num_nodes,time_limit\n" << "2,100,10\n";
+  }
+  {
+    std::ofstream out(queue_combined);
+    out << "job_submit_time,num_nodes,time_limit\n"
+        << "0,100,10\n"
+        << "1,100,10\n"
+        << "2,100,10\n";
+  }
+
+  std::string queued_progressive_stats;
+  std::string queued_combined_stats;
+  {
+    auto params = make_progressive_params({queue_part1, queue_part2});
+    params.set_outfile("/tmp/test_progressive_queue_stats_out.csv");
+    Simulation sim(params);
+    sim.run();
+    std::ostringstream stats;
+    sim.print_stats(stats);
+    queued_progressive_stats = stats.str();
+  }
+  {
+    Sim_Params params;
+    params.m_infile = queue_combined;
+    params.m_total_nodes = 100;
+    params.m_trace_format = "simple";
+    params.m_timestamp_format = "epoch";
+    params.m_run_time_mode = RunTimeMode::LIMIT;
+    params.set_outfile("/tmp/test_combined_queue_stats_out.csv");
+    Simulation sim(params);
+    sim.run();
+    std::ostringstream stats;
+    sim.print_stats(stats);
+    queued_combined_stats = stats.str();
+  }
+  if (queued_progressive_stats != queued_combined_stats) {
+    std::cerr << "Queued progressive and single-file statistics differ:\n"
+              << "--- progressive ---\n"
+              << queued_progressive_stats << "--- single file ---\n"
+              << queued_combined_stats;
+    throw std::runtime_error(
+        "input partitioning changed queued simulation statistics");
+  }
+  if (queued_progressive_stats.find("Average queue length: 0.333333 jobs") ==
+          std::string::npos ||
+      queued_progressive_stats.find("Peak queue length: 2 jobs") ==
+          std::string::npos) {
+    std::cerr << "Unexpected per-arrival queue statistics:\n"
+              << queued_progressive_stats;
+    throw std::runtime_error("queue statistics use the wrong sampling rule");
+  }
+  std::remove(queue_part1);
+  std::remove(queue_part2);
+  std::remove(queue_combined);
 
   std::cout << "  PASSED" << std::endl;
 }

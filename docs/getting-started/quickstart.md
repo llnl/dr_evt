@@ -1,353 +1,90 @@
-# Quick Start Guide - DR_EVT HPC Job Scheduler Simulator
+# Quick Start
 
-## Overview
-
-DR_EVT includes a **SLURM-style backfilling scheduler**, enabling realistic job scheduling simulation.
-
-Source code, releases, and issue tracking are available in the
-[DR_EVT GitHub repository](https://github.com/LLNL/dr_evt).
-
-## Features
-
-- **Priority Policies**: FCFS (First-Come-First-Served), an alternative FCFS implementation (for testing), FCFS with conservative/no backfilling support, SJF (Shortest-Job-First), LJF (Longest-Job-First)
-- **EASY Backfilling**: First job gets reservation, others backfill if they don't delay it
-- **Conservative Backfilling**: All jobs get reservations
-- **Run Time Modes**: Read from trace (actual), sample from distribution, or use time limits
-- **Trace Data Models**: Standard records by default, or experimental power-usage records (from Fugaku@RIKEN) with `avgpcon`, `minpcon`, and `maxpcon`
-
-## Build Instructions
-
-### Prerequisites
-- Python 3.9+
-- C++ compiler with C++17 support
-- No admin access required
-
-### Setup (One-Time)
-
-```bash
-# 1. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# 2. Install build tools
-pip install --upgrade pip cmake
-
-# 3. Configure and build
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-
-# 4. Verify
-${CMAKE_INSTALL_PREFIX}/bin/simulator --help
-```
-
-### Dependencies
-
-Boost is found via `find_package` first and otherwise uses FetchContent.
-Protobuf and gRPC are optional: a Protobuf-only build discovers or fetches
-standalone Protobuf, while a gRPC build discovers gRPC first and otherwise
-fetches gRPC with its compatible bundled Protobuf. No root/sudo access is
-needed. First-time source builds can take several minutes; subsequent builds
-reuse the populated sources. For full setup details, see
+This guide builds DR_EVT and runs a small scheduler simulation. A basic build
+requires CMake 3.24 or later, a C++17 compiler, and Boost. Optional Python,
+Protobuf, gRPC, MPI, and testing dependencies are covered in
 [Installation](installation.md).
 
-- **Boost**: `find_package` first; `FetchContent` fallback if not found
-- **Protobuf**: only relevant with `-DDR_EVT_ENABLE_PROTOBUF=ON` (needed for `--config` files and the gRPC client/server); `find_package` first, `FetchContent` fallback if not found - see [Protobuf Configuration](../user-guide/protobuf-config.md) and [Client/Server Setup](../user-guide/grpc-setup.md)
+## Build
 
-## Usage
-
-### Basic Example
 ```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace_file.txt \
-  --total_nodes 795 \
-  --backfill_policy easy \
-  --priority_policy fcfs \
+git clone https://github.com/LLNL/dr_evt.git
+cd dr_evt
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j4
 ```
 
-### All Options
+If Boost is not installed, configuration uses the repository's dependency
+fallback. The first build can therefore take longer and may require network
+access.
 
-This is a quick summary; see [Command-Line Reference](../user-guide/command-line.md)
-for the full description of every option. DR_EVT also supports prototext-based
-configuration files (see [Protobuf Configuration](../user-guide/protobuf-config.md)).
+## Run a simulation
 
-```
-Input/Output:
-  -i, --infile <file>          Input trace file
-  -L, --infile_list <file>     File listing multiple trace files - progressive loading (mutually exclusive with --infile)
-  -o, --outfile <file>         Output file for results
-  -R, --resource_trace <file>  Write resource usage trace to file
-  -H, --resource_history_capacity <size>  Initial resource-history buffer capacity (default: 0 = 2x loaded jobs, floored at 4096)
+Run the included two-job trace on a 100-node system:
 
-Simulation setup:
-  -n, --total_nodes <N>        Number of nodes in system (default: 795)
-  -j, --max_jobs <N>           Maximum number of jobs to simulate
-  -t, --max_time <T>           Maximum simulation time
-  -s, --seed <N>                Random number seed
-
-Scheduling policy:
-  -b, --backfill_policy <policy>   easy|conservative|none (default: easy)
-  -p, --priority_policy <policy>   fcfs|fcfs_alt|fcfs_conservative|sjf|ljf (default: fcfs)
-  -q, --queue_impl <impl>          circular|deque|multimap|block (default: circular)
-  -Q, --block_size <size>          Block size when queue_impl=block (default: 128)
-  -A, --wait_queue_capacity <size>   Initial wait queue capacity when queue_impl=circular
-  -G, --wait_queue_overflow <mode>   abort|grow when queue_impl=circular (default: grow)
-
-Job store:
-  -K, --job_store_capacity <size>      Initial job-record store capacity (default: 0 = size of trace)
-  -W, --job_store_overflow <mode>      abort|grow when job_store_capacity exceeded (default: grow)
-      --job_flush_interval <records>   Completed-job flush interval (default: 0 = job-store capacity)
-  -m, --check_memory_pressure <fraction>  Refuse to grow the job store past this fraction of available memory (0 < fraction <= 1; disabled unless given)
-
-Trace data model and format:
-      --trace_type <type>       standard|pcon (default: standard)
-                                Select the job/resource data model independently
-                                of the input trace format
-  -f, --trace_format <fmt>      simple|lassen (default: simple)
-  -T, --timestamp_format <fmt>  epoch|iso (default: iso)
-  -z, --timezone <tz>           Timezone for iso timestamps (default: America/Los_Angeles)
-
-Duration/run time modeling:
-                                       planning estimate
-  -r, --run_time_mode <mode>          actual|distribution|limit (default: actual)
-                                       how the job's actual run time is determined
-  -D, --run_time_distribution <type>  normal|lognormal|uniform (default: normal)
-  -S, --run_time_scale <factor>       Scale factor for run time sampling (default: 1.0)
-  -V, --run_time_stddev <factor>      Std deviation factor for run time sampling
-
-Config file (requires protobuf support):
-  -c, --config <file>          Read simulation parameters from a protobuf config file
-                               (see [Protobuf Configuration](../user-guide/protobuf-config.md))
-
-Other:
-  -v, --verbose                 Enable verbose output
-  -M, --msec_output             Millisecond-precision timestamps in output
-  -h, --help                    Display usage information
-```
-
-### Examples
-
-**Conservative backfilling with shortest-job-first:**
 ```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
-  --backfill_policy conservative \
-  --priority_policy sjf \
-  --outfile results_conservative_sjf.txt
+${CMAKE_INSTALL_PREFIX}/bin/simulator tests/test_traces/unit/simple_2jobs.csv \
+  --trace_format simple \
+  --timestamp_format epoch \
+  --run_time_mode limit \
+  --total_nodes 100 \
+  --outfile results.csv \
+  --resource_trace resources.csv
 ```
 
-**Using actual run times from trace:**
+The simulator prints the resolved configuration followed by job counts,
+simulation time, average wait and turnaround times, makespan, average and peak
+waiting-queue lengths, and process wall-clock time. Definitions are in
+[Output Trace Files](../user-guide/output-traces.md#cli-summary).
+
+It also writes:
+
+- `results.csv`, the scheduled start and end time of each accepted job; and
+- `resources.csv`, free and allocated nodes after every resource change.
+
+Inspect them with:
+
 ```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
-  --run_time_mode actual \
-  --outfile results_actual.txt
+head results.csv
+head resources.csv
 ```
 
-**Limited simulation (first 1000 jobs):**
-```bash
-${CMAKE_INSTALL_PREFIX}/bin/simulator trace.txt \
-  --max_jobs 1000 \
-  --outfile results_subset.txt
-```
+## Use your own trace
 
-## Output
+A minimal simulation trace is a CSV file with named columns:
 
-The simulator outputs:
-- Job statistics (submissions, completions)
-- Average wait time
-- Average turnaround time
-- Makespan (total time to complete all jobs)
-- Per-job results (submit, start, end times)
-
-## Trace File Format
-
-Input trace files are CSV, with columns looked up by name in the header
-row (any order works) - not fixed-position, and not tab-separated.
-
-**Simulation mode** (scheduler computes start/end times - the common case):
 ```text
 job_submit_time,num_nodes,time_limit
-0,10,100
-50,10,50
+0,80,100
+10,15,30
+20,60,50
 ```
 
-**Replay mode** (`begin_time`/`end_time` already known, replayed exactly):
-```text
-job_submit_time,begin_time,end_time,num_nodes,time_limit
-0,0,100,10,100
-50,100,150,10,50
-```
+Run it by replacing the input path in the command above. The full input
+schemas, optional columns, replay detection, and timestamp forms are defined
+in [Input Trace Files](../user-guide/trace-formats.md).
 
-`time_limit` is also accepted under the column names `timelimit` or
-`walltime`, so an existing trace can be reused without editing its header.
-`q_id` is optional and defaults to `1` (`Queue1`) when absent. To accept the
-legacy named `queue` column instead, configure with
-`-DDR_EVT_LEGACY_QUEUE_INPUT=ON`.
+## Choose scheduler behavior
 
-See [Trace File Formats](../user-guide/trace-formats.md) for the full
-column reference (including the Lassen format and the `lassen` format
-option) and [Simulation vs Replay Modes](../dev/design-decisions/SIMULATION_VS_REPLAY_MODES.md)
-for how the parser picks a mode.
-
-## Understanding the Algorithms
-
-### Priority Policies
-
-**FCFS (First-Come-First-Served)**
-- Jobs scheduled in submission order
-- Traditional fair scheduling
-- Default policy
-
-**SJF (Shortest-Job-First)**
-- Shorter jobs scheduled first
-- Minimizes average wait time
-- May starve long jobs
-
-**LJF (Longest-Job-First)**
-- Longer jobs scheduled first
-- Useful for throughput optimization
-- May starve short jobs
-
-### EASY Backfilling
-- **How it works**: The first job in the queue gets a guaranteed start time (reservation)
-- **Backfilling**: Smaller jobs can "jump the queue" if they finish before the first job's reservation
-- **Best for**: Mixed workloads with varying job sizes
-- **Tradeoff**: Simple but may delay some jobs unnecessarily
-
-### Conservative Backfilling
-- **How it works**: ALL queued jobs get reservations
-- **Backfilling**: Jobs can only backfill if they don't delay ANY reservation
-- **Best for**: Fairness - prevents starvation
-- **Tradeoff**: More conservative, may leave resources idle
-
-### Run Time Modes
-
-**How jobs actually run (run_time_mode):**
-
-- `actual` (default) - Read actual run time from trace (most realistic)
-- `distribution` - Sample from statistical distribution
-- `limit` - Run for exactly time_limit (debug mode)
-
-**Note:** Scheduler uses time_limit as the best estimator for planning
-- Upper bound on performance
-
-## Troubleshooting
-
-### CMake can't find Boost
-```bash
-# On macOS with Homebrew
-cmake .. -DBOOST_ROOT=/opt/homebrew/opt/boost
-
-# Or search a dependency prefix, including with AVOID_SYSTEM_BOOST=ON
-cmake .. -DCMAKE_PREFIX_PATH=/path/to/dependencies -DAVOID_SYSTEM_BOOST=ON
-
-# Or set environment variable
-export BOOST_ROOT=/path/to/boost
-cmake .. -DCMAKE_BUILD_TYPE=Release
-```
-
-### Build fails during Protobuf download
-- Check internet connection
-- Or download protobuf manually and use:
-```bash
-cmake .. -DPROTOBUF_ROOT=/path/to/protobuf
-```
-
-### "No such file or directory" errors
-Make sure you're in the build directory:
-```bash
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-```
-
-## Development
-
-### Running Tests
-
-Most regression suites are driven by shell scripts, while selected tests are
-also registered with CTest.
+The defaults are FCFS priority with EASY backfilling. For example, strict FCFS
+without backfilling uses:
 
 ```bash
-# Register ordinary CTest tests
-cmake .. -DBUILD_TESTING=ON
-
-# Run the power-usage-focused CTest tests
-ctest -R 'test_pcon_trace|test_trace_type_cli' --output-on-failure
+${CMAKE_INSTALL_PREFIX}/bin/simulator input.csv \
+  --priority_policy fcfs \
+  --backfill_policy none
 ```
 
-The older Catch2-based unit-test framework is separate. Enable it with:
+See [Command-Line Options](../user-guide/command-line.md) for every flag and
+[Scheduling Policies](../BACKFILLING_ALGORITHMS.md) for policy semantics.
+Protobuf configuration files are described in
+[Protocol Buffer Configuration](../user-guide/protobuf-config.md).
 
-```bash
-cmake .. -DDR_EVT_WITH_UNIT_TESTING=ON
-```
+## Next steps
 
-The existing Catch2 tests use the Catch2 v2 single-header API. If a compatible
-installation is not found, DR_EVT fetches Catch2 v2.13.10.
-
-The larger regression suites continue to run through their shell runners:
-
-```bash
-./tests/run_scheduler_correctness_tests.sh
-./tests/run_append_job_tests.sh
-./tests/run_progressive_load_tests.sh
-./tests/run_configs_tests.sh
-```
-
-See the [Testing Guide](../TESTING_GUIDE.md) for the full list of test
-scripts and what each covers.
-
-### Rebuilding After Code Changes
-```bash
-cd build
-make -j4  # Only rebuilds changed files
-```
-
-### Clean Build
-```bash
-rm -rf build
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-```
-
-## Documentation
-
-- **[Installation Guide](installation.md)**: Detailed build instructions
-- **[Tutorial](tutorial.md)**: Step-by-step first simulation
-- **[User Guide](../user-guide/overview.md)**: Complete usage manual
-- **[Testing Guide](../TESTING_GUIDE.md)**: Test suite and validation
-
-## Citation
-
-If you use this scheduler implementation in your research, please cite:
-```bibtex
-@software{dr_evt_scheduler,
-  title = {DR\_EVT: distributed discrete resource event simulation},
-  author = {Jae-Seung Yeom},
-  year = {2026},
-  url = {https://github.com/llnl/dr_evt}
-}
-```
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Support
-
-For issues or questions:
-1. Check [Installation Guide](installation.md) for build problems
-2. Review [Testing Guide](../TESTING_GUIDE.md) for test suite details
-3. Read [User Guide](../user-guide/overview.md) for usage questions
-4. Open an issue on GitHub
-
-## What's Next?
-
-Planned features:
-- Checkpoint/restart capability for long-running simulations
-- Simulation warmup: allow jobs to run before the intended simulation window
-  such that the simulation accounting begins from a realistic, warmed-up
-  resource state rather than an empty system. The input trace may start days
-  earlier, but warmup jobs should be excluded from tracing.
-- Multi-file output: split output traces across multiple files with a
-  configurable per-file record limit, for long-running digital twin
-  simulations.
+- [Tutorial](tutorial.md) walks through a three-job EASY schedule.
+- [User Guide](../user-guide/overview.md) maps inputs, outputs, and interfaces.
+- [Installation](installation.md) covers optional features and troubleshooting.
+- [Test Suite](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#build-and-run) lists
+  validation commands.

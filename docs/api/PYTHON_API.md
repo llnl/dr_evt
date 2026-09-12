@@ -8,747 +8,121 @@
 
 <div id="python-api-content" class="api-search-content">
 
-Complete Python bindings for DR_EVT HPC Job Scheduler Simulator with streaming mode support.
+The `dr_evt` extension exposes batch and incremental simulation through
+pybind11. Build and import instructions are in
+[Installation](../getting-started/installation.md#cmake-configuration-options).
 
-## Overview
-
-The Python API provides full access to DR_EVT's streaming simulation capabilities, allowing you to:
-
-- Submit jobs dynamically to the scheduler
-- Control simulation time advancement
-- Monitor resource usage and queue status in real-time
-- Get comprehensive scheduling statistics
-- Configure all scheduling policies and parameters
-- Use the same verified EASY backfilling implementation as the C++ code
-
-## Installation
-
-### Prerequisites
-
-- Python 3.6+
-- C++ compiler with C++17 support
-- CMake 3.12+
-- Boost libraries
-
-### Build from Source
-
-```bash
-# Configure with Python support
-cd build
-cmake .. -DDR_EVT_BUILD_PYTHON=ON
-make
-
-# Install Python module
-cd ../python
-pip install .
-```
-
-### Verify Installation
-
-```python
-import dr_evt
-print(dr_evt.__version__)  # 1.0.0
-```
-
-## Quick Example
+## Example
 
 ```python
 import dr_evt
 
-# Configure simulation
 params = dr_evt.SimParams()
 params.infile = "jobs.csv"
 params.total_nodes = 100
 params.trace_format = "simple"
 params.timestamp_format = "epoch"
 params.run_time_mode = dr_evt.RunTimeMode.LIMIT
-params.backfill_policy = dr_evt.BackfillPolicy.EASY
-params.priority_policy = dr_evt.PriorityPolicy.FCFS
 
-# Create simulator and load trace
 sim = dr_evt.Simulation(params)
-sim.initialize_trace()
+queue = "pbatch" if dr_evt.legacy_queue_input else "1"
+sim.append_job(0.0, 10, queue, 100.0)
+sim.advance_to(0.0)
 
-# Submit job and advance
-sim.insert_job(0, 0.0)
-sim.run_until_inclusive(0.0)
-
-# Monitor
-print(f"Nodes in use: {sim.get_nodes_in_use()}/{params.total_nodes}")
-print(f"Available: {sim.get_available_nodes()}")
-print(f"Queue size: {sim.get_active_job_count()}")
-
-# Get statistics
 stats = sim.get_statistics()
-print(f"Utilization: {stats.utilization*100:.1f}%")
-print(f"Running: {stats.jobs_running}, Waiting: {stats.jobs_waiting}")
+print(stats.jobs_running, stats.nodes_in_use)
 ```
 
-## Configuration Parameters
+A complete runnable example is
+[`python/example_streaming.py`](https://github.com/LLNL/dr_evt/blob/main/python/example_streaming.py).
 
-All CLI options are available through `SimParams`. See [command-line.md](../user-guide/command-line.md) for detailed descriptions.
+## Configuration
 
-### Input/Output
+`SimParams` currently exposes these mutable attributes:
 
-```python
-params = dr_evt.SimParams()
+| Attribute | Type |
+|---|---|
+| `infile` | `str` |
+| `total_nodes` | `int` |
+| `trace_format` | `str` |
+| `timestamp_format` | `str` |
+| `run_time_mode` | `RunTimeMode` |
+| `backfill_policy` | `BackfillPolicy` |
+| `priority_policy` | `PriorityPolicy` |
+| `verbose` | `bool` |
 
-# Input trace file
-params.infile = "jobs.csv"
+Other C++/CLI configuration fields are not exposed by the binding. Use the
+`simulator` executable when one of those settings is required; its options
+are documented in [Command-Line Options](../user-guide/command-line.md).
 
-# Output files configured via C++ methods:
-# params.set_outfile("output.csv")
-# params.set_resource_trace("resources.csv")
-```
-
-### System Configuration
-
-```python
-# Total nodes in cluster
-params.total_nodes = 100  # Default: 795
-```
-
-### Trace Format
-
-```python
-# Trace file format
-params.trace_format = "simple"   # or "lassen"
-
-# Timestamp format in trace
-params.timestamp_format = "epoch"  # or "iso"
-
-# Timezone (only for iso timestamps)
-# params.timezone = "America/Los_Angeles"  # Not exposed in bindings yet
-```
-
-### Scheduling Policies
-
-```python
-# Backfilling policy
-params.backfill_policy = dr_evt.BackfillPolicy.EASY
-# Options: NONE, EASY, CONSERVATIVE
-
-# Job priority/ordering
-params.priority_policy = dr_evt.PriorityPolicy.FCFS
-# Options: FCFS, SJF (Shortest Job First), LJF (Longest Job First)
-
-# Scheduler's own job-length estimate for reservation/backfill planning
-# Scheduler uses time_limit as the best estimator for planning
-```
-
-### Run Time Mode (Simulation)
-
-```python
-# How the job's actual, observed execution length is determined
-params.run_time_mode = dr_evt.RunTimeMode.LIMIT
-# Options:
-# - ACTUAL: Read from actual_run_time column (also accepted:
-#   duration, actual_duration, run_time)
-# - LIMIT: Jobs run exactly their time_limit
-# - DISTRIBUTION: Sample from statistical distribution
-
-# Distribution parameters (when run_time_mode=DISTRIBUTION)
-# params.run_time_distribution = DistributionType.NORMAL  # Not exposed yet
-# params.run_time_scale = 0.8  # 80% of time_limit on average
-# params.run_time_stddev = 0.1  # 10% standard deviation
-```
-
-### Output Control
-
-```python
-# Enable verbose debug output
-params.verbose = True  # Default: False
-```
-
-## Missing Parameters in Python Bindings
-
-The following parameters from the protobuf schema (`dr_evt_params.proto`) are **not yet exposed** in the Python API (`dr_evt_bindings.cpp`):
-
-### Currently Exposed (9 parameters)
-✅ `infile` - Input trace file  
-✅ `total_nodes` - Total compute nodes  
-✅ `trace_format` - Trace format (simple/lassen)  
-✅ `timestamp_format` - Timestamp format (epoch/iso)  
-✅ `run_time_mode` - How the job's actual run time is determined (actual/distribution/limit)  
-✅ `backfill_policy` - Backfilling policy (easy/conservative/none)  
-✅ `priority_policy` - Priority policy (fcfs/sjf/ljf)  
-✅ `verbose` - Verbose output flag  
-
-### Missing from Python Bindings (17 parameters)
-
-**Critical for Full Functionality:**
-
-| Parameter | Type | Default | Purpose | Impact |
-|-----------|------|---------|---------|--------|
-| `seed` | uint32 | Random | RNG seed for reproducibility | **High** - Can't reproduce simulations |
-| `max_jobs` | uint32 | Unlimited | Limit jobs processed | **Medium** - Can't test subsets |
-| `max_time` | double | Unlimited | Stop at simulation time | **Medium** - Can't limit runtime |
-| `timezone` | string | "America/Los_Angeles" | Timezone for ISO timestamps | **Medium** - Can't parse non-Pacific times correctly |
-| `infile_list` | string | (none) | Path to a file listing multiple trace files - progressive loading, so job-store capacity can actually bound memory | **Medium** - Python can only drive single-file (batch) loading; no way to trigger progressive loading from Python |
-| `memory_pressure_fraction` | double | `0.0` (disabled) | Refuse to grow the job store past this fraction of available memory (must be `> 0.0` and `<= 1.0`) | **Low** - no way to enable this check from Python; not enforced by default anyway |
-
-**Run Time Simulation (only if run_time_mode=DISTRIBUTION):**
-
-| Parameter | Type | Default | Purpose | Impact |
-|-----------|------|---------|---------|--------|
-| `run_time_distribution` | string | "normal" | Distribution type | **Low** - Can't customize distribution |
-| `run_time_scale` | double | 1.0 | Scale factor | **Low** - Can't model realistic run times |
-| `run_time_stddev` | double | 0.0 | Standard deviation | **Low** - Can't add variation |
-
-**Queue Implementation (FCFS scheduler only):**
-
-| Parameter | Type | Default | Purpose | Impact |
-|-----------|------|---------|---------|--------|
-| `queue_impl` | string | "circular" | Wait-queue data structure (circular/deque/multimap/block) | **Medium** - Can't select faster/alternate implementations |
-| `block_size` | uint32 | 128 | Block size when queue_impl="block" | **Low** - Can't tune block queue |
-| `wait_queue_capacity` | uint64 | 0 (sized to trace) | Initial capacity when queue_impl="circular" | **Low** - Can't bound memory use |
-| `wait_queue_overflow` | string | "grow" | abort/grow when wait_queue_capacity exceeded | **Low** - Can't test overflow behavior |
-
-**Output Control:**
-
-| Parameter | Type | Default | Purpose | Impact |
-|-----------|------|---------|---------|--------|
-| `outfile` | string | stdout | Output trace file | **High** - Can't set output file from Python |
-| `resource_trace` | string | None | Resource usage trace | **Low** - Can't capture resource timeline |
-| `resource_history_capacity` | uint64 | `0` (= 2x loaded jobs, floored at 4096) | Initial capacity of the resource-history circular buffer | **Low** - Can't tune memory use for long-running/streaming sessions from Python |
-| `msec_output` | bool | False | Millisecond-precision timestamps | **Low** - Can't get sub-second output resolution |
-
-### Also Missing: Simulation Methods (not parameters)
-
-Beyond `Sim_Params` fields, three `Simulation` class methods aren't bound:
-
-| Method | Purpose | Impact |
-|--------|---------|--------|
-| `get_resource_history()` | Return in-memory (time, nodes_in_use, nodes_available) history directly | **Medium** - Must write to CSV via `write_resource_trace()` (also unbound) and re-read, rather than getting data directly in Python |
-| `write_resource_trace(filename)` | Write resource history to a file, independent of `Sim_Params.resource_trace` | **Low** - No way to trigger this from Python at all |
-| `get_trace()` | Access the full `Trace` object (individual job records) | **Medium** - Only `get_trace_size()` (a job count) is exposed; `Trace`/`Job_Record` themselves aren't bound as Python classes, so there's no way to inspect individual submitted jobs from Python |
-
-### Workarounds
-
-**Option 1: Use Protobuf Config File**
-```python
-import dr_evt
-import subprocess
-
-# Create protobuf config with missing parameters - fields go directly
-# at the top level (Simulation_Params' own fields), not wrapped in a
-# "sim_setup { ... }" block
-config = """
-infile: "jobs.csv"
-outfile: "results.csv"
-total_nodes: 1000
-seed: 42
-max_jobs: 5000
-max_time: 86400.0
-timezone: "UTC"
-run_time_mode: "distribution"
-run_time_distribution: "normal"
-run_time_scale: 0.8
-run_time_stddev: 0.1
-backfill_policy: "easy"
-queue_impl: "circular"
-wait_queue_capacity: 10000
-verbose: false
-"""
-
-# Write config file
-with open("sim_config.textproto", "w") as f:
-    f.write(config)
-
-# Call C++ binary with config - the positional trace-file argument is
-# still required even though infile is set inside the config; it
-# always wins over whatever infile is set to, so it must be given on
-# the command line regardless (must match infile's own value here)
-subprocess.run(["./simulator", "jobs.csv", "--config", "sim_config.textproto"])
-```
-
-**Option 2: Call C++ Binary from Python**
-```python
-import subprocess
-import pandas as pd
-
-result = subprocess.run([
-    "./simulator",
-    "jobs.csv",
-    "--total_nodes", "1000",
-    "--seed", "42",
-    "--max_jobs", "5000",
-    "--timezone", "UTC",
-    "--run_time_mode", "distribution",
-    "--run_time_distribution", "normal",
-    "--run_time_scale", "0.8",
-    "--outfile", "results.csv"
-], capture_output=True, text=True)
-
-# Parse results
-df = pd.read_csv("results.csv")
-```
-
-**Option 3: Extend Python Bindings**
-
-To expose missing parameters, edit `python/dr_evt_bindings.cpp`:
-
-```cpp
-py::class_<Sim_Params>(m, "SimParams")
-    .def(py::init<>())
-    // Existing bindings...
-    .def_readwrite("infile", &Sim_Params::m_infile)
-    .def_readwrite("total_nodes", &Sim_Params::m_total_nodes)
-    // ... existing 9 parameters ...
-    
-    // ADD MISSING PARAMETERS:
-    .def_readwrite("seed", &Sim_Params::m_seed)
-    .def_readwrite("max_jobs", &Sim_Params::m_max_jobs)
-    .def_readwrite("max_time", &Sim_Params::m_max_time)
-    .def_readwrite("outfile", &Sim_Params::m_outfile)
-    .def_readwrite("resource_trace", &Sim_Params::m_resource_trace)
-    .def_readwrite("timezone", &Sim_Params::m_timezone)
-    .def_readwrite("run_time_distribution", &Sim_Params::m_run_time_distribution)
-    .def_readwrite("run_time_scale", &Sim_Params::m_run_time_scale)
-    .def_readwrite("run_time_stddev", &Sim_Params::m_run_time_stddev);
-```
-
-Then rebuild:
-```bash
-cd build
-cmake .. -DDR_EVT_BUILD_PYTHON=ON
-make
-cd ../python
-pip install --force-reinstall .
-```
-
-### Impact on Use Cases
-
-| Use Case | Missing Parameters Needed | Workaround |
-|----------|--------------------------|------------|
-| **Reproducible simulations** | `seed` | Use config file or CLI |
-| **Output to file** | `outfile` | Use CLI or call `write_simulated_trace()` |
-| **Test on subset** | `max_jobs`, `max_time` | Preprocess trace file |
-| **Non-Pacific timezones** | `timezone` | Convert timestamps to Pacific time or use epoch |
-| **Realistic run time variation** | `run_time_distribution`, `run_time_scale`, `run_time_stddev` | Set `run_time_mode=DISTRIBUTION` in config file |
-| **Genuine streaming (feeding jobs Python learned about live)** | `append_job()`/`append_jobs()` (methods, not `Sim_Params` fields) | Use `append_job()` for one job or `append_jobs()` with `JobAppendRequest` values for an ordered batch |
-| **Bounding job-store memory across a large trace** | `infile_list` | Use the CLI's `--infile_list` (see [Command-Line Options](../user-guide/command-line.md)) or a protobuf config file instead of the Python API |
-| **Refusing rather than risking memory exhaustion under load** | `memory_pressure_fraction` | Use the CLI's `--check_memory_pressure` or a protobuf config file instead of the Python API |
-
-### Recommendation
-
-For complete control, either:
-1. **Add missing bindings** (10 lines of code in `dr_evt_bindings.cpp`)
-2. **Use protobuf config files** (already fully supported)
-3. **Call C++ binary via subprocess** (simplest for one-off scripts)
+The module exports `legacy_queue_input`, a Boolean indicating whether queue
+arguments use legacy names or numeric IDs.
 
 ## Enumerations
 
-### BackfillPolicy
-
-```python
-dr_evt.BackfillPolicy.NONE          # No backfilling (strict FCFS)
-dr_evt.BackfillPolicy.EASY          # EASY backfilling (default)
-dr_evt.BackfillPolicy.CONSERVATIVE  # Conservative backfilling
-```
-
-### PriorityPolicy
-
-```python
-dr_evt.PriorityPolicy.FCFS              # First-Come-First-Served (default)
-dr_evt.PriorityPolicy.FCFS_CONSERVATIVE # FCFS with conservative backfilling
-dr_evt.PriorityPolicy.SJF               # Shortest Job First
-dr_evt.PriorityPolicy.LJF               # Longest Job First
-```
-
-### RunTimeMode
-
-```python
-dr_evt.RunTimeMode.ACTUAL        # Read actual_run_time from trace (default)
-dr_evt.RunTimeMode.DISTRIBUTION  # Sample from distribution
-dr_evt.RunTimeMode.LIMIT         # Jobs run exactly time_limit (debug only)
-```
-
-## Streaming API
-
-### Job Submission
-
-```python
-# Append and enqueue a genuinely new job. Returns its trace job ID.
-job_id = sim.append_job(10.0, 20, "pbatch", 200.0)
-
-# Append an ordered batch atomically. Returns IDs in request order.
-requests = [
-    dr_evt.JobAppendRequest(20.0, 10, "pbatch", 100.0),
-    dr_evt.JobAppendRequest(25.0, 15, "pbatch", 120.0),
-]
-job_ids = sim.append_jobs(requests)
-```
-
-`append_jobs()` requires non-decreasing `submit_time` values. If any request
-is invalid, the whole batch is rejected and no job is appended.
-
-### Time Advancement
-
-```python
-# Process events up to AND INCLUDING target_time
-sim.advance_to(75.0)
-
-# Process events up to BUT EXCLUDING target_time
-sim.run_until_exclusive(100.0)
-```
-
-**Key Difference:**
-- `advance_to(T)`: Processes all events at time T
-- `run_until_exclusive(T)`: Stops just before time T
-
-Example:
-```python
-# A new job arrives at t=0.
-sim.append_job(0.0, 10, "pbatch", 100.0)
-sim.run_until_exclusive(0.0)  # Job NOT started yet
-sim.advance_to(0.0)  # Job started, resources allocated
-```
-
-## Monitoring API
-
-### Resource Status
-
-```python
-# Current simulation time
-current_time = sim.get_current_time()
-
-# Node usage
-nodes_used = sim.get_nodes_in_use()
-nodes_free = sim.get_available_nodes()
-utilization = nodes_used / params.total_nodes
-```
-
-### Queue Status and Shadow Time
-
-```python
-# Number of jobs waiting
-queue_size = sim.get_active_job_count()
-
-# When will FCFS head start? (reservation time)
-shadow_time = sim.get_fcfs_head_shadow_time()
-estimated_wait = shadow_time - sim.get_current_time() if shadow_time >= 0 else None
-```
-
-`shadow_time` is the FCFS head's earliest reserved start time under the
-scheduler's time-limit model, or `-1` when no job is waiting. It is the
-FCFS/EASY reservation query; it is not an actual-runtime completion forecast.
-
-### Resource-Change Times (Backfill Window)
-
-For one consistent FCFS/EASY reservation snapshot, without running the gRPC
-service, use `get_backfill_window()`:
-
-```python
-window = sim.get_backfill_window()
-print(window.current_time, window.available_nodes, window.shadow_time)
-for release in window.releases:
-    print(release.time, release.nodes_released)
-```
-
-`shadow_time` is the reserved start time for the FCFS queue head, or `-1`
-when no job is waiting. `releases` is the resource-change-time query: each
-entry reports the absolute simulation `time` and summed `nodes_released` at
-that time. Releases use time-limit estimates through the reservation; jobs
-ending together are combined.
-
-### Comprehensive Statistics
-
-```python
-stats = sim.get_statistics()
-
-# Job counts
-print(f"Submitted: {stats.jobs_submitted}")
-print(f"Completed: {stats.jobs_completed}")
-print(f"Running: {stats.jobs_running}")
-print(f"Waiting: {stats.jobs_waiting}")
-
-# Performance metrics
-print(f"Current time: {stats.current_time}")
-print(f"Makespan: {stats.makespan}")
-print(f"Avg wait time: {stats.avg_wait_time}")
-print(f"Avg turnaround: {stats.avg_turnaround_time}")
-
-# Resource metrics
-print(f"Nodes in use: {stats.nodes_in_use}/{stats.total_nodes}")
-print(f"Utilization: {stats.utilization*100:.1f}%")
-```
-
-## Batch Mode API
-
-```python
-# Run entire simulation at once (traditional mode)
-sim = dr_evt.Simulation(params)
-sim.initialize_trace()
-sim.run()  # Processes all jobs
-
-# Get results
-stats = sim.get_statistics()
-sim.write_simulated_trace()  # Writes to configured output file
-sim.print_stats()  # Print to stdout
-```
-
-## Use Cases
-
-### 1. Online Admission Control
-
-```python
-# Check if new job can be admitted
-stats = sim.get_statistics()
-MAX_QUEUE_SIZE = 100
-
-if stats.jobs_waiting > MAX_QUEUE_SIZE:
-    print("REJECT: Queue full")
-elif sim.get_available_nodes() < job.nodes:
-    # Estimate wait time
-    shadow_time = sim.get_fcfs_head_shadow_time()
-    wait = shadow_time - sim.get_current_time()
-    print(f"QUEUED: Estimated wait {wait:.0f}s")
-else:
-    print("ACCEPT: Resources available")
-```
-
-### 2. Policy Comparison
-
-```python
-policies = [
-    dr_evt.BackfillPolicy.NONE,
-    dr_evt.BackfillPolicy.EASY,
-    dr_evt.BackfillPolicy.CONSERVATIVE,
-]
-
-results = {}
-for policy in policies:
-    params.backfill_policy = policy
-    sim = dr_evt.Simulation(params)
-    sim.initialize_trace()
-    sim.run()
-
-    stats = sim.get_statistics()
-    results[policy] = {
-        'makespan': stats.makespan,
-        'avg_wait': stats.avg_wait_time,
-        'utilization': stats.utilization,
-    }
-
-# Find best policy
-best = min(results.items(), key=lambda x: x[1]['avg_wait'])
-print(f"Best policy: {best[0]} (avg wait: {best[1]['avg_wait']:.1f}s)")
-```
-
-### 3. Real-time Dashboard
-
-```python
-import time
-
-while sim.get_active_job_count() > 0 or sim.get_nodes_in_use() > 0:
-    # Advance by 60 seconds
-    current = sim.get_current_time()
-    sim.run_until_inclusive(current + 60)
-
-    stats = sim.get_statistics()
-    print(f"t={stats.current_time:6.0f} | "
-          f"Util: {stats.utilization*100:5.1f}% | "
-          f"Queue: {stats.jobs_waiting:3d} | "
-          f"Running: {stats.jobs_running:3d}")
-
-    time.sleep(0.1)  # Animate
-```
-
-### 4. Custom Scheduler Integration
-
-```python
-# External scheduler decides, DR_EVT executes
-class CustomScheduler:
-    def __init__(self, sim):
-        self.sim = sim
-
-    def schedule_next(self):
-        # Custom scheduling logic
-        job_idx = self.pick_best_job()
-
-        if self.sim.get_available_nodes() >= self.get_job_nodes(job_idx):
-            # Start immediately
-            t = self.sim.get_current_time()
-            self.sim.insert_job(job_idx, t)
-            self.sim.run_until_inclusive(t)
-            return True
-        return False
-
-    def run(self):
-        while self.has_pending_jobs():
-            if not self.schedule_next():
-                # Wait for resources
-                shadow = self.sim.get_fcfs_head_shadow_time()
-                self.sim.run_until_inclusive(shadow)
-```
-
-### 5. What-If Simulation
-
-```python
-# Simulate same workload with different cluster sizes
-cluster_sizes = [50, 100, 200, 500]
-
-results = []
-for nodes in cluster_sizes:
-    params.total_nodes = nodes
-    sim = dr_evt.Simulation(params)
-    sim.initialize_trace()
-    sim.run()
-
-    stats = sim.get_statistics()
-    results.append({
-        'nodes': nodes,
-        'makespan': stats.makespan,
-        'utilization': stats.utilization,
-        'avg_wait': stats.avg_wait_time,
-    })
-
-# Plot results
-import pandas as pd
-df = pd.DataFrame(results)
-print(df)
-```
-
-## Performance
-
-The Python API is a thin wrapper around the C++ implementation:
-
-- **Minimal overhead**: Direct C++ calls via pybind11 (< 1% overhead)
-- **Same algorithm**: Identical verified EASY backfilling
-- **Same results**: Bit-identical output to C++ simulator
-- **Fast**: C++ implementation is 4.8x faster than pure Python reference
-
-Benchmark (100-job workload):
-- C++ simulator: 0.020 seconds
-- Python API: 0.020 seconds (negligible wrapper overhead)
-- Pure Python: 0.054 seconds (2.7x slower)
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-# Build with Python support
-cd build
-cmake .. -DDR_EVT_BUILD_PYTHON=ON
-make
-
-# Run Python tests
-cd ..
-./tests/run_python_tests.sh
-```
-
-Expected output:
-```
-1. Module Import
-  ✓ Version: 1.0.0
-2. Enumerations
-  ✓ BackfillPolicy
-  ✓ PriorityPolicy
-  ✓ RunTimeMode
-...
-Test Results: 16/16 passed
-✅ ALL PYTHON API TESTS PASSED!
-```
-
-## Examples
-
-Complete working examples in `python/`:
-
-- **example_streaming.py**: Online simulation with real-time monitoring
-
-The full Python API test suite lives at `tests/test_python_api.py` (run via
-`tests/run_python_tests.sh` above, and in CI).
-It also executes `python/example_streaming.py` from the repository root, so
-the documented invocation remains covered.
-
-## Troubleshooting
-
-### ModuleNotFoundError: No module named 'dr_evt'
-
-```bash
-# Ensure Python bindings were built
-cd build
-cmake .. -DDR_EVT_BUILD_PYTHON=ON
-make
-
-# Install the module
-cd ../python
-pip install .
-```
-
-### Trace fails to load
-
-```python
-# Must call initialize_trace() before streaming
-sim = dr_evt.Simulation(params)
-sim.initialize_trace()  # <- Required!
-sim.insert_job(0, 0.0)
-```
-
-### Statistics are zero
-
-```python
-# Run simulation first
-sim.initialize_trace()
-sim.run()  # Or use streaming API to process jobs
-stats = sim.get_statistics()  # Now populated
-```
-
-### AttributeError: 'SimParams' object has no attribute 'X'
-
-Some parameters are not yet exposed in Python bindings:
-- Use C++ API directly
-- Or pass via command line to simulator binary
-- Or submit PR to add binding (see Contributing)
-
-## API Reference
-
-Full API documentation: [python/README.md](https://github.com/llnl/dr_evt/blob/main/python/README.md)
-
-CLI options reference: [command-line.md](../user-guide/command-line.md)
-
-## Comparison: Python vs C++ API
-
-| Feature | Python API | C++ API |
-|---------|-----------|---------|
-| Streaming mode | ✅ Full support | ✅ Full support |
-| All scheduling policies | ✅ Yes | ✅ Yes |
-| Real-time monitoring | ✅ Yes | ✅ Yes |
-| Comprehensive statistics | ✅ Yes | ✅ Yes |
-| All config parameters | ⚠️ Most (8/14) | ✅ All (14/14) |
-| Performance | Fast (thin wrapper) | Fastest |
-| Ease of use | High (scripting) | Medium (compiled) |
-| Integration | Easy (import) | Medium (linking) |
-| Best for | Prototyping, analysis | Production, HPC |
-
-## Contributing
-
-To add new Python bindings:
-
-1. Add C++ method to `src/sim/sim.hpp`
-2. Implement in `src/sim/sim.cpp`
-3. Add pybind11 binding in `python/dr_evt_bindings.cpp`:
-   ```cpp
-   .def_readwrite("new_param", &Sim_Params::m_new_param)
-   ```
-4. Add test in `tests/test_python_api.py` (the actual Python API test
-   suite, run via `tests/run_python_tests.sh` and CI)
-5. Document here and in `python/README.md`
-
-## See Also
-
-- [CLI Options](../user-guide/command-line.md) - Complete CLI reference
-- [C++ Streaming API](STREAMING_API.md) - C++ API documentation
-- [Python Examples](https://github.com/llnl/dr_evt/blob/main/python/example_streaming.py) - Working code examples
-- [Python API Details](https://github.com/llnl/dr_evt/blob/main/python/README.md) - Detailed Python reference
-- [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE algorithm descriptions
-
----
-
-**Version:** 1.0.0
-**Status:** Production Ready
-**License:** MIT
+- `RunTimeMode.ACTUAL`, `RunTimeMode.DISTRIBUTION`,
+  `RunTimeMode.LIMIT`
+- `BackfillPolicy.NONE`, `BackfillPolicy.EASY`,
+  `BackfillPolicy.CONSERVATIVE`
+- `PriorityPolicy.FCFS`, `PriorityPolicy.FCFS_CONSERVATIVE`,
+  `PriorityPolicy.SJF`, `PriorityPolicy.LJF`
+
+Their scheduling semantics are documented in
+[Command-Line Options](../user-guide/command-line.md) and
+[Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md).
+
+## Simulation methods
+
+| Method | Result |
+|---|---|
+| `run()` | Run a configured batch trace to completion. |
+| `initialize_trace(max_jobs=0)` | Load the configured trace and return the number loaded. |
+| `append_job(submit_time, num_nodes, queue, limit_time)` | Append and enqueue one live job; return its ID. |
+| `append_jobs(requests)` | Atomically append and enqueue ordered `JobAppendRequest` values; return their IDs. |
+| `advance_to(target_time)` | Process events at or before the target. |
+| `run_until_exclusive(target_time)` | Process events strictly before the target. |
+| `get_current_time()` | Return current simulation time. |
+| `get_nodes_in_use()` | Return allocated nodes. |
+| `get_available_nodes()` | Return free nodes. |
+| `get_active_job_count()` | Return waiting jobs. |
+| `get_fcfs_head_shadow_time()` | Return the FCFS-head reservation time, or `-1`. |
+| `get_backfill_window()` | Return the current FCFS/EASY reservation snapshot. |
+| `get_statistics()` | Return a `Statistics` snapshot. |
+| `write_simulated_trace()` | Write the configured job-schedule output. |
+| `print_stats()` | Print summary statistics. |
+| `get_trace_size()` | Return the number of records currently in the job store. |
+
+Detailed time-advancement and job-submission contracts are defined in the
+[Streaming API](STREAMING_API.md).
+
+## Supporting types
+
+`JobAppendRequest(submit_time, num_nodes, queue, limit_time)` represents one
+entry passed to `append_jobs()`.
+
+`BackfillWindow` exposes `current_time`, `available_nodes`,
+`shadow_time`, and an ordered list of `ResourceRelease` values. Each release
+contains `time` and `nodes_released`.
+
+`Statistics` exposes:
+
+- `jobs_submitted`, `jobs_completed`, `jobs_running`, and
+  `jobs_waiting`;
+- `current_time`, `total_nodes`, `nodes_in_use`, and
+  `nodes_available`; and
+- `utilization`, `avg_wait_time`, `avg_turnaround_time`, and
+  `makespan`.
+
+Metric definitions are in
+[Output Trace Files](../user-guide/output-traces.md#cli-summary).
+
+## Testing and source
+
+The binding is defined in
+[`python/dr_evt_bindings.cpp`](https://github.com/LLNL/dr_evt/blob/main/python/dr_evt_bindings.cpp).
+Python test commands and status are maintained in the
+[Python API tests section](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#python-api-tests)
+of the Test Suite README. The test implementation is
+[`tests/test_python_api.py`](https://github.com/LLNL/dr_evt/blob/main/tests/test_python_api.py).
 
 </div>

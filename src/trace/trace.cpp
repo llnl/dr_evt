@@ -29,10 +29,9 @@ BasicTrace<Policy>::BasicTrace(const std::string &fname)
       m_job_store_capacity_resolved(false),
       m_job_store_overflow(CircularOverflowPolicy::GROW),
       m_job_flush_interval(0), m_departures_since_job_flush(0),
-      m_replay_jobs_enqueued(0),
-      m_completed_count(0),
-      m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
-      m_default_timezone("+00:00"), m_resource_history_capacity(0),
+      m_replay_jobs_enqueued(0), m_completed_count(0), m_wait_time_sum(0.0),
+      m_turnaround_time_sum(0.0), m_makespan(0.0), m_default_timezone("+00:00"),
+      m_resource_history_capacity(0),
       m_resource_history_capacity_resolved(false),
       m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)),
       m_resource_trace_msec(false), m_simulated_trace_msec(false),
@@ -50,10 +49,9 @@ BasicTrace<Policy>::BasicTrace(const std::string &fname,
       m_job_store_capacity(0), m_job_store_capacity_resolved(false),
       m_job_store_overflow(CircularOverflowPolicy::GROW),
       m_job_flush_interval(0), m_departures_since_job_flush(0),
-      m_replay_jobs_enqueued(0),
-      m_completed_count(0),
-      m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
-      m_default_timezone("+00:00"), m_resource_history_capacity(0),
+      m_replay_jobs_enqueued(0), m_completed_count(0), m_wait_time_sum(0.0),
+      m_turnaround_time_sum(0.0), m_makespan(0.0), m_default_timezone("+00:00"),
+      m_resource_history_capacity(0),
       m_resource_history_capacity_resolved(false),
       m_resource_trace_total_nodes(static_cast<num_nodes_t>(0u)),
       m_resource_trace_msec(false), m_simulated_trace_msec(false),
@@ -74,9 +72,8 @@ BasicTrace<Policy>::BasicTrace(const std::string &fname,
       m_job_store_capacity_resolved(false),
       m_job_store_overflow(CircularOverflowPolicy::GROW),
       m_job_flush_interval(0), m_departures_since_job_flush(0),
-      m_replay_jobs_enqueued(0),
-      m_completed_count(0),
-      m_wait_time_sum(0.0), m_turnaround_time_sum(0.0), m_makespan(0.0),
+      m_replay_jobs_enqueued(0), m_completed_count(0), m_wait_time_sum(0.0),
+      m_turnaround_time_sum(0.0), m_makespan(0.0),
       m_default_timezone("+00:00"), // Default to UTC
       m_resource_history_capacity(0),
       m_resource_history_capacity_resolved(false),
@@ -826,9 +823,8 @@ void BasicTrace<Policy>::maybe_flush_completed_jobs(
     return;
   }
   const size_t interval = effective_job_flush_interval();
-  if (departures_processed >= interval -
-                                  std::min(interval,
-                                           m_departures_since_job_flush)) {
+  if (departures_processed >=
+      interval - std::min(interval, m_departures_since_job_flush)) {
     m_departures_since_job_flush = interval;
   } else {
     m_departures_since_job_flush += departures_processed;
