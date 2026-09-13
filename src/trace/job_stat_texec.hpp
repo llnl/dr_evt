@@ -38,13 +38,13 @@ public:
    *  the quartile, and the distribution shows how long jobs actually ran
    *  compared to the timeout set by users.
    */
-  using tbins_t = typename std::array<num_jobs_t, N>;
+  using tbins_t = std::array<num_jobs_t, N>;
 
   /**
    *  Execution time distribution for each resource set, i.e., the number of
    *  nodes.
    */
-  using tbins_by_nnodes_t = typename std::map<num_nodes_t, tbins_t>;
+  using tbins_by_nnodes_t = std::map<num_nodes_t, tbins_t>;
 
   struct timeout_slot {
     /// Jobs accumulated for this requested-time-limit slot.

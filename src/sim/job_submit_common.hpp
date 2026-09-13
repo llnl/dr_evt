@@ -19,7 +19,7 @@ namespace dr_evt {
 using submit_hour_t = std::vector<num_jobs_t>;
 
 /// Samples for all 168 hour-of-week slots, indexed by day and hour.
-using submit_week_t = typename std::array<submit_hour_t, 7 * 24>;
+using submit_week_t = std::array<submit_hour_t, 7 * 24>;
 
 /**@}*/
 } // end of namespace dr_evt

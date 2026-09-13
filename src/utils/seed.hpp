@@ -13,38 +13,37 @@
  */
 
 #include <array>
+#include <concepts>
+#include <cmath>
 #include <functional>
-#include <math.h>
 #include <random>
 #include <type_traits>
 #include <unordered_set>
 #include <vector>
 
-namespace std {
-// hasher for std::array
+namespace dr_evt {
+/** \addtogroup dr_evt_rng
+ *  @{ */
+
+/** Hash an array without adding an unsupported specialization to namespace
+ * std. */
 template <typename T, size_t N>
-/** @brief Hash specialization used to store generated seed keys. */
-struct hash<array<T, N>> {
-  using arg_t = array<T, N>; ///< Array type accepted by operator()().
-  using result_t = size_t;   ///< Hash result type.
+struct array_hash {
+  using arg_t = std::array<T, N>; ///< Array type accepted by operator()().
+  using result_t = size_t;        ///< Hash result type.
 
   /** @brief Combine hashes of all array elements.
    * @param[in] a Array whose elements are hashed.
    * @return Combined hash value as result_t. */
   result_t operator()(const arg_t &a) const {
-    hash<T> hasher;
+    std::hash<T> hasher;
     result_t h = 0ul;
-    for (size_t i = 0ul; i < N; ++i) {
-      h = h * 31 + hasher(a[i]);
+    for (const auto &value : a) {
+      h = h * 31 + hasher(value);
     }
     return h;
   }
 };
-} // namespace std
-
-namespace dr_evt {
-/** \addtogroup dr_evt_rng
- *  @{ */
 
 /**
  * @brief Sequence of 32-bit-compatible words accepted by `std::seed_seq`.
@@ -62,19 +61,15 @@ namespace dr_evt {
  */
 using seed_seq_param_t = std::vector<std::seed_seq::result_type>;
 
-// https://stackoverflow.com/questions/36568050/sfinae-not-happening-with-stdunderlying-type
-template <typename T, bool = std::is_enum<T>::value>
-/** @brief Select an enum's underlying type, or the type itself otherwise. */
-struct underlying_type_SFINAE {
-  using type = typename std::underlying_type<T>::type; ///< Enum's underlying
-                                                       ///< integral type.
-};
-
+/** Type accepted by make_seed_seq_input(). Enumerations are hashed through
+ * their underlying integer type. */
 template <typename T>
-/** @brief Non-enum specialization of underlying_type_SFINAE. */
-struct underlying_type_SFINAE<T, false> {
-  using type = T; ///< Original non-enumeration type.
-};
+concept seed_hashable =
+    std::is_enum_v<std::remove_cvref_t<T>> ||
+    requires(const std::remove_cvref_t<T> &value) {
+      { std::hash<std::remove_cvref_t<T>>{}(value) } ->
+          std::convertible_to<size_t>;
+    };
 
 /**
  * @brief Convert one hashable value into seed-sequence input words.
@@ -91,16 +86,19 @@ struct underlying_type_SFINAE<T, false> {
  * @param[in] v Value to hash.
  * @return Seed words containing the complete hash representation.
  */
-template <typename T> seed_seq_param_t make_seed_seq_input(const T &v) {
+template <seed_hashable T>
+seed_seq_param_t make_seed_seq_input(const T &v) {
   using item_type = std::seed_seq::result_type; // at least 32 bit
+  using value_type = std::remove_cvref_t<T>;
 
-  using U = typename std::conditional<std::is_enum<T>::value,
-                                      typename underlying_type_SFINAE<T>::type,
-                                      T>::type;
-  typename std::hash<U> h;
-
-  // const auto hv = h(static_cast<const U>(v)); // 64-bit type (i.e. size_t)
-  const auto hv = h(static_cast<U>(v)); // 64-bit type (i.e. size_t)
+  const auto hv = [&] {
+    if constexpr (std::is_enum_v<value_type>) {
+      using underlying_type = std::underlying_type_t<value_type>;
+      return std::hash<underlying_type>{}(static_cast<underlying_type>(v));
+    } else {
+      return std::hash<value_type>{}(v);
+    }
+  }();
 
   // NOTE: This conditional is only needed if seed_seq trims a 64-bit integer
   // input element into a 32-bit one loosing the information before processing
@@ -128,8 +126,8 @@ template <typename T> seed_seq_param_t make_seed_seq_input(const T &v) {
  * @param[in] args Remaining values to hash.
  * @return Concatenated seed words for all supplied values.
  */
-template <typename T, typename... Args>
-seed_seq_param_t make_seed_seq_input(T first, const Args &...args) {
+template <seed_hashable T, seed_hashable... Args>
+seed_seq_param_t make_seed_seq_input(const T &first, const Args &...args) {
   seed_seq_param_t res = make_seed_seq_input(first);
   seed_seq_param_t res2 = make_seed_seq_input(args...);
   res.insert(res.end(), res2.begin(), res2.end());
@@ -146,7 +144,7 @@ seed_seq_param_t make_seed_seq_input(T first, const Args &...args) {
 template <size_t N>
 inline std::array<unsigned, N> compute_key(const seed_seq_param_t &p) {
   std::seed_seq ss(p.begin(), p.end());
-  typename std::array<unsigned, N> gen;
+  std::array<unsigned, N> gen;
   ss.generate(gen.begin(), gen.end());
   return gen;
 }
@@ -183,14 +181,14 @@ gen_unique_seed_seq_params(const size_t num,
     return false;
   }
 
-  std::unordered_set<key_t> seed_set;
+  std::unordered_set<key_t, array_hash<unsigned, N>> seed_set;
   uint32_t variation = 0u;
   do {
     seed_seq_param_t p;
     p.push_back(variation);
     p.insert(p.end(), common_param.begin(), common_param.end());
     const auto s = compute_key<N>(p);
-    if (seed_set.count(s) == 0ul) {
+    if (!seed_set.contains(s)) {
       seed_set.insert(s);
       unique_params.emplace_back(p);
     }

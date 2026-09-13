@@ -27,11 +27,7 @@
 #error "no config"
 #endif
 
-#if defined(DR_EVT_HAS_STD_FILESYSTEM)
 #include <filesystem>
-#else
-#include <boost/filesystem.hpp>
-#endif
 
 namespace dr_evt {
 /** \addtogroup dr_evt_utils

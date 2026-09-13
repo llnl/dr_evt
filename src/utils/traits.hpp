@@ -52,10 +52,6 @@ concept raw_binary_vector =
 template <typename T>
 concept raw_binary_serializable = raw_binary_scalar<T> || raw_binary_vector<T>;
 
-template <typename T>
-struct is_bool : std::bool_constant<std::same_as<std::remove_cvref_t<T>, bool>> {
-};
-
 /**@}*/
 } // end of namespace dr_evt
 #endif // DR_EVT_UTILS_TRAITS_HPP

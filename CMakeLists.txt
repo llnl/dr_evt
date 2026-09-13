@@ -281,12 +281,6 @@ if (NOT DL_LIBRARY)
   endif (DL_LIBRARY)
 endif ()
 
-if (DR_EVT_HAS_STD_FILESYSTEM)
-  set(LIB_FILESYSTEM "stdc++fs")
-else ()
-  set(LIB_FILESYSTEM ${Boost_LIBRARIES})
-endif ()
-
 # Optional dependencies
 
 if (DR_EVT_WITH_SER20)
@@ -407,8 +401,8 @@ target_include_directories(sim-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(sim-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
-set_target_properties(sim-bin PROPERTIES OUTPUT_NAME simulator ${Boost_LIBRARIES})
+target_link_libraries(sim-bin PRIVATE dr_evt)
+set_target_properties(sim-bin PROPERTIES OUTPUT_NAME simulator)
 set_target_properties(sim-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 list(APPEND DR_EVT_EXEC_TARGETS sim-bin)
@@ -419,7 +413,7 @@ target_include_directories(trace-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(trace-bin PRIVATE dr_evt ${LIB_FILESYSTEM} ${Boost_LIBRARIES})
+target_link_libraries(trace-bin PRIVATE dr_evt)
 set_target_properties(trace-bin PROPERTIES OUTPUT_NAME tracer)
 set_target_properties(trace-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -433,7 +427,7 @@ if (DR_EVT_HAS_GRPC)
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
   target_link_libraries(dr_evt_server-bin PRIVATE
-    dr_evt dr_evt_service_proto ${LIB_FILESYSTEM} ${Boost_LIBRARIES})
+    dr_evt dr_evt_service_proto)
   set_target_properties(dr_evt_server-bin PROPERTIES OUTPUT_NAME dr_evt_server)
   set_target_properties(dr_evt_server-bin PROPERTIES CMAKE_INSTALL_RPATH
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -498,7 +492,7 @@ target_include_directories(t_state_rngen-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(t_state_rngen-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(t_state_rngen-bin PRIVATE dr_evt)
 set_target_properties(t_state_rngen-bin PROPERTIES OUTPUT_NAME t_state_rngen)
 set_target_properties(t_state_rngen-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -512,7 +506,7 @@ if (DR_EVT_HAS_SER20)
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-  target_link_libraries(t_state_ser20-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+  target_link_libraries(t_state_ser20-bin PRIVATE dr_evt)
   set_target_properties(t_state_ser20-bin PROPERTIES OUTPUT_NAME t_state_ser20)
   set_target_properties(t_state_ser20-bin PROPERTIES CMAKE_INSTALL_RPATH
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -528,7 +522,7 @@ target_include_directories(t_state-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(t_state-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(t_state-bin PRIVATE dr_evt)
 set_target_properties(t_state-bin PROPERTIES OUTPUT_NAME t_state)
 set_target_properties(t_state-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -542,7 +536,7 @@ target_include_directories(t_rngen-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(t_rngen-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(t_rngen-bin PRIVATE dr_evt)
 set_target_properties(t_rngen-bin PROPERTIES OUTPUT_NAME t_rngen)
 set_target_properties(t_rngen-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -560,7 +554,7 @@ target_include_directories(test_append_job_api-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(test_append_job_api-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_append_job_api-bin PRIVATE dr_evt)
 set_target_properties(test_append_job_api-bin PROPERTIES OUTPUT_NAME test_append_job_api)
 set_target_properties(test_append_job_api-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -574,7 +568,7 @@ target_include_directories(test_pcon_trace-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(test_pcon_trace-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_pcon_trace-bin PRIVATE dr_evt)
 set_target_properties(test_pcon_trace-bin PROPERTIES OUTPUT_NAME test_pcon_trace)
 set_target_properties(test_pcon_trace-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -588,7 +582,7 @@ target_include_directories(test_replay_reclamation-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(test_replay_reclamation-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_replay_reclamation-bin PRIVATE dr_evt)
 set_target_properties(test_replay_reclamation-bin PROPERTIES
   OUTPUT_NAME test_replay_reclamation
   CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -633,7 +627,7 @@ target_include_directories(test_progressive_load-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(test_progressive_load-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_progressive_load-bin PRIVATE dr_evt)
 set_target_properties(test_progressive_load-bin PROPERTIES OUTPUT_NAME test_progressive_load)
 set_target_properties(test_progressive_load-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -647,7 +641,7 @@ target_include_directories(test_queue_input-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
-target_link_libraries(test_queue_input-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_queue_input-bin PRIVATE dr_evt)
 set_target_properties(test_queue_input-bin PROPERTIES OUTPUT_NAME test_queue_input)
 set_target_properties(test_queue_input-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -662,7 +656,7 @@ target_include_directories(test_batch_vs_streaming-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(test_batch_vs_streaming-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_batch_vs_streaming-bin PRIVATE dr_evt)
 set_target_properties(test_batch_vs_streaming-bin PROPERTIES OUTPUT_NAME test_batch_vs_streaming)
 set_target_properties(test_batch_vs_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -677,7 +671,7 @@ target_include_directories(test_block_queue-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>)
 
-target_link_libraries(test_block_queue-bin PRIVATE dr_evt ${LIB_FILESYSTEM})
+target_link_libraries(test_block_queue-bin PRIVATE dr_evt)
 set_target_properties(test_block_queue-bin PROPERTIES OUTPUT_NAME test_block_queue)
 set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
                       "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
@@ -697,7 +691,7 @@ if(MPI_CXX_FOUND)
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}>
     ${MPI_CXX_INCLUDE_DIRS})
 
-  target_link_libraries(test_mpi_streaming-bin PRIVATE dr_evt ${LIB_FILESYSTEM} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(test_mpi_streaming-bin PRIVATE dr_evt ${MPI_CXX_LIBRARIES})
   set_target_properties(test_mpi_streaming-bin PROPERTIES OUTPUT_NAME test_mpi_streaming)
   set_target_properties(test_mpi_streaming-bin PROPERTIES CMAKE_INSTALL_RPATH
                         "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")

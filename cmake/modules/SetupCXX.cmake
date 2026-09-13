@@ -2,7 +2,6 @@
 # custom flags. <Tom's skeptical face>
 
 include(CheckCXXCompilerFlag)
-include(CheckIncludeFileCXX)
 
 # MACRO DR_EVT_CHECK_AND_APPEND_FLAG
 #
@@ -111,20 +110,6 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   dr_evt_check_and_append_flag(CMAKE_CXX_FLAGS -diag-disable=2196 -wd1011 -wd1875 -diag-disable=11074 -diag-disable=11076  ${GCC_INTEROP})
 
 endif ()
-
-
-################################################################
-# Check if std::filesystem is available
-################################################################
-try_compile(DR_EVT_HAS_STD_FILESYSTEM "${CMAKE_BINARY_DIR}/temp"
-            "${CMAKE_SOURCE_DIR}/cmake/tests/has_filesystem.cpp"
-            CMAKE_FLAGS ${CMAKE_CXX_FLAGS}
-            LINK_LIBRARIES stdc++fs)
-if (DR_EVT_HAS_STD_FILESYSTEM)
-  message(STATUS "Compiler has std::filesystem support")
-else ()
-  message(STATUS "Compiler does not have std::filesystem support. Using boost::filesystem")
-endif (DR_EVT_HAS_STD_FILESYSTEM)
 
 
 ################################################################

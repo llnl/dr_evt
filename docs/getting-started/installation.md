@@ -6,7 +6,9 @@
  + **Platforms**: Linux-based systems (macOS may work but not officially supported)
  + **C++ compiler**: C++20 concepts support (GCC 10+, Clang 13+, or newer)
  + **CMake**: 3.24 or later
- + **Boost**: Components required: `regex`, `filesystem`, `system`, `program_options`, `serialization`, `container`, `multi_index`, `circular_buffer`
+ + **Boost**: Compiled components required: `program_options` and
+   `serialization`; header-only APIs used: `graph`, `multi_index`, and
+   `circular_buffer`
    - Tested with Boost 1.70+
    - Install: `apt-get install libboost-all-dev` (Ubuntu/Debian) or `brew install boost` (macOS)
  + **Ser20**: RNG-state serialization; an installed package is used when available, otherwise CMake uses `external/ser20` or fetches the pinned release

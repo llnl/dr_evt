@@ -62,7 +62,7 @@ if (EXISTS "${CMAKE_BINARY_DIR}/_deps/boost-build")
     unset(Boost_LIBRARY_DIRS)
     unset(Boost_LIBRARIES CACHE)
     unset(Boost_LIBRARIES)
-    foreach(DR_EVT_BOOST_COMPONENT regex filesystem system program_options serialization container)
+    foreach(DR_EVT_BOOST_COMPONENT program_options serialization)
         string(TOUPPER "${DR_EVT_BOOST_COMPONENT}" DR_EVT_BOOST_COMPONENT_UPPER)
         unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_FOUND CACHE)
         unset(Boost_${DR_EVT_BOOST_COMPONENT_UPPER}_FOUND)
@@ -119,12 +119,8 @@ endforeach()
 list(REMOVE_DUPLICATES DR_EVT_BOOST_INCLUDE_HINTS)
 list(REMOVE_DUPLICATES DR_EVT_BOOST_LIBRARY_HINTS)
 set(DR_EVT_BOOST_COMPONENTS
-    regex
-    filesystem
-    system
     program_options
-    serialization
-    container)
+    serialization)
 
 # Prefer a modern exported Boost package when one is available.
 find_package(Boost CONFIG QUIET COMPONENTS ${DR_EVT_BOOST_COMPONENTS}
@@ -210,7 +206,8 @@ if(NOT Boost_FOUND)
     endif()
     unset(DR_EVT_BOOST_FETCHCONTENT_SOURCE_DIR)
 
-    set(BOOST_INCLUDE_LIBRARIES regex filesystem system program_options serialization container multi_index circular_buffer)
+    set(BOOST_INCLUDE_LIBRARIES
+        program_options serialization graph multi_index circular_buffer)
     set(BOOST_ENABLE_CMAKE ON)
 
     # Suppress compiler warnings from third-party Boost code
@@ -239,10 +236,8 @@ if(NOT Boost_FOUND)
 
     # Boost CMake automatically creates targets with Boost:: prefix
     set(Boost_LIBRARIES
-        Boost::regex
-        Boost::filesystem
-        Boost::system
-        Boost::program_options)
+        Boost::program_options
+        Boost::serialization)
     set(Boost_LIBRARIES "${Boost_LIBRARIES}"
         CACHE STRING "Boost libraries" FORCE)
     set(DR_EVT_BOOST_FETCHCONTENT ON)
@@ -257,10 +252,8 @@ else()
 
     # Set Boost_LIBRARIES for compatibility
     set(Boost_LIBRARIES
-        Boost::regex
-        Boost::filesystem
-        Boost::system
-        Boost::program_options)
+        Boost::program_options
+        Boost::serialization)
 
     message(STATUS "Boost imported targets: ${Boost_LIBRARIES}")
 endif()

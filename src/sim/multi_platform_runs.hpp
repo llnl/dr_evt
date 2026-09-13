@@ -33,11 +33,11 @@ public:
   /// Execution-time value type.
   using texec_t = double;
   /// One execution-time sample across every platform.
-  using sample_t = typename std::array<texec_t, N>;
+  using sample_t = std::array<texec_t, N>;
   /// All execution-time samples.
-  using data_t = typename std::vector<sample_t>;
+  using data_t = std::vector<sample_t>;
   /// Names of the N platform columns.
-  using header_t = typename std::array<std::string, N>;
+  using header_t = std::array<std::string, N>;
 
 protected:
   /// Loaded execution-time samples.
