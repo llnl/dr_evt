@@ -1,0 +1,120 @@
+kind	season	job_window	time_window	script	prerequisite
+capacity	FY2021-H1			jobs/capacity/capacity-FY2021-H1.slurm	
+baseline	FY2021-H1			jobs/baseline/baseline-FY2021-H1.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	16	unlimited	jobs/easypower/easypower-FY2021-H1-n16-tunlimited.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	16	1h	jobs/easypower/easypower-FY2021-H1-n16-t1h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	16	6h	jobs/easypower/easypower-FY2021-H1-n16-t6h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	32	unlimited	jobs/easypower/easypower-FY2021-H1-n32-tunlimited.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	32	1h	jobs/easypower/easypower-FY2021-H1-n32-t1h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	32	6h	jobs/easypower/easypower-FY2021-H1-n32-t6h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	64	unlimited	jobs/easypower/easypower-FY2021-H1-n64-tunlimited.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	64	1h	jobs/easypower/easypower-FY2021-H1-n64-t1h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	64	6h	jobs/easypower/easypower-FY2021-H1-n64-t6h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	128	unlimited	jobs/easypower/easypower-FY2021-H1-n128-tunlimited.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	128	1h	jobs/easypower/easypower-FY2021-H1-n128-t1h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	128	6h	jobs/easypower/easypower-FY2021-H1-n128-t6h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	256	unlimited	jobs/easypower/easypower-FY2021-H1-n256-tunlimited.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	256	1h	jobs/easypower/easypower-FY2021-H1-n256-t1h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+easypower	FY2021-H1	256	6h	jobs/easypower/easypower-FY2021-H1-n256-t6h.slurm	jobs/capacity/capacity-FY2021-H1.slurm
+capacity	FY2021-H2			jobs/capacity/capacity-FY2021-H2.slurm	
+baseline	FY2021-H2			jobs/baseline/baseline-FY2021-H2.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	16	unlimited	jobs/easypower/easypower-FY2021-H2-n16-tunlimited.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	16	1h	jobs/easypower/easypower-FY2021-H2-n16-t1h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	16	6h	jobs/easypower/easypower-FY2021-H2-n16-t6h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	32	unlimited	jobs/easypower/easypower-FY2021-H2-n32-tunlimited.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	32	1h	jobs/easypower/easypower-FY2021-H2-n32-t1h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	32	6h	jobs/easypower/easypower-FY2021-H2-n32-t6h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	64	unlimited	jobs/easypower/easypower-FY2021-H2-n64-tunlimited.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	64	1h	jobs/easypower/easypower-FY2021-H2-n64-t1h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	64	6h	jobs/easypower/easypower-FY2021-H2-n64-t6h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	128	unlimited	jobs/easypower/easypower-FY2021-H2-n128-tunlimited.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	128	1h	jobs/easypower/easypower-FY2021-H2-n128-t1h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	128	6h	jobs/easypower/easypower-FY2021-H2-n128-t6h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	256	unlimited	jobs/easypower/easypower-FY2021-H2-n256-tunlimited.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	256	1h	jobs/easypower/easypower-FY2021-H2-n256-t1h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+easypower	FY2021-H2	256	6h	jobs/easypower/easypower-FY2021-H2-n256-t6h.slurm	jobs/capacity/capacity-FY2021-H2.slurm
+capacity	FY2022-H1			jobs/capacity/capacity-FY2022-H1.slurm	
+baseline	FY2022-H1			jobs/baseline/baseline-FY2022-H1.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	16	unlimited	jobs/easypower/easypower-FY2022-H1-n16-tunlimited.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	16	1h	jobs/easypower/easypower-FY2022-H1-n16-t1h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	16	6h	jobs/easypower/easypower-FY2022-H1-n16-t6h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	32	unlimited	jobs/easypower/easypower-FY2022-H1-n32-tunlimited.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	32	1h	jobs/easypower/easypower-FY2022-H1-n32-t1h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	32	6h	jobs/easypower/easypower-FY2022-H1-n32-t6h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	64	unlimited	jobs/easypower/easypower-FY2022-H1-n64-tunlimited.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	64	1h	jobs/easypower/easypower-FY2022-H1-n64-t1h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	64	6h	jobs/easypower/easypower-FY2022-H1-n64-t6h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	128	unlimited	jobs/easypower/easypower-FY2022-H1-n128-tunlimited.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	128	1h	jobs/easypower/easypower-FY2022-H1-n128-t1h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	128	6h	jobs/easypower/easypower-FY2022-H1-n128-t6h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	256	unlimited	jobs/easypower/easypower-FY2022-H1-n256-tunlimited.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	256	1h	jobs/easypower/easypower-FY2022-H1-n256-t1h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+easypower	FY2022-H1	256	6h	jobs/easypower/easypower-FY2022-H1-n256-t6h.slurm	jobs/capacity/capacity-FY2022-H1.slurm
+capacity	FY2022-H2			jobs/capacity/capacity-FY2022-H2.slurm	
+baseline	FY2022-H2			jobs/baseline/baseline-FY2022-H2.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	16	unlimited	jobs/easypower/easypower-FY2022-H2-n16-tunlimited.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	16	1h	jobs/easypower/easypower-FY2022-H2-n16-t1h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	16	6h	jobs/easypower/easypower-FY2022-H2-n16-t6h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	32	unlimited	jobs/easypower/easypower-FY2022-H2-n32-tunlimited.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	32	1h	jobs/easypower/easypower-FY2022-H2-n32-t1h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	32	6h	jobs/easypower/easypower-FY2022-H2-n32-t6h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	64	unlimited	jobs/easypower/easypower-FY2022-H2-n64-tunlimited.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	64	1h	jobs/easypower/easypower-FY2022-H2-n64-t1h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	64	6h	jobs/easypower/easypower-FY2022-H2-n64-t6h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	128	unlimited	jobs/easypower/easypower-FY2022-H2-n128-tunlimited.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	128	1h	jobs/easypower/easypower-FY2022-H2-n128-t1h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	128	6h	jobs/easypower/easypower-FY2022-H2-n128-t6h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	256	unlimited	jobs/easypower/easypower-FY2022-H2-n256-tunlimited.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	256	1h	jobs/easypower/easypower-FY2022-H2-n256-t1h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+easypower	FY2022-H2	256	6h	jobs/easypower/easypower-FY2022-H2-n256-t6h.slurm	jobs/capacity/capacity-FY2022-H2.slurm
+capacity	FY2023-H1			jobs/capacity/capacity-FY2023-H1.slurm	
+baseline	FY2023-H1			jobs/baseline/baseline-FY2023-H1.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	16	unlimited	jobs/easypower/easypower-FY2023-H1-n16-tunlimited.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	16	1h	jobs/easypower/easypower-FY2023-H1-n16-t1h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	16	6h	jobs/easypower/easypower-FY2023-H1-n16-t6h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	32	unlimited	jobs/easypower/easypower-FY2023-H1-n32-tunlimited.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	32	1h	jobs/easypower/easypower-FY2023-H1-n32-t1h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	32	6h	jobs/easypower/easypower-FY2023-H1-n32-t6h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	64	unlimited	jobs/easypower/easypower-FY2023-H1-n64-tunlimited.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	64	1h	jobs/easypower/easypower-FY2023-H1-n64-t1h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	64	6h	jobs/easypower/easypower-FY2023-H1-n64-t6h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	128	unlimited	jobs/easypower/easypower-FY2023-H1-n128-tunlimited.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	128	1h	jobs/easypower/easypower-FY2023-H1-n128-t1h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	128	6h	jobs/easypower/easypower-FY2023-H1-n128-t6h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	256	unlimited	jobs/easypower/easypower-FY2023-H1-n256-tunlimited.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	256	1h	jobs/easypower/easypower-FY2023-H1-n256-t1h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+easypower	FY2023-H1	256	6h	jobs/easypower/easypower-FY2023-H1-n256-t6h.slurm	jobs/capacity/capacity-FY2023-H1.slurm
+capacity	FY2023-H2			jobs/capacity/capacity-FY2023-H2.slurm	
+baseline	FY2023-H2			jobs/baseline/baseline-FY2023-H2.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	16	unlimited	jobs/easypower/easypower-FY2023-H2-n16-tunlimited.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	16	1h	jobs/easypower/easypower-FY2023-H2-n16-t1h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	16	6h	jobs/easypower/easypower-FY2023-H2-n16-t6h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	32	unlimited	jobs/easypower/easypower-FY2023-H2-n32-tunlimited.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	32	1h	jobs/easypower/easypower-FY2023-H2-n32-t1h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	32	6h	jobs/easypower/easypower-FY2023-H2-n32-t6h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	64	unlimited	jobs/easypower/easypower-FY2023-H2-n64-tunlimited.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	64	1h	jobs/easypower/easypower-FY2023-H2-n64-t1h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	64	6h	jobs/easypower/easypower-FY2023-H2-n64-t6h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	128	unlimited	jobs/easypower/easypower-FY2023-H2-n128-tunlimited.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	128	1h	jobs/easypower/easypower-FY2023-H2-n128-t1h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	128	6h	jobs/easypower/easypower-FY2023-H2-n128-t6h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	256	unlimited	jobs/easypower/easypower-FY2023-H2-n256-tunlimited.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	256	1h	jobs/easypower/easypower-FY2023-H2-n256-t1h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+easypower	FY2023-H2	256	6h	jobs/easypower/easypower-FY2023-H2-n256-t6h.slurm	jobs/capacity/capacity-FY2023-H2.slurm
+capacity	FY2024-H1			jobs/capacity/capacity-FY2024-H1.slurm	
+baseline	FY2024-H1			jobs/baseline/baseline-FY2024-H1.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	16	unlimited	jobs/easypower/easypower-FY2024-H1-n16-tunlimited.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	16	1h	jobs/easypower/easypower-FY2024-H1-n16-t1h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	16	6h	jobs/easypower/easypower-FY2024-H1-n16-t6h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	32	unlimited	jobs/easypower/easypower-FY2024-H1-n32-tunlimited.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	32	1h	jobs/easypower/easypower-FY2024-H1-n32-t1h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	32	6h	jobs/easypower/easypower-FY2024-H1-n32-t6h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	64	unlimited	jobs/easypower/easypower-FY2024-H1-n64-tunlimited.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	64	1h	jobs/easypower/easypower-FY2024-H1-n64-t1h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	64	6h	jobs/easypower/easypower-FY2024-H1-n64-t6h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	128	unlimited	jobs/easypower/easypower-FY2024-H1-n128-tunlimited.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	128	1h	jobs/easypower/easypower-FY2024-H1-n128-t1h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	128	6h	jobs/easypower/easypower-FY2024-H1-n128-t6h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	256	unlimited	jobs/easypower/easypower-FY2024-H1-n256-tunlimited.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	256	1h	jobs/easypower/easypower-FY2024-H1-n256-t1h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
+easypower	FY2024-H1	256	6h	jobs/easypower/easypower-FY2024-H1-n256-t6h.slurm	jobs/capacity/capacity-FY2024-H1.slurm
