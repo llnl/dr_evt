@@ -116,9 +116,13 @@ message InitRequest {
     // Planning time-limit grid for scheduler projections; zero is exact.
     double planning_time_resolution = 25;
 
-    // Maximum reservation look-ahead for periodic backfill. Presence is
-    // explicit so zero is a valid immediate horizon.
+    // Maximum reservation look-ahead for event-driven or periodic backfill.
+    // Presence is explicit so zero is a valid immediate horizon.
     optional double planning_horizon = 26;
+
+    // Optional EASYPower caps used by the experimental scheduler.
+    bool cap_backfill_power = 27;
+    bool cap_fcfs_power = 28;
 
     // Seconds a job's nodes stay unavailable after it ends (default 0).
     // Not applied to replayed history.

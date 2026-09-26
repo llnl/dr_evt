@@ -229,6 +229,8 @@ public:
                 "Redis output requires DR_EVT_WITH_REDIS=ON");
           }
 #endif
+          sp.m_cap_backfill_power = r.cap_backfill_power();
+          sp.m_cap_fcfs_power = r.cap_fcfs_power();
 
           if (r.backfill_policy().empty())
             sp.m_backfill_policy = dr_evt::BackfillPolicy::EASY;

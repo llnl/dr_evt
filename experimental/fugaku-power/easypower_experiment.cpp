@@ -162,13 +162,12 @@ public:
       const std::shared_ptr<TelemetryState> &telemetry,
       const std::vector<Capacity_Change> &capacity_changes,
       tdiff_t candidate_time_window, size_t initial_capacity,
-      CircularOverflowPolicy overflow_policy)
+      CircularOverflowPolicy overflow_policy, bool cap_backfill_power,
+      bool cap_fcfs_power)
       : EASYPowerScheduler(
             total_nodes, initial_job_count, num_max_candidates, maximum_power,
-            initial_target, std::move(power_function),
-            [](double projected, sim_time_t, double target) {
-              return std::abs(projected - target);
-            },
+            initial_target, 1.0, 1.0, maximum_power * maximum_power,
+            std::move(power_function),
             [telemetry,
              &capacity_changes](const std::vector<EASYPowerJob> &waiting,
                                 const std::vector<EASYPowerJob> &running,
@@ -209,7 +208,8 @@ public:
                   capacity_changes, telemetry->current_time);
               return telemetry->estimated;
             },
-            initial_capacity, overflow_policy),
+            initial_capacity, overflow_policy, cap_backfill_power,
+            cap_fcfs_power),
         telemetry_(telemetry), capacity_changes_(capacity_changes),
         candidate_time_window_(candidate_time_window), allocated_area_(0.0),
         capacity_area_(0.0), accounting_time_(0.0), accounted_nodes_(0),
@@ -372,13 +372,14 @@ void print_stats(const char *name, const PconSimulation::Statistics &stats,
 } // namespace
 
 int main(int argc, char **argv) {
-  if (argc < 8 || argc > 10) {
+  if (argc < 8) {
     std::cerr
         << "usage: easypower_experiment "
            "{easy|easypower|easy-progressive|easypower-progressive} "
            "INPUT_OR_LIST OUTPUT_DIR "
            "TOTAL_NODES CANDIDATE_LIMIT MAX_POWER_W INITIAL_TARGET_W "
-           "[CANDIDATE_TIME_WINDOW_S] [CAPACITY_SCHEDULE.csv]\n"
+           "[CANDIDATE_TIME_WINDOW_S] [CAPACITY_SCHEDULE.csv] "
+           "[MAX_TIME_EPOCH_S] [--cap_backfill_power] [--cap_fcfs_power]\n"
            "  Progressive modes interpret INPUT_OR_LIST as an ordered file "
            "list and run the listed batches as one workload.\n"
            "  A zero time window means unlimited. A positive window limits "
@@ -395,8 +396,37 @@ int main(int argc, char **argv) {
     const auto candidate_limit = static_cast<size_t>(std::stoull(argv[5]));
     const double maximum_power = std::stod(argv[6]);
     const double initial_target = std::stod(argv[7]);
-    const double candidate_time_window = argc >= 9 ? std::stod(argv[8]) : 0.0;
-    const std::string capacity_schedule = argc == 10 ? argv[9] : "";
+    bool cap_backfill_power = false;
+    bool cap_fcfs_power = false;
+    std::vector<std::string> optional_positionals;
+    for (int index = 8; index < argc; ++index) {
+      const std::string argument = argv[index];
+      if (argument == "--cap-backfill-power") {
+        cap_backfill_power = true;
+      } else if (argument == "--cap_backfill_power") {
+        cap_backfill_power = true;
+      } else if (argument == "--cap-fcfs-power") {
+        cap_fcfs_power = true;
+      } else if (argument == "--cap_fcfs_power") {
+        cap_fcfs_power = true;
+      } else if (!argument.empty() && argument.front() == '-') {
+        throw std::invalid_argument("unknown option: " + argument);
+      } else {
+        optional_positionals.push_back(argument);
+      }
+    }
+    if (optional_positionals.size() > 3) {
+      throw std::invalid_argument("too many positional arguments");
+    }
+    const double candidate_time_window =
+        optional_positionals.empty() ? 0.0
+                                     : std::stod(optional_positionals[0]);
+    const std::string capacity_schedule =
+        optional_positionals.size() >= 2 ? optional_positionals[1] : "";
+    const std::optional<sim_time_t> max_time =
+        optional_positionals.size() == 3
+            ? std::optional<sim_time_t>(std::stod(optional_positionals[2]))
+            : std::nullopt;
     std::filesystem::create_directories(output);
 
     const bool progressive =
@@ -432,7 +462,17 @@ int main(int argc, char **argv) {
     params.m_run_time_mode = RunTimeMode::ACTUAL;
     params.m_backfill_policy = BackfillPolicy::EASY;
     params.m_num_max_candidates = candidate_limit;
+    params.m_cap_backfill_power = cap_backfill_power;
+    params.m_cap_fcfs_power = cap_fcfs_power;
     params.m_capacity_schedule = capacity_schedule;
+    if (max_time) {
+      if (!std::isfinite(*max_time) || *max_time < 0.0) {
+        throw std::invalid_argument(
+            "MAX_TIME_EPOCH_S must be finite and nonnegative");
+      }
+      params.m_max_time = *max_time;
+      params.m_is_time_set = true;
+    }
     const std::vector<Capacity_Change> capacity_changes =
         load_capacity_schedule(capacity_schedule, total_nodes);
 
@@ -464,7 +504,8 @@ int main(int argc, char **argv) {
             return powers.at(id);
           },
           telemetry, capacity_changes, candidate_time_window,
-          params.m_wait_queue_capacity, params.m_wait_queue_overflow);
+          params.m_wait_queue_capacity, params.m_wait_queue_overflow,
+          params.m_cap_backfill_power, params.m_cap_fcfs_power);
       auto *easypower = scheduler.get();
       auto *simulation = new PconSimulation(params, std::move(scheduler));
       simulation->run();

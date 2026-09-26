@@ -140,6 +140,33 @@ protected:
       const running_jobs_t &effective_running_jobs, sim_time_t current_time);
 
   /**
+   * @brief Check whether a resource-fitting FCFS head may start now.
+   * @param[in] job_id Identifier of the FCFS head job.
+   * @param[in] available_nodes Nodes currently available for dispatch.
+   * @param[in] effective_running_jobs Running jobs, including starts selected
+   *            during this scheduling pass.
+   * @param[in] current_time Scheduler timestamp.
+   * @return true if the head may start now; otherwise false.
+   */
+  virtual bool can_start_fcfs_job(job_no_t job_id, num_nodes_t available_nodes,
+                                  const running_jobs_t &effective_running_jobs,
+                                  sim_time_t current_time) const;
+
+  /**
+   * @brief Project the reservation time for a blocked FCFS head.
+   * @param[in] job_id Identifier of the FCFS head job.
+   * @param[in] nodes_requested Nodes requested by the FCFS head.
+   * @param[in] available_nodes Nodes currently available for dispatch.
+   * @param[in] effective_running_jobs Running jobs, including starts selected
+   *            during this scheduling pass.
+   * @param[in] current_time Scheduler timestamp.
+   * @return Earliest projected time at which the head may start.
+   */
+  virtual sim_time_t fcfs_head_reservation_time(
+      job_no_t job_id, num_nodes_t nodes_requested, num_nodes_t available_nodes,
+      const running_jobs_t &effective_running_jobs, sim_time_t current_time);
+
+  /**
    * Called once after a complete same-timestamp arrival batch becomes
    * eligible and before any FCFS dispatch from that batch.
    */
