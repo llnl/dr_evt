@@ -106,6 +106,8 @@ private:
     visit("backfill_interval", self.m_backfill_interval);
     visit("planning_time_resolution", self.m_planning_time_resolution);
     visit("planning_horizon", self.m_planning_horizon);
+    visit("cap_backfill_power", self.m_cap_backfill_power);
+    visit("cap_fcfs_power", self.m_cap_fcfs_power);
     visit("priority_policy", self.m_priority_policy);
     visit("queue_impl", self.m_queue_impl);
     visit("block_size", self.m_block_size);
@@ -227,6 +229,10 @@ public:
   tdiff_t m_planning_horizon;
   /// Whether a replay warm start reconstructs the pre-boundary wait queue.
   WarmStartWaitQueuePolicy m_warm_start_wait_queue;
+  /// Whether EASYPower caps backfill jobs at the configured power limit.
+  bool m_cap_backfill_power;
+  /// Whether EASYPower caps FCFS jobs at the configured power limit.
+  bool m_cap_fcfs_power;
   /// Job priority/order policy applied by the scheduler.
   PriorityPolicy m_priority_policy;
   /// Wait-queue implementation used by FCFS scheduling.

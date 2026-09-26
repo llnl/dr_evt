@@ -3,6 +3,9 @@
 These files are intentionally untracked while the experiment is under
 development. The public CMake configuration does not name or build EASYPower.
 
+The mathematical and event-level specification is in
+[`EASYPOWER_ALGORITHM.tex`](EASYPOWER_ALGORITHM.tex).
+
 Build the private driver through the untracked CMake injection:
 
 ```bash
@@ -66,6 +69,28 @@ capacity must be at most that value. Capacity reductions do not preempt
 running jobs. EASYPower's forward horizon follows future capacity changes, and
 reported utilization divides allocated-node time by effective-capacity time
 (`max(scheduled capacity, live allocation)` while reductions drain).
+
+EASYPower ranks feasible backfill candidates with the semi-clamped cost
+
+```text
+C(P, t) = w (P - P_target(t))^2                      when P <= P_max
+          C_dom + w_max (P - P_max)^2                when P > P_max
+```
+
+The current experiment explicitly supplies `w = 1`, `w_max = 1`, and
+`C_dom = P_max^2`. The scheduler validates that weights are positive and that
+`C_dom >= w * P_max^2`. Because `P_target` is clamped to `[0, P_max]`, every
+at-or-below-limit candidate ranks ahead of every above-limit candidate. This
+is not a hard admission cap by default: if all feasible EASY candidates exceed
+`P_max`, the least-overshooting candidate is still selected. FCFS-prefix jobs
+are not ranked by this cost.
+
+Pass `--cap_backfill_power` to filter resource-feasible backfill candidates
+whose predicted power would make total running power exceed `P_max`. If every
+candidate is filtered, no job is backfilled. Pass `--cap_fcfs_power` to apply
+the same admission limit to each job in the FCFS prefix. The options are
+independent and can be used together; jobs whose individual predicted power
+exceeds `P_max` can never start when the applicable hard cap is enabled.
 
 The endpoint metric compares instantaneous power at the two ends of a physical
 interval: `abs(P(t + delta) - P(t)) / delta`. It is not a fixed-bin average and

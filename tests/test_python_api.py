@@ -171,6 +171,8 @@ def test_sim_params(result):
         params.run_time_mode = dr_evt.RunTimeMode.LIMIT
         params.backfill_policy = dr_evt.BackfillPolicy.EASY
         params.num_max_candidates = 8
+        params.cap_backfill_power = True
+        params.cap_fcfs_power = True
         params.priority_policy = dr_evt.PriorityPolicy.FCFS
         params.node_release_delay = 30.0
         params.node_release_delay_model = dr_evt.ReleaseDelayModel.EXPONENTIAL

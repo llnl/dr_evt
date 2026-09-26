@@ -87,13 +87,18 @@ $SIMULATOR "$TEST_TRACE" \
     --num_max_candidates 8 \
     --planning_time_resolution 10 \
     --planning_horizon 10 \
+    --cap_backfill_power \
+    --cap_fcfs_power \
     --outfile "$TEST_WORK_DIR/cli_full.csv"
 
 $SIMULATOR "$TEST_TRACE" \
     --config tests/test_configs/full_config.pb \
-    --outfile "$TEST_WORK_DIR/pb_full.csv"
+    --outfile "$TEST_WORK_DIR/pb_full.csv" \
+    > "$TEST_WORK_DIR/pb_full.log"
 
-if diff -q "$TEST_WORK_DIR/cli_full.csv" "$TEST_WORK_DIR/pb_full.csv" > /dev/null; then
+if diff -q "$TEST_WORK_DIR/cli_full.csv" "$TEST_WORK_DIR/pb_full.csv" > /dev/null &&
+   grep -q "cap_backfill_power: true" "$TEST_WORK_DIR/pb_full.log" &&
+   grep -q "cap_fcfs_power: true" "$TEST_WORK_DIR/pb_full.log"; then
     echo "  ✓ Full config matches CLI"
     PASS=$((PASS + 1))
 else

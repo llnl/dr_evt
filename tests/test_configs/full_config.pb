@@ -6,4 +6,6 @@ priority_policy: "fcfs"
 num_max_candidates: 8
 planning_time_resolution: 10
 planning_horizon: 10
+cap_backfill_power: true
+cap_fcfs_power: true
 run_time_mode: "limit"

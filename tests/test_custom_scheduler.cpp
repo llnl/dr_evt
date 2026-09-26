@@ -6,9 +6,11 @@
  ******************************************************************************/
 
 #define DR_EVT_HAS_CONFIG 1
+#include "sim/scheduler_easy_power.hpp"
 #include "sim/scheduler_fcfs_easy_custom.hpp"
 #include "sim/sim.hpp"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <fstream>
@@ -87,6 +89,125 @@ void test_selector_must_return_a_candidate() {
     threw = true;
   }
   assert(threw);
+}
+
+class TestableEASYPowerScheduler final : public EASYPowerScheduler {
+public:
+  TestableEASYPowerScheduler(
+      double maximum_power = 12.0, double initial_target = 10.0,
+      double target_weight = 1.0, double maximum_weight = 1.0,
+      double dominant_cost = 12.0 * 12.0, double replay_horizon = 1.0,
+      double replay_running_energy = 0.0,
+      std::array<double, 4> powers = {10.0, 2.1, 1.0, 3.0},
+      bool cap_backfill_power = false, bool cap_fcfs_power = false)
+      : EASYPowerScheduler(
+            100, 4, 4, maximum_power, initial_target, target_weight,
+            maximum_weight, dominant_cost,
+            [powers](job_no_t job_id, sim_time_t, tdiff_t, num_nodes_t) {
+              return powers.at(job_id);
+            },
+            [replay_horizon, replay_running_energy](
+                const std::vector<EASYPowerJob> &,
+                const std::vector<EASYPowerJob> &, double, num_nodes_t) {
+              return EASYPowerReplayResult{replay_horizon,
+                                           replay_running_energy};
+            },
+            0, CircularOverflowPolicy::GROW, cap_backfill_power,
+            cap_fcfs_power) {
+    for (job_no_t job_id = 0; job_id < 4; ++job_id) {
+      insert_job(job_id, 0.0, 10.0, 1);
+    }
+  }
+
+  std::optional<job_no_t> choose(const backfill_candidates_t &candidates) {
+    const running_jobs_t running{{0, {0.0, 10.0, 1}}};
+    return select_backfill_candidate(candidates, 99, running, 0.0);
+  }
+
+  double cost(double projected_power) const {
+    return candidate_power_cost(projected_power);
+  }
+
+  void refresh_target() { on_jobs_became_eligible(0, 4, 100, {}, 0.0); }
+};
+
+void test_easypower_semiclamped_candidate_cost() {
+  // Use non-unit parameters so each term in the specified equation is
+  // independently observable. P == P_max belongs to the target branch.
+  const TestableEASYPowerScheduler weighted(12.0, 10.0, 2.0, 3.0, 400.0);
+  if (weighted.cost(8.0) != 8.0 || weighted.cost(12.0) != 8.0 ||
+      weighted.cost(13.0) != 403.0) {
+    throw std::runtime_error(
+        "EASYPower candidate costs do not match the specified equation");
+  }
+
+  TestableEASYPowerScheduler scheduler;
+
+  // Projected powers are 12.1 and 11.0. Plain target distance would select
+  // 12.1, but the dominant above-P_max branch must select 11.0.
+  if (scheduler.choose({{1, 0}, {2, 0}}) != 2) {
+    throw std::runtime_error(
+        "EASYPower semi-clamping did not prefer an in-limit candidate");
+  }
+
+  // Semi-clamping is not a hard cap: if every candidate exceeds P_max, the
+  // least-overshooting candidate is selected.
+  if (scheduler.choose({{1, 0}, {3, 0}}) != 1) {
+    throw std::runtime_error(
+        "EASYPower semi-clamping did not minimize above-limit excess");
+  }
+
+  TestableEASYPowerScheduler capped_backfill(12.0, 10.0, 1.0, 1.0, 144.0, 1.0,
+                                             0.0, {10.0, 2.1, 1.0, 3.0}, true,
+                                             false);
+  if (capped_backfill.choose({{1, 0}, {3, 0}})) {
+    throw std::runtime_error(
+        "EASYPower backfill cap admitted an above-limit candidate");
+  }
+
+  TestableEASYPowerScheduler capped_fcfs(12.0, 10.0, 1.0, 1.0, 144.0, 1.0, 0.0,
+                                         {10.0, 2.1, 1.0, 3.0}, false, true);
+  const auto fcfs_starts = capped_fcfs.schedule(100, {}, 0.0);
+  if (fcfs_starts != std::vector<job_no_t>{0}) {
+    throw std::runtime_error(
+        "EASYPower FCFS cap did not stop the power-exceeding prefix job");
+  }
+
+  bool rejected_non_dominant_cost = false;
+  try {
+    TestableEASYPowerScheduler invalid(12.0, 10.0, 2.0, 1.0, 287.0);
+    (void)invalid;
+  } catch (const std::invalid_argument &) {
+    rejected_non_dominant_cost = true;
+  }
+  if (!rejected_non_dominant_cost) {
+    throw std::runtime_error("EASYPower accepted C_dom below w * P_max^2");
+  }
+
+  // At large scales, C_dom + 1 can round back to C_dom. Candidate ordering
+  // must still preserve the mathematical dominance of the over-limit branch.
+  constexpr double large_maximum = 120000000.0;
+  TestableEASYPowerScheduler rounded(large_maximum, large_maximum, 1.0, 1.0,
+                                     large_maximum * large_maximum, 1.0, 0.0,
+                                     {0.0, large_maximum + 1.0, 0.0, 0.0});
+  if (rounded.choose({{1, 0}, {2, 0}}) != 2) {
+    throw std::runtime_error(
+        "EASYPower floating-point rounding broke branch dominance");
+  }
+
+  // E_Q = (10 + 2.1 + 1 + 3) * 10 = 161 and E_R = 20. The
+  // unclamped target is therefore (E_R + E_Q) / H = 1.81.
+  TestableEASYPowerScheduler target(12.0, 0.0, 1.0, 1.0, 144.0, 100.0, 20.0);
+  target.refresh_target();
+  if (std::abs(target.power_target() - 1.81) > 1e-12) {
+    throw std::runtime_error("EASYPower target does not equal (E_R + E_Q) / H");
+  }
+
+  TestableEASYPowerScheduler clamped(12.0, 0.0, 1.0, 1.0, 144.0, 1.0, 20.0);
+  clamped.refresh_target();
+  if (clamped.power_target() != 12.0) {
+    throw std::runtime_error("EASYPower target was not clamped to P_max");
+  }
 }
 
 void test_arrival_scans_only_new_jobs() {
@@ -449,6 +570,7 @@ int main(int argc, char **argv) {
 
   test_external_backfill_selection();
   test_selector_must_return_a_candidate();
+  test_easypower_semiclamped_candidate_cost();
   test_arrival_scans_only_new_jobs();
   test_subclass_extension_hooks();
   test_current_utilization_api();

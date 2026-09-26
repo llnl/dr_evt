@@ -147,6 +147,25 @@ std::optional<job_no_t> FCFSEasyCustomScheduler::select_backfill_candidate(
   return m_backfill_selector(candidates);
 }
 
+bool FCFSEasyCustomScheduler::can_start_fcfs_job(
+    job_no_t job_id, num_nodes_t available_nodes,
+    const running_jobs_t &effective_running_jobs,
+    sim_time_t current_time) const {
+  (void)job_id;
+  (void)available_nodes;
+  (void)effective_running_jobs;
+  (void)current_time;
+  return true;
+}
+
+sim_time_t FCFSEasyCustomScheduler::fcfs_head_reservation_time(
+    job_no_t job_id, num_nodes_t nodes_requested, num_nodes_t available_nodes,
+    const running_jobs_t &effective_running_jobs, sim_time_t current_time) {
+  (void)job_id;
+  return calculate_fcfs_reservation(nodes_requested, available_nodes,
+                                    effective_running_jobs, current_time);
+}
+
 void FCFSEasyCustomScheduler::on_jobs_became_eligible(
     size_t newly_eligible_begin, size_t eligible_end,
     num_nodes_t available_nodes, const running_jobs_t &running_jobs,
@@ -359,20 +378,25 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
+  running_jobs_t effective_running_jobs = running_jobs;
   projected_starts_t projected_starts;
-  std::vector<job_no_t> projected_start_ids;
 
-  while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
-         (m_wait_queue.front().removed ||
-          m_wait_queue.front().nodes_requested <= available_nodes)) {
+  while (m_eligible_end_idx > 0 && !m_wait_queue.empty()) {
+    if (!m_wait_queue.front().removed &&
+        (m_wait_queue.front().nodes_requested > available_nodes ||
+         !can_start_fcfs_job(m_wait_queue.front().job_id, available_nodes,
+                             effective_running_jobs, current_time))) {
+      break;
+    }
     if (!m_wait_queue.front().removed) {
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      projected_starts.push_back(
-          {current_time, release_estimate(current_time, job.run_time_estimate),
-           job.nodes_requested});
-      projected_start_ids.push_back(job.job_id);
+      const Running_Job projected_start{
+          current_time, release_estimate(current_time, job.run_time_estimate),
+          job.nodes_requested};
+      projected_starts.push_back(projected_start);
+      effective_running_jobs[job.job_id] = projected_start;
     } else {
       --m_removed_count;
     }
@@ -392,9 +416,9 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
     return jobs_to_run;
   }
 
-  m_fcfs_reservation_time = calculate_fcfs_reservation(
-      m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
-      current_time, projected_starts);
+  m_fcfs_reservation_time = fcfs_head_reservation_time(
+      m_wait_queue.front().job_id, m_wait_queue.front().nodes_requested,
+      available_nodes, effective_running_jobs, current_time);
 
   // Scanning only new arrivals is unsafe with a queue depth: a start moves
   // older, never-examined jobs into the window. The depth bounds the full
@@ -413,13 +437,6 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
       complete_candidate_scan();
     }
     return jobs_to_run;
-  }
-
-  // Preserve the callback API's effective-map view, but materialize it only
-  // after the reservation-only candidate scan found work for a selector.
-  running_jobs_t effective_running_jobs = running_jobs;
-  for (size_t i = 0; i < projected_starts.size(); ++i) {
-    effective_running_jobs[projected_start_ids[i]] = projected_starts[i];
   }
 
   if (m_candidate_preparation_pending) {
