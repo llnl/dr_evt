@@ -17,6 +17,8 @@ Optional environment settings:
   RELEASE_DELAY_MINUTES=10
   CASES_PER_ROW=21
   SIMULATOR_FORMAT=0                (1 writes time,total_nodes CSVs)
+  ANALYSIS_START=EPOCH_SECONDS      (inclusive; requires ANALYSIS_END)
+  ANALYSIS_END=EPOCH_SECONDS        (exclusive; requires ANALYSIS_START)
 EOF
 }
 
@@ -37,11 +39,24 @@ GRACE_MINUTES=${GRACE_MINUTES:-60}
 RELEASE_DELAY_MINUTES=${RELEASE_DELAY_MINUTES:-10}
 CASES_PER_ROW=${CASES_PER_ROW:-21}
 SIMULATOR_FORMAT=${SIMULATOR_FORMAT:-0}
+ANALYSIS_START=${ANALYSIS_START:-}
+ANALYSIS_END=${ANALYSIS_END:-}
 
 if [[ -z "$CAPACITY_NODES" ]]; then
     echo "CAPACITY_NODES must be set to the machine's structural node capacity" >&2
     echo "Example: CAPACITY_NODES=158976 $0 '$TRACE_PATTERN' '$OUTPUT_DIRECTORY'" >&2
     exit 2
+fi
+if [[ -n "$ANALYSIS_START" || -n "$ANALYSIS_END" ]]; then
+    if [[ ! "$ANALYSIS_START" =~ ^[0-9]+$ || ! "$ANALYSIS_END" =~ ^[0-9]+$ ]] ||
+       (( ANALYSIS_END <= ANALYSIS_START )); then
+        echo "ANALYSIS_START and ANALYSIS_END must be integer epoch seconds with END > START" >&2
+        exit 2
+    fi
+fi
+ANALYSIS_ARGS=()
+if [[ -n "$ANALYSIS_START" ]]; then
+    ANALYSIS_ARGS=(--analysis-start "$ANALYSIS_START" --analysis-end "$ANALYSIS_END")
 fi
 
 if [[ "$TRACE_PATTERN" != /* ]]; then
@@ -72,6 +87,7 @@ python3 "$SCRIPT_DIR/discover_maintenance.py" "$TRACE_PATTERN" \
     --overlap-policy "$OVERLAP_POLICY" \
     --timezone "$TRACE_TIMEZONE" \
     --known-capacity "$CAPACITY_NODES" \
+    "${ANALYSIS_ARGS[@]}" \
     --all-states \
     --output "$BOOTSTRAP_REPORT" \
     --bins-output "$TIMELINE"
@@ -91,6 +107,7 @@ python3 "$SCRIPT_DIR/discover_maintenance.py" "$TRACE_PATTERN" \
     --overlap-policy "$OVERLAP_POLICY" \
     --timezone "$TRACE_TIMEZONE" \
     --known-capacity "$CAPACITY_NODES" \
+    "${ANALYSIS_ARGS[@]}" \
     --backfill-evidence "$EVIDENCE" \
     --all-states \
     --output "$REPORT" \
