@@ -288,8 +288,10 @@ BasicSimulation(const Sim_Params& params, job_cost_function_t cost_function,
 
 Set `params.m_num_max_candidates` before construction. The cost function is
 invoked as each job enters the wait queue. The selection function receives up
-to that many feasible `(job_id, cost)` pairs and returns one of those IDs, or
-`std::nullopt` to decline a backfill.
+to that many feasible `BackfillCandidate` records and returns the selected
+record's position in that vector, or `std::nullopt` to decline a backfill.
+Each record carries its ephemeral circular-queue index and scheduler scalar;
+EASYPower uses that scalar as predicted power.
 
 **Get current simulation time:**
 ```cpp

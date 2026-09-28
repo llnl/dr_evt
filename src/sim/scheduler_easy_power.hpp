@@ -10,7 +10,6 @@
 
 #include "sim/scheduler_fcfs_easy_custom.hpp"
 #include <functional>
-#include <unordered_map>
 
 namespace dr_evt {
 
@@ -62,6 +61,11 @@ public:
                   tdiff_t run_time_estimate,
                   num_nodes_t nodes_requested) override;
 
+  void insert_job_with_metadata(
+      job_no_t job_id, sim_time_t submit_time, tdiff_t run_time_estimate,
+      num_nodes_t nodes_requested,
+      const SchedulerJobMetadata &metadata) override;
+
   double power_target() const { return m_power_target; }
   double maximum_power() const { return m_maximum_power; }
   std::optional<double> maximum_job_power_for_admission() const override {
@@ -72,19 +76,21 @@ protected:
   /** Evaluate the specified semi-clamped cost for a projected total power. */
   double candidate_power_cost(double projected_power) const;
 
-  std::optional<job_no_t>
+  std::optional<size_t>
   select_backfill_candidate(const backfill_candidates_t &candidates,
                             num_nodes_t available_nodes,
                             const running_jobs_t &effective_running_jobs,
                             sim_time_t current_time) override;
 
-  bool can_start_fcfs_job(job_no_t job_id, num_nodes_t available_nodes,
+  std::optional<double>
+  running_job_power(const JobEntry &job) const override;
+
+  bool can_start_fcfs_job(const JobEntry &job, num_nodes_t available_nodes,
                           const running_jobs_t &effective_running_jobs,
                           sim_time_t current_time) const override;
 
   sim_time_t
-  fcfs_head_reservation_time(job_no_t job_id, num_nodes_t nodes_requested,
-                             num_nodes_t available_nodes,
+  fcfs_head_reservation_time(const JobEntry &job, num_nodes_t available_nodes,
                              const running_jobs_t &effective_running_jobs,
                              sim_time_t current_time) override;
 
@@ -117,7 +123,6 @@ private:
   double m_dominant_cost;
   job_power_function_t m_power_function;
   easypower_forward_replay_t m_forward_replay;
-  std::unordered_map<job_no_t, double> m_predicted_power;
   bool m_target_refreshed_for_arrivals;
   bool m_cap_backfill_power;
   bool m_cap_fcfs_power;

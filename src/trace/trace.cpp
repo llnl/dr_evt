@@ -940,6 +940,16 @@ const Job_Record &BasicTrace<Policy>::job_at(job_no_t job_no) const {
 }
 
 template <typename Policy>
+std::optional<double>
+BasicTrace<Policy>::scheduler_power(job_no_t job_no) const {
+  // job_at() performs the permanent-ID bounds checks. The physical offset is
+  // then safe and retains the policy-specific record type (including Pcon).
+  (void)job_at(job_no);
+  const size_t idx = static_cast<size_t>(job_no - m_num_reclaimed);
+  return Policy::scheduler_power(m_data[idx]);
+}
+
+template <typename Policy>
 bool BasicTrace<Policy>::is_front_reclaimable(sim_time_t current_time) const {
   if (m_data.empty()) {
     return false;

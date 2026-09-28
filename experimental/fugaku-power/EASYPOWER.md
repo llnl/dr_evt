@@ -81,16 +81,27 @@ The current experiment explicitly supplies `w = 1`, `w_max = 1`, and
 `C_dom = P_max^2`. The scheduler validates that weights are positive and that
 `C_dom >= w * P_max^2`. Because `P_target` is clamped to `[0, P_max]`, every
 at-or-below-limit candidate ranks ahead of every above-limit candidate. This
-is not a hard admission cap by default: if all feasible EASY candidates exceed
-`P_max`, the least-overshooting candidate is still selected. FCFS-prefix jobs
-are not ranked by this cost.
+is not a hard admission cap for combined running power by default: if all
+feasible EASY candidates would make total running power exceed `P_max`, the
+least-overshooting candidate is still selected. FCFS-prefix jobs are not ranked
+by this cost. A job whose `maxpcon` exceeds `P_max` is always dropped while
+loading because it exceeds the configured per-job maximum.
+The diagnostic identifies its source row, submit time, node count, predicted
+power, and the applicable limit.
+
+Each input batch is parsed once. The retained Pcon record supplies `avgpcon`
+to EASYPower and supplies actual runtime and time limit to the experiment's
+forward-replay telemetry when the job enters the scheduler. There is no
+separate metadata preload, so rejected rows cannot shift power or runtime
+values onto later compacted job IDs. `maxpcon` is used only for the per-job
+admission check; scheduling projections continue to use `avgpcon`.
 
 Pass `--cap_backfill_power` to filter resource-feasible backfill candidates
 whose predicted power would make total running power exceed `P_max`. If every
 candidate is filtered, no job is backfilled. Pass `--cap_fcfs_power` to apply
 the same admission limit to each job in the FCFS prefix. The options are
-independent and can be used together; jobs whose individual predicted power
-exceeds `P_max` can never start when the applicable hard cap is enabled.
+independent and can be used together. These flags govern combined running
+power; the per-job admission check above is independent of them.
 
 The endpoint metric compares instantaneous power at the two ends of a physical
 interval: `abs(P(t + delta) - P(t)) / delta`. It is not a fixed-bin average and

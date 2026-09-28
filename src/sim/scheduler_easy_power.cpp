@@ -23,9 +23,9 @@ EASYPowerScheduler::EASYPowerScheduler(
     easypower_forward_replay_t forward_replay, size_t initial_capacity,
     CircularOverflowPolicy overflow_policy, bool cap_backfill_power,
     bool cap_fcfs_power)
-    : FCFSEasyCustomScheduler(total_nodes, initial_job_count,
-                              BackfillPolicy::EASY, num_max_candidates,
-                              initial_capacity, overflow_policy),
+    : FCFSEasyCustomScheduler(total_nodes, initial_job_count, BackfillPolicy::EASY,
+                          num_max_candidates, initial_capacity,
+                          overflow_policy),
       m_maximum_power(maximum_power), m_power_target(initial_target),
       m_target_weight(target_weight), m_maximum_weight(maximum_weight),
       m_dominant_cost(dominant_cost),
@@ -53,15 +53,20 @@ EASYPowerScheduler::EASYPowerScheduler(
         "EASYPowerScheduler requires positive finite weights and a finite "
         "dominant cost >= target_weight * Pmax^2");
   }
-  if (!m_power_function || !m_forward_replay) {
+  if (!m_forward_replay) {
     throw std::invalid_argument(
-        "EASYPowerScheduler requires power and forward-replay functions");
+        "EASYPowerScheduler requires a forward-replay function");
   }
 }
 
 void EASYPowerScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
                                     tdiff_t run_time_estimate,
                                     num_nodes_t nodes_requested) {
+  if (!m_power_function) {
+    throw std::invalid_argument(
+        "EASYPowerScheduler requires inline power metadata or a power "
+        "function");
+  }
   const double predicted_power =
       m_power_function(job_id, submit_time, run_time_estimate, nodes_requested);
   if (!std::isfinite(predicted_power) || predicted_power < 0.0) {
@@ -70,8 +75,24 @@ void EASYPowerScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
         "nonnegative");
   }
   insert_job_with_cost(job_id, submit_time, run_time_estimate, nodes_requested,
-                       0);
-  m_predicted_power[job_id] = predicted_power;
+                       predicted_power);
+}
+
+void EASYPowerScheduler::insert_job_with_metadata(
+    job_no_t job_id, sim_time_t submit_time, tdiff_t run_time_estimate,
+    num_nodes_t nodes_requested, const SchedulerJobMetadata &metadata) {
+  if (!metadata.predicted_power) {
+    insert_job(job_id, submit_time, run_time_estimate, nodes_requested);
+    return;
+  }
+  const double predicted_power = *metadata.predicted_power;
+  if (!std::isfinite(predicted_power) || predicted_power < 0.0) {
+    throw std::invalid_argument(
+        "EASYPowerScheduler predicted job power must be finite and "
+        "nonnegative");
+  }
+  insert_job_with_cost(job_id, submit_time, run_time_estimate, nodes_requested,
+                       predicted_power);
 }
 
 std::vector<EASYPowerJob>
@@ -80,19 +101,19 @@ EASYPowerScheduler::running_power_jobs(const running_jobs_t &running_jobs,
   std::vector<EASYPowerJob> result;
   result.reserve(running_jobs.size());
   for (const auto &[job_id, running] : running_jobs) {
-    const auto power = m_predicted_power.find(job_id);
-    if (power == m_predicted_power.end()) {
+    if (!running.predicted_power) {
       throw std::logic_error(
           "EASYPowerScheduler has no power estimate for a running job");
     }
     const tdiff_t remaining = std::max<tdiff_t>(
         0.0, running.start_time + running.run_time - current_time);
-    result.push_back({job_id, remaining, running.nodes, power->second});
+    result.push_back({job_id, remaining, running.nodes,
+                      *running.predicted_power});
   }
   return result;
 }
 
-std::optional<job_no_t> EASYPowerScheduler::select_backfill_candidate(
+std::optional<size_t> EASYPowerScheduler::select_backfill_candidate(
     const backfill_candidates_t &candidates, num_nodes_t available_nodes,
     const running_jobs_t &effective_running_jobs, sim_time_t current_time) {
   (void)available_nodes;
@@ -102,17 +123,12 @@ std::optional<job_no_t> EASYPowerScheduler::select_backfill_candidate(
     current_power += job.predicted_power;
   }
 
-  std::optional<job_no_t> selected;
+  std::optional<size_t> selected;
   double best_cost = std::numeric_limits<double>::infinity();
   bool best_exceeds_maximum = false;
-  for (const auto &[job_id, ignored_cost] : candidates) {
-    (void)ignored_cost;
-    const auto power = m_predicted_power.find(job_id);
-    if (power == m_predicted_power.end()) {
-      throw std::logic_error(
-          "EASYPowerScheduler has no power estimate for a candidate");
-    }
-    const double projected_power = current_power + power->second;
+  for (size_t index = 0; index < candidates.size(); ++index) {
+    const auto &candidate = candidates[index];
+    const double projected_power = current_power + candidate.cost;
     const bool exceeds_maximum = projected_power > m_maximum_power;
     if (m_cap_backfill_power && exceeds_maximum) {
       continue;
@@ -122,7 +138,7 @@ std::optional<job_no_t> EASYPowerScheduler::select_backfill_candidate(
     // floating-point rounding makes C_dom + a tiny overshoot equal C_dom.
     if (!selected || (best_exceeds_maximum && !exceeds_maximum) ||
         (best_exceeds_maximum == exceeds_maximum && cost < best_cost)) {
-      selected = job_id;
+      selected = index;
       best_cost = cost;
       best_exceeds_maximum = exceeds_maximum;
     }
@@ -130,20 +146,20 @@ std::optional<job_no_t> EASYPowerScheduler::select_backfill_candidate(
   return selected;
 }
 
+std::optional<double>
+EASYPowerScheduler::running_job_power(const JobEntry &job) const {
+  return job.m_cost;
+}
+
 bool EASYPowerScheduler::can_start_fcfs_job(
-    job_no_t job_id, num_nodes_t available_nodes,
+    const JobEntry &job, num_nodes_t available_nodes,
     const running_jobs_t &effective_running_jobs,
     sim_time_t current_time) const {
   (void)available_nodes;
   if (!m_cap_fcfs_power) {
     return true;
   }
-  const auto head_power = m_predicted_power.find(job_id);
-  if (head_power == m_predicted_power.end()) {
-    throw std::logic_error(
-        "EASYPowerScheduler has no power estimate for the FCFS head");
-  }
-  double projected_power = head_power->second;
+  double projected_power = job.m_cost;
   for (const auto &job :
        running_power_jobs(effective_running_jobs, current_time)) {
     projected_power += job.predicted_power;
@@ -152,18 +168,11 @@ bool EASYPowerScheduler::can_start_fcfs_job(
 }
 
 sim_time_t EASYPowerScheduler::fcfs_head_reservation_time(
-    job_no_t job_id, num_nodes_t nodes_requested, num_nodes_t available_nodes,
+    const JobEntry &job, num_nodes_t available_nodes,
     const running_jobs_t &effective_running_jobs, sim_time_t current_time) {
   if (!m_cap_fcfs_power) {
     return FCFSEasyCustomScheduler::fcfs_head_reservation_time(
-        job_id, nodes_requested, available_nodes, effective_running_jobs,
-        current_time);
-  }
-
-  const auto head_power = m_predicted_power.find(job_id);
-  if (head_power == m_predicted_power.end()) {
-    throw std::logic_error(
-        "EASYPowerScheduler has no power estimate for the FCFS head");
+        job, available_nodes, effective_running_jobs, current_time);
   }
 
   num_nodes_t projected_available = available_nodes;
@@ -174,27 +183,27 @@ sim_time_t EASYPowerScheduler::fcfs_head_reservation_time(
   };
   std::map<sim_time_t, Release> releases;
   for (const auto &[running_id, running] : effective_running_jobs) {
-    const auto power = m_predicted_power.find(running_id);
-    if (power == m_predicted_power.end()) {
+    (void)running_id;
+    if (!running.predicted_power) {
       throw std::logic_error(
           "EASYPowerScheduler has no power estimate for a running job");
     }
-    projected_power += power->second;
+    projected_power += *running.predicted_power;
     const sim_time_t end_time = running.start_time + running.run_time;
     if (end_time > current_time) {
       releases[end_time].nodes += running.nodes;
-      releases[end_time].power += power->second;
+      releases[end_time].power += *running.predicted_power;
     }
   }
-  if (nodes_requested <= projected_available &&
-      projected_power + head_power->second <= m_maximum_power) {
+  if (job.nodes_requested <= projected_available &&
+      projected_power + job.m_cost <= m_maximum_power) {
     return current_time;
   }
   for (const auto &[end_time, release] : releases) {
     projected_available += release.nodes;
     projected_power = std::max(0.0, projected_power - release.power);
-    if (nodes_requested <= projected_available &&
-        projected_power + head_power->second <= m_maximum_power) {
+    if (job.nodes_requested <= projected_available &&
+        projected_power + job.m_cost <= m_maximum_power) {
       return end_time;
     }
   }
@@ -262,14 +271,9 @@ void EASYPowerScheduler::refresh_power_target(
     if (job.removed) {
       continue;
     }
-    const auto power = m_predicted_power.find(job.job_id);
-    if (power == m_predicted_power.end()) {
-      throw std::logic_error(
-          "EASYPowerScheduler has no power estimate for a waiting job");
-    }
     waiting.push_back({job.job_id, job.run_time_estimate, job.nodes_requested,
-                       power->second});
-    waiting_energy += power->second * job.run_time_estimate;
+                       job.m_cost});
+    waiting_energy += job.m_cost * job.run_time_estimate;
   }
 
   const auto running = running_power_jobs(running_jobs, current_time);

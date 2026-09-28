@@ -52,7 +52,7 @@ using timeout_t = unsigned;   ///< time limit in seconds
 using num_nodes_t = unsigned; ///< Number of compute nodes type
 using num_jobs_t = size_t;    ///< Number of jobs type
 using job_no_t = num_jobs_t;  ///< Job number type
-using job_cost_t = int;       ///< Integer cost exposed to backfill selectors.
+using job_cost_t = double;    ///< Scheduler scalar exposed to selectors.
 using num_cols_t = unsigned;  ///< Number of columns type
 using col_no_t = num_cols_t;  ///< Column-number type.
 

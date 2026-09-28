@@ -323,6 +323,9 @@ public:
    * @return Read-only reference to the corresponding record. */
   const Job_Record &job_at(job_no_t job_no) const;
 
+  /** Power estimate embedded in the retained record, when the policy has one. */
+  std::optional<double> scheduler_power(job_no_t job_no) const;
+
   /// Jobs reclaimed so far - add to data().size() for the true total
   /// ever loaded (data().size() alone undercounts once anything's
   /// been reclaimed).

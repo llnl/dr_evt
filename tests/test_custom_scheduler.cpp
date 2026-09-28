@@ -13,10 +13,12 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -33,22 +35,23 @@ job_cost_t cost_from_job_order(job_no_t job_id, sim_time_t, tdiff_t,
   return static_cast<job_cost_t>(job_id);
 }
 
-std::optional<job_no_t>
+std::optional<size_t>
 select_lowest_cost(const backfill_candidates_t &candidates) {
   if (candidates.empty()) {
     return std::nullopt;
   }
-  return std::min_element(candidates.begin(), candidates.end(),
-                          [](const auto &lhs, const auto &rhs) {
-                            return lhs.second < rhs.second;
-                          })
-      ->first;
+  const auto selected =
+      std::min_element(candidates.begin(), candidates.end(),
+                       [](const auto &lhs, const auto &rhs) {
+                         return lhs.cost < rhs.cost;
+                       });
+  return static_cast<size_t>(std::distance(candidates.begin(), selected));
 }
 
 void test_external_backfill_selection() {
   backfill_candidates_t observed;
   auto observe_and_select_lowest =
-      [&](const backfill_candidates_t &candidates) -> std::optional<job_no_t> {
+      [&](const backfill_candidates_t &candidates) -> std::optional<size_t> {
     observed = candidates;
     return select_lowest_cost(candidates);
   };
@@ -64,11 +67,11 @@ void test_external_backfill_selection() {
 
   const auto selected = scheduler.schedule(100, {}, 0.0);
   assert((selected == std::vector<job_no_t>{0, 2}));
-  assert((observed == backfill_candidates_t{{2, 2}, {3, 3}}));
+  assert((observed == backfill_candidates_t{{1, 2}, {2, 3}}));
 
   // The comparator considers only cost, so std::min_element keeps the first
   // candidate when costs tie.
-  assert(select_lowest_cost({{7, 4}, {8, 2}, {9, 2}}) == 8);
+  assert(select_lowest_cost({{7, 4}, {8, 2}, {9, 2}}) == 1);
 }
 
 void test_selector_must_return_a_candidate() {
@@ -76,7 +79,7 @@ void test_selector_must_return_a_candidate() {
       100, 0, BackfillPolicy::EASY, 1,
       [](job_no_t, sim_time_t, tdiff_t, num_nodes_t) { return 0; },
       [](const backfill_candidates_t &) {
-        return std::optional<job_no_t>{99};
+        return std::optional<size_t>{99};
       });
   scheduler.insert_job(0, 0.0, 100.0, 70);
   scheduler.insert_job(1, 0.0, 200.0, 50);
@@ -119,9 +122,12 @@ public:
     }
   }
 
-  std::optional<job_no_t> choose(const backfill_candidates_t &candidates) {
-    const running_jobs_t running{{0, {0.0, 10.0, 1}}};
-    return select_backfill_candidate(candidates, 99, running, 0.0);
+  std::optional<size_t> choose(const backfill_candidates_t &candidates) {
+    const running_jobs_t running{{0, {0.0, 10.0, 1, 10.0}}};
+    const auto selected =
+        select_backfill_candidate(candidates, 99, running, 0.0);
+    return selected ? std::optional<size_t>{candidates[*selected].queue_index}
+                    : std::nullopt;
   }
 
   double cost(double projected_power) const {
@@ -145,14 +151,14 @@ void test_easypower_semiclamped_candidate_cost() {
 
   // Projected powers are 12.1 and 11.0. Plain target distance would select
   // 12.1, but the dominant above-P_max branch must select 11.0.
-  if (scheduler.choose({{1, 0}, {2, 0}}) != 2) {
+  if (scheduler.choose({{1, 2.1}, {2, 1.0}}) != 2) {
     throw std::runtime_error(
         "EASYPower semi-clamping did not prefer an in-limit candidate");
   }
 
   // Semi-clamping is not a hard cap: if every candidate exceeds P_max, the
   // least-overshooting candidate is selected.
-  if (scheduler.choose({{1, 0}, {3, 0}}) != 1) {
+  if (scheduler.choose({{1, 2.1}, {3, 3.0}}) != 1) {
     throw std::runtime_error(
         "EASYPower semi-clamping did not minimize above-limit excess");
   }
@@ -160,7 +166,7 @@ void test_easypower_semiclamped_candidate_cost() {
   TestableEASYPowerScheduler capped_backfill(12.0, 10.0, 1.0, 1.0, 144.0, 1.0,
                                              0.0, {10.0, 2.1, 1.0, 3.0}, true,
                                              false);
-  if (capped_backfill.choose({{1, 0}, {3, 0}})) {
+  if (capped_backfill.choose({{1, 2.1}, {3, 3.0}})) {
     throw std::runtime_error(
         "EASYPower backfill cap admitted an above-limit candidate");
   }
@@ -190,7 +196,8 @@ void test_easypower_semiclamped_candidate_cost() {
   TestableEASYPowerScheduler rounded(large_maximum, large_maximum, 1.0, 1.0,
                                      large_maximum * large_maximum, 1.0, 0.0,
                                      {0.0, large_maximum + 1.0, 0.0, 0.0});
-  if (rounded.choose({{1, 0}, {2, 0}}) != 2) {
+  if (rounded.choose(
+          {{1, large_maximum + 1.0}, {2, 0.0}}) != 2) {
     throw std::runtime_error(
         "EASYPower floating-point rounding broke branch dominance");
   }
@@ -207,6 +214,74 @@ void test_easypower_semiclamped_candidate_cost() {
   clamped.refresh_target();
   if (clamped.power_target() != 12.0) {
     throw std::runtime_error("EASYPower target was not clamped to P_max");
+  }
+}
+
+void test_easypower_load_admission_limits() {
+  constexpr const char *trace_path = "/tmp/easypower_admission_limits.csv";
+  {
+    std::ofstream trace(trace_path);
+#if DR_EVT_LEGACY_QUEUE_INPUT
+    trace << "job_submit_time,num_nodes,queue,time_limit,avgpcon,minpcon,"
+             "maxpcon\n"
+          << "0,1,pbatch,1,5,4,6\n"
+          << "0,101,pbatch,1,2,1,3\n"
+          << "0,1,pbatch,1,13,12,14\n"
+          << "0,100,pbatch,1,12,11,12\n"
+          << "0,1,pbatch,1,3,2,4\n";
+#else
+    trace << "job_submit_time,num_nodes,q_id,time_limit,avgpcon,minpcon,"
+             "maxpcon\n"
+          << "0,1,1,1,5,4,6\n"
+          << "0,101,1,1,2,1,3\n"
+          << "0,1,1,1,13,12,14\n"
+          << "0,100,1,1,12,11,12\n"
+          << "0,1,1,1,3,2,4\n";
+#endif
+  }
+
+  auto scheduler = std::make_unique<EASYPowerScheduler>(
+      100, 0, 4, 12.0, 10.0, 1.0, 1.0, 144.0, job_power_function_t{},
+      [](const std::vector<EASYPowerJob> &,
+         const std::vector<EASYPowerJob> &, double, num_nodes_t) {
+        return EASYPowerReplayResult{1.0, 0.0};
+      },
+      0, CircularOverflowPolicy::GROW, true, true);
+  assert(scheduler->maximum_job_power_for_admission() == 12.0);
+
+  Sim_Params params;
+  params.m_infile = trace_path;
+  params.m_total_nodes = 100;
+  params.m_trace_type = TraceType::PCON;
+  params.m_trace_format = "simple";
+  params.m_timestamp_format = "epoch";
+  params.m_run_time_mode = RunTimeMode::LIMIT;
+
+  std::ostringstream diagnostics;
+  auto *original_stderr = std::cerr.rdbuf(diagnostics.rdbuf());
+  try {
+    PconSimulation simulation(params, std::move(scheduler));
+    simulation.run();
+    assert(simulation.get_trace().data().size() == 3u);
+    assert(simulation.get_statistics().jobs_completed == 3u);
+    assert(simulation.get_trace().data()[0].pcon().avgpcon == 5.0);
+    assert(simulation.get_trace().data()[1].pcon().avgpcon == 12.0);
+    assert(simulation.get_trace().data()[2].pcon().avgpcon == 3.0);
+  } catch (...) {
+    std::cerr.rdbuf(original_stderr);
+    std::remove(trace_path);
+    throw;
+  }
+  std::cerr.rdbuf(original_stderr);
+  std::remove(trace_path);
+
+  const std::string messages = diagnostics.str();
+  if (messages.find("Dropped trace row 2") == std::string::npos ||
+      messages.find("maximum allowed nodes") == std::string::npos ||
+      messages.find("Dropped trace row 3") == std::string::npos ||
+      messages.find("maximum allowed power") == std::string::npos) {
+    throw std::runtime_error(
+        "EASYPower did not report both loader admission rejections");
   }
 }
 
@@ -230,12 +305,12 @@ void test_arrival_scans_only_new_jobs() {
   std::vector<backfill_candidates_t> selections;
   auto selector =
       [&selections](
-          const backfill_candidates_t &candidates) -> std::optional<job_no_t> {
+          const backfill_candidates_t &candidates) -> std::optional<size_t> {
     selections.push_back(candidates);
     if (selections.size() == 1) {
       return std::nullopt;
     }
-    return candidates.front().first;
+    return size_t{0};
   };
 
   Simulation simulation(params, cost_from_job_order, selector);
@@ -255,9 +330,9 @@ void test_arrival_scans_only_new_jobs() {
   simulation.advance_to(20.0);
 
   assert(selections.size() == 3);
-  assert((selections[0] == backfill_candidates_t{{2, 2}}));
-  assert((selections[1] == backfill_candidates_t{{3, 3}}));
-  assert((selections[2] == backfill_candidates_t{{2, 2}}));
+  assert((selections[0] == backfill_candidates_t{{1, 2}}));
+  assert((selections[1] == backfill_candidates_t{{2, 3}}));
+  assert((selections[2] == backfill_candidates_t{{1, 2}}));
 }
 
 class ObservingCustomScheduler final : public FCFSEasyCustomScheduler {
@@ -289,7 +364,7 @@ protected:
     fcfs_started_before_candidates = fcfs_jobs_started;
   }
 
-  std::optional<job_no_t> select_backfill_candidate(
+  std::optional<size_t> select_backfill_candidate(
       const backfill_candidates_t &candidates, num_nodes_t available_nodes,
       const running_jobs_t &running_jobs, sim_time_t current_time) override {
     ++selection_calls;
@@ -571,6 +646,7 @@ int main(int argc, char **argv) {
   test_external_backfill_selection();
   test_selector_must_return_a_candidate();
   test_easypower_semiclamped_candidate_cost();
+  test_easypower_load_admission_limits();
   test_arrival_scans_only_new_jobs();
   test_subclass_extension_hooks();
   test_current_utilization_api();

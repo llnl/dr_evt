@@ -52,15 +52,16 @@ auto cost_from_job_order =
       return static_cast<job_cost_t>(job_id);
     };
 auto select_lowest_cost =
-    [](const backfill_candidates_t& candidates) -> std::optional<job_no_t> {
+    [](const backfill_candidates_t& candidates) -> std::optional<size_t> {
       if (candidates.empty()) {
         return std::nullopt;
       }
-      return std::min_element(
+      const auto selected = std::min_element(
           candidates.begin(), candidates.end(),
           [](const auto& lhs, const auto& rhs) {
-            return lhs.second < rhs.second;
-          })->first;
+            return lhs.cost < rhs.cost;
+          });
+      return static_cast<size_t>(std::distance(candidates.begin(), selected));
     };
 
 Simulation sim(params, cost_from_job_order, select_lowest_cost);
@@ -69,10 +70,13 @@ Simulation sim(params, cost_from_job_order, select_lowest_cost);
 The cost function runs when each job enters the wait queue and its result is
 stored as `JobEntry::m_cost`. When the FCFS head is blocked, the scheduler
 collects up to the configured number of feasible candidates in FCFS order and
-passes their `(job_id, cost)` pairs to the selector. Returning an ID not in the
-offered vector is an error. Returning `std::nullopt` skips backfilling for that
-scheduling decision. The example's cost-only `std::min_element` comparison
-selects the first candidate in vector order when multiple costs are equal.
+passes their queue indices and scheduler scalars to the selector. EASYPower
+stores predicted power in that existing scalar. The selector returns a
+position in that candidate vector; returning an out-of-range position is an
+error. Returning `std::nullopt` skips backfilling for that scheduling decision.
+Queue indices are valid only during the current selection call. The example's
+cost-only `std::min_element` comparison selects the first candidate in vector
+order when costs are equal.
 
 `num_max_candidates` is not a wait-queue scan limit. It applies only after the
 custom EASY scheduler has tested jobs for resource and reservation-window
