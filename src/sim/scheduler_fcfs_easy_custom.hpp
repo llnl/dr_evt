@@ -21,12 +21,22 @@ template <typename TraceType> class BasicSimulation;
 /** \addtogroup dr_evt_sim
  *  @{ */
 
-using backfill_candidate_t = std::pair<job_no_t, job_cost_t>;
+/** Ephemeral direct reference to a feasible wait-queue entry. */
+struct BackfillCandidate {
+  size_t queue_index;
+  job_cost_t cost;
+
+  bool operator==(const BackfillCandidate &other) const {
+    return queue_index == other.queue_index && cost == other.cost;
+  }
+};
+
+using backfill_candidate_t = BackfillCandidate;
 using backfill_candidates_t = std::vector<backfill_candidate_t>;
 using job_cost_function_t =
     std::function<job_cost_t(job_no_t, sim_time_t, tdiff_t, num_nodes_t)>;
 using backfill_selector_t =
-    std::function<std::optional<job_no_t>(const backfill_candidates_t &)>;
+    std::function<std::optional<size_t>(const backfill_candidates_t &)>;
 
 /**
  * @brief Customizable FCFS scheduler with externally selected backfilling.
@@ -34,9 +44,10 @@ using backfill_selector_t =
  * FCFS-head handling, circular-buffer growth, and EASY feasibility checks
  * match FCFSEasyCircularScheduler. When a job is inserted, a caller-provided
  * cost function computes the m_cost stored in its wait-queue entry. When the
- * head is blocked, up to num_max_candidates feasible (job_id, cost) pairs are
- * reported to a caller-provided selector. Only the candidate returned by that
- * selector is backfilled during the call.
+ * head is blocked, up to num_max_candidates feasible queue references are
+ * reported to a caller-provided selector. The selector returns a position in
+ * that candidate vector, and the corresponding queue entry is accessed
+ * directly.
  */
 class FCFSEasyCustomScheduler : public SchedulerBase {
 private:
@@ -135,36 +146,45 @@ protected:
   size_t eligible_job_end() const { return m_eligible_end_idx; }
 
   /** Allow a subclass to choose from the bounded feasible candidate set. */
-  virtual std::optional<job_no_t> select_backfill_candidate(
+  virtual std::optional<size_t> select_backfill_candidate(
       const backfill_candidates_t &candidates, num_nodes_t available_nodes,
       const running_jobs_t &effective_running_jobs, sim_time_t current_time);
 
   /**
+   * @brief Return optional power metadata for a job that is starting.
+   * @param[in] job Wait-queue entry selected to start.
+   * @return The predicted power to store in its running record, or std::nullopt
+   *         when the scheduler has no power model.
+   */
+  virtual std::optional<double> running_job_power(const JobEntry &job) const;
+
+  /**
    * @brief Check whether a resource-fitting FCFS head may start now.
-   * @param[in] job_id Identifier of the FCFS head job.
+   * @param[in] job FCFS head wait-queue entry.
    * @param[in] available_nodes Nodes currently available for dispatch.
    * @param[in] effective_running_jobs Running jobs, including starts selected
    *            during this scheduling pass.
    * @param[in] current_time Scheduler timestamp.
    * @return true if the head may start now; otherwise false.
    */
-  virtual bool can_start_fcfs_job(job_no_t job_id, num_nodes_t available_nodes,
+  virtual bool can_start_fcfs_job(const JobEntry &job,
+                                  num_nodes_t available_nodes,
                                   const running_jobs_t &effective_running_jobs,
                                   sim_time_t current_time) const;
 
   /**
    * @brief Project the reservation time for a blocked FCFS head.
-   * @param[in] job_id Identifier of the FCFS head job.
-   * @param[in] nodes_requested Nodes requested by the FCFS head.
+   * @param[in] job FCFS head wait-queue entry.
    * @param[in] available_nodes Nodes currently available for dispatch.
    * @param[in] effective_running_jobs Running jobs, including starts selected
    *            during this scheduling pass.
    * @param[in] current_time Scheduler timestamp.
    * @return Earliest projected time at which the head may start.
    */
-  virtual sim_time_t fcfs_head_reservation_time(
-      job_no_t job_id, num_nodes_t nodes_requested, num_nodes_t available_nodes,
-      const running_jobs_t &effective_running_jobs, sim_time_t current_time);
+  virtual sim_time_t
+  fcfs_head_reservation_time(const JobEntry &job, num_nodes_t available_nodes,
+                             const running_jobs_t &effective_running_jobs,
+                             sim_time_t current_time);
 
   /**
    * Called once after a complete same-timestamp arrival batch becomes
@@ -200,8 +220,8 @@ public:
    * @param[in] num_max_candidates Maximum feasible jobs shown per decision.
    * @param[in] cost_function Function called at insertion to compute m_cost
    * from job ID, submit time, estimated runtime, and requested nodes.
-   * @param[in] selector Function returning a candidate job ID, or nullopt to
-   * make no backfill selection. The selected ID must occur in its input.
+   * @param[in] selector Function returning an index into its candidate vector,
+   * or nullopt to make no backfill selection.
    * @param[in] initial_capacity Initial circular-buffer capacity; zero derives
    * one from initial_job_count.
    * @param[in] overflow_policy Action when the circular buffer is full.

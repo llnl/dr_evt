@@ -104,6 +104,9 @@ struct Standard_Trace_Policy {
   }
   /** @brief Reset runtime accounting before restoring running jobs. */
   void reset_runtime_state() {}
+  static std::optional<double> scheduler_power(const record_type &) {
+    return std::nullopt;
+  }
   void on_start(const record_type &) {}
   void on_finish(const record_type &) {}
 };
@@ -135,6 +138,9 @@ struct Pcon_Trace_Policy {
   }
   /** @brief Reset accumulated Pcon values before restoring running jobs. */
   void reset_runtime_state() { m_current = {}; }
+  static std::optional<double> scheduler_power(const record_type &job) {
+    return job.pcon().avgpcon;
+  }
   void on_start(const record_type &job) {
     const auto &pcon = job.pcon();
     m_current.avgpcon += pcon.avgpcon;
@@ -254,6 +260,11 @@ struct Swf_Trace_Policy {
   }
   /// @brief Reset runtime accounting before restoring running jobs (no-op).
   void reset_runtime_state() {}
+  /** @brief Predicted power for the scheduler. @return Nothing; SWF has no
+   *  power data. */
+  static std::optional<double> scheduler_power(const record_type &) {
+    return std::nullopt;
+  }
   /// @brief Hook called when a job starts (no-op for SWF).
   void on_start(const record_type &) {}
   /// @brief Hook called when a job finishes (no-op for SWF).

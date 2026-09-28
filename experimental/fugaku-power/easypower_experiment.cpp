@@ -12,6 +12,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -127,38 +128,11 @@ struct TelemetryState {
   std::ofstream output;
 };
 
-struct JobMetadata {
-  std::vector<double> powers;
-  std::vector<double> actual_runtime;
-  std::vector<double> time_limit;
-};
-
-JobMetadata load_job_metadata(const std::vector<std::string> &trace_files) {
-  JobMetadata metadata;
-  for (const std::string &trace_file : trace_files) {
-    // Keep only the three scheduler/telemetry vectors after each batch. This
-    // mirrors progressive simulation's global job-ID order without retaining
-    // all parsed trace records in memory at the same time.
-    PconTrace source(trace_file, "simple", "epoch", "+00:00");
-    if (source.load_data() != EXIT_SUCCESS) {
-      throw std::runtime_error("failed to load Pcon metadata from " +
-                               trace_file);
-    }
-    for (const auto &job : source.data()) {
-      metadata.powers.push_back(job.pcon().avgpcon);
-      metadata.actual_runtime.push_back(job.get_actual_run_time());
-      metadata.time_limit.push_back(job.get_limit_time());
-    }
-  }
-  return metadata;
-}
-
 class InstrumentedEASYPowerScheduler final : public EASYPowerScheduler {
 public:
   InstrumentedEASYPowerScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
       size_t num_max_candidates, double maximum_power, double initial_target,
-      job_power_function_t power_function,
       const std::shared_ptr<TelemetryState> &telemetry,
       const std::vector<Capacity_Change> &capacity_changes,
       tdiff_t candidate_time_window, size_t initial_capacity,
@@ -167,7 +141,7 @@ public:
       : EASYPowerScheduler(
             total_nodes, initial_job_count, num_max_candidates, maximum_power,
             initial_target, 1.0, 1.0, maximum_power * maximum_power,
-            std::move(power_function),
+            {},
             [telemetry,
              &capacity_changes](const std::vector<EASYPowerJob> &waiting,
                                 const std::vector<EASYPowerJob> &running,
@@ -221,6 +195,21 @@ public:
     }
   }
 
+  void insert_job_with_metadata(
+      job_no_t job_id, sim_time_t submit_time, tdiff_t run_time_estimate,
+      num_nodes_t nodes_requested,
+      const SchedulerJobMetadata &metadata) override {
+    EASYPowerScheduler::insert_job_with_metadata(
+        job_id, submit_time, run_time_estimate, nodes_requested, metadata);
+    const size_t required = static_cast<size_t>(job_id) + 1;
+    if (telemetry_->actual_runtime.size() < required) {
+      telemetry_->actual_runtime.resize(required);
+      telemetry_->time_limit.resize(required);
+    }
+    telemetry_->actual_runtime[job_id] = metadata.actual_run_time;
+    telemetry_->time_limit[job_id] = metadata.time_limit;
+  }
+
   double capacity_aware_resource_area() const { return allocated_area_; }
   double capacity_aware_utilization() const {
     return capacity_area_ > 0.0 ? allocated_area_ / capacity_area_ : 0.0;
@@ -247,7 +236,7 @@ protected:
         fcfs_jobs_started);
   }
 
-  std::optional<job_no_t>
+  std::optional<size_t>
   select_backfill_candidate(const backfill_candidates_t &candidates,
                             num_nodes_t available_nodes,
                             const running_jobs_t &effective_running_jobs,
@@ -272,22 +261,23 @@ protected:
     const sim_time_t cutoff =
         queue[head_index].submit_time + candidate_time_window_;
     backfill_candidates_t within_window;
+    std::vector<size_t> original_positions;
     within_window.reserve(candidates.size());
-    size_t queue_index = head_index;
-    for (const auto &candidate : candidates) {
-      while (queue_index < eligible_end &&
-             queue[queue_index].job_id != candidate.first) {
-        ++queue_index;
+    original_positions.reserve(candidates.size());
+    for (size_t position = 0; position < candidates.size(); ++position) {
+      const auto &candidate = candidates[position];
+      if (candidate.queue_index >= eligible_end) {
+        throw std::logic_error("EASYPower candidate has invalid queue index");
       }
-      if (queue_index == eligible_end) {
-        throw std::logic_error("EASYPower candidate is absent from wait queue");
-      }
-      if (queue[queue_index].submit_time <= cutoff) {
+      if (queue[candidate.queue_index].submit_time <= cutoff) {
         within_window.push_back(candidate);
+        original_positions.push_back(position);
       }
     }
-    return EASYPowerScheduler::select_backfill_candidate(
+    const auto selected = EASYPowerScheduler::select_backfill_candidate(
         within_window, available_nodes, effective_running_jobs, current_time);
+    return selected ? std::optional<size_t>{original_positions[*selected]}
+                    : std::nullopt;
   }
 
   void on_scheduling_cycle_complete(num_nodes_t available_nodes,
@@ -445,15 +435,7 @@ int main(int argc, char **argv) {
     } else {
       params.m_infile = input;
     }
-    const std::vector<std::string> single_trace = {input};
-    const auto &trace_files =
-        progressive ? params.m_infile_list_parsed : single_trace;
-    JobMetadata metadata = load_job_metadata(trace_files);
-    const std::vector<double> &powers = metadata.powers;
-
     auto telemetry = std::make_shared<TelemetryState>();
-    telemetry->actual_runtime = std::move(metadata.actual_runtime);
-    telemetry->time_limit = std::move(metadata.time_limit);
 
     params.m_total_nodes = total_nodes;
     params.m_trace_type = TraceType::PCON;
@@ -498,11 +480,8 @@ int main(int argc, char **argv) {
       params.set_outfile((output / "jobs.csv").string());
       params.set_resource_trace((output / "resources.csv").string());
       auto scheduler = std::make_unique<InstrumentedEASYPowerScheduler>(
-          params.m_total_nodes, progressive ? 0 : powers.size(),
+          params.m_total_nodes, 0,
           params.m_num_max_candidates, maximum_power, initial_target,
-          [&powers](job_no_t id, sim_time_t, tdiff_t, num_nodes_t) {
-            return powers.at(id);
-          },
           telemetry, capacity_changes, candidate_time_window,
           params.m_wait_queue_capacity, params.m_wait_queue_overflow,
           params.m_cap_backfill_power, params.m_cap_fcfs_power);
