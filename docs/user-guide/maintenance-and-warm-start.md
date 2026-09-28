@@ -162,6 +162,18 @@ barrier. Jobs submitted before `t` but not yet running are intentionally
 excluded because inheriting a historical wait queue is a separate scheduling
 policy choice.
 
+### Current limitation: historical waiting jobs are not restored
+
+Replay warm start reconstructs jobs that were running at the boundary, but it
+does not reconstruct jobs submitted before `t` that were still waiting then.
+It therefore cannot reproduce the historical pending queue, its ordering, or
+pre-boundary wait durations.
+
+Restoring those jobs is future work. It must preserve the boundary-time
+resource and power state of running jobs while restoring waiting jobs in a
+well-defined order under the active capacity schedule. Until then, warm start
+models the live allocation at `t`, not the complete historical queue state.
+
 ### Synthetic initialization traces (legacy workaround)
 
 `prepare_warm_start_trace.py` is an alternative workaround for environments
