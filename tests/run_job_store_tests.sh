@@ -33,9 +33,8 @@
 # 1. Requesting a tiny initial capacity - forcing several grow
 #    reallocations during loading - still produces byte-identical
 #    job-output to requesting the default (already-sufficient) capacity.
-# 2. A rejected job doesn't stall the front-of-buffer sweep - it's
-#    skipped immediately via the sentinel check, and every job behind
-#    it still completes and gets written correctly.
+# 2. A job exceeding total_nodes is dropped before entering the job store,
+#    and every admissible job behind it still completes and is written.
 # 3. Running stats (completed count, wait/turnaround time, makespan) are
 #    identical either way - they're accumulated incrementally in Trace
 #    as each job is written, not re-derived by iterating m_data after
@@ -190,11 +189,8 @@ fi
 echo ""
 echo "Testing: rejected job doesn't stall the front-reclaiming sweep"
 
-# Job 1 requests more nodes than total_nodes exists - rejected at
-# submission, submit_time set to the sentinel so the front-reclaiming
-# sweep skips it immediately rather than waiting forever for an
-# end_time that will never resolve. capacity=2 with 4 jobs forces the
-# sweep to actually reach it mid-run, not just at the final flush.
+# Job 1 requests more nodes than total_nodes provides and is dropped while
+# loading, before it can consume a job-store slot or receive a job ID.
 reject_trace="tests/test_traces/feature/rejected_job.csv"
 
 reject_out="$TEST_WORK_DIR/reject_out.csv"
@@ -210,12 +206,12 @@ $SIMULATOR "$reject_trace" \
     --outfile "$reject_out" \
     > "$reject_log" 2>&1
 
-# Expect: rejection logged, exactly 3 data lines in the output (the 3
+# Expect: drop logged, exactly 3 data lines in the output (the 3
 # real jobs - header plus 3, so 4 total), and "Jobs completed: 3".
 data_lines=$(($(wc -l < "$reject_out") - 1))
 
-if ! grep -qi "rejected" "$reject_log"; then
-    echo "  ✗ FAIL - rejection was not logged"
+if ! grep -q "Dropped trace row" "$reject_log"; then
+    echo "  ✗ FAIL - dropped job was not logged"
     FAIL=$((FAIL + 1))
 elif [ "$data_lines" -ne 3 ]; then
     echo "  ✗ FAIL - expected 3 completed jobs in output, found $data_lines"

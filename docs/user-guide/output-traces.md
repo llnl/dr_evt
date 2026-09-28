@@ -33,8 +33,8 @@ job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit
 ```
 
 `begin_time` and `end_time` are the schedule produced by simulation.
-`exit_status` is written as `0`. Jobs rejected before scheduling are not
-written to this output. With
+`exit_status` is written as `0`. Jobs dropped during input admission are not
+written to this output; each drop is reported on standard error. With
 `-DDR_EVT_LEGACY_QUEUE_INPUT=ON`, the equivalent selected input/output column
 is the legacy named `queue` field instead of `q_id`.
 

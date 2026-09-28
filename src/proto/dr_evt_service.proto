@@ -57,6 +57,7 @@ message ClientMessage {
 // from a flat Sim_Params-equivalent config (same fields as the existing
 // protobuf --config schema). Must be sent before any other request.
 message InitRequest {
+    // System node limit; larger file-loaded jobs are dropped before storage.
     uint32 total_nodes = 1;
     string trace_format = 2;       // "simple", "lassen", or "swf" (default: "simple")
     string timestamp_format = 3;   // retained "epoch"/"iso" compatibility value

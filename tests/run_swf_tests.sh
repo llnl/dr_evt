@@ -62,12 +62,13 @@ else
 fi
 
 # 3. --cores_per_node overrides the header: with 1 the 16-processor job
-#    needs 16 nodes and is rejected against total_nodes 4.
+#    needs 16 nodes and is dropped at load against total_nodes 4.
 if "$SIMULATOR" "$FIX/tiny.swf" --trace_type swf --cores_per_node 1 \
         --total_nodes 4 "${COMMON[@]}" --outfile "$WORK_DIR/cpn1.out" \
         >"$WORK_DIR/cpn1.log" 2>&1 \
    && grep -q "cores_per_node=1" "$WORK_DIR/cpn1.log" \
-   && grep -q "requests 16 nodes" "$WORK_DIR/cpn1.log"; then
+   && grep -q "nodes=16): request exceeds maximum allowed nodes (4)" \
+        "$WORK_DIR/cpn1.log"; then
     echo "  ✓ --cores_per_node 1 overrides the header-derived divisor"
     PASS=$((PASS + 1))
 else

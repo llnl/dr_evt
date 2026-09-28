@@ -176,7 +176,9 @@ Apply a CSV of capacity change points during simulation. See
 for the schema, semantics, detection tool, and initialization workflow.
 
 `--total_nodes` remains the physical maximum and the oversized-job rejection
-threshold. Scheduled values may range from zero through that maximum. A job
+threshold. Oversized input jobs are dropped during loading and reported with
+their source row, submit time, requested nodes, and limit. Scheduled values may
+range from zero through that maximum. A job
 that exceeds only the current scheduled capacity waits for a later increase;
 it is not rejected. Reductions do not preempt running jobs, and a zero value
 pauses all new starts for this workload. A schedule row at time zero replaces
@@ -347,6 +349,18 @@ The command-line and prototext parsers store this value in `Sim_Params`. The
 cost and selection callbacks themselves are installed when constructing the
 custom scheduler through the C++ or Python API; they cannot be encoded
 in a command-line argument or prototext file.
+
+### `--cap_backfill_power` and `--cap_fcfs_power`
+
+These independent, disabled-by-default flags configure hard EASYPower
+admission. `--cap_backfill_power` filters resource-feasible backfill candidates
+whose predicted addition would put total running power above `P_max`.
+`--cap_fcfs_power` applies the same check to each resource-feasible FCFS-prefix
+job. The standard schedulers retain these values in `Sim_Params` but do not use
+them; they take effect when constructing `EASYPowerScheduler`. Independently
+of these combined-power flags, EASYPower drops an input job during loading when
+that job's `maxpcon` exceeds `P_max`, and prints its source row, submit time,
+node count, `maxpcon`, and limit.
 
 ### `-p, --priority_policy POLICY`
 Job priority/ordering policy.

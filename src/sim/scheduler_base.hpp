@@ -234,6 +234,11 @@ public:
   /** @brief Destroy a scheduler through its polymorphic base interface. */
   virtual ~SchedulerBase() = default;
 
+  /** Per-job power admission limit, if this scheduler defines one. */
+  virtual std::optional<double> maximum_job_power_for_admission() const {
+    return std::nullopt;
+  }
+
   /**
    * @brief Set the grid used for projected reservation timestamps.
    * @param[in] resolution Seconds between planning timestamps; zero retains

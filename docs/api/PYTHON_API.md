@@ -54,7 +54,7 @@ or `None`.
 | `redis_key_prefix` | `str` |
 | `checkpoint_file` | `str` |
 | `checkpoint_interval_jobs` | `int` |
-| `total_nodes` | `int` |
+| `total_nodes` | `int`; file-loaded jobs requesting more are dropped and reported |
 | `capacity_schedule` | `str` |
 | `sim_start_time` | `float` |
 | `trace_format` | `str` |

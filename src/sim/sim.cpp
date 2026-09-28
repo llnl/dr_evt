@@ -395,6 +395,9 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
   configure_node_release_delay();
+  m_trace.set_admission_limits(
+      params.m_total_nodes,
+      m_scheduler->maximum_job_power_for_admission());
   reset_capacity_schedule();
 }
 
@@ -434,6 +437,9 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
   configure_node_release_delay();
+  m_trace.set_admission_limits(
+      params.m_total_nodes,
+      m_scheduler->maximum_job_power_for_admission());
   reset_capacity_schedule();
 }
 
@@ -471,6 +477,9 @@ BasicSimulation<TraceType>::BasicSimulation(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
   configure_node_release_delay();
+  m_trace.set_admission_limits(
+      params.m_total_nodes,
+      m_scheduler->maximum_job_power_for_admission());
   reset_capacity_schedule();
 }
 
