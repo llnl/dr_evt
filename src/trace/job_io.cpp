@@ -15,9 +15,11 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
+#include "trace/trace_policy.hpp"
 
 namespace dr_evt {
 
@@ -26,9 +28,127 @@ using std::endl;
 using std::string;
 using std::vector;
 
+namespace {
+
+bool exceeds_node_limit(const Job_Record &job, num_jobs_t source_row,
+                        const Trace_Admission_Limits *limits) {
+  if (limits == nullptr || !limits->maximum_nodes ||
+      job.get_num_nodes() <= *limits->maximum_nodes) {
+    return false;
+  }
+  if (limits->report_dropped_jobs) {
+    std::cerr << "Dropped trace row " << source_row
+              << " (submit_time=" << dr_evt::to_string(job.get_submit_time())
+              << ", nodes=" << job.get_num_nodes()
+              << "): request exceeds maximum allowed nodes ("
+              << *limits->maximum_nodes << ")\n";
+  }
+  return true;
+}
+
+class Standard_Record_Sink {
+public:
+  Standard_Record_Sink(vector<Job_Record> &records,
+                       const Trace_Admission_Limits *limits)
+      : m_records(records), m_limits(limits) {}
+
+  void initialize(const string &) {}
+  int empty_input_result() const { return EXIT_SUCCESS; }
+  void append(Job_Record &&job, const string &, num_jobs_t source_row) {
+    if (exceeds_node_limit(job, source_row, m_limits)) {
+      return;
+    }
+    m_records.emplace_back(std::move(job));
+  }
+
+private:
+  vector<Job_Record> &m_records;
+  const Trace_Admission_Limits *m_limits;
+};
+
+class Pcon_Record_Sink {
+public:
+  Pcon_Record_Sink(vector<Pcon_Job_Record> &records,
+                   const Trace_Admission_Limits *limits)
+      : m_records(records), m_limits(limits) {}
+
+  void initialize(const string &header) {
+    std::unordered_map<string, size_t> columns;
+    const auto fields = comma_separate(header);
+    for (size_t i = 0; i < fields.size(); ++i) {
+      columns.emplace(trim(header.substr(fields[i].first, fields[i].second)),
+                      i);
+    }
+
+    m_avg_index = required_index(columns, "avgpcon");
+    m_min_index = required_index(columns, "minpcon");
+    m_max_index = required_index(columns, "maxpcon");
+  }
+
+  int empty_input_result() const { return EXIT_FAILURE; }
+
+  void append(Job_Record &&job, const string &line, num_jobs_t source_row) {
+    if (exceeds_node_limit(job, source_row, m_limits)) {
+      return;
+    }
+    const auto fields = comma_separate(line);
+    if (m_avg_index >= fields.size() || m_min_index >= fields.size() ||
+        m_max_index >= fields.size()) {
+      throw std::invalid_argument("Pcon trace row " +
+                                  std::to_string(source_row) +
+                                  " has fewer columns than its header");
+    }
+
+    Pcon_Values pcon;
+    set_by(pcon.avgpcon,
+           trim(line.substr(fields[m_avg_index].first,
+                            fields[m_avg_index].second)));
+    set_by(pcon.minpcon,
+           trim(line.substr(fields[m_min_index].first,
+                            fields[m_min_index].second)));
+    set_by(pcon.maxpcon,
+           trim(line.substr(fields[m_max_index].first,
+                            fields[m_max_index].second)));
+    if (m_limits != nullptr && m_limits->maximum_job_power &&
+        pcon.maxpcon > *m_limits->maximum_job_power) {
+      if (m_limits->report_dropped_jobs) {
+        std::cerr << "Dropped trace row " << source_row
+                  << " (submit_time="
+                  << dr_evt::to_string(job.get_submit_time())
+                  << ", nodes=" << job.get_num_nodes()
+                  << ", maxpcon=" << pcon.maxpcon
+                  << "): maxpcon exceeds maximum allowed power ("
+                  << *m_limits->maximum_job_power << ")\n";
+      }
+      return;
+    }
+    m_records.emplace_back(std::move(job), pcon);
+  }
+
+private:
+  static size_t required_index(
+      const std::unordered_map<string, size_t> &columns, const char *name) {
+    const auto found = columns.find(name);
+    if (found == columns.end()) {
+      throw std::invalid_argument(string("Pcon trace requires column '") +
+                                  name + "'");
+    }
+    return found->second;
+  }
+
+  vector<Pcon_Job_Record> &m_records;
+  const Trace_Admission_Limits *m_limits;
+  size_t m_avg_index = 0;
+  size_t m_min_index = 0;
+  size_t m_max_index = 0;
+};
+
+} // namespace
+
 #if DR_EVT_LEGACY_QUEUE_INPUT
-int load(const string &fname, const Data_Columns &dcols,
-         vector<Job_Record> &data, num_jobs_t max_cnt) {
+template <typename RecordSink>
+int load_impl(const string &fname, const Data_Columns &dcols, RecordSink &sink,
+              num_jobs_t max_cnt) {
   if (fname.empty()) {
     return EXIT_FAILURE;
   }
@@ -51,7 +171,10 @@ int load(const string &fname, const Data_Columns &dcols,
   }
 
   string line;
-  std::getline(ifs, line); // Consume the header line
+  if (!std::getline(ifs, line)) {
+    return sink.empty_input_result();
+  }
+  sink.initialize(line);
 
   if (max_cnt == static_cast<num_jobs_t>(0u)) {
     max_cnt = std::numeric_limits<num_jobs_t>::max();
@@ -139,10 +262,11 @@ int load(const string &fname, const Data_Columns &dcols,
       // particular sample that is not compliant.
 #if SHOW_ORG_NO
       // line number starts from 1
-      data.push_back(Job_Record(cnt, rec_str, timestamp_encoding));
+      Job_Record job(cnt, rec_str, timestamp_encoding);
 #else
-      data.push_back(Job_Record(rec_str, timestamp_encoding));
+      Job_Record job(rec_str, timestamp_encoding);
 #endif
+      sink.append(std::move(job), line, cnt);
     } catch (std::domain_error &e) {
       // Ignore this case
       std::cerr << std::string(e.what()) + ": [" + std::to_string(cnt) + "]"
@@ -158,14 +282,15 @@ int load(const string &fname, const Data_Columns &dcols,
   return EXIT_SUCCESS;
 }
 #else
-/** @brief Load CSV trace rows into job records using configured columns.
+/** @brief Load CSV trace rows through a policy-selected record sink.
  * @param[in] fname Input trace filename.
  * @param[in] dcols Validated input-column mapping.
- * @param[out] data Destination records appended from the file.
+ * @param[in,out] sink Destination that stores each accepted source row.
  * @param[in] max_cnt Maximum records to load; zero means no explicit limit.
  * @return `EXIT_SUCCESS` on success, otherwise a nonzero status. */
-int load(const string &fname, const Data_Columns &dcols,
-         vector<Job_Record> &data, num_jobs_t max_cnt) {
+template <typename RecordSink>
+int load_impl(const string &fname, const Data_Columns &dcols, RecordSink &sink,
+              num_jobs_t max_cnt) {
   if (fname.empty()) {
     return EXIT_FAILURE;
   }
@@ -182,7 +307,10 @@ int load(const string &fname, const Data_Columns &dcols,
   }
 
   string line;
-  std::getline(ifs, line); // Consume the header line.
+  if (!std::getline(ifs, line)) {
+    return sink.empty_input_result();
+  }
+  sink.initialize(line);
   if (max_cnt == static_cast<num_jobs_t>(0u)) {
     max_cnt = std::numeric_limits<num_jobs_t>::max();
   }
@@ -223,12 +351,13 @@ int load(const string &fname, const Data_Columns &dcols,
           timestamp_encoding = detect_timestamp_encoding(fields.at(1));
           timestamp_encoding_detected = true;
         }
-        data.emplace_back(fields, queue,
-                          dcols.get_trace_mode() == TraceMode::REPLAY,
-                          timestamp_encoding);
+        Job_Record job(fields, queue,
+                       dcols.get_trace_mode() == TraceMode::REPLAY,
+                       timestamp_encoding);
 #if SHOW_ORG_NO
-        data.back().set_org_line_no(cnt);
+        job.set_org_line_no(cnt);
 #endif
+        sink.append(std::move(job), line, cnt);
       } catch (std::domain_error &e) {
         std::cerr << std::string(e.what()) + ": [" + std::to_string(cnt) + "]"
                   << endl;
@@ -268,12 +397,13 @@ int load(const string &fname, const Data_Columns &dcols,
         timestamp_encoding = detect_timestamp_encoding(fields.at(1));
         timestamp_encoding_detected = true;
       }
-      data.emplace_back(fields, Queue1,
-                        dcols.get_trace_mode() == TraceMode::REPLAY,
-                        timestamp_encoding);
+      Job_Record job(fields, Queue1,
+                     dcols.get_trace_mode() == TraceMode::REPLAY,
+                     timestamp_encoding);
 #if SHOW_ORG_NO
-      data.back().set_org_line_no(cnt);
+      job.set_org_line_no(cnt);
 #endif
+      sink.append(std::move(job), line, cnt);
     } catch (std::domain_error &e) {
       std::cerr << std::string(e.what()) + ": [" + std::to_string(cnt) + "]"
                 << endl;
@@ -286,6 +416,20 @@ int load(const string &fname, const Data_Columns &dcols,
   return EXIT_SUCCESS;
 }
 #endif // DR_EVT_LEGACY_QUEUE_INPUT
+
+int load(const string &fname, const Data_Columns &dcols,
+         vector<Job_Record> &data, num_jobs_t max_cnt,
+         const Trace_Admission_Limits *limits) {
+  Standard_Record_Sink sink(data, limits);
+  return load_impl(fname, dcols, sink, max_cnt);
+}
+
+int load(const string &fname, const Data_Columns &dcols,
+         vector<Pcon_Job_Record> &data, num_jobs_t max_cnt,
+         const Trace_Admission_Limits *limits) {
+  Pcon_Record_Sink sink(data, limits);
+  return load_impl(fname, dcols, sink, max_cnt);
+}
 
 /** @brief Print requested limits beside actual execution durations.
  * @param[in] data Job records to print. */

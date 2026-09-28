@@ -36,7 +36,8 @@ message DR_EVT_Params {
         bool verbose = 8;
 
         // Scheduling parameters
-        uint32 total_nodes = 9;         // System node count (default: 795)
+        // System node count (default: 795); larger input jobs are dropped.
+        uint32 total_nodes = 9;
         string backfill_policy = 10;     // "easy", "conservative", "hybrid", or "none" (default: "easy")
         string priority_policy = 11;    // "fcfs", "fcfs_alt", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
 

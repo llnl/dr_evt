@@ -24,6 +24,9 @@ namespace dr_evt {
 /** \addtogroup dr_evt_trace
  *  @{ */
 
+class Pcon_Job_Record;
+struct Trace_Admission_Limits;
+
 /**
  * @brief Load Job_Record values from a trace file.
  * @param[in] fname Input trace filename.
@@ -34,7 +37,22 @@ namespace dr_evt {
  */
 int load(const std::string &fname, const Data_Columns &dcols,
          std::vector<Job_Record> &data,
-         num_jobs_t max_cnt = static_cast<num_jobs_t>(0u));
+         num_jobs_t max_cnt = static_cast<num_jobs_t>(0u),
+         const Trace_Admission_Limits *limits = nullptr);
+
+/**
+ * @brief Load jobs and their Pcon values from a trace file in one pass.
+ * @param[in] fname Input trace filename.
+ * @param[in] dcols Validated column mapping for the trace format.
+ * @param[out] data Destination Pcon records appended from the file.
+ * @param[in] max_cnt Maximum source rows to inspect; zero means no explicit
+ * limit.
+ * @return EXIT_SUCCESS on success, otherwise a nonzero error code.
+ */
+int load(const std::string &fname, const Data_Columns &dcols,
+         std::vector<Pcon_Job_Record> &data,
+         num_jobs_t max_cnt = static_cast<num_jobs_t>(0u),
+         const Trace_Admission_Limits *limits = nullptr);
 
 /** @brief Write a collection of jobs in tabular trace form.
  * @tparam JobContainer Container supporting empty(), front(), and iteration.

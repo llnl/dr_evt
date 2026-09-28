@@ -64,6 +64,9 @@ public:
 
   double power_target() const { return m_power_target; }
   double maximum_power() const { return m_maximum_power; }
+  std::optional<double> maximum_job_power_for_admission() const override {
+    return m_maximum_power;
+  }
 
 protected:
   /** Evaluate the specified semi-clamped cost for a projected total power. */

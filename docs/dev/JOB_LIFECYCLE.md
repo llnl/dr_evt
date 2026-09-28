@@ -95,10 +95,13 @@ Simulation::append_job()
      -> SchedulerBase::insert_job()  add scheduling data to the wait queue
 ```
 
-`submit_job()` records resource occupancy as observed at arrival, rejects jobs
-that request more than the system's total nodes, and inserts accepted jobs into
-the scheduler. Queue-length statistics count the earlier jobs already waiting
-when each accepted job arrives.
+File loading drops jobs that request more than the system's total nodes before
+they enter the trace store or receive a job ID. EASYPower additionally drops a
+job whose `maxpcon` exceeds `P_max`. Both cases print the source row
+and identifying job values. `submit_job()` retains the node-limit check for
+jobs arriving through the live append APIs, then records resource occupancy
+and inserts accepted jobs into the scheduler. Queue-length statistics count
+the earlier jobs already waiting when each accepted job arrives.
 
 `SchedulerBase::insert_job()` and `Trace::insert_job()` deliberately operate
 on different structures despite their shared name. The former is wait-queue
@@ -113,9 +116,9 @@ retry duplicate jobs and is therefore not an acceptable failure mode.
 The resulting state progression is:
 
 ```text
-known future job -> waiting -> running -> completed -> written -> reclaimed
-                       \
-                        -> rejected (request exceeds total capacity)
+input row -> admitted job -> waiting -> running -> completed -> written
+         \
+          -> dropped (node request or EASYPower per-job power exceeds limit)
 ```
 
 Rejected jobs never enter the wait queue and are omitted from scheduled-job

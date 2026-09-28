@@ -119,6 +119,8 @@ protected:
   size_t m_replay_jobs_enqueued;
   double m_memory_pressure_fraction =
       0.0; ///< 0.0 = disabled; see set_memory_pressure_fraction()
+  /// Limits used to discard jobs before assigning trace-store job IDs.
+  Trace_Admission_Limits m_admission_limits;
 
   /// Tracks continuity across load_next_file() calls: the latest
   /// submit_time seen across every file loaded so far this way, so
@@ -287,6 +289,15 @@ public:
    * @param[in] n_lines_to_read Maximum rows to load; zero means all rows.
    * @return `EXIT_SUCCESS` on success, otherwise a nonzero status. */
   int load_data(num_jobs_t n_lines_to_read = static_cast<num_jobs_t>(0u));
+
+  /** Configure whole-record filtering applied by all subsequent file loads. */
+  void set_admission_limits(
+      std::optional<num_nodes_t> maximum_nodes,
+      std::optional<double> maximum_job_power = std::nullopt,
+      bool report_dropped_jobs = true) {
+    m_admission_limits = {maximum_nodes, maximum_job_power,
+                          report_dropped_jobs};
+  }
 
   /// Allow write access to the job trace data - for range-based
   /// iteration only (write_simulated_trace(), print(), etc.). Indexing

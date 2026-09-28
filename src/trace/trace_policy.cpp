@@ -22,88 +22,23 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
-#include <unordered_map>
 
 namespace dr_evt {
 
 int Standard_Trace_Policy::load_records(const std::string &fname,
                                         const Data_Columns &dcols,
                                         std::vector<record_type> &records,
-                                        num_jobs_t max_count) {
-  return load(fname, dcols, records, max_count);
+                                        num_jobs_t max_count,
+                                        const Trace_Admission_Limits &limits) {
+  return load(fname, dcols, records, max_count, &limits);
 }
 
 int Pcon_Trace_Policy::load_records(const std::string &fname,
                                     const Data_Columns &dcols,
                                     std::vector<record_type> &records,
-                                    num_jobs_t max_count) {
-  std::vector<Job_Record> jobs;
-  const int rc = load(fname, dcols, jobs, max_count);
-  if (rc != EXIT_SUCCESS) {
-    return rc;
-  }
-
-  std::ifstream input(fname);
-  if (!input) {
-    return EXIT_FAILURE;
-  }
-
-  std::string line;
-  if (!std::getline(input, line)) {
-    return EXIT_FAILURE;
-  }
-
-  std::unordered_map<std::string, size_t> columns;
-  const auto header_fields = comma_separate(line);
-  for (size_t i = 0; i < header_fields.size(); ++i) {
-    columns.emplace(
-        trim(line.substr(header_fields[i].first, header_fields[i].second)), i);
-  }
-
-  auto required_index = [&columns](const char *name) {
-    const auto found = columns.find(name);
-    if (found == columns.end()) {
-      throw std::invalid_argument(std::string("Pcon trace requires column '") +
-                                  name + "'");
-    }
-    return found->second;
-  };
-  const size_t avg_index = required_index("avgpcon");
-  const size_t min_index = required_index("minpcon");
-  const size_t max_index = required_index("maxpcon");
-
-  if (max_count == static_cast<num_jobs_t>(0u)) {
-    max_count = std::numeric_limits<num_jobs_t>::max();
-  }
-
-  records.reserve(jobs.size());
-  num_jobs_t count = 0;
-  while (count < max_count && records.size() < jobs.size() &&
-         std::getline(input, line)) {
-    ++count;
-    const auto fields = comma_separate(line);
-    if (avg_index >= fields.size() || min_index >= fields.size() ||
-        max_index >= fields.size()) {
-      throw std::invalid_argument("Pcon trace row " + std::to_string(count) +
-                                  " has fewer columns than its header");
-    }
-    Pcon_Values pcon;
-    set_by(pcon.avgpcon, trim(line.substr(fields[avg_index].first,
-                                          fields[avg_index].second)));
-    set_by(pcon.minpcon, trim(line.substr(fields[min_index].first,
-                                          fields[min_index].second)));
-    set_by(pcon.maxpcon, trim(line.substr(fields[max_index].first,
-                                          fields[max_index].second)));
-    records.emplace_back(std::move(jobs[records.size()]), pcon);
-  }
-
-  if (records.size() != jobs.size()) {
-    throw std::invalid_argument(
-        "Pcon trace parsing produced a different number of experimental "
-        "values and job records");
-  }
-
-  return EXIT_SUCCESS;
+                                    num_jobs_t max_count,
+                                    const Trace_Admission_Limits &limits) {
+  return load(fname, dcols, records, max_count, &limits);
 }
 
 namespace {
@@ -192,7 +127,8 @@ unsigned Swf_Trace_Policy::header_max_nodes(const std::string &fname) {
 int Swf_Trace_Policy::load_records(const std::string &fname,
                                    const Data_Columns &dcols,
                                    std::vector<record_type> &records,
-                                   num_jobs_t max_count) {
+                                   num_jobs_t max_count,
+                                   const Trace_Admission_Limits &limits) {
   std::ifstream input(fname);
   if (!input) {
     std::cerr << "Failed to open SWF trace: " << fname << std::endl;
@@ -211,6 +147,8 @@ int Swf_Trace_Policy::load_records(const std::string &fname,
   num_jobs_t accepted = 0;
   num_jobs_t skipped = 0;
   num_jobs_t clamped = 0;
+  num_jobs_t dropped = 0;
+  num_jobs_t data_row = 0;
   size_t line_no = 0;
   std::string line;
   // Fixed once the first data line is seen, so a header key that appears
@@ -238,6 +176,7 @@ int Swf_Trace_Policy::load_records(const std::string &fname,
       }
       continue;
     }
+    ++data_row;
     if (!divisor_fixed) {
       const unsigned override = dcols.cores_per_node_override();
       if (override > 0u) {
@@ -306,6 +245,20 @@ int Swf_Trace_Policy::load_records(const std::string &fname,
     const std::uint8_t swf_q = (queue_no >= 1.0 && queue_no <= 255.0)
                                    ? static_cast<std::uint8_t>(queue_no)
                                    : static_cast<std::uint8_t>(0u);
+    if (limits.maximum_nodes && job.get_num_nodes() > *limits.maximum_nodes) {
+      // Same admission rule and diagnostic as the CSV loaders: a request
+      // larger than the system can never be scheduled, so it never receives
+      // a simulation job ID.
+      if (limits.report_dropped_jobs) {
+        std::cerr << "Dropped trace row " << data_row << " (submit_time="
+                  << dr_evt::to_string(job.get_submit_time())
+                  << ", nodes=" << job.get_num_nodes()
+                  << "): request exceeds maximum allowed nodes ("
+                  << *limits.maximum_nodes << ")\n";
+      }
+      ++dropped;
+      continue;
+    }
     records.emplace_back(std::move(job), swf_no, swf_q);
     ++accepted;
   }
@@ -321,7 +274,8 @@ int Swf_Trace_Policy::load_records(const std::string &fname,
   std::cerr << "SWF: loaded " << accepted << " records, skipped " << skipped
             << " (processors<=0 or run_time<=0), cores_per_node="
             << static_cast<unsigned>(cores_per_node) << ", run time truncated"
-            << " to the requested time for " << clamped << std::endl;
+            << " to the requested time for " << clamped << ", dropped "
+            << dropped << " above the node limit" << std::endl;
   return EXIT_SUCCESS;
 }
 
