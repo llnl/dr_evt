@@ -30,6 +30,7 @@ struct Trace_Admission_Limits {
   std::optional<num_nodes_t> maximum_nodes;
   std::optional<double> maximum_job_power;
   bool report_dropped_jobs = true;
+  std::optional<double> maximum_average_job_power;
 };
 
 /** Values carried by one job in the Pcon experiment. */
@@ -107,6 +108,9 @@ struct Standard_Trace_Policy {
   static std::optional<double> scheduler_power(const record_type &) {
     return std::nullopt;
   }
+  static std::optional<double> scheduler_maximum_power(const record_type &) {
+    return std::nullopt;
+  }
   void on_start(const record_type &) {}
   void on_finish(const record_type &) {}
 };
@@ -140,6 +144,10 @@ struct Pcon_Trace_Policy {
   void reset_runtime_state() { m_current = {}; }
   static std::optional<double> scheduler_power(const record_type &job) {
     return job.pcon().avgpcon;
+  }
+  static std::optional<double>
+  scheduler_maximum_power(const record_type &job) {
+    return job.pcon().maxpcon;
   }
   void on_start(const record_type &job) {
     const auto &pcon = job.pcon();

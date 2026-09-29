@@ -51,6 +51,7 @@ struct SchedulerJobMetadata {
   std::optional<double> predicted_power;
   tdiff_t actual_run_time;
   timeout_t time_limit;
+  std::optional<double> maximum_power = std::nullopt;
 };
 
 /**
@@ -245,6 +246,20 @@ public:
   /** Per-job power admission limit, if this scheduler defines one. */
   virtual std::optional<double> maximum_job_power_for_admission() const {
     return std::nullopt;
+  }
+
+  /** Per-job average-power admission limit, if defined by the scheduler. */
+  virtual std::optional<double>
+  maximum_average_job_power_for_admission() const {
+    return std::nullopt;
+  }
+
+  /** Select the trace power value copied into running-job scheduler state. */
+  virtual std::optional<double> scheduling_power(
+      std::optional<double> average_power,
+      std::optional<double> maximum_power) const {
+    (void)maximum_power;
+    return average_power;
   }
 
   /**

@@ -109,6 +109,19 @@ public:
     set_by(pcon.maxpcon,
            trim(line.substr(fields[m_max_index].first,
                             fields[m_max_index].second)));
+    if (m_limits != nullptr && m_limits->maximum_average_job_power &&
+        pcon.avgpcon > *m_limits->maximum_average_job_power) {
+      if (m_limits->report_dropped_jobs) {
+        std::cerr << "Dropped trace row " << source_row
+                  << " (submit_time="
+                  << dr_evt::to_string(job.get_submit_time())
+                  << ", nodes=" << job.get_num_nodes()
+                  << ", avgpcon=" << pcon.avgpcon
+                  << "): avgpcon exceeds maximum allowed average power ("
+                  << *m_limits->maximum_average_job_power << ")\n";
+      }
+      return;
+    }
     if (m_limits != nullptr && m_limits->maximum_job_power &&
         pcon.maxpcon > *m_limits->maximum_job_power) {
       if (m_limits->report_dropped_jobs) {

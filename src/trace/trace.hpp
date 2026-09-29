@@ -294,9 +294,10 @@ public:
   void set_admission_limits(
       std::optional<num_nodes_t> maximum_nodes,
       std::optional<double> maximum_job_power = std::nullopt,
-      bool report_dropped_jobs = true) {
+      bool report_dropped_jobs = true,
+      std::optional<double> maximum_average_job_power = std::nullopt) {
     m_admission_limits = {maximum_nodes, maximum_job_power,
-                          report_dropped_jobs};
+                          report_dropped_jobs, maximum_average_job_power};
   }
 
   /// Allow write access to the job trace data - for range-based
@@ -325,6 +326,7 @@ public:
 
   /** Power estimate embedded in the retained record, when the policy has one. */
   std::optional<double> scheduler_power(job_no_t job_no) const;
+  std::optional<double> scheduler_maximum_power(job_no_t job_no) const;
 
   /// Jobs reclaimed so far - add to data().size() for the true total
   /// ever loaded (data().size() alone undercounts once anything's

@@ -8,7 +8,7 @@
 #ifndef DR_EVT_SIM_SCHEDULER_EASY_POWER_HPP
 #define DR_EVT_SIM_SCHEDULER_EASY_POWER_HPP
 
-#include "sim/scheduler_fcfs_easy_custom.hpp"
+#include "sim/scheduler_power_cap.hpp"
 #include <functional>
 
 namespace dr_evt {
@@ -27,8 +27,6 @@ struct EASYPowerReplayResult {
   double running_energy;
 };
 
-using job_power_function_t =
-    std::function<double(job_no_t, sim_time_t, tdiff_t, num_nodes_t)>;
 using easypower_forward_replay_t = std::function<EASYPowerReplayResult(
     const std::vector<EASYPowerJob> &, const std::vector<EASYPowerJob> &,
     double, num_nodes_t)>;
@@ -46,7 +44,7 @@ using easypower_forward_replay_t = std::function<EASYPowerReplayResult(
  * is refreshed again when the first backfill candidate set is ready; later
  * backfills at the same event reuse it.
  */
-class EASYPowerScheduler : public FCFSEasyCustomScheduler {
+class EASYPowerScheduler : public PowerCappedFCFSScheduler {
 public:
   EASYPowerScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
@@ -57,20 +55,7 @@ public:
       CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW,
       bool cap_backfill_power = false, bool cap_fcfs_power = false);
 
-  void insert_job(job_no_t job_id, sim_time_t submit_time,
-                  tdiff_t run_time_estimate,
-                  num_nodes_t nodes_requested) override;
-
-  void insert_job_with_metadata(
-      job_no_t job_id, sim_time_t submit_time, tdiff_t run_time_estimate,
-      num_nodes_t nodes_requested,
-      const SchedulerJobMetadata &metadata) override;
-
   double power_target() const { return m_power_target; }
-  double maximum_power() const { return m_maximum_power; }
-  std::optional<double> maximum_job_power_for_admission() const override {
-    return m_maximum_power;
-  }
 
 protected:
   /** Evaluate the specified semi-clamped cost for a projected total power. */
@@ -81,18 +66,6 @@ protected:
                             num_nodes_t available_nodes,
                             const running_jobs_t &effective_running_jobs,
                             sim_time_t current_time) override;
-
-  std::optional<double>
-  running_job_power(const JobEntry &job) const override;
-
-  bool can_start_fcfs_job(const JobEntry &job, num_nodes_t available_nodes,
-                          const running_jobs_t &effective_running_jobs,
-                          sim_time_t current_time) const override;
-
-  sim_time_t
-  fcfs_head_reservation_time(const JobEntry &job, num_nodes_t available_nodes,
-                             const running_jobs_t &effective_running_jobs,
-                             sim_time_t current_time) override;
 
   void on_jobs_became_eligible(size_t newly_eligible_begin, size_t eligible_end,
                                num_nodes_t available_nodes,
@@ -116,16 +89,12 @@ private:
   running_power_jobs(const running_jobs_t &running_jobs,
                      sim_time_t current_time) const;
 
-  double m_maximum_power;
   double m_power_target;
   double m_target_weight;
   double m_maximum_weight;
   double m_dominant_cost;
-  job_power_function_t m_power_function;
   easypower_forward_replay_t m_forward_replay;
   bool m_target_refreshed_for_arrivals;
-  bool m_cap_backfill_power;
-  bool m_cap_fcfs_power;
 };
 
 } // namespace dr_evt
