@@ -4,6 +4,8 @@
 if(NOT TARGET easypower-experiment-bin)
   add_executable(easypower-experiment-bin
     "${CMAKE_SOURCE_DIR}/experimental/fugaku-power/easypower_experiment.cpp"
+    "${CMAKE_SOURCE_DIR}/src/sim/scheduler_power_cap.cpp"
+    "${CMAKE_SOURCE_DIR}/src/sim/scheduler_easy_pc.cpp"
     "${CMAKE_SOURCE_DIR}/src/sim/scheduler_easy_power.cpp")
   target_include_directories(easypower-experiment-bin PUBLIC
     "${CMAKE_BINARY_DIR}"

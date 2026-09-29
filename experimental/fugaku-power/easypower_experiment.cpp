@@ -1,5 +1,6 @@
 #include "params/sim_params.hpp"
 #include "sim/capacity_schedule.hpp"
+#include "sim/scheduler_easy_pc.hpp"
 #include "sim/scheduler_easy_power.hpp"
 #include "sim/sim.hpp"
 #include "trace/trace.hpp"
@@ -10,6 +11,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -365,7 +367,9 @@ int main(int argc, char **argv) {
   if (argc < 8) {
     std::cerr
         << "usage: easypower_experiment "
-           "{easy|easypower|easy-progressive|easypower-progressive} "
+           "{easy|easypower|easy-pc-mean|easy-pc-max|easy-progressive|"
+           "easypower-progressive|easy-pc-mean-progressive|"
+           "easy-pc-max-progressive} "
            "INPUT_OR_LIST OUTPUT_DIR "
            "TOTAL_NODES CANDIDATE_LIMIT MAX_POWER_W INITIAL_TARGET_W "
            "[CANDIDATE_TIME_WINDOW_S] [CAPACITY_SCHEDULE.csv] "
@@ -374,7 +378,9 @@ int main(int argc, char **argv) {
            "list and run the listed batches as one workload.\n"
            "  A zero time window means unlimited. A positive window limits "
            "candidates to submission times no later than the blocked FCFS "
-           "head's submission time plus the window.\n";
+           "head's submission time plus the window. EASY+PC modes scan the "
+           "complete EASY-feasible queue in FCFS order and ignore candidate "
+           "limit, initial target, and candidate time window.\n";
     return 2;
   }
 
@@ -420,11 +426,18 @@ int main(int argc, char **argv) {
     std::filesystem::create_directories(output);
 
     const bool progressive =
-        mode == "easy-progressive" || mode == "easypower-progressive";
+        mode == "easy-progressive" || mode == "easypower-progressive" ||
+        mode == "easy-pc-mean-progressive" ||
+        mode == "easy-pc-max-progressive";
     const bool run_easy = mode == "easy" || mode == "easy-progressive";
     const bool run_easypower =
         mode == "easypower" || mode == "easypower-progressive";
-    if (!run_easy && !run_easypower) {
+    const bool run_easy_pc_mean =
+        mode == "easy-pc-mean" || mode == "easy-pc-mean-progressive";
+    const bool run_easy_pc_max =
+        mode == "easy-pc-max" || mode == "easy-pc-max-progressive";
+    if (!run_easy && !run_easypower && !run_easy_pc_mean &&
+        !run_easy_pc_max) {
       std::cerr << "unknown mode: " << mode << '\n';
       return 2;
     }
@@ -467,6 +480,27 @@ int main(int argc, char **argv) {
       simulation->write_simulated_trace();
       simulation->write_resource_trace(params.get_resource_trace());
       print_stats("easy", stats);
+    } else if (run_easy_pc_mean || run_easy_pc_max) {
+      if (cap_backfill_power || cap_fcfs_power) {
+        throw std::invalid_argument(
+            "EASY+PC modes always cap FCFS and backfill admission; separate "
+            "cap flags are not accepted");
+      }
+      params.set_outfile((output / "jobs.csv").string());
+      params.set_resource_trace((output / "resources.csv").string());
+      auto scheduler = std::make_unique<EASYPCScheduler>(
+          params.m_total_nodes, 0, std::numeric_limits<size_t>::max(),
+          maximum_power,
+          run_easy_pc_mean ? EASYPCPowerMode::MEAN
+                           : EASYPCPowerMode::MAXIMUM,
+          job_power_function_t{}, params.m_wait_queue_capacity,
+          params.m_wait_queue_overflow);
+      auto *simulation = new PconSimulation(params, std::move(scheduler));
+      simulation->run();
+      const auto stats = simulation->get_statistics();
+      simulation->write_simulated_trace();
+      simulation->write_resource_trace(params.get_resource_trace());
+      print_stats(run_easy_pc_mean ? "easy-pc-mean" : "easy-pc-max", stats);
     } else {
       telemetry->output.open(output / "target_horizon.csv");
       if (!telemetry->output) {
