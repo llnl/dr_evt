@@ -625,6 +625,8 @@ endif()
 # prediction-horizon APIs.
 add_executable(test_custom_scheduler-bin
   tests/test_custom_scheduler.cpp
+  src/sim/scheduler_power_cap.cpp
+  src/sim/scheduler_easy_pc.cpp
   src/sim/scheduler_easy_power.cpp)
 target_include_directories(test_custom_scheduler-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>

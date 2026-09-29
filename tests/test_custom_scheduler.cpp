@@ -6,6 +6,7 @@
  ******************************************************************************/
 
 #define DR_EVT_HAS_CONFIG 1
+#include "sim/scheduler_easy_pc.hpp"
 #include "sim/scheduler_easy_power.hpp"
 #include "sim/scheduler_fcfs_easy_custom.hpp"
 #include "sim/sim.hpp"
@@ -214,6 +215,46 @@ void test_easypower_semiclamped_candidate_cost() {
   clamped.refresh_target();
   if (clamped.power_target() != 12.0) {
     throw std::runtime_error("EASYPower target was not clamped to P_max");
+  }
+}
+
+void test_easy_pc_mean_and_maximum_modes() {
+  EASYPCScheduler mean_scheduler(10, 0, 4, 10.0,
+                                 EASYPCPowerMode::MEAN);
+  EASYPCScheduler max_scheduler(10, 0, 4, 10.0,
+                                EASYPCPowerMode::MAXIMUM);
+
+  const SchedulerJobMetadata metadata{4.0, 10.0, 10, 8.0};
+  if (mean_scheduler.scheduling_power(metadata.predicted_power,
+                                      metadata.maximum_power) != 4.0 ||
+      max_scheduler.scheduling_power(metadata.predicted_power,
+                                     metadata.maximum_power) != 8.0) {
+    throw std::runtime_error("EASY+PC selected the wrong power metric");
+  }
+  if (mean_scheduler.maximum_average_job_power_for_admission() != 10.0 ||
+      mean_scheduler.maximum_job_power_for_admission() ||
+      max_scheduler.maximum_average_job_power_for_admission() ||
+      max_scheduler.maximum_job_power_for_admission() != 10.0) {
+    throw std::runtime_error("EASY+PC exposed the wrong admission limit");
+  }
+
+  // Job 0 starts as the FCFS prefix. Job 1 becomes the blocked head. Of the
+  // EASY-feasible jobs behind it, job 2 is first but exceeds the power cap;
+  // the scheduler must retain queue order while finding and starting job 3.
+  const std::array<double, 4> powers{6.0, 5.0, 5.0, 4.0};
+  EASYPCScheduler scheduler(
+      10, 0, 4, 10.0, EASYPCPowerMode::MEAN,
+      [powers](job_no_t job_id, sim_time_t, tdiff_t, num_nodes_t) {
+        return powers.at(job_id);
+      });
+  scheduler.insert_job(0, 0.0, 100.0, 6);
+  scheduler.insert_job(1, 0.0, 200.0, 5);
+  scheduler.insert_job(2, 0.0, 10.0, 1);
+  scheduler.insert_job(3, 0.0, 10.0, 1);
+  const auto selected = scheduler.schedule(10, {}, 0.0);
+  if (selected != std::vector<job_no_t>{0, 3}) {
+    throw std::runtime_error(
+        "EASY+PC did not choose the first power-feasible backfill job");
   }
 }
 
@@ -646,6 +687,7 @@ int main(int argc, char **argv) {
   test_external_backfill_selection();
   test_selector_must_return_a_candidate();
   test_easypower_semiclamped_candidate_cost();
+  test_easy_pc_mean_and_maximum_modes();
   test_easypower_load_admission_limits();
   test_arrival_scans_only_new_jobs();
   test_subclass_extension_hooks();

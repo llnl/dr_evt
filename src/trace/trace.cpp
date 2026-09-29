@@ -950,6 +950,14 @@ BasicTrace<Policy>::scheduler_power(job_no_t job_no) const {
 }
 
 template <typename Policy>
+std::optional<double>
+BasicTrace<Policy>::scheduler_maximum_power(job_no_t job_no) const {
+  (void)job_at(job_no);
+  const size_t idx = static_cast<size_t>(job_no - m_num_reclaimed);
+  return Policy::scheduler_maximum_power(m_data[idx]);
+}
+
+template <typename Policy>
 bool BasicTrace<Policy>::is_front_reclaimable(sim_time_t current_time) const {
   if (m_data.empty()) {
     return false;

@@ -103,6 +103,11 @@ int main() {
   try {
     dr_evt::PconTrace trace(input_path, "simple", "epoch", "+00:00");
     passed = trace.load_data() == EXIT_SUCCESS;
+    if (trace.scheduler_power(0) != 1.5 ||
+        trace.scheduler_maximum_power(0) != 3.0) {
+      std::cerr << "Pcon scheduler power metadata regression\n";
+      passed = false;
+    }
     trace.run_job_trace(output_path, 4);
 
     std::ifstream output(output_path);
@@ -169,6 +174,19 @@ int main() {
         messages.find("maximum allowed power") == std::string::npos) {
       std::cerr << "trace admission filtering/diagnostics regression\n"
                 << messages;
+      passed = false;
+    }
+
+    dr_evt::Trace_Admission_Limits average_limits;
+    average_limits.maximum_nodes = 4;
+    average_limits.maximum_average_job_power = 10.0;
+    std::vector<dr_evt::Pcon_Job_Record> average_records;
+    dr_evt::Pcon_Trace_Policy::load_records(
+        admission_input_path, columns, average_records, 0, average_limits);
+    if (average_records.size() != 1u ||
+        average_records[0].get_submit_time().first != 3 ||
+        !expect_pcon(average_records[0], 3, 2, 4)) {
+      std::cerr << "average-power admission filtering regression\n";
       passed = false;
     }
 
