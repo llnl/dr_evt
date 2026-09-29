@@ -32,5 +32,18 @@ sbatch jobs/easypower/easypower-fcfs-cap-2023-06-n64-t1h.slurm
 ./run_n_left.sh 12
 ```
 
+To submit only unfinished FCFS-cap runs for the 2022 traces, or for the
+combined 2023 and 2024 traces, use the year-scoped wrappers:
+
+```bash
+./run_2022.sh
+./run_2023_2024.sh
+```
+
+Each invocation submits at most 60 jobs. Pass a count from 1 through 60 to
+submit a smaller batch, for example `./run_2022.sh 36`. Both wrappers apply
+the same artifact completeness and shared-prerequisite checks as
+`run_n_left.sh`.
+
 The original suite's environment overrides remain available. Use a distinct
 `OUTPUT_ROOT` for every parameter set.
