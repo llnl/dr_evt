@@ -115,8 +115,8 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
 
                 rejected = subprocess.run(
                     [str(suite / "run_one.sh"), "baseline", "2023-07"],
-                    check=False, env=environment, capture_output=True,
-                    text=True)
+                    check=False, env=environment, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, universal_newlines=True)
                 self.assertEqual(rejected.returncode, 2)
                 self.assertIn("reuses capacity and baseline", rejected.stderr)
 
@@ -132,7 +132,8 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
                 })
                 result = subprocess.run(
                     [str(suite / "run_n_left.sh"), "1"], check=False,
-                    env=environment, capture_output=True, text=True)
+                    env=environment, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, universal_newlines=True)
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("shared input, capacity, or baseline is incomplete",
                               result.stderr)
@@ -184,7 +185,8 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
 
                 result = subprocess.run(
                     [str(FCFS_SUITE / script_name), "2"], check=True,
-                    env=environment, capture_output=True, text=True)
+                    env=environment, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, universal_newlines=True)
                 submitted = capture.read_text().splitlines()
                 self.assertEqual(len(submitted), 2)
                 self.assertIn("Submitted 2 jobs", result.stdout)
@@ -195,7 +197,8 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
     def test_fcfs_submitter_rejects_more_than_60_jobs(self):
         result = subprocess.run(
             [str(FCFS_SUITE / "run_2022.sh"), "61"], check=False,
-            capture_output=True, text=True)
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True)
         self.assertEqual(result.returncode, 2)
         self.assertIn("COUNT_FROM_1_TO_60", result.stderr)
 
