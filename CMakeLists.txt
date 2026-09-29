@@ -972,6 +972,13 @@ if(DR_EVT_WITH_UNIT_TESTING)
       LABELS "unit;scripts;multi-cluster-bf"
       SKIP_RETURN_CODE 77
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(
+      NAME test_monthly_easy_pc_scripts
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_monthly_easy_pc_scripts.py)
+    set_tests_properties(test_monthly_easy_pc_scripts PROPERTIES
+      LABELS "unit;scripts"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   endif()
 
   set_tests_properties(

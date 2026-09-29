@@ -90,3 +90,9 @@ python/dr_evt_market/lc_traces/
 /experimental/multi-cluster/prediction-utilization-study/
 /experimental/multi-cluster/relative-performance-plots/
 /experimental/multi-cluster/trace-scale-comparison-plots/
+
+# Experiments
+experimental/fugaku-power/results
+experimental/fugaku-power/literature-search
+experimental/fugaku-power/private-notes
+experimental/fugaku-power/individual-monthly-warm-start-*
