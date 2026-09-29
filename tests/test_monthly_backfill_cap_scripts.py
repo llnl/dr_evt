@@ -137,6 +137,68 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
                 self.assertIn("shared input, capacity, or baseline is incomplete",
                               result.stderr)
 
+    def test_fcfs_year_submitters_select_requested_years(self):
+        cases = (
+            ("run_2022.sh", ("2022-",)),
+            ("run_2023_2024.sh", ("2023-", "2024-")),
+        )
+        for script_name, expected_prefixes in cases:
+            with self.subTest(script=script_name), \
+                    tempfile.TemporaryDirectory() as temporary:
+                temporary = Path(temporary)
+                shared = temporary / "shared"
+                first_month = "2022-01" if script_name == "run_2022.sh" \
+                    else "2023-01"
+                month_root = shared / first_month
+                for directory in (month_root / "capacity-detection",
+                                  month_root / "easy-baseline",
+                                  month_root / "input"):
+                    directory.mkdir(parents=True)
+                (month_root / "capacity-detection/.complete").touch()
+                (month_root / "capacity-detection/"
+                 "resource_capacity_without_reduced_capacity.csv").write_text(
+                     "capacity\n")
+                (month_root / "easy-baseline/.complete").touch()
+                (month_root / "easy-baseline/jobs.csv").write_text("jobs\n")
+                (month_root / "easy-baseline/resources.csv").write_text(
+                    "resources\n")
+                (month_root / "input/warm-start-scheduling_trace.csv").write_text(
+                    "trace\n")
+                (month_root / "input/infile.txt").write_text("input\n")
+
+                bin_dir = temporary / "bin"
+                bin_dir.mkdir()
+                capture = temporary / "submitted.txt"
+                sbatch = bin_dir / "sbatch"
+                sbatch.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "printf '%s\\n' \"$1\" >>\"$CAPTURE\"\n")
+                sbatch.chmod(0o700)
+                environment = os.environ.copy()
+                environment.update({
+                    "PATH": f"{bin_dir}:{environment['PATH']}",
+                    "CAPTURE": str(capture),
+                    "OUTPUT_ROOT": str(temporary / "results"),
+                    "SHARED_OUTPUT_ROOT": str(shared),
+                })
+
+                result = subprocess.run(
+                    [str(FCFS_SUITE / script_name), "2"], check=True,
+                    env=environment, capture_output=True, text=True)
+                submitted = capture.read_text().splitlines()
+                self.assertEqual(len(submitted), 2)
+                self.assertIn("Submitted 2 jobs", result.stdout)
+                self.assertTrue(all(
+                    any(prefix in path for prefix in expected_prefixes)
+                    for path in submitted))
+
+    def test_fcfs_submitter_rejects_more_than_60_jobs(self):
+        result = subprocess.run(
+            [str(FCFS_SUITE / "run_2022.sh"), "61"], check=False,
+            capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("COUNT_FROM_1_TO_60", result.stderr)
+
     def run_shared_runner(self, cap_backfill_power, cap_fcfs_power):
         temporary_context = tempfile.TemporaryDirectory()
         self.addCleanup(temporary_context.cleanup)
