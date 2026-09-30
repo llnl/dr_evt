@@ -18,9 +18,20 @@ BOTH_SUITE = (ROOT / "experimental/fugaku-power/"
               "individual-monthly-warm-start-both-power-caps-jobs")
 BASE_RUNNER = (ROOT / "experimental/fugaku-power/"
                "individual-monthly-warm-start-jobs/run_one.sh")
+MANIFEST_HEADER = ("kind\tmonth\tjob_window\ttime_window\tscript\t"
+                   "prerequisite\n")
 
 
 class MonthlyBackfillCapScriptsTest(unittest.TestCase):
+    @staticmethod
+    def write_manifest(path, kind, months):
+        rows = [MANIFEST_HEADER]
+        for index, month in enumerate(months, start=1):
+            rows.append(
+                f"{kind}\t{month}\t{index}\t1h\tjob-{month}-{index}.slurm\t"
+                "shared capacity and baseline\n")
+        path.write_text("".join(rows))
+
     def test_generator_creates_isolated_capped_job_set(self):
         spec = importlib.util.spec_from_file_location(
             "generate_capped_monthly_jobs", SUITE / "generate_job_set.py")
@@ -126,9 +137,17 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
                     tempfile.TemporaryDirectory() as temporary:
                 temporary = Path(temporary)
                 environment = os.environ.copy()
+                manifest = temporary / "manifest.tsv"
+                kind = {
+                    SUITE: "easypower-cap",
+                    FCFS_SUITE: "easypower-fcfs-cap",
+                    BOTH_SUITE: "easypower-both-caps",
+                }[suite]
+                self.write_manifest(manifest, kind, ("2023-07",))
                 environment.update({
                     "OUTPUT_ROOT": str(temporary / "variant-results"),
                     "SHARED_OUTPUT_ROOT": str(temporary / "missing-shared"),
+                    "MANIFEST_PATH": str(manifest),
                 })
                 result = subprocess.run(
                     [str(suite / "run_n_left.sh"), "1"], check=False,
@@ -176,11 +195,16 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
                     "printf '%s\\n' \"$1\" >>\"$CAPTURE\"\n")
                 sbatch.chmod(0o700)
                 environment = os.environ.copy()
+                manifest = temporary / "manifest.tsv"
+                self.write_manifest(
+                    manifest, "easypower-fcfs-cap",
+                    (first_month, first_month, "2021-01"))
                 environment.update({
                     "PATH": f"{bin_dir}:{environment['PATH']}",
                     "CAPTURE": str(capture),
                     "OUTPUT_ROOT": str(temporary / "results"),
                     "SHARED_OUTPUT_ROOT": str(shared),
+                    "MANIFEST_PATH": str(manifest),
                 })
 
                 result = subprocess.run(
