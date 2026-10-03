@@ -33,6 +33,7 @@ struct Trace_Admission_Limits;
  * @param[in] dcols Validated column mapping for the trace format.
  * @param[out] data Destination records appended from the file.
  * @param[in] max_cnt Maximum records to load; zero means no explicit limit.
+ * @param[in] limits Optional admission limits used to filter parsed records.
  * @return EXIT_SUCCESS on success, otherwise a nonzero error code.
  */
 int load(const std::string &fname, const Data_Columns &dcols,
@@ -47,6 +48,7 @@ int load(const std::string &fname, const Data_Columns &dcols,
  * @param[out] data Destination Pcon records appended from the file.
  * @param[in] max_cnt Maximum source rows to inspect; zero means no explicit
  * limit.
+ * @param[in] limits Optional admission limits used to filter parsed records.
  * @return EXIT_SUCCESS on success, otherwise a nonzero error code.
  */
 int load(const std::string &fname, const Data_Columns &dcols,
