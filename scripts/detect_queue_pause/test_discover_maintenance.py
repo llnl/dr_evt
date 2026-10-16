@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 
 from discover_maintenance import (
@@ -8,6 +10,7 @@ from discover_maintenance import (
     detect_periods,
     filename_month_window,
     parse_args,
+    read_traces,
 )
 
 
@@ -324,6 +327,34 @@ class DetectorTests(unittest.TestCase):
         )
         self.assertEqual(start, 1690815600)
         self.assertEqual(end, 1693494000)
+
+    def test_rows_repeated_across_files_are_counted_once(self):
+        header = "job_submit_time,begin_time,end_time,num_nodes\n"
+        crossing = "0,0,7200,10\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            first = os.path.join(temporary, "a.csv")
+            second = os.path.join(temporary, "b.csv")
+            with open(first, "w") as stream:
+                stream.write(header + crossing + "0,0,3600,5\n")
+            with open(second, "w") as stream:
+                stream.write(header + crossing + "3600,3600,7200,2\n")
+            builder = TimelineBuilder(3600)
+            stats = read_traces([first, second], builder)
+        self.assertEqual(stats.rows, 4)
+        self.assertEqual(stats.duplicate_rows, 1)
+        self.assertEqual(sum(builder.start_nodes.values()), 17)
+
+    def test_identical_rows_within_one_file_are_distinct_jobs(self):
+        header = "job_submit_time,begin_time,end_time,num_nodes\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = os.path.join(temporary, "a.csv")
+            with open(path, "w") as stream:
+                stream.write(header + "0,0,3600,4\n" * 2)
+            builder = TimelineBuilder(3600)
+            stats = read_traces([path], builder)
+        self.assertEqual(stats.rows, 2)
+        self.assertEqual(stats.duplicate_rows, 0)
+        self.assertEqual(sum(builder.start_nodes.values()), 8)
 
 
 if __name__ == "__main__":
