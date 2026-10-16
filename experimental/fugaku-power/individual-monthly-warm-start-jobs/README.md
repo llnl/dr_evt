@@ -14,6 +14,10 @@ explicit-job warm start, rather than the simulator's replay warm-start mode.
 
 ## Generate and run
 
+The generator, `prepare_monthly_input.py`, and the month-boundary helpers in
+`run_one.sh` need Python 3.9 or newer for `zoneinfo`; the Slurm jobs load a
+suitable Python module themselves.
+
 Run this once after changing the monthly trace inventory:
 
 ```bash
