@@ -187,7 +187,8 @@ public:
             initial_capacity, overflow_policy, cap_backfill_power,
             cap_fcfs_power),
         telemetry_(telemetry), capacity_changes_(capacity_changes),
-        candidate_time_window_(candidate_time_window), allocated_area_(0.0),
+        candidate_time_window_(candidate_time_window),
+        accounting_started_(false), allocated_area_(0.0),
         capacity_area_(0.0), accounting_time_(0.0), accounted_nodes_(0),
         accounted_capacity_(capacity_at(0.0)) {
     if (!std::isfinite(candidate_time_window_) ||
@@ -308,6 +309,14 @@ protected:
 private:
   void update_accounting(const running_jobs_t &running_jobs,
                          sim_time_t current_time) {
+    if (!accounting_started_) {
+      // Simulation time is absolute epoch seconds, so the accounting window
+      // must open at the first scheduling event rather than at time zero.
+      // Otherwise the idle span before the trace begins (about 1.7e9 s) is
+      // counted as unused capacity and utilization collapses toward zero.
+      accounting_time_ = current_time;
+      accounting_started_ = true;
+    }
     const tdiff_t duration = current_time - accounting_time_;
     if (duration < 0.0) {
       throw std::logic_error("EASYPower capacity accounting moved backward");
@@ -341,6 +350,7 @@ private:
   std::shared_ptr<TelemetryState> telemetry_;
   const std::vector<Capacity_Change> &capacity_changes_;
   tdiff_t candidate_time_window_;
+  bool accounting_started_;
   double allocated_area_;
   double capacity_area_;
   sim_time_t accounting_time_;
