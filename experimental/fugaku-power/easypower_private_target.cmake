@@ -1,5 +1,5 @@
-# Private CMake injection for the unpublished EASYPower experiment.
-# Load with -DCMAKE_PROJECT_INCLUDE=<this-file>; the public CMake files remain
+# Adds the EASYPower experiment target to a build. Load with
+# -DCMAKE_PROJECT_INCLUDE=<this-file>; the public CMake files remain
 # unaware of these targets and sources.
 if(NOT TARGET easypower-experiment-bin)
   add_executable(easypower-experiment-bin
