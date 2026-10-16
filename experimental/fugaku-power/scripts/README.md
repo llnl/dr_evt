@@ -6,7 +6,9 @@ otherwise.
 ## Requirements
 
 Use Python 3.7 or newer. The trace splitter and copied reference scheduler use
-only the Python standard library. Plotting and Parquet analysis require:
+only the Python standard library. The monthly warm-start suites
+(`../individual-monthly-warm-start-*`) need Python 3.9 or newer for
+`zoneinfo`. Plotting and Parquet analysis require:
 
 ```bash
 python3 -m pip install pandas pyarrow numpy matplotlib
