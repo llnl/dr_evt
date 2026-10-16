@@ -8,10 +8,14 @@ would exceed `MAXIMUM_POWER`.
 The inherited defaults are `MAXIMUM_POWER=12000000` (12 MW) and
 `INITIAL_TARGET=MAXIMUM_POWER`. The 12 MW value is an earlier study parameter,
 not a documented physical Fugaku limit. These admission caps do not preempt
-running jobs or reduce power already present at the warm-start boundary. Every
-EASYPower run drops an input job whose `maxpcon` exceeds
+running jobs or reduce power already present at the warm-start boundary:
+`run_one.sh` passes `--uncapped_submit_time=<month start>` so the initialization
+jobs, which are submitted exactly at the boundary, start regardless of either
+cap and the month begins in its historical state. The caps govern only later
+arrivals. Every EASYPower run drops an input job whose `maxpcon` exceeds
 `MAXIMUM_POWER` before assigning simulation job IDs and reports it in the log.
-This per-job admission rule is independent of both aggregate-power caps.
+This per-job admission rule is independent of both aggregate-power caps and
+also applies to initialization jobs.
 
 Results default to:
 

@@ -258,6 +258,53 @@ void test_easy_pc_mean_and_maximum_modes() {
   }
 }
 
+void test_power_cap_initialization_job_exemption() {
+  // Warm-start initialization jobs are submitted at the boundary and may sum
+  // to more than the cap. With the exemption they all start, as they did
+  // historically; later arrivals remain capped against the resulting power.
+  const std::array<double, 4> powers{6.0, 5.0, 3.0, 1.0};
+  auto power_of = [powers](job_no_t job_id, sim_time_t, tdiff_t,
+                           num_nodes_t) { return powers.at(job_id); };
+
+  EASYPCScheduler capped(10, 0, 4, 10.0, EASYPCPowerMode::MEAN, power_of);
+  capped.insert_job(0, 0.0, 100.0, 2);
+  capped.insert_job(1, 0.0, 100.0, 2);
+  capped.insert_job(2, 0.0, 100.0, 1);
+  const auto capped_starts = capped.schedule(10, {}, 0.0);
+  if (std::find(capped_starts.begin(), capped_starts.end(), 1) !=
+      capped_starts.end()) {
+    throw std::runtime_error(
+        "EASY+PC started an above-cap job without an exemption");
+  }
+
+  EASYPCScheduler exempting(10, 0, 4, 10.0, EASYPCPowerMode::MEAN, power_of);
+  exempting.set_uncapped_submit_time(0.0);
+  exempting.insert_job(0, 0.0, 100.0, 2);
+  exempting.insert_job(1, 0.0, 100.0, 2);
+  exempting.insert_job(2, 0.0, 100.0, 1);
+  exempting.insert_job(3, 1.0, 100.0, 1);
+  if (exempting.schedule(10, {}, 0.0) != std::vector<job_no_t>{0, 1, 2}) {
+    throw std::runtime_error(
+        "EASY+PC did not start every initialization job at the boundary");
+  }
+  const running_jobs_t running{{0, {0.0, 100.0, 2, 6.0}},
+                               {1, {0.0, 100.0, 2, 5.0}},
+                               {2, {0.0, 100.0, 1, 3.0}}};
+  if (!exempting.schedule(5, running, 1.0).empty()) {
+    throw std::runtime_error(
+        "EASY+PC admitted a post-boundary job above the cap already reached "
+        "by initialization jobs");
+  }
+
+  TestableEASYPowerScheduler capped_fcfs(12.0, 10.0, 1.0, 1.0, 144.0, 1.0, 0.0,
+                                         {10.0, 2.1, 1.0, 3.0}, true, true);
+  capped_fcfs.set_uncapped_submit_time(0.0);
+  if (capped_fcfs.schedule(100, {}, 0.0) != std::vector<job_no_t>{0, 1, 2, 3}) {
+    throw std::runtime_error(
+        "EASYPower caps did not exempt warm-start initialization jobs");
+  }
+}
+
 void test_easypower_load_admission_limits() {
   constexpr const char *trace_path = "/tmp/easypower_admission_limits.csv";
   {
@@ -688,6 +735,7 @@ int main(int argc, char **argv) {
   test_selector_must_return_a_candidate();
   test_easypower_semiclamped_candidate_cost();
   test_easy_pc_mean_and_maximum_modes();
+  test_power_cap_initialization_job_exemption();
   test_easypower_load_admission_limits();
   test_arrival_scans_only_new_jobs();
   test_subclass_extension_hooks();

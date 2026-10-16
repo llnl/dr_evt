@@ -383,14 +383,18 @@ int main(int argc, char **argv) {
            "INPUT_OR_LIST OUTPUT_DIR "
            "TOTAL_NODES CANDIDATE_LIMIT MAX_POWER_W INITIAL_TARGET_W "
            "[CANDIDATE_TIME_WINDOW_S] [CAPACITY_SCHEDULE.csv] "
-           "[MAX_TIME_EPOCH_S] [--cap_backfill_power] [--cap_fcfs_power]\n"
+           "[MAX_TIME_EPOCH_S] [--cap_backfill_power] [--cap_fcfs_power] "
+           "[--uncapped_submit_time=EPOCH_S]\n"
            "  Progressive modes interpret INPUT_OR_LIST as an ordered file "
            "list and run the listed batches as one workload.\n"
            "  A zero time window means unlimited. A positive window limits "
            "candidates to submission times no later than the blocked FCFS "
            "head's submission time plus the window. EASY+PC modes scan the "
            "complete EASY-feasible queue in FCFS order and ignore candidate "
-           "limit, initial target, and candidate time window.\n";
+           "limit, initial target, and candidate time window.\n"
+           "  --uncapped_submit_time exempts jobs submitted at or before the "
+           "given time from the aggregate FCFS and backfill power caps, so "
+           "warm-start initialization jobs reproduce the boundary state.\n";
     return 2;
   }
 
@@ -404,9 +408,12 @@ int main(int argc, char **argv) {
     const double initial_target = std::stod(argv[7]);
     bool cap_backfill_power = false;
     bool cap_fcfs_power = false;
+    std::optional<sim_time_t> uncapped_submit_time;
     std::vector<std::string> optional_positionals;
     for (int index = 8; index < argc; ++index) {
       const std::string argument = argv[index];
+      const std::string option_prefix = "--uncapped_submit_time=";
+      const std::string option_prefix_dashed = "--uncapped-submit-time=";
       if (argument == "--cap-backfill-power") {
         cap_backfill_power = true;
       } else if (argument == "--cap_backfill_power") {
@@ -415,6 +422,13 @@ int main(int argc, char **argv) {
         cap_fcfs_power = true;
       } else if (argument == "--cap_fcfs_power") {
         cap_fcfs_power = true;
+      } else if (argument.rfind(option_prefix, 0) == 0 ||
+                 argument.rfind(option_prefix_dashed, 0) == 0) {
+        const double value = std::stod(argument.substr(option_prefix.size()));
+        if (!std::isfinite(value)) {
+          throw std::invalid_argument("--uncapped_submit_time must be finite");
+        }
+        uncapped_submit_time = value;
       } else if (!argument.empty() && argument.front() == '-') {
         throw std::invalid_argument("unknown option: " + argument);
       } else {
@@ -505,6 +519,9 @@ int main(int argc, char **argv) {
                            : EASYPCPowerMode::MAXIMUM,
           job_power_function_t{}, params.m_wait_queue_capacity,
           params.m_wait_queue_overflow);
+      if (uncapped_submit_time) {
+        scheduler->set_uncapped_submit_time(*uncapped_submit_time);
+      }
       auto *simulation = new PconSimulation(params, std::move(scheduler));
       simulation->run();
       const auto stats = simulation->get_statistics();
@@ -529,6 +546,9 @@ int main(int argc, char **argv) {
           telemetry, capacity_changes, candidate_time_window,
           params.m_wait_queue_capacity, params.m_wait_queue_overflow,
           params.m_cap_backfill_power, params.m_cap_fcfs_power);
+      if (uncapped_submit_time) {
+        scheduler->set_uncapped_submit_time(*uncapped_submit_time);
+      }
       auto *easypower = scheduler.get();
       auto *simulation = new PconSimulation(params, std::move(scheduler));
       simulation->run();

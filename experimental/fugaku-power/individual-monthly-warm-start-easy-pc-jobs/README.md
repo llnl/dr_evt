@@ -20,6 +20,13 @@ The default cap is 12 MW because that is the existing study parameter; it is
 not asserted to be a documented physical Fugaku limit. Use the same
 `MAXIMUM_POWER` for both policies and every comparison run.
 
+The warm-start initialization jobs are submitted exactly at the month
+boundary and stand in for work that was already running. `run_one.sh` passes
+`--uncapped_submit_time=<month start>` so they start regardless of the cap
+and the month begins in its historical state; the cap governs only the
+month's ordinary arrivals. The per-job admission drop (`avgpcon` above the
+cap for `mean`, `maxpcon` for `max`) still applies to initialization jobs.
+
 Prepared monthly inputs, capacity schedules, and EASY baselines are reused
 from `individual-monthly-warm-start-sweep`. Results default to:
 

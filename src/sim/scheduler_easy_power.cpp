@@ -76,6 +76,7 @@ std::optional<size_t> EASYPowerScheduler::select_backfill_candidate(
   (void)available_nodes;
   (void)current_time;
   const double running_power = current_power(effective_running_jobs);
+  const auto &queue = queued_jobs();
 
   std::optional<size_t> selected;
   double best_cost = std::numeric_limits<double>::infinity();
@@ -84,7 +85,8 @@ std::optional<size_t> EASYPowerScheduler::select_backfill_candidate(
     const auto &candidate = candidates[index];
     const double projected_power = running_power + candidate.cost;
     const bool exceeds_maximum = projected_power > maximum_power();
-    if (cap_backfill_power() && exceeds_maximum) {
+    if (cap_backfill_power() && exceeds_maximum &&
+        !is_uncapped_job(queue[candidate.queue_index])) {
       continue;
     }
     const double cost = candidate_power_cost(projected_power);

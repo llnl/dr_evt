@@ -9,10 +9,14 @@ EASYPower ranking behavior and may exceed that value.
 The inherited defaults are `MAXIMUM_POWER=12000000` (12 MW) and
 `INITIAL_TARGET=MAXIMUM_POWER`. The 12 MW value is an earlier study parameter,
 not a documented physical Fugaku limit. The FCFS cap does not preempt jobs or
-reduce power already present at the warm-start boundary. Every EASYPower run
-drops an input job whose `maxpcon` exceeds `MAXIMUM_POWER` before
+reduce power already present at the warm-start boundary: `run_one.sh` passes
+`--uncapped_submit_time=<month start>` so the initialization jobs, which are
+submitted exactly at the boundary, start regardless of the cap and the month
+begins in its historical state. The cap governs only later arrivals. Every
+EASYPower run drops an input job whose `maxpcon` exceeds `MAXIMUM_POWER` before
 assigning simulation job IDs and reports it in the log. This per-job admission
-rule is independent of the aggregate FCFS cap.
+rule is independent of the aggregate FCFS cap and also applies to
+initialization jobs.
 
 Results default to:
 

@@ -103,6 +103,13 @@ the same admission limit to each job in the FCFS prefix. The options are
 independent and can be used together. These flags govern combined running
 power; the per-job admission check above is independent of them.
 
+Pass `--uncapped_submit_time=EPOCH_S` to exempt jobs submitted at or before that
+time from both aggregate caps. The monthly warm-start suites use it for their
+initialization jobs, which are submitted exactly at the month boundary and
+stand in for work that was already running; without the exemption a capped run
+would start the month from a cap-feasible subset of the historical state. The
+per-job `maxpcon` admission check still applies to those jobs.
+
 The endpoint metric compares instantaneous power at the two ends of a physical
 interval: `abs(P(t + delta) - P(t)) / delta`. It is not a fixed-bin average and
 is unrelated to the scheduler candidate windows. Pass `--endpoint-windows ''`

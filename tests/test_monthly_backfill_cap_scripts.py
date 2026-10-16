@@ -240,6 +240,13 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
                 actual = [argument for argument in arguments
                           if argument.startswith("--cap_")]
                 self.assertEqual(actual, expected)
+                # Initialization jobs are exempt from the aggregate caps.
+                # 2023-07-01T00:00 Asia/Tokyo is 1688137200 seconds UTC.
+                uncapped = [argument for argument in arguments
+                         if argument.startswith("--uncapped_submit_time=")]
+                self.assertEqual(len(uncapped), 1)
+                self.assertEqual(float(uncapped[0].split("=", 1)[1]),
+                                 1688137200.0)
 
 
 if __name__ == "__main__":
