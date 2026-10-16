@@ -1,12 +1,12 @@
-# Private EASYPower workflow
+# EASYPower workflow
 
-These files are intentionally untracked while the experiment is under
-development. The public CMake configuration does not name or build EASYPower.
+These files live under `experimental/` and are not part of the core
+simulator. The public CMake configuration does not name or build EASYPower.
+The driver is built only when CMake is pointed at
+`easypower_private_target.cmake` through `CMAKE_PROJECT_INCLUDE`, which adds
+the `easypower_experiment` target to an otherwise ordinary build.
 
-The mathematical and event-level specification is in
-[`EASYPOWER_ALGORITHM.tex`](EASYPOWER_ALGORITHM.tex).
-
-Build the private driver through the untracked CMake injection:
+Build the driver with:
 
 ```bash
 experimental/fugaku-power/scripts/build_easypower_experiment.sh
