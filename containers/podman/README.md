@@ -82,7 +82,7 @@ choose a key prefix. Run the finalized/live status example with:
 ```bash
 /opt/dr-evt/bin/dr_evt_client dr-evt-server:50051 /input/my-trace.csv \
   --redis-uri redis://dr-evt-redis:6379 \
-  --redis-key-prefix dr_evt:client-example \
+  --redis-key-prefix dr_evt:run42 \
   --advance-to 100
 ```
 

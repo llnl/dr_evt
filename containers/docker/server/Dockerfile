@@ -44,7 +44,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         libboost-all-dev \
-        libhiredis1.1 \
+        libhiredis1.1.0 \
         libgrpc++-dev \
         libprotobuf-dev \
     && rm -rf /var/lib/apt/lists/*

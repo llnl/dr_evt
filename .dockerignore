@@ -9,3 +9,9 @@ __pycache__
 *.py[cod]
 *.core
 core
+# Host-side inputs, outputs, and local installs are never needed in the image.
+results
+data
+install
+venv
+experimental/fugaku-power/results

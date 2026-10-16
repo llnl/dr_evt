@@ -68,7 +68,7 @@ To run the finalized/live status example through the Compose Redis service:
 ```bash
 /opt/dr-evt/bin/dr_evt_client server:50051 /input/my-trace.csv \
   --redis-uri redis://redis:6379 \
-  --redis-key-prefix dr_evt:client-example \
+  --redis-key-prefix dr_evt:run42 \
   --advance-to 100
 ```
 
