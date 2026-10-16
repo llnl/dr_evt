@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# DR_EVT gRPC client image. It starts an interactive shell in /data.
+# DR_EVT gRPC client image. It starts an interactive shell in /input.
 
 FROM ubuntu:24.04 AS build
 
@@ -41,7 +41,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         libgrpc++-dev \
-        libhiredis1.1 \
+        libhiredis1.1.0 \
         libprotobuf-dev \
     && rm -rf /var/lib/apt/lists/*
 
