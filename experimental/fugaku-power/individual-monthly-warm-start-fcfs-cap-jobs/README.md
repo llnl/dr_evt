@@ -36,8 +36,8 @@ sbatch jobs/easypower/easypower-fcfs-cap-2023-06-n64-t1h.slurm
 ./run_n_left.sh 12
 ```
 
-Each `run_n_left.sh` invocation submits at most 60 jobs. Pass a count from 1
-through 60 to submit a smaller batch.
+Each `run_n_left.sh` invocation submits up to the given number of unfinished
+jobs, 36 by default, in manifest order.
 
 The original suite's environment overrides remain available. Use a distinct
 `OUTPUT_ROOT` for every parameter set.
