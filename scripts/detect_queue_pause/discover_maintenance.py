@@ -114,12 +114,14 @@ class TraceStats:
         rows=0,
         invalid_rows=0,
         invalid_intervals=0,
+        duplicate_rows=0,
         min_submit=None,
         max_submit=None,
     ):
         self.rows = rows
         self.invalid_rows = invalid_rows
         self.invalid_intervals = invalid_intervals
+        self.duplicate_rows = duplicate_rows
         self.min_submit = min_submit
         self.max_submit = max_submit
         self.analysis_start = min_submit
@@ -242,6 +244,11 @@ def read_traces(
     stats = TraceStats()
     if analysis_window is not None:
         stats.analysis_start, stats.analysis_end = analysis_window
+    # Monthly trace files overlap: a job that crosses a month boundary is
+    # listed in both months' files. A row already read from a different file
+    # is the same job and is skipped. Identical rows within one file are kept,
+    # because distinct jobs (for example array tasks) can share every column.
+    first_file_of_row = {} if len(paths) > 1 else None
     for path in paths:
         window = analysis_window
         if window is None and overlap_policy == "filename-month":
@@ -268,6 +275,12 @@ def read_traces(
             max_index = max(indices)
             for row in reader:
                 stats.rows += 1
+                if first_file_of_row is not None:
+                    key = tuple(row)
+                    origin = first_file_of_row.setdefault(key, path)
+                    if origin != path:
+                        stats.duplicate_rows += 1
+                        continue
                 try:
                     if len(row) <= max_index:
                         raise ValueError
@@ -993,6 +1006,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "rows": stats.rows,
                 "invalid_rows": stats.invalid_rows,
                 "invalid_intervals": stats.invalid_intervals,
+                "duplicate_rows": stats.duplicate_rows,
                 "backfill_evidence": (
                     None if not args.backfill_evidence else {
                         "path": os.path.abspath(args.backfill_evidence),

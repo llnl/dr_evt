@@ -46,7 +46,10 @@ RELEASE_DELAY_MINUTES=10 \
 
 `OVERLAP_POLICY=combine` treats overlapping files as distinct concurrent
 records. Use `filename-month` only for files named
-`YY_MM_scheduling_trace.csv` whose adjacent exports duplicate coverage. Run
+`YY_MM_scheduling_trace.csv` whose adjacent exports duplicate coverage. Under
+either policy a row that was already read from a different input file is
+skipped and counted as `duplicate_rows` in the report; identical rows within
+one file are kept as distinct jobs. Run
 `./generate_capacity_schedule.sh --help` for all wrapper settings.
 
 The workflow produces replay evidence, an hourly timeline, an all-state JSON
