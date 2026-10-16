@@ -157,14 +157,6 @@ class MonthlyBackfillCapScriptsTest(unittest.TestCase):
                 self.assertIn("shared input, capacity, or baseline is incomplete",
                               result.stderr)
 
-    def test_fcfs_submitter_rejects_more_than_60_jobs(self):
-        result = subprocess.run(
-            [str(FCFS_SUITE / "run_n_left.sh"), "61"], check=False,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            universal_newlines=True)
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("COUNT_FROM_1_TO_60", result.stderr)
-
     def run_shared_runner(self, cap_backfill_power, cap_fcfs_power):
         temporary_context = tempfile.TemporaryDirectory()
         self.addCleanup(temporary_context.cleanup)

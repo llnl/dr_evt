@@ -1,7 +1,7 @@
 # Shared implementation for the monthly warm-start EASYPower submitters (the
 # base suite and the power-cap suites).
 # The suite wrapper defines n, manifest_kind, output_name, and suite_dir before
-# sourcing this file. It may also define max_n, years, and SHARED_OUTPUT_ROOT.
+# sourcing this file. It may also define SHARED_OUTPUT_ROOT.
 
 common_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd -- "$common_dir/../../.." && pwd)
@@ -10,18 +10,6 @@ if [[ ! $n =~ ^[1-9][0-9]*$ ]]; then
   echo "usage: run_n_left.sh [POSITIVE_COUNT]" >&2
   exit 2
 fi
-if [[ -n ${max_n:-} ]] && ((n > max_n)); then
-  echo "usage: run_n_left.sh [COUNT_FROM_1_TO_$max_n]" >&2
-  exit 2
-fi
-
-years=${years:-}
-for year in $years; do
-  [[ $year =~ ^[0-9]{4}$ ]] || {
-    echo "YEARS must contain space-separated four-digit years" >&2
-    exit 2
-  }
-done
 
 output_root=${OUTPUT_ROOT:-$repo_dir/experimental/fugaku-power/results/$output_name}
 shared_output_root=${SHARED_OUTPUT_ROOT:-$repo_dir/experimental/fugaku-power/results/individual-monthly-warm-start-sweep}
@@ -36,9 +24,6 @@ esac
 submitted=0
 while IFS=$'\t' read -r kind month window time_window script prerequisite; do
   [[ $kind == "$manifest_kind" ]] || continue
-  if [[ -n $years ]]; then
-    [[ " $years " == *" ${month%%-*} "* ]] || continue
-  fi
   case $time_window in
     unlimited) slug=unlimited ;;
     1h) slug=3600s ;;
