@@ -74,13 +74,34 @@ else:
     year, value = (year + 1, 1) if value == 12 else (year, value + 1)
     print("{:.15g}".format(datetime(year, value, 1, tzinfo=ZoneInfo(timezone)).timestamp()))
 ' "$month" "$trace_timezone" "${SIM_END_TIME:-}")
+# Initialization jobs are submitted exactly at the month boundary. The driver
+# exempts jobs submitted at or before this time from the aggregate caps so the
+# month starts in its historical state.
+initialization_boundary=$(python3 -c '
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import sys
+label, timezone, override = sys.argv[1:]
+timezone = "Asia/Tokyo" if timezone == "JST" else timezone
+if override:
+    try:
+        print("{:.15g}".format(float(override)))
+    except ValueError:
+        parsed = datetime.fromisoformat(override.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=ZoneInfo(timezone))
+        print("{:.15g}".format(parsed.timestamp()))
+else:
+    year, value = map(int, label.split("-"))
+    print("{:.15g}".format(datetime(year, value, 1, tzinfo=ZoneInfo(timezone)).timestamp()))
+' "$month" "$trace_timezone" "${SIM_START_TIME:-}")
 module unload python/3.13.2 2>/dev/null || true
 module load gcc/13.3.1-magic openmpi/4.1.2 boost/1.86.0 cmake/3.30.5
 export OMP_NUM_THREADS=1
 
 "$driver" "easy-pc-$power_mode-progressive" "$input_dir/infile.txt" \
   "$staging" "$total_nodes" 1 "$maximum_power" "$maximum_power" 0 \
-  "$capacity_schedule" "$cutoff" \
+  "$capacity_schedule" "$cutoff" "--uncapped_submit_time=$initialization_boundary" \
   >"$month_root/easy-pc-$power_mode-${SLURM_JOB_ID:-manual-$$}.log" 2>&1
 [[ -s $staging/jobs.csv && -s $staging/resources.csv ]] || {
   echo "EASY+PC-$power_mode output incomplete" >&2

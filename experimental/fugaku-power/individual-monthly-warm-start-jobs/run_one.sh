@@ -164,11 +164,14 @@ easypower)
   require_capacity; require_shared_baseline; prepare_input; [[ -x $driver ]] || { echo "EASYPower driver unavailable: $driver" >&2; exit 2; }
   job_root="$month_root/job-window-$window/$label"; final="$job_root/easypower_n${window}_t${slug}"; [[ -f $final/.complete && -s $final/jobs.csv && -s $final/resources.csv && -s $final/target_horizon.csv ]] && { echo "EASYPower run already complete"; exit 0; }; [[ ! -e $final ]] || { echo "refusing to overwrite incomplete EASYPower result" >&2; exit 2; }
   cutoff=$(month_end_epoch)
+  initialization_boundary=$(month_start_epoch)
   mkdir -p -- "$job_root"; staging="$job_root/easypower_n${window}_t${slug}.tmp-${SLURM_JOB_ID:-manual-$$}"; mkdir -- "$staging"; load_runtime; cd -- "$repo_dir"
   cap_args=()
   ((cap_backfill_power == 1)) && cap_args+=(--cap_backfill_power)
   ((cap_fcfs_power == 1)) && cap_args+=(--cap_fcfs_power)
-  "$driver" easypower-progressive "$monthly_list" "$staging" "$total_nodes" "$window" "$maximum_power" "$initial_target" "$seconds" "$capacity_schedule" "$cutoff" "${cap_args[@]}" >"$job_root/easypower_n${window}_t${slug}-${SLURM_JOB_ID:-manual-$$}.log" 2>&1
+  # Initialization jobs are submitted exactly at the month boundary. Exempt
+  # them from the aggregate caps so the month starts in its historical state.
+  "$driver" easypower-progressive "$monthly_list" "$staging" "$total_nodes" "$window" "$maximum_power" "$initial_target" "$seconds" "$capacity_schedule" "$cutoff" "--uncapped_submit_time=$initialization_boundary" "${cap_args[@]}" >"$job_root/easypower_n${window}_t${slug}-${SLURM_JOB_ID:-manual-$$}.log" 2>&1
   [[ -s $staging/jobs.csv && -s $staging/resources.csv && -s $staging/target_horizon.csv ]] || { echo "EASYPower output incomplete" >&2; exit 1; }; touch "$staging/.complete"; mv -- "$staging" "$final"
   ;;
 *) usage; exit 2;;

@@ -27,7 +27,8 @@ PowerCappedFCFSScheduler::PowerCappedFCFSScheduler(
       m_maximum_power(maximum_power),
       m_power_function(std::move(power_function)),
       m_cap_backfill_power(cap_backfill_power),
-      m_cap_fcfs_power(cap_fcfs_power) {
+      m_cap_fcfs_power(cap_fcfs_power),
+      m_uncapped_submit_time(-std::numeric_limits<sim_time_t>::infinity()) {
   if (!std::isfinite(m_maximum_power) || m_maximum_power < 0.0) {
     throw std::invalid_argument(
         "power-capped scheduler maximum power must be finite and "
@@ -100,14 +101,14 @@ bool PowerCappedFCFSScheduler::can_start_fcfs_job(
     sim_time_t current_time) const {
   (void)available_nodes;
   (void)current_time;
-  return !m_cap_fcfs_power ||
+  return !m_cap_fcfs_power || is_uncapped_job(job) ||
          current_power(effective_running_jobs) + job.m_cost <= m_maximum_power;
 }
 
 sim_time_t PowerCappedFCFSScheduler::fcfs_head_reservation_time(
     const JobEntry &job, num_nodes_t available_nodes,
     const running_jobs_t &effective_running_jobs, sim_time_t current_time) {
-  if (!m_cap_fcfs_power) {
+  if (!m_cap_fcfs_power || is_uncapped_job(job)) {
     return FCFSEasyCustomScheduler::fcfs_head_reservation_time(
         job, available_nodes, effective_running_jobs, current_time);
   }

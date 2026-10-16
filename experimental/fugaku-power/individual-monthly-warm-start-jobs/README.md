@@ -51,6 +51,13 @@ The run log identifies every dropped source row and its relevant values. The
 per-job power rule is independent of the optional aggregate backfill and FCFS
 caps; EASY baselines apply only the node limit.
 
+EASYPower runs also pass `--uncapped_submit_time=<month start>` to the driver.
+Jobs submitted at or before that instant, which are exactly the initialization
+jobs, are exempt from the aggregate backfill and FCFS caps. They therefore
+start at the boundary regardless of their combined power, and a capped month
+begins in the same state as the historical machine. The caps govern only the
+month's ordinary arrivals.
+
 Capacity detection uses a generated historical boundary-context trace: the
 original month’s records plus only historical jobs still running at the month
 boundary. This lets it recognize opening occupancy without allowing synthetic

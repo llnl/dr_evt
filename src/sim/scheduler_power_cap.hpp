@@ -33,6 +33,21 @@ public:
                                 num_nodes_t nodes_requested,
                                 const SchedulerJobMetadata &metadata) override;
 
+  /**
+   * @brief Exempt warm-start initialization jobs from the aggregate power caps.
+   * @details Jobs submitted at or before @p submit_time represent work that
+   * was already running when the simulation window opened. They must start
+   * regardless of the FCFS and backfill caps so the initial machine state
+   * matches history; the caps then govern only later arrivals. Per-job
+   * admission limits applied at trace load are unaffected. The default
+   * (negative infinity) exempts nothing.
+   * @param[in] submit_time Latest submit time treated as an initialization job.
+   */
+  void set_uncapped_submit_time(sim_time_t submit_time) {
+    m_uncapped_submit_time = submit_time;
+  }
+  sim_time_t uncapped_submit_time() const { return m_uncapped_submit_time; }
+
 protected:
   PowerCappedFCFSScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
@@ -47,6 +62,11 @@ protected:
   double current_power(const running_jobs_t &running_jobs) const;
 
   bool cap_backfill_power() const { return m_cap_backfill_power; }
+
+  /** Whether a queued job is an initialization job exempt from the caps. */
+  bool is_uncapped_job(const JobEntry &job) const {
+    return job.submit_time <= m_uncapped_submit_time;
+  }
 
   std::optional<double> running_job_power(const JobEntry &job) const override;
 
@@ -64,6 +84,7 @@ private:
   job_power_function_t m_power_function;
   bool m_cap_backfill_power;
   bool m_cap_fcfs_power;
+  sim_time_t m_uncapped_submit_time;
 };
 
 } // namespace dr_evt
