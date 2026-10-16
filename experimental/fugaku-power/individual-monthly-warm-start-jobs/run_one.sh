@@ -154,7 +154,7 @@ baseline)
   [[ -x $driver ]] || { echo "EASYPower driver unavailable: $driver" >&2; exit 2; }
   final="$month_root/easy-baseline"; [[ -f $final/.complete && -s $final/jobs.csv && -s $final/resources.csv ]] && { echo "baseline already complete"; exit 0; }; [[ ! -e $final ]] || { echo "refusing to overwrite incomplete baseline" >&2; exit 2; }
   cutoff=$(month_end_epoch)
-  staging="$month_root/easy-baseline.tmp-${SLURM_JOB_ID:-manual-$$}"; mkdir -- "$staging"; load_runtime; cd -- "$repo_dir"
+  staging="$month_root/easy-baseline.tmp-${SLURM_JOB_ID:-manual-$$}"; mkdir -p -- "$month_root"; mkdir -- "$staging"; load_runtime; cd -- "$repo_dir"
   "$driver" easy-progressive "$monthly_list" "$staging" "$total_nodes" 1 "$maximum_power" "$initial_target" 0 "$capacity_schedule" "$cutoff" >"$month_root/baseline-${SLURM_JOB_ID:-manual-$$}.log" 2>&1
   [[ -s $staging/jobs.csv && -s $staging/resources.csv ]] || { echo "baseline output incomplete" >&2; exit 1; }; touch "$staging/.complete"; mv -- "$staging" "$final"
   ;;
