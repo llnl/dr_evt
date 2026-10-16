@@ -3,10 +3,6 @@
 # Poll one fiscal-sweep Slurm allocation until it reaches a terminal state.
 # A "job ID" is the number printed by sbatch, for example 845219.
 
-module load gcc/13.3.1-magic openmpi/4.1.2 cmake/3.30.5 python/3.13.
-export BUILD_DRIVER=0
-export EASYPOWER_BUILD_DIR=/p/vast1/f-data/build
-
 set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
