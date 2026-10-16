@@ -1,6 +1,7 @@
-# Shared implementation for the monthly warm-start power-cap submitters.
+# Shared implementation for the monthly warm-start EASYPower submitters (the
+# base suite and the power-cap suites).
 # The suite wrapper defines n, manifest_kind, output_name, and suite_dir before
-# sourcing this file. It may also define max_n and years.
+# sourcing this file. It may also define max_n, years, and SHARED_OUTPUT_ROOT.
 
 common_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd -- "$common_dir/../../.." && pwd)

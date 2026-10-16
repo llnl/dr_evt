@@ -1,26 +1,17 @@
-  n=12
-  submitted=0
-  while IFS=$'\t' read -r kind month window time_window script prerequisite; do
-      [[ $kind == easypower ]] || continue
+#!/usr/bin/env bash
+set -euo pipefail
 
-      case "$time_window" in
-          unlimited) slug=unlimited ;;
-          1h)        slug=3600s ;;
-          6h)        slug=21600s ;;
-      esac
+# Submit unfinished EASYPower jobs from this suite's manifest. Capacity and
+# baseline jobs are submitted by hand (see README); this wrapper submits only
+# `easypower` rows whose month already has complete capacity, baseline, and
+# input results under the shared root, which for this suite is its own root.
+# Number of unfinished jobs to submit. The first argument overrides this default.
+n=${1:-12}
+manifest_kind=easypower
+output_name=individual-monthly-warm-start-sweep
 
-      result="../results/individual-monthly-warm-start-sweep/$month/job-window-$window/$month/easypower_n${window}_t${slug}"
-
-      if [[ ! -f "$result/.complete" ||
-            ! -s "$result/jobs.csv" ||
-            ! -s "$result/resources.csv" ||
-            ! -s "$result/target_horizon.csv" ]]; then
-          sbatch "$script"
-          ((submitted += 1))
-      fi
-      if (( submitted >= $n )); then
-        break
-      fi
-  done < manifest.tsv
-
-  echo "Submitted $submitted jobs"
+suite_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# This suite produces the shared capacity, baseline, and input results itself,
+# so its prerequisites live under its own output root unless overridden.
+SHARED_OUTPUT_ROOT=${SHARED_OUTPUT_ROOT:-${OUTPUT_ROOT:-$suite_dir/../results/$output_name}}
+source "$suite_dir/../scripts/submit_monthly_warm_start_cap_jobs.sh"
