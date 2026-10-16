@@ -171,7 +171,7 @@ easypower)
   ((cap_fcfs_power == 1)) && cap_args+=(--cap_fcfs_power)
   # Initialization jobs are submitted exactly at the month boundary. Exempt
   # them from the aggregate caps so the month starts in its historical state.
-  "$driver" easypower-progressive "$monthly_list" "$staging" "$total_nodes" "$window" "$maximum_power" "$initial_target" "$seconds" "$capacity_schedule" "$cutoff" "--uncapped_submit_time=$initialization_boundary" "${cap_args[@]}" >"$job_root/easypower_n${window}_t${slug}-${SLURM_JOB_ID:-manual-$$}.log" 2>&1
+  "$driver" easypower-progressive "$monthly_list" "$staging" "$total_nodes" "$window" "$maximum_power" "$initial_target" "$seconds" "$capacity_schedule" "$cutoff" "--uncapped_submit_time=$initialization_boundary" ${cap_args[@]+"${cap_args[@]}"} >"$job_root/easypower_n${window}_t${slug}-${SLURM_JOB_ID:-manual-$$}.log" 2>&1
   [[ -s $staging/jobs.csv && -s $staging/resources.csv && -s $staging/target_horizon.csv ]] || { echo "EASYPower output incomplete" >&2; exit 1; }; touch "$staging/.complete"; mv -- "$staging" "$final"
   ;;
 *) usage; exit 2;;
