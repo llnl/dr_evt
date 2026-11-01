@@ -1160,6 +1160,10 @@ void Sim_Params::print() const {
   } else {
     msg += to_string(m_planning_horizon) + "\n";
   }
+  msg += " - cap_backfill_power: " +
+         string{m_cap_backfill_power ? "true" : "false"} + "\n";
+  msg += " - cap_fcfs_power: " + string{m_cap_fcfs_power ? "true" : "false"} +
+         "\n";
   msg += " - job_flush_interval: " + to_string(m_job_flush_interval) + "\n";
   msg += " - is_jobs_set: " + string{m_is_jobs_set ? "true" : "false"} + "\n";
   msg += " - is_time_set: " + string{m_is_time_set ? "true" : "false"} + "\n";
