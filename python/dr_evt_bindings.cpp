@@ -132,6 +132,12 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readwrite("num_max_candidates", &Sim_Params::m_num_max_candidates,
                      "int: Maximum feasible jobs offered to the experimental "
                      "backfill selector.")
+      .def_readwrite("cap_backfill_power", &Sim_Params::m_cap_backfill_power,
+                     "bool: Reject backfill candidates that exceed the "
+                     "configured power cap.")
+      .def_readwrite("cap_fcfs_power", &Sim_Params::m_cap_fcfs_power,
+                     "bool: Reject FCFS jobs that exceed the configured "
+                     "power cap.")
       .def_readwrite("reservation_depth", &Sim_Params::m_reservation_depth,
                      "int: Waiting jobs holding reservations under HYBRID "
                      "backfilling; must be positive with HYBRID, ignored "
