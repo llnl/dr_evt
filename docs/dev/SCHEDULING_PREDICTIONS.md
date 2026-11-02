@@ -49,17 +49,23 @@ reservation set that the scheduler protects in its current pass:
 - Conservative protects the applicable waiting prefix.
 - A job projected beyond `planning_horizon` creates no reservation and does
   not consume a reservation-depth slot.
-- A backfill queue-depth limit constrains the pass that identifies protected
-  jobs; it must not suppress an estimate for a deeper waiting job.
+- A backfill queue-depth limit constrains scheduling work in one pass. It does
+  not limit the reservation projection: a query can project every waiting job.
 
 The exact prefix and ordering must come from the scheduler's policy, not from
 a separate interpretation in an API layer. This prevents status reporting from
 drifting from the scheduling decision it describes.
 
-For every protected job, the API should report its reservation time. For a
-non-protected job, the estimator uses the capacity profile remaining after
-protected reservations. Non-protected estimates do not themselves create
+For every waiting job, the API should report a start-time projection and its
+kind. A protected job reports `reserved` and its reservation time. A
+non-protected job reports `estimated`, using the capacity profile remaining
+after protected reservations. Non-protected estimates do not themselves create
 reservations unless the caller explicitly requests an exact lookahead.
+
+The caller can choose the reporting scope: all waiting jobs (the default for
+experiments) or only the current backfill queue-depth prefix. This option
+filters returned records; it must not change the scheduler policy or the
+reservation projection used to calculate them.
 
 ## Exact lookahead
 
@@ -135,23 +141,42 @@ Neither variant is a reservation: other unreserved jobs can receive overlapping
 optimistic estimates. Callers needing policy-exact start times should request
 the output-free lookahead instead.
 
-## Proposed API shape
+## API contract
 
-The public API should make the result kind explicit rather than requiring a
-caller to infer it from a timestamp:
+The APIs have distinct cost and purpose:
 
-| Result kind | Source | Intended use |
+| API | Purpose | Cost |
 | --- | --- | --- |
-| `reserved` | Scheduler's protected reservation | Planned start visibility |
-| `lookahead` | Output-free side simulation | Policy-exact start prediction |
-| `estimated` | Reservation-aware profile | Low-cost per-job estimate |
-| `queue_drain` | Reservation-aware area integration | Experimental aggregate horizon |
+| `get_fcfs_head_shadow_time()` | Core scheduler head-reservation state | Existing scheduler state |
+| `get_backfill_window()` | Core FCFS/EASY capacity and release snapshot | On-demand snapshot |
+| `get_job_statuses()` | Common cheap per-job start-time reporting for EASY, hybrid, and conservative | Profile sweep over selected queue prefix |
+| `get_prediction_horizon(utilization)` | Aggregate experimental queue-drain horizon | Resource-area event sweep |
+| Lookahead API (new) | Policy-exact per-job starts | Output-free side simulation |
 
-The existing `get_prediction_horizon()` should remain compatible as the
-EASY queue-drain calculation. A new or generalized queue-drain API should
-return enough metadata to interpret an experimental result, at least the
-horizon, utilization factor, unreserved resource-time area, protected
-reservation count, and latest reservation completion.
+`get_job_statuses()` remains the common lifecycle-status API. Its pending-job
+result will identify whether its reported start time is `reserved` (from the
+scheduler's reservation projection) or `estimated` (from the
+reservation-aware profile). Existing scheduled jobs continue to return their
+actual start and end times.
+
+The query gains an estimation-depth option. It controls how many waiting jobs
+receive pending start-time results, while preserving a status record for every
+requested ID. A depth of zero means the complete waiting queue and is the
+default; a finite depth limits reported estimates to that queue prefix. The
+option is an API output/work bound only: it never changes scheduler
+configuration, backfill policy, or the reservation plan used as an input to
+the calculation.
+
+The exact-lookahead operation is a separate API because its side simulation is
+materially more expensive. It returns policy-exact starts rather than reusing
+the cheap API's `reserved`/`estimated` classification.
+
+`get_prediction_horizon()` remains the separate queue-drain API for
+experiments. Its existing EASY behavior remains compatible. Its
+hybrid/conservative extension should expose enough metadata to interpret the
+area calculation, at least the horizon, utilization factor, unreserved
+resource-time area, protected reservation count, and latest reservation
+completion.
 
 ## Validation plan
 
@@ -159,12 +184,14 @@ Tests should cover the following independently:
 
 1. A protected job reports its reservation rather than a generic estimate.
 2. An unreserved job's estimate respects every protected reservation.
-3. Hybrid depth, queue-depth limits, and horizon-skipped jobs select the same
+3. The zero estimation-depth default covers all waiting jobs; a finite depth
+   suppresses only pending start-time results outside the returned prefix.
+4. Hybrid depth, queue-depth limits, and horizon-skipped jobs select the same
    protected set as the scheduler.
-4. Exact lookahead start times match an output-suppressed normal simulation.
-5. Queue-drain area accounting does not double-count reserved work and reacts
+5. Exact lookahead start times match an output-suppressed normal simulation.
+6. Queue-drain area accounting does not double-count reserved work and reacts
    to running releases and capacity changes.
-6. No prediction query mutates live scheduling state or creates output.
+7. No prediction query mutates live scheduling state or creates output.
 
 The existing status and EASY prediction-horizon tests provide starting
 coverage, but new tests are required before enabling the proposed APIs.
