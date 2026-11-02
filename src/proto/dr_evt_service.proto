@@ -122,8 +122,8 @@ message InitRequest {
     optional double planning_horizon = 26;
 
     // Optional EASYPower caps used by the experimental scheduler.
-    bool cap_backfill_power = 27;
-    bool cap_fcfs_power = 28;
+    bool cap_backfill_power = 28;
+    bool cap_fcfs_power = 29;
 
     // Seconds a job's nodes stay unavailable after it ends (default 0).
     // Not applied to replayed history.
