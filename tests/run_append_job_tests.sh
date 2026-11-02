@@ -48,7 +48,7 @@ echo ""
 PASS=0
 FAIL=0
 
-# --- Test: C++ API (test_append_job_api.cpp's 23 focused checks) ---
+# --- Test: C++ API (test_append_job_api.cpp's focused checks) ---
 echo "Testing: append_job_api (C++ level)"
 
 # Test binaries are installed under bin/tests/ (see CMakeLists.txt's

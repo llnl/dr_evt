@@ -2127,17 +2127,11 @@ void BasicSimulation<TraceType>::record_appended_job_start(job_no_t job_idx) {
 template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
-    const std::vector<job_no_t> &job_idxs) const {
-  std::map<job_no_t, sim_time_t> expected_starts;
-
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
   // Free-node profile: each key starts a segment that keeps its value until
-  // the next key. Seeded from running-job releases at their limit times and
-  // the scheduled capacity changes still ahead, the same timeline the
-  // schedulers reserve against. Pending jobs are then placed in queue order
-  // at their earliest fit for their full time limit, and each placement is
-  // carved out of the profile, so a short job behind a blocked head may be
-  // projected ahead of it, as a backfill scheduler's own reservation walk
-  // would do.
+  // the next key. It is seeded from running-job releases and future capacity
+  // changes, then extended by this query's temporary immediate-dispatch and
+  // policy reservation windows. Nothing is retained by the live scheduler.
   std::map<sim_time_t, num_nodes_t> profile;
   {
     // Signed deltas: releases add, capacity reductions subtract. The balance
@@ -2174,48 +2168,109 @@ BasicSimulation<TraceType>::get_job_statuses(
   }
 
   // Insert a segment boundary at t, inheriting the enclosing segment's value.
-  const auto split_at = [&profile](sim_time_t t) {
-    auto lb = profile.lower_bound(t);
-    if (lb == profile.end() || lb->first != t) {
-      profile.emplace_hint(lb, t, std::prev(lb)->second);
+  const auto split_at = [](std::map<sim_time_t, num_nodes_t> &target,
+                           sim_time_t t) {
+    auto lb = target.lower_bound(t);
+    if (lb == target.end() || lb->first != t) {
+      target.emplace_hint(lb, t, std::prev(lb)->second);
     }
   };
 
-  for (const job_no_t pending_id : m_scheduler->pending_job_ids()) {
-    const auto &record = m_trace.job_at(pending_id);
-    const num_nodes_t nodes = record.get_num_nodes();
-    const tdiff_t limit = record.get_limit_time();
-    sim_time_t start = std::max(
-        m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
-
-    // Earliest fit: scan segments covering [start, start + limit); on the
-    // first segment that is too small, restart from the next segment that
-    // is large enough. Every segment is visited at most once per job.
-    auto segment = std::prev(profile.upper_bound(start));
-    bool fits = true;
+  const auto earliest_fit = [](const std::map<sim_time_t, num_nodes_t> &target,
+                               num_nodes_t nodes, tdiff_t limit,
+                               sim_time_t start) -> std::optional<sim_time_t> {
+    if (target.empty()) {
+      return std::nullopt;
+    }
+    auto segment = std::prev(target.upper_bound(start));
     for (;;) {
       auto scan = segment;
-      while (scan != profile.end() &&
+      while (scan != target.end() &&
              (scan == segment || scan->first < start + limit) &&
              scan->second >= nodes) {
         ++scan;
       }
-      if (scan == profile.end() ||
+      if (scan == target.end() ||
           (scan != segment && scan->first >= start + limit)) {
-        break;
+        return start;
       }
       do {
         ++scan;
-      } while (scan != profile.end() && scan->second < nodes);
-      if (scan == profile.end()) {
-        fits = false;
-        break;
+      } while (scan != target.end() && scan->second < nodes);
+      if (scan == target.end()) {
+        return std::nullopt;
       }
       segment = scan;
       start = scan->first;
     }
-    if (!fits) {
+  };
+
+  const auto reserve = [&split_at](std::map<sim_time_t, num_nodes_t> &target,
+                                    sim_time_t start, num_nodes_t nodes,
+                                    tdiff_t limit) {
+    if (limit <= 0) {
+      return;
+    }
+    split_at(target, start);
+    split_at(target, start + limit);
+    for (auto it = target.find(start);
+         it != target.end() && it->first < start + limit; ++it) {
+      it->second -= nodes;
+    }
+  };
+
+  // Build a query-local reservation plan. It never changes the scheduler, but
+  // it follows the configured backfill policy: blocked in-horizon EASY head,
+  // HYBRID prefix, or CONSERVATIVE queue retain capacity in this profile.
+  // Jobs that are predicted to dispatch immediately also consume their
+  // projected run window, while an out-of-horizon job remains an estimate and
+  // cannot constrain later estimates.
+  const auto pending_job_ids = m_scheduler->pending_job_ids();
+  std::map<sim_time_t, num_nodes_t> reservation_profile = std::move(profile);
+  std::map<job_no_t, sim_time_t> expected_starts;
+  std::map<job_no_t, Start_Time_Kind> expected_kinds;
+  bool easy_blocked_head_seen = false;
+  size_t hybrid_reserved = 0;
+  size_t projected_count = 0;
+
+  for (const job_no_t pending_id : pending_job_ids) {
+    if (estimation_depth != 0 && projected_count >= estimation_depth) {
+      break;
+    }
+    ++projected_count;
+    const auto &record = m_trace.job_at(pending_id);
+    const num_nodes_t nodes = record.get_num_nodes();
+    const tdiff_t limit = record.get_limit_time();
+    const sim_time_t earliest = std::max(
+        m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
+    const auto start = earliest_fit(reservation_profile, nodes, limit, earliest);
+    if (!start) {
       continue;
+    }
+
+    const bool starts_now = *start <= m_current_time;
+    const bool within_horizon =
+        *start - m_current_time <= m_params.m_planning_horizon;
+    bool reserved = false;
+    switch (m_params.m_backfill_policy) {
+    case BackfillPolicy::EASY:
+      if (!starts_now && !easy_blocked_head_seen) {
+        easy_blocked_head_seen = true;
+        reserved = within_horizon;
+      }
+      break;
+    case BackfillPolicy::HYBRID:
+      reserved = !starts_now && within_horizon &&
+                 hybrid_reserved < m_params.m_reservation_depth;
+      if (reserved) {
+        ++hybrid_reserved;
+      }
+      break;
+    case BackfillPolicy::CONSERVATIVE:
+      reserved = !starts_now && within_horizon;
+      break;
+    case BackfillPolicy::NONE:
+      break;
     }
 
     const bool is_appended =
@@ -2225,16 +2280,17 @@ BasicSimulation<TraceType>::get_job_statuses(
         m_appended_job_query_records[pending_id - m_first_appended_job_idx]
             .tracked;
     if (is_appended) {
-      expected_starts[pending_id] = start;
+      expected_starts[pending_id] = *start;
+      expected_kinds[pending_id] =
+          reserved ? Start_Time_Kind::RESERVED : Start_Time_Kind::ESTIMATED;
     }
-    if (limit <= 0) {
-      continue; // Nothing to reserve for a zero-length placement.
-    }
-    split_at(start);
-    split_at(start + limit);
-    for (auto it = profile.find(start);
-         it != profile.end() && it->first < start + limit; ++it) {
-      it->second -= nodes;
+
+    // A start-now placement is a predicted immediate dispatch and must affect
+    // later jobs in this local plan. Under strict FCFS (no backfill), preserve
+    // the historical serial forecast by reserving every projected placement.
+    if (starts_now || reserved ||
+        m_params.m_backfill_policy == BackfillPolicy::NONE) {
+      reserve(reservation_profile, *start, nodes, limit);
     }
   }
 
@@ -2252,7 +2308,7 @@ BasicSimulation<TraceType>::get_job_statuses(
     const auto &job =
         m_appended_job_query_records[job_idx - m_first_appended_job_idx];
     Job_Status status{job_idx, Job_State::PENDING, std::nullopt, std::nullopt,
-                      std::nullopt};
+                      std::nullopt, Start_Time_Kind::NONE};
     if (job.rejected) {
       status.state = Job_State::REJECTED;
     } else if (job.scheduled) {
@@ -2263,6 +2319,7 @@ BasicSimulation<TraceType>::get_job_statuses(
     } else if (const auto it = expected_starts.find(job_idx);
                it != expected_starts.end()) {
       status.expected_start_time = it->second;
+      status.start_time_kind = expected_kinds.at(job_idx);
     }
     result.push_back(status);
   }

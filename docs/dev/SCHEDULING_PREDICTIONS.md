@@ -4,8 +4,9 @@
 
 This document records the design for exposing scheduler timing information to
 streaming clients and experiments. It separates a scheduler reservation from a
-start-time estimate and from an aggregate queue-drain estimate. The proposed
-hybrid/conservative extensions described below are not implemented yet.
+start-time estimate and from an aggregate queue-drain estimate. The common
+cheap per-job query is implemented; exact lookahead and the reservation-aware
+hybrid/conservative queue-drain extension remain design work.
 
 The design must not add persistent prediction state or work to the normal
 scheduling path. Prediction work is performed only when a caller asks for it.
@@ -26,12 +27,16 @@ capacity claimed by protected reservations.
 
 ## Current behavior
 
-`Simulation::get_job_statuses()` currently creates a temporary earliest-fit
-capacity projection for all pending jobs. It has no persistent sidecar state
-and is not restricted by `backfill_queue_depth`, hybrid reservation depth, or
-`planning_horizon`. This makes it useful as an all-queue forecast, but it does
-not presently expose a distinct reservation result or replay the full
-hybrid/conservative policy.
+`Simulation::get_job_statuses(job_ids, estimation_depth)` builds a temporary
+reservation-aware capacity projection. A pending result carries a start time
+and a `reserved` or `estimated` kind: EASY's blocked in-horizon head, the
+in-horizon hybrid reservation-depth prefix, and in-horizon conservative
+blocked jobs are reported as `reserved`; other pending starts are estimates
+that respect those retained windows. A zero `estimation_depth` is the default
+and reports pending timing for the complete waiting queue. A finite depth
+bounds this temporary projection to the reported prefix. It does not change
+scheduler state or policy; exact effects from later admissible backfill remain
+the responsibility of the separate full-lookahead design.
 
 `Simulation::get_prediction_horizon(utilization)` is a separate existing
 queue-level metric. It is currently available only to the EASY-capable FCFS
@@ -46,7 +51,7 @@ reservation set that the scheduler protects in its current pass:
 
 - EASY protects the blocked head.
 - Hybrid protects the configured reservation-depth prefix.
-- Conservative protects the applicable waiting prefix.
+- Conservative projects every in-horizon blocked waiting job.
 - A job projected beyond `planning_horizon` creates no reservation and does
   not consume a reservation-depth slot.
 - A backfill queue-depth limit constrains scheduling work in one pass. It does
@@ -56,7 +61,7 @@ The exact prefix and ordering must come from the scheduler's policy, not from
 a separate interpretation in an API layer. This prevents status reporting from
 drifting from the scheduling decision it describes.
 
-For every waiting job, the API should report a start-time projection and its
+For every waiting job, the cheap API reports a start-time projection and its
 kind. A protected job reports `reserved` and its reservation time. A
 non-protected job reports `estimated`, using the capacity profile remaining
 after protected reservations. Non-protected estimates do not themselves create

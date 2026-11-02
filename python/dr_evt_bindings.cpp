@@ -83,6 +83,12 @@ PYBIND11_MODULE(dr_evt, m) {
       .value("COMPLETED", Simulation::Job_State::COMPLETED)
       .value("REJECTED", Simulation::Job_State::REJECTED);
 
+  py::enum_<Simulation::Start_Time_Kind>(m, "StartTimeKind",
+                                         py::arithmetic())
+      .value("NONE", Simulation::Start_Time_Kind::NONE)
+      .value("RESERVED", Simulation::Start_Time_Kind::RESERVED)
+      .value("ESTIMATED", Simulation::Start_Time_Kind::ESTIMATED);
+
   // Mutable configuration populated before constructing Simulation.
   py::class_<Sim_Params>(m, "SimParams")
       .def(py::init<>(), "Creates a configuration with DR_EVT default values.")
@@ -270,7 +276,11 @@ PYBIND11_MODULE(dr_evt, m) {
                     "Optional[float]: Scheduled completion time.")
       .def_readonly("expected_start_time",
                     &Simulation::Job_Status::expected_start_time,
-                    "Optional[float]: Current projection while pending.");
+                    "Optional[float]: Pending reservation-derived or "
+                    "estimated start; inspect start_time_kind.")
+      .def_readonly("start_time_kind", &Simulation::Job_Status::start_time_kind,
+                    "StartTimeKind: NONE, RESERVED, or ESTIMATED source of a "
+                    "pending start time.");
 
   // Main Simulation class
   py::class_<Simulation>(m, "Simulation")
@@ -319,10 +329,15 @@ PYBIND11_MODULE(dr_evt, m) {
            "no request is appended.")
 
       .def("get_job_statuses", &Simulation::get_job_statuses,
-           py::arg("job_idxs"),
+           py::arg("job_idxs"), py::arg("estimation_depth") = 0,
            "Return status snapshots for appended job IDs in request order. "
-           "Pending jobs have expected_start_time; scheduled jobs have "
-           "start_time and end_time.")
+           "Pending jobs have expected_start_time and start_time_kind; a "
+           "protected scheduler reservation is RESERVED, otherwise the value "
+           "is an ESTIMATED reservation-respecting fit. "
+           "Set estimation_depth to limit temporary planning and pending "
+           "start-time results to a queue prefix; zero considers the "
+           "complete waiting queue. "
+           "Scheduled jobs have start_time and end_time.")
 
       // Streaming API - Time advancement
       .def("run_until_exclusive", &Simulation::run_until_exclusive,

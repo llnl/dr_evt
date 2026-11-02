@@ -407,7 +407,8 @@ public:
             job_idxs.push_back(static_cast<dr_evt::job_no_t>(idx));
           }
           auto *out = resp.mutable_get_job_statuses();
-          for (const auto &status : sim->get_job_statuses(job_idxs)) {
+          for (const auto &status : sim->get_job_statuses(
+                   job_idxs, req.get_job_statuses().estimation_depth())) {
             auto *job = out->add_jobs();
             job->set_job_idx(status.job_idx);
             using State = dr_evt::Simulation::Job_State;
@@ -431,6 +432,11 @@ public:
               times->set_end_time(*status.end_time);
             } else if (status.expected_start_time) {
               job->set_expected_start_time(*status.expected_start_time);
+              using StartTimeKind = dr_evt::Simulation::Start_Time_Kind;
+              job->set_start_time_kind(
+                  status.start_time_kind == StartTimeKind::RESERVED
+                      ? START_TIME_KIND_RESERVED
+                      : START_TIME_KIND_ESTIMATED);
             }
           }
           break;

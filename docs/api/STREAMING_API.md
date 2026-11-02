@@ -133,14 +133,13 @@ flushed; an ID not created by the append APIs raises `std::out_of_range`.
 This query uses simulation state and does not require a Redis-enabled build or
 a Redis server.
 
-`expected_start_time` is an all-waiting-job, earliest-fit forecast rather than
-a reservation or a start-time guarantee. The query builds temporary capacity
-state and considers every pending job in queue order; it does not change the
-scheduler. In particular, `backfill_queue_depth`, hybrid reservation depth,
-and `planning_horizon` constrain a scheduler pass and its protected
-reservations, but do not prevent a deeper or horizon-skipped job from being
-considered for an estimate. Subsequent scheduling decisions, arrivals, or
-capacity changes can change that estimate.
+`expected_start_time` is paired with `start_time_kind`. `reserved` identifies
+a protected EASY, hybrid, or conservative reservation; `estimated` identifies
+a reservation-respecting earliest fit and is not a start-time guarantee. The
+query builds temporary capacity state and does not change the scheduler.
+`estimation_depth` limits temporary planning and returned pending timing to a
+queue prefix; zero, the default, considers the complete waiting queue. It does
+not change scheduler configuration or policy.
 
 ### `advance_to(target_time)`
 

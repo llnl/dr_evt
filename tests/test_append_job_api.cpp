@@ -203,6 +203,29 @@ void test_expected_start_is_earliest_fit() {
   assert(projected[1].expected_start_time == 10.0);
   assert(projected[2].expected_start_time == 0.0);
   assert(projected[3].expected_start_time == 110.0);
+  assert(projected[0].start_time_kind ==
+         Simulation::Start_Time_Kind::ESTIMATED);
+  assert(projected[1].start_time_kind ==
+         Simulation::Start_Time_Kind::RESERVED);
+  assert(projected[2].start_time_kind ==
+         Simulation::Start_Time_Kind::ESTIMATED);
+  assert(projected[3].start_time_kind ==
+         Simulation::Start_Time_Kind::ESTIMATED);
+
+  // A finite query depth limits only pending start-time results. Statuses
+  // remain request-order preserving for the complete caller-supplied list.
+  const auto bounded = sim.get_job_statuses(ids, 2);
+  assert(bounded.size() == ids.size());
+  assert(bounded[0].expected_start_time == 0.0);
+  assert(bounded[1].expected_start_time == 10.0);
+  assert(bounded[0].start_time_kind ==
+         Simulation::Start_Time_Kind::ESTIMATED);
+  assert(bounded[1].start_time_kind ==
+         Simulation::Start_Time_Kind::RESERVED);
+  assert(!bounded[2].expected_start_time.has_value());
+  assert(!bounded[3].expected_start_time.has_value());
+  assert(bounded[2].start_time_kind == Simulation::Start_Time_Kind::NONE);
+  assert(bounded[3].start_time_kind == Simulation::Start_Time_Kind::NONE);
 
   // After scheduling at t=0, A and C run; the head's projection is the
   // shadow time and D's projection is unchanged.
@@ -220,6 +243,92 @@ void test_expected_start_is_earliest_fit() {
   auto done = sim.get_job_statuses(ids);
   assert(done[1].start_time == 10.0);
   assert(done[3].start_time == 110.0);
+
+  std::cout << "  PASSED" << std::endl;
+}
+
+// expected_start_time is a forecast for the whole waiting queue, not the
+// protected-reservation set of one conservative/hybrid backfill pass. A
+// depth-one scan and finite horizon therefore do not suppress estimates for
+// jobs behind the scan prefix. Once scheduled, the horizon-skipped head does
+// not constrain the candidate; that later outcome is intentionally distinct
+// from the initial generic forecast.
+void test_expected_start_covers_unreserved_waiting_jobs() {
+  std::cout << "\n=== Expected start: unreserved waiting jobs ==="
+            << std::endl;
+
+  for (const auto policy : {BackfillPolicy::EASY,
+                            BackfillPolicy::CONSERVATIVE,
+                            BackfillPolicy::HYBRID}) {
+    auto params = make_params();
+    params.m_backfill_policy = policy;
+    params.m_backfill_queue_depth = 1;
+    params.m_planning_horizon = 100.0;
+    if (policy == BackfillPolicy::HYBRID) {
+      params.m_reservation_depth = 1;
+    }
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+
+    // A occupies 90 nodes until t=1000. H needs all 100 nodes, so its
+    // projected t=1000 reservation is beyond the 100 s planning horizon.
+    // C and D are both deeper than the one-job backfill scan prefix.
+    const auto a = sim.append_job(0.0, 90, kTestQueueInput, 1000.0);
+    const auto head = sim.append_job(0.0, 100, kTestQueueInput, 10.0);
+    const auto candidate = sim.append_job(0.0, 10, kTestQueueInput, 2000.0);
+    const auto deep = sim.append_job(0.0, 1, kTestQueueInput, 1.0);
+
+    const auto statuses = sim.get_job_statuses({a, head, candidate, deep});
+    assert(statuses.size() == 4);
+    for (const auto &status : statuses) {
+      assert(status.state == Simulation::Job_State::PENDING);
+      assert(status.expected_start_time.has_value());
+    }
+    assert(approx_equal(*statuses[0].expected_start_time, 0.0));
+    assert(approx_equal(*statuses[1].expected_start_time, 1000.0));
+    assert(approx_equal(*statuses[2].expected_start_time, 0.0));
+    assert(approx_equal(*statuses[3].expected_start_time, 1000.0));
+    for (const auto &status : statuses) {
+      assert(status.start_time_kind == Simulation::Start_Time_Kind::ESTIMATED);
+    }
+
+    // The scheduler skips H's out-of-horizon reservation and starts C at the
+    // current pass. This confirms the forecast above was not exposed as a
+    // reservation or guarantee.
+    sim.advance_to(0.0);
+    const auto started = sim.get_job_statuses({candidate}).front();
+    assert(started.state == Simulation::Job_State::RUNNING);
+    assert(approx_equal(*started.start_time, 0.0));
+  }
+
+  // An in-horizon blocked head is protected by both policies. Conservative
+  // also protects the later blocked job, while hybrid depth one reports that
+  // later start as an estimate rather than a reservation.
+  for (const auto policy : {BackfillPolicy::CONSERVATIVE,
+                            BackfillPolicy::HYBRID}) {
+    auto params = make_params();
+    params.m_backfill_policy = policy;
+    if (policy == BackfillPolicy::HYBRID) {
+      params.m_reservation_depth = 1;
+    }
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+    const auto a = sim.append_job(0.0, 90, kTestQueueInput, 10.0);
+    const auto head = sim.append_job(0.0, 100, kTestQueueInput, 5.0);
+    const auto later = sim.append_job(0.0, 100, kTestQueueInput, 5.0);
+    const auto statuses = sim.get_job_statuses({a, head, later});
+    assert(approx_equal(*statuses[0].expected_start_time, 0.0));
+    assert(approx_equal(*statuses[1].expected_start_time, 10.0));
+    assert(approx_equal(*statuses[2].expected_start_time, 15.0));
+    assert(statuses[0].start_time_kind ==
+           Simulation::Start_Time_Kind::ESTIMATED);
+    assert(statuses[1].start_time_kind ==
+           Simulation::Start_Time_Kind::RESERVED);
+    assert(statuses[2].start_time_kind ==
+           (policy == BackfillPolicy::CONSERVATIVE
+                ? Simulation::Start_Time_Kind::RESERVED
+                : Simulation::Start_Time_Kind::ESTIMATED));
+  }
 
   std::cout << "  PASSED" << std::endl;
 }
@@ -1597,6 +1706,7 @@ int main() {
     test_append_with_empty_trace();
     test_appended_job_statuses();
     test_expected_start_is_earliest_fit();
+    test_expected_start_covers_unreserved_waiting_jobs();
     test_append_reclaims_before_growing();
     test_append_rejects_past_submit_time();
     test_append_jobs_batch();

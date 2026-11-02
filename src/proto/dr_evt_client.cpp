@@ -157,6 +157,18 @@ const char *job_state_name(dr_evt_grpc::JobState state) {
   }
 }
 
+/** @brief Return the printable source of a pending start time. */
+const char *start_time_kind_name(dr_evt_grpc::StartTimeKind kind) {
+  switch (kind) {
+  case dr_evt_grpc::START_TIME_KIND_RESERVED:
+    return "reserved";
+  case dr_evt_grpc::START_TIME_KIND_ESTIMATED:
+    return "estimated";
+  default:
+    return "unspecified";
+  }
+}
+
 /**
  * @brief Print a live job status returned by the simulation server.
  * @param[in] status Status to print.
@@ -168,7 +180,9 @@ void print_live_status(const dr_evt_grpc::JobStatus &status) {
     std::cout << ", start=" << status.scheduled().start_time()
               << ", end=" << status.scheduled().end_time();
   } else if (status.has_expected_start_time()) {
-    std::cout << ", expected_start=" << status.expected_start_time();
+    std::cout << ", expected_start=" << status.expected_start_time()
+              << " (" << start_time_kind_name(status.start_time_kind())
+              << ")";
   }
   std::cout << ")\n";
 }

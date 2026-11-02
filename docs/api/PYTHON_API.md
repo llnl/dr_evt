@@ -173,12 +173,12 @@ A pending `JobStatus` has `state == JobState.PENDING` and an
 releases, and the scheduler's current queue order. Each pending job is placed
 at its earliest fit for its whole time limit after the jobs ahead of it are
 reserved, so a short job behind a blocked head may be projected before the
-head. This is an all-waiting-job forecast, not a scheduler reservation or
-start-time guarantee: jobs beyond a conservative/hybrid queue-depth or
-reservation-depth limit, and jobs skipped by `planning_horizon`, are still
-considered for an estimate. Those settings restrict a scheduler pass, while
-the status query uses temporary projection state and does not change the
-scheduler. Running and completed jobs
+head. `JobStatus.start_time_kind` is `StartTimeKind.RESERVED` for a protected
+scheduler reservation and `StartTimeKind.ESTIMATED` for a non-binding fit
+that respects protected reservations. Pass `estimation_depth` to
+`get_job_statuses()` to limit temporary planning and pending timing to a queue
+prefix; zero is the default and considers the complete waiting queue. This
+changes neither the scheduler nor its reservation plan. Running and completed jobs
 have `start_time` and `end_time`; rejected jobs have no timing. The compact
 timing record remains available after completed trace rows are flushed.
 

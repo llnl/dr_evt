@@ -49,16 +49,14 @@ in-process via the streaming API:
 one `JobStatus` per ID in the same order. A pending job carries
 `expected_start_time`; a running or completed job carries `scheduled` with
 `start_time` and `end_time`; and a rejected job carries no timing value.
-`expected_start_time` is an earliest-fit projection: pending jobs are walked
-in queue order and each is placed at the first time enough nodes remain free
-for its whole time limit, after running jobs release at their time limits and
-after the jobs placed before it. A short job behind a blocked head can
-therefore be projected earlier than the head. It is a non-binding forecast,
-not a conservative/hybrid reservation or a start-time guarantee. Every waiting
-job is considered, including jobs outside a backfill queue-depth or hybrid
-reservation-depth prefix and jobs skipped by `planning_horizon`; those settings
-limit a scheduler pass, not this read-only forecast. The head's value equals
-the shadow time from `GetFCFSHeadShadowTimeRequest`.
+`expected_start_time` is paired with a `start_time_kind`: `reserved` is a
+protected scheduler reservation, while `estimated` is a non-binding earliest
+fit that respects protected reservations. A short job behind a blocked head
+can therefore receive an estimate earlier than the head. `estimation_depth`
+on the request limits temporary planning and pending timing to a queue prefix;
+zero is the default and considers the complete waiting queue. It does not
+change scheduling policy or reservations. The head's reserved value equals the shadow time from
+`GetFCFSHeadShadowTimeRequest`.
 Unknown or non-appended IDs produce `ErrorResponse`. The request reads the
 server's simulation state and works regardless of whether Redis output support
 is compiled or configured.
