@@ -173,7 +173,12 @@ A pending `JobStatus` has `state == JobState.PENDING` and an
 releases, and the scheduler's current queue order. Each pending job is placed
 at its earliest fit for its whole time limit after the jobs ahead of it are
 reserved, so a short job behind a blocked head may be projected before the
-head. Running and completed jobs
+head. This is an all-waiting-job forecast, not a scheduler reservation or
+start-time guarantee: jobs beyond a conservative/hybrid queue-depth or
+reservation-depth limit, and jobs skipped by `planning_horizon`, are still
+considered for an estimate. Those settings restrict a scheduler pass, while
+the status query uses temporary projection state and does not change the
+scheduler. Running and completed jobs
 have `start_time` and `end_time`; rejected jobs have no timing. The compact
 timing record remains available after completed trace rows are flushed.
 

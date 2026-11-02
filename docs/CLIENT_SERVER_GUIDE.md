@@ -53,8 +53,12 @@ one `JobStatus` per ID in the same order. A pending job carries
 in queue order and each is placed at the first time enough nodes remain free
 for its whole time limit, after running jobs release at their time limits and
 after the jobs placed before it. A short job behind a blocked head can
-therefore be projected earlier than the head. The head's value equals the
-shadow time from `GetFCFSHeadShadowTimeRequest`.
+therefore be projected earlier than the head. It is a non-binding forecast,
+not a conservative/hybrid reservation or a start-time guarantee. Every waiting
+job is considered, including jobs outside a backfill queue-depth or hybrid
+reservation-depth prefix and jobs skipped by `planning_horizon`; those settings
+limit a scheduler pass, not this read-only forecast. The head's value equals
+the shadow time from `GetFCFSHeadShadowTimeRequest`.
 Unknown or non-appended IDs produce `ErrorResponse`. The request reads the
 server's simulation state and works regardless of whether Redis output support
 is compiled or configured.

@@ -16,6 +16,9 @@ maintainer-facing build guidance. It is separate from the user documentation.
 - [Performance Analysis](PERFORMANCE_ANALYSIS.md) — Linux `perf` breakdown of
   the circular FCFS scheduler on the June 2022 RIKEN trace and its primary
   optimization targets.
+- [Scheduling Predictions and Reservations](SCHEDULING_PREDICTIONS.md) —
+  Design for reservation reporting, output-free lookahead, and low-cost
+  queue-drain estimates.
 - [Simulation vs. Replay Modes](design-decisions/SIMULATION_VS_REPLAY_MODES.md)
   — The two execution models and their trade-offs.
 - [Timezone Offset Support](design-decisions/TIMEZONE_SUPPORT.md) — ISO 8601
