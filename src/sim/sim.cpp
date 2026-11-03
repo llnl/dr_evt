@@ -2279,9 +2279,8 @@ BasicSimulation<TraceType>::get_job_statuses(
   // Build a query-local reservation plan. It never changes the scheduler, but
   // it follows the configured backfill policy: blocked in-horizon EASY head,
   // HYBRID prefix, or CONSERVATIVE queue retain capacity in this profile.
-  // Jobs that are predicted to dispatch immediately also consume their
-  // projected run window, while an out-of-horizon job remains an estimate and
-  // cannot constrain later estimates.
+  // Every projected job consumes its run window in this query-local serial
+  // forecast. An out-of-horizon job remains ESTIMATED rather than RESERVED.
   std::map<sim_time_t, num_nodes_t> reservation_profile = std::move(profile);
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
@@ -2337,13 +2336,11 @@ BasicSimulation<TraceType>::get_job_statuses(
           reserved ? Start_Time_Kind::RESERVED : Start_Time_Kind::ESTIMATED;
     }
 
-    // A start-now placement is a predicted immediate dispatch and must affect
-    // later jobs in this local plan. Under strict FCFS (no backfill), preserve
-    // the historical serial forecast by reserving every projected placement.
-    if (starts_now || reserved ||
-        m_params.m_backfill_policy == BackfillPolicy::NONE) {
-      reserve(reservation_profile, *start, nodes, limit);
-    }
+    // Every placement consumes its projected whole-duration window before the
+    // next queue job is considered. RESERVED identifies a policy-protected
+    // placement; ESTIMATED remains a non-binding forecast, but still keeps
+    // this query's queue-order projection serial.
+    reserve(reservation_profile, *start, nodes, limit);
   }
 
   return result;

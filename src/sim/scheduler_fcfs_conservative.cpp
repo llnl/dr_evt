@@ -52,6 +52,7 @@ sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
   const size_t depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t reserved = 0;
+  running_jobs_t planned_jobs = running_jobs;
   for (size_t i = 0; i < backfill_index; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed)
@@ -59,14 +60,19 @@ sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
     if (depth != 0 && reserved >= depth)
       break;
 
-    // Calculate when this job could start
+    // Place each protected waiting job into the same temporary resource-time
+    // plan before calculating the next reservation.
     sim_time_t job_reservation = calculate_fcfs_reservation(
-        job.nodes_requested, available_nodes, running_jobs, current_time);
+        job.nodes_requested, available_nodes, planned_jobs, current_time);
     // Beyond the planning horizon the job is not planned: no reservation
     // and no reservation-depth slot (Slurm bf_window).
     if (!reservation_within_horizon(job_reservation, current_time))
       continue;
     ++reserved;
+    planned_jobs[job.job_id] = {
+        job_reservation,
+        release_estimate(job_reservation, job.run_time_estimate),
+        job.nodes_requested};
 
     // Track the earliest reservation time
     earliest_conflict = std::min(earliest_conflict, job_reservation);

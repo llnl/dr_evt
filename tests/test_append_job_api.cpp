@@ -251,12 +251,12 @@ void test_expected_start_is_earliest_fit() {
   std::cout << "  PASSED" << std::endl;
 }
 
-// expected_start_time is a forecast for the whole waiting queue, not the
-// protected-reservation set of one conservative/hybrid backfill pass. A
+// expected_start_time is a serial forecast for the whole waiting queue, not
+// the protected-reservation set of one conservative/hybrid backfill pass. A
 // depth-one scan and finite horizon therefore do not suppress estimates for
-// jobs behind the scan prefix. Once scheduled, the horizon-skipped head does
-// not constrain the candidate; that later outcome is intentionally distinct
-// from the initial generic forecast.
+// jobs behind the scan prefix: each forecast placement constrains the next.
+// Once scheduled, the horizon-skipped head does not constrain the candidate;
+// that later outcome is intentionally distinct from the initial forecast.
 void test_expected_start_covers_unreserved_waiting_jobs() {
   std::cout << "\n=== Expected start: unreserved waiting jobs ===" << std::endl;
 
@@ -288,8 +288,8 @@ void test_expected_start_covers_unreserved_waiting_jobs() {
     }
     assert(approx_equal(*statuses[0].expected_start_time, 0.0));
     assert(approx_equal(*statuses[1].expected_start_time, 1000.0));
-    assert(approx_equal(*statuses[2].expected_start_time, 0.0));
-    assert(approx_equal(*statuses[3].expected_start_time, 1000.0));
+    assert(approx_equal(*statuses[2].expected_start_time, 1010.0));
+    assert(approx_equal(*statuses[3].expected_start_time, 0.0));
     for (const auto &status : statuses) {
       assert(status.start_time_kind == Simulation::Start_Time_Kind::ESTIMATED);
     }

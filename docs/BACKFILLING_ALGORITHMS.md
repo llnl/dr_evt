@@ -92,10 +92,11 @@ hybrid or conservative reservations.
 
 ### Conservative
 
-Conservative backfilling protects every earlier waiting job. For each
-candidate, the scheduler calculates the reservations of the jobs ahead of it
-and uses their earliest reservation as the candidate's backfill window. The
-candidate starts only if it fits and completes strictly before that window.
+Conservative backfilling protects every earlier waiting job with a chained
+resource-time reservation plan. Each protected waiting job is placed in queue
+order and consumes its requested nodes over its requested runtime before the
+next protected job is planned. A candidate starts only if it fits now and its
+projected execution does not delay any interval in that accumulated plan.
 Jobs accepted earlier in the same scheduling pass are included when later
 candidates are evaluated.
 
@@ -106,10 +107,10 @@ deque implementation.
 
 ### Hybrid
 
-`--backfill_policy hybrid --reservation_depth N` gives reservations to the
-first `N` waiting jobs in queue order. A candidate deeper than `N` may start
-only if it fits now and completes before the earliest reservation among
-those `N`; it holds no reservation itself, so later candidates may pass it.
+`--backfill_policy hybrid --reservation_depth N` builds that chained plan for
+the first `N` waiting jobs in queue order. A candidate deeper than `N` may
+start only if it does not delay any reservation in that plan; it holds no
+reservation itself, so later candidates may pass it.
 `N = 1` reproduces EASY and a depth of at least the queue length is
 conservative. Slurm behaves this way when `bf_job_part_count_reserve` is
 set, and Fluxion's `hybrid` queue policy does the same with
@@ -154,3 +155,8 @@ result; see [Wait Queues](dev/WAIT_QUEUES.md).
   SP2 with Backfilling*.
 - Feitelson, D. G., and Weil, A. M. (1998), *Utilization and Predictability in
   Scheduling the IBM SP2 with Backfilling*.
+- Slurm, [Backfill Scheduling](https://slurm.schedmd.com/sched_config.html#backfill)
+  and [`_add_reservation()`](https://github.com/SchedMD/slurm/blob/4da7cc366ea9e109f769da83339e299f9aaff78f/src/plugins/sched/backfill/backfill.c#L4251).
+- Fluxion qmanager,
+  [conservative and hybrid policy contract](https://github.com/flux-framework/flux-sched/blob/981a1328a5a74149d459e83e96ad841c2ba153a2/doc/man5/flux-config-sched-fluxion-qmanager.rst#L82-L99)
+  and [reservation loop](https://github.com/flux-framework/flux-sched/blob/981a1328a5a74149d459e83e96ad841c2ba153a2/qmanager/policies/queue_policy_bf_base_impl.hpp#L41-L68).

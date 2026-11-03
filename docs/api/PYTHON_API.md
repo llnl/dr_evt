@@ -176,9 +176,10 @@ at its earliest fit for its whole time limit after the jobs ahead of it are
 reserved, so a short job behind a blocked head may be projected before the
 head. `JobStatus.start_time_kind` is `StartTimeKind.RESERVED` for a protected
 scheduler reservation and `StartTimeKind.ESTIMATED` for a non-binding fit
-that respects protected reservations. Unreserved estimates do not reserve
-capacity for later estimates and may overlap; they are optimistic opportunities
-based on requested time limits, not start guarantees. Pass `estimation_depth` to
+that respects protected reservations. Every projected placement consumes its
+requested time window before the next queue job is placed; estimates are still
+non-binding forecasts based on requested time limits, not start guarantees.
+Pass `estimation_depth` to
 `get_job_statuses()` to limit temporary planning and pending timing to a queue
 prefix; zero is the default and considers the complete waiting queue. This
 changes neither the scheduler nor its reservation plan. Running and completed jobs

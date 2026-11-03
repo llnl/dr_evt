@@ -93,6 +93,8 @@ protected:
   size_t wait_queue_size() const override { return m_wait_queue.size(); }
 
 private:
+  /** Build the chained protected reservation plan before job_index and return
+   * its earliest planned start. */
   sim_time_t calculate_conservative_window(size_t job_index,
                                            num_nodes_t available_nodes,
                                            const running_jobs_t &running_jobs,

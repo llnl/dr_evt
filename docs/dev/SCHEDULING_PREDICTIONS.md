@@ -38,11 +38,10 @@ bounds this temporary projection to the reported prefix. It does not change
 scheduler state or policy; exact effects from later admissible backfill remain
 the responsibility of the separate full-lookahead design.
 
-The projection is deliberately not a scheduler replay.  It walks the queue in
-order and retains capacity only for predicted immediate starts, protected
-reservations, and (with no backfill) every earlier FCFS placement.  An earlier
-unreserved waiting job receives an `estimated` earliest fit but does not claim
-capacity for later estimates.  Estimates may consequently overlap each other.
+The projection is deliberately not a scheduler replay. It walks the queue in
+order and carves every projected placement from its temporary profile before
+placing the next job. An `estimated` result is therefore a serial queue-order
+forecast, not a scheduler-protected reservation.
 They use requested time limits for running and protected work: a completion
 before its limit can advance a future estimate, while a later admissible
 backfill choice can delay an unreserved estimate.  This is why `estimated` is

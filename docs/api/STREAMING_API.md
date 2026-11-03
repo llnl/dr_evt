@@ -136,8 +136,9 @@ a Redis server.
 `expected_start_time` is paired with `start_time_kind`. `reserved` identifies
 a protected EASY, hybrid, or conservative reservation; `estimated` identifies
 a reservation-respecting earliest fit and is not a start-time guarantee.
-Unreserved estimates do not claim capacity for later estimates and may overlap;
-they use requested limits for running and protected work. A policy-exact answer
+Every projected placement consumes its requested time window before the next
+queue job is placed. Estimates use requested limits for running and protected
+work. A policy-exact answer
 requires the separate full-lookahead operation. The query builds temporary
 capacity state and does not change the scheduler.
 `estimation_depth` limits temporary planning and returned pending timing to a
