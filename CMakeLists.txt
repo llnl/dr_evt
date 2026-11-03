@@ -777,6 +777,14 @@ list(APPEND DR_EVT_UNIT_TEST_TARGETS test_node_release_delay-bin)
 
 # Native warm-start coverage: boundary classification, capacity transitions,
 # statistics, all scheduler policies/queue backends, and differential traces.
+add_executable(benchmark_job_statuses-bin tests/benchmark_job_statuses.cpp)
+target_include_directories(benchmark_job_statuses-bin PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>)
+target_link_libraries(benchmark_job_statuses-bin PRIVATE dr_evt)
+set_target_properties(benchmark_job_statuses-bin PROPERTIES
+  OUTPUT_NAME benchmark_job_statuses)
+
 add_executable(test_warm_start-bin tests/test_warm_start.cpp)
 target_include_directories(test_warm_start-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
