@@ -440,6 +440,8 @@ public:
 
 protected:
 #if defined(DR_EVT_HAS_SER20)
+  /** Estimate serialized checkpoint bytes before allocating a buffer. */
+  size_t checkpoint_reserve_bytes() const;
   void save_checkpoint_impl(std::ostream &output, bool preserve_outputs);
   void load_checkpoint_impl(std::istream &input, bool restore_outputs);
 #endif

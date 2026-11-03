@@ -34,7 +34,6 @@
 #include <iomanip>
 #include <limits>
 #include <queue>
-#include <sstream>
 #include <type_traits>
 #include <typeinfo>
 
@@ -88,10 +87,10 @@ template <typename... Ts> consteval size_t checkpoint_scalar_bytes() {
   return (sizeof(Ts) + ... + size_t{0});
 }
 
-// This is the fixed scalar portion common to every runnable snapshot. Dynamic
-// parameter strings and container payloads are added from their live counts
-// at the call site.
-constexpr size_t lookahead_snapshot_fixed_bytes = checkpoint_scalar_bytes<
+// This is the fixed scalar portion common to every runnable checkpoint.
+// Dynamic parameter strings and container payloads are added from their live
+// counts at the call site.
+constexpr size_t checkpoint_fixed_bytes = checkpoint_scalar_bytes<
     decltype(checkpoint_magic), std::uint32_t, std::uint8_t, std::uint32_t,
     bool, sim_time_t, sim_time_t, bool, num_nodes_t, size_t, num_nodes_t,
     tdiff_t, sim_time_t, num_jobs_t, num_jobs_t, num_jobs_t, sim_time_t, size_t,
@@ -215,6 +214,36 @@ struct ParamsFieldWriter {
       }
     } else {
       writer.value(field);
+    }
+  }
+};
+
+/** Add the serialized extent of one parameter field to an estimate. */
+struct ParamsFieldSizeEstimator {
+  size_t &bytes;
+
+  void add(size_t amount) {
+    if (amount > std::numeric_limits<size_t>::max() - bytes) {
+      bytes = std::numeric_limits<size_t>::max();
+    } else {
+      bytes += amount;
+    }
+  }
+
+  template <typename T> void operator()(const char *, const T &field) {
+    if constexpr (std::is_enum_v<T>) {
+      add(sizeof(std::underlying_type_t<T>));
+    } else if constexpr (std::is_same_v<T, std::string>) {
+      add(sizeof(std::uint64_t));
+      add(field.size());
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+      add(sizeof(std::uint64_t));
+      for (const auto &item : field) {
+        add(sizeof(std::uint64_t));
+        add(item.size());
+      }
+    } else {
+      add(sizeof(T));
     }
   }
 };
@@ -1137,6 +1166,47 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
 }
 
 template <typename TraceType>
+size_t BasicSimulation<TraceType>::checkpoint_reserve_bytes() const {
+  const auto saturating_add = [](size_t total, size_t count, size_t width) {
+    if (count > (std::numeric_limits<size_t>::max() - total) / width) {
+      return std::numeric_limits<size_t>::max();
+    }
+    return total + count * width;
+  };
+
+  // The constant term is calculated at compile time from scalar archive
+  // types. Container entries use their live population below.
+  size_t bytes = checkpoint_fixed_bytes;
+  ParamsFieldSizeEstimator parameter_bytes{bytes};
+  m_params.visit_fields(parameter_bytes);
+  bytes = saturating_add(bytes, m_capacity_changes.size(),
+                         sizeof(Capacity_Change) + 16);
+  bytes = saturating_add(bytes, m_appended_job_query_records.size(),
+                         sizeof(Appended_Job_Query_Record) + 16);
+  bytes = saturating_add(bytes, m_scheduler->pending_job_ids().size(),
+                         sizeof(job_no_t) + 16);
+  if (m_custom_scheduler != nullptr) {
+    bytes = saturating_add(bytes, m_custom_scheduler->m_wait_queue.size(), 64);
+  }
+  bytes = saturating_add(bytes, m_running_jobs.size(),
+                         sizeof(running_jobs_t::value_type) + 16);
+  bytes = saturating_add(bytes, m_pending_queue_arrivals.size(), 32);
+  bytes = saturating_add(bytes, m_event_queue.size(), 32);
+  bytes =
+      saturating_add(bytes, m_trace.m_data.size(),
+                     sizeof(typename TraceType::policy_type::record_type) + 32);
+  bytes = saturating_add(bytes, m_trace.m_ctx.m_evtq.size(), 32);
+  bytes = saturating_add(bytes, m_trace.m_ctx.m_resource_history.size(), 64);
+
+  // Binary archive collection counts and fields need modest headroom. This
+  // remains an estimate, never a claim that the serialized extent is exact.
+  if (bytes < std::numeric_limits<size_t>::max() / 4) {
+    bytes += bytes / 4;
+  }
+  return bytes;
+}
+
+template <typename TraceType>
 void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
                                                       bool preserve_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
@@ -1437,14 +1507,18 @@ void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
 
 template <typename TraceType>
 void BasicSimulation<TraceType>::save_checkpoint(const std::string &filename) {
-  std::ostringstream buffer(std::ios::out | std::ios::binary);
-  save_checkpoint(buffer);
+  std::vector<char> buffer;
+  buffer.reserve(checkpoint_reserve_bytes());
+  {
+    ostreamvec<char> stream_buffer(buffer);
+    std::ostream output(&stream_buffer);
+    save_checkpoint(output);
+  }
   std::ofstream output(filename, std::ios::binary | std::ios::trunc);
   if (!output) {
     throw std::runtime_error("cannot open checkpoint for writing: " + filename);
   }
-  const std::string state = buffer.str();
-  output.write(state.data(), static_cast<std::streamsize>(state.size()));
+  output.write(buffer.data(), static_cast<std::streamsize>(buffer.size()));
   output.close();
   if (!output) {
     throw std::runtime_error("failed to finish checkpoint: " + filename);
@@ -2351,34 +2425,7 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
   // Reuse storage on this caller thread. ostreamvec grows the vector only
   // when the previous snapshot capacity is insufficient, unlike stringstream.
   thread_local std::vector<char> snapshot;
-  const auto saturating_add = [](size_t total, size_t count, size_t width) {
-    if (count > (std::numeric_limits<size_t>::max() - total) / width) {
-      return std::numeric_limits<size_t>::max();
-    }
-    return total + count * width;
-  };
-  // The archive also contains field tags, container counts, and variable
-  // strings, so this is deliberately an estimate with headroom rather than a
-  // promise of an exact serialized byte count.
-  size_t reserve_bytes = lookahead_snapshot_fixed_bytes;
-  reserve_bytes =
-      saturating_add(reserve_bytes, m_trace.m_data.size(),
-                     sizeof(typename TraceType::policy_type::record_type) + 32);
-  reserve_bytes = saturating_add(reserve_bytes, m_running_jobs.size(),
-                                 sizeof(running_jobs_t::value_type) + 32);
-  reserve_bytes =
-      saturating_add(reserve_bytes, m_scheduler->pending_job_ids().size(), 32);
-  reserve_bytes =
-      saturating_add(reserve_bytes, m_trace.pending_events().size(), 32);
-  reserve_bytes = saturating_add(reserve_bytes, m_capacity_changes.size(), 32);
-  reserve_bytes =
-      saturating_add(reserve_bytes, m_appended_job_query_records.size(),
-                     sizeof(Appended_Job_Query_Record) + 16);
-  reserve_bytes = saturating_add(reserve_bytes,
-                                 m_trace.m_ctx.m_resource_history.size(), 64);
-  if (reserve_bytes < std::numeric_limits<size_t>::max() / 4) {
-    reserve_bytes += reserve_bytes / 4;
-  }
+  const size_t reserve_bytes = checkpoint_reserve_bytes();
   if (snapshot.capacity() < reserve_bytes) {
     snapshot.reserve(reserve_bytes);
   }
