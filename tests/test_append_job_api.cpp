@@ -205,8 +205,7 @@ void test_expected_start_is_earliest_fit() {
   assert(projected[3].expected_start_time == 110.0);
   assert(projected[0].start_time_kind ==
          Simulation::Start_Time_Kind::ESTIMATED);
-  assert(projected[1].start_time_kind ==
-         Simulation::Start_Time_Kind::RESERVED);
+  assert(projected[1].start_time_kind == Simulation::Start_Time_Kind::RESERVED);
   assert(projected[2].start_time_kind ==
          Simulation::Start_Time_Kind::ESTIMATED);
   assert(projected[3].start_time_kind ==
@@ -218,10 +217,8 @@ void test_expected_start_is_earliest_fit() {
   assert(bounded.size() == ids.size());
   assert(bounded[0].expected_start_time == 0.0);
   assert(bounded[1].expected_start_time == 10.0);
-  assert(bounded[0].start_time_kind ==
-         Simulation::Start_Time_Kind::ESTIMATED);
-  assert(bounded[1].start_time_kind ==
-         Simulation::Start_Time_Kind::RESERVED);
+  assert(bounded[0].start_time_kind == Simulation::Start_Time_Kind::ESTIMATED);
+  assert(bounded[1].start_time_kind == Simulation::Start_Time_Kind::RESERVED);
   assert(!bounded[2].expected_start_time.has_value());
   assert(!bounded[3].expected_start_time.has_value());
   assert(bounded[2].start_time_kind == Simulation::Start_Time_Kind::NONE);
@@ -254,11 +251,9 @@ void test_expected_start_is_earliest_fit() {
 // not constrain the candidate; that later outcome is intentionally distinct
 // from the initial generic forecast.
 void test_expected_start_covers_unreserved_waiting_jobs() {
-  std::cout << "\n=== Expected start: unreserved waiting jobs ==="
-            << std::endl;
+  std::cout << "\n=== Expected start: unreserved waiting jobs ===" << std::endl;
 
-  for (const auto policy : {BackfillPolicy::EASY,
-                            BackfillPolicy::CONSERVATIVE,
+  for (const auto policy : {BackfillPolicy::EASY, BackfillPolicy::CONSERVATIVE,
                             BackfillPolicy::HYBRID}) {
     auto params = make_params();
     params.m_backfill_policy = policy;
@@ -304,8 +299,8 @@ void test_expected_start_covers_unreserved_waiting_jobs() {
   // An in-horizon blocked head is protected by both policies. Conservative
   // also protects the later blocked job, while hybrid depth one reports that
   // later start as an estimate rather than a reservation.
-  for (const auto policy : {BackfillPolicy::CONSERVATIVE,
-                            BackfillPolicy::HYBRID}) {
+  for (const auto policy :
+       {BackfillPolicy::CONSERVATIVE, BackfillPolicy::HYBRID}) {
     auto params = make_params();
     params.m_backfill_policy = policy;
     if (policy == BackfillPolicy::HYBRID) {
@@ -1355,6 +1350,10 @@ void test_prediction_horizon() {
     standard.advance_to(0.0);
     assert(approx_equal(standard.get_fcfs_head_shadow_time(), 40.0));
     assert(approx_equal(standard.get_prediction_horizon(0.5), 8.0));
+    const auto starts = standard.get_queue_drain_start_times(1.0, 1);
+    assert(starts.size() == 1);
+    assert(approx_equal(starts[0].expected_start_time, 40.0));
+    assert(starts[0].start_time_kind == Simulation::Start_Time_Kind::RESERVED);
   }
 
   auto unsupported_params = make_params();

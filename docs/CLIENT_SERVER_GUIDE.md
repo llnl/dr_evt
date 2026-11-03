@@ -57,6 +57,8 @@ on the request limits temporary planning and pending timing to a queue prefix;
 zero is the default and considers the complete waiting queue. It does not
 change scheduling policy or reservations. The head's reserved value equals the shadow time from
 `GetFCFSHeadShadowTimeRequest`.
+Unreserved estimates do not claim capacity for later estimates and can overlap;
+use a full scheduler lookahead when a policy-exact future schedule is required.
 Unknown or non-appended IDs produce `ErrorResponse`. The request reads the
 server's simulation state and works regardless of whether Redis output support
 is compiled or configured.

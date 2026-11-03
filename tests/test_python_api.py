@@ -382,6 +382,10 @@ def test_backfill_window_api(result):
         standard.append_job(0.0, 50, QUEUE_INPUT, 8.0)
         standard.advance_to(0.0)
         assert standard.get_prediction_horizon(0.5) == 8.0
+        starts = standard.get_queue_drain_start_times(1.0, estimation_depth=1)
+        assert len(starts) == 1
+        assert starts[0].expected_start_time == 40.0
+        assert starts[0].start_time_kind == dr_evt.StartTimeKind.RESERVED
         result.record_pass("Backfill window snapshot")
     except Exception as e:
         result.record_fail("Backfill window API", str(e))

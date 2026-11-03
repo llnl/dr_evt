@@ -135,8 +135,11 @@ a Redis server.
 
 `expected_start_time` is paired with `start_time_kind`. `reserved` identifies
 a protected EASY, hybrid, or conservative reservation; `estimated` identifies
-a reservation-respecting earliest fit and is not a start-time guarantee. The
-query builds temporary capacity state and does not change the scheduler.
+a reservation-respecting earliest fit and is not a start-time guarantee.
+Unreserved estimates do not claim capacity for later estimates and may overlap;
+they use requested limits for running and protected work. A policy-exact answer
+requires the separate full-lookahead operation. The query builds temporary
+capacity state and does not change the scheduler.
 `estimation_depth` limits temporary planning and returned pending timing to a
 queue prefix; zero, the default, considers the complete waiting queue. It does
 not change scheduler configuration or policy.
@@ -372,6 +375,19 @@ for (const auto& change : window.releases) {
 ```cpp
 tdiff_t horizon = sim.get_prediction_horizon(utilization);
 ```
+
+**Approximate each waiting job's start from queue-drain area:**
+
+```cpp
+auto estimates = sim.get_queue_drain_start_times(utilization);
+```
+
+This on-demand approximation sweeps cumulative queued node-time against the
+utilization-scaled capacity profile after protected reservations are removed.
+`estimation_depth` limits the returned queue prefix; zero covers all waiting
+jobs. `RESERVED` entries are protected scheduler reservations. Other entries
+are optimistic area estimates, not contiguous first-fit placements or start
+guarantees.
 
 This method is available for the standard and Custom FCFS implementations with
 EASY backfilling. Call it after the current backfilling cycle completes. At

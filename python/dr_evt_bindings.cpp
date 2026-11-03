@@ -83,8 +83,7 @@ PYBIND11_MODULE(dr_evt, m) {
       .value("COMPLETED", Simulation::Job_State::COMPLETED)
       .value("REJECTED", Simulation::Job_State::REJECTED);
 
-  py::enum_<Simulation::Start_Time_Kind>(m, "StartTimeKind",
-                                         py::arithmetic())
+  py::enum_<Simulation::Start_Time_Kind>(m, "StartTimeKind", py::arithmetic())
       .value("NONE", Simulation::Start_Time_Kind::NONE)
       .value("RESERVED", Simulation::Start_Time_Kind::RESERVED)
       .value("ESTIMATED", Simulation::Start_Time_Kind::ESTIMATED);
@@ -171,9 +170,8 @@ PYBIND11_MODULE(dr_evt, m) {
       .def(py::init([](sim_time_t submit_time, num_nodes_t num_nodes,
                        const std::string &queue, tdiff_t limit_time,
                        std::optional<tdiff_t> actual_run_time) {
-             return Simulation::Job_Append_Request{submit_time, num_nodes,
-                                                   queue, limit_time,
-                                                   actual_run_time};
+             return Simulation::Job_Append_Request{
+                 submit_time, num_nodes, queue, limit_time, actual_run_time};
            }),
            py::arg("submit_time"), py::arg("num_nodes"), py::arg("queue"),
            py::arg("limit_time"), py::arg("actual_run_time") = py::none(),
@@ -281,6 +279,15 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readonly("start_time_kind", &Simulation::Job_Status::start_time_kind,
                     "StartTimeKind: NONE, RESERVED, or ESTIMATED source of a "
                     "pending start time.");
+
+  py::class_<Simulation::Queue_Drain_Start_Estimate>(m,
+                                                     "QueueDrainStartEstimate")
+      .def_readonly("job_idx", &Simulation::Queue_Drain_Start_Estimate::job_idx)
+      .def_readonly(
+          "expected_start_time",
+          &Simulation::Queue_Drain_Start_Estimate::expected_start_time)
+      .def_readonly("start_time_kind",
+                    &Simulation::Queue_Drain_Start_Estimate::start_time_kind);
 
   // Main Simulation class
   py::class_<Simulation>(m, "Simulation")
@@ -408,6 +415,12 @@ PYBIND11_MODULE(dr_evt, m) {
            "Estimate the waiting-queue drain time from the FCFS shadow time. "
            "Computed on demand for supported EASY schedulers; future arrivals "
            "are excluded.")
+
+      .def("get_queue_drain_start_times",
+           &Simulation::get_queue_drain_start_times, py::arg("utilization"),
+           py::arg("estimation_depth") = 0,
+           "Return queue-order resource-area start approximations. Zero depth "
+           "covers the complete waiting queue; results are not guarantees.")
 
       // Monitoring - Comprehensive statistics
       .def("get_statistics", &Simulation::get_statistics,

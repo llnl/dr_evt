@@ -138,6 +138,7 @@ Their scheduling semantics are documented in
 | `get_fcfs_head_shadow_time()` | Return the FCFS-head reservation time, or `-1` when no head waits or no projected release or scheduled capacity change lets it start. |
 | `get_backfill_window()` | Return the current FCFS/EASY reservation snapshot, including all running-job releases. |
 | `get_prediction_horizon(utilization)` | On demand, estimate the supported FCFS/EASY waiting-queue drain time from the shadow time. |
+| `get_queue_drain_start_times(utilization, estimation_depth=0)` | Return queue-order resource-area start approximations; protected reservations are exact, other results are optimistic. |
 | `get_statistics()` | Return a `Statistics` snapshot. |
 | `write_simulated_trace()` | Write the configured job-schedule output. |
 | `print_stats()` | Print summary statistics. |
@@ -175,7 +176,9 @@ at its earliest fit for its whole time limit after the jobs ahead of it are
 reserved, so a short job behind a blocked head may be projected before the
 head. `JobStatus.start_time_kind` is `StartTimeKind.RESERVED` for a protected
 scheduler reservation and `StartTimeKind.ESTIMATED` for a non-binding fit
-that respects protected reservations. Pass `estimation_depth` to
+that respects protected reservations. Unreserved estimates do not reserve
+capacity for later estimates and may overlap; they are optimistic opportunities
+based on requested time limits, not start guarantees. Pass `estimation_depth` to
 `get_job_statuses()` to limit temporary planning and pending timing to a queue
 prefix; zero is the default and considers the complete waiting queue. This
 changes neither the scheduler nor its reservation plan. Running and completed jobs

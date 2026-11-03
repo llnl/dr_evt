@@ -344,6 +344,13 @@ public:
     Start_Time_Kind start_time_kind = Start_Time_Kind::NONE;
   };
 
+  /** @brief Resource-area approximation for one waiting job. */
+  struct Queue_Drain_Start_Estimate {
+    job_no_t job_idx;
+    sim_time_t expected_start_time;
+    Start_Time_Kind start_time_kind;
+  };
+
   /**
    * @brief Query appended jobs by their stable identifiers.
    * @details Pending jobs receive an on-demand reservation-aware start time.
@@ -371,6 +378,28 @@ public:
   std::vector<Job_Status>
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth = 0) const;
+
+  /**
+   * @brief Approximate pending-job starts from cumulative resource-time area.
+   * @details Protected EASY, hybrid, and conservative reservation windows are
+   * removed from the available-resource profile.  Each unreserved job is then
+   * assigned the time at which utilization-scaled free resource area covers
+   * the unreserved queued node-time ahead of it.  This is faster than a
+   * first-fit placement for every unreserved job, but it is not a guarantee:
+   * it does not model fragmentation or future backfill choices.  A protected
+   * job returns its reservation with kind RESERVED.  The query is on demand
+   * and does not retain state in the scheduler.
+   * @param[in] utilization Expected usable-capacity factor in (0, 1], or zero
+   * to use one.
+   * @param[in] estimation_depth Maximum waiting-queue prefix to return; zero
+   * covers the entire waiting queue.
+   * @return Estimates in scheduler queue order.
+   * @throws std::invalid_argument if utilization is not finite or is outside
+   * [0, 1].
+   */
+  std::vector<Queue_Drain_Start_Estimate>
+  get_queue_drain_start_times(double utilization,
+                              size_t estimation_depth = 0) const;
 
 protected:
   /**

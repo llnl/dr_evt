@@ -5,8 +5,8 @@
 This document records the design for exposing scheduler timing information to
 streaming clients and experiments. It separates a scheduler reservation from a
 start-time estimate and from an aggregate queue-drain estimate. The common
-cheap per-job query is implemented; exact lookahead and the reservation-aware
-hybrid/conservative queue-drain extension remain design work.
+cheap per-job query and resource-area per-job approximation are implemented;
+exact lookahead remains design work.
 
 The design must not add persistent prediction state or work to the normal
 scheduling path. Prediction work is performed only when a caller asks for it.
@@ -38,6 +38,17 @@ bounds this temporary projection to the reported prefix. It does not change
 scheduler state or policy; exact effects from later admissible backfill remain
 the responsibility of the separate full-lookahead design.
 
+The projection is deliberately not a scheduler replay.  It walks the queue in
+order and retains capacity only for predicted immediate starts, protected
+reservations, and (with no backfill) every earlier FCFS placement.  An earlier
+unreserved waiting job receives an `estimated` earliest fit but does not claim
+capacity for later estimates.  Estimates may consequently overlap each other.
+They use requested time limits for running and protected work: a completion
+before its limit can advance a future estimate, while a later admissible
+backfill choice can delay an unreserved estimate.  This is why `estimated` is
+an optimistic opportunity rather than a guarantee, and why a scheduler-
+consistent answer requires exact lookahead.
+
 `Simulation::get_prediction_horizon(utilization)` is a separate existing
 queue-level metric. It is currently available only to the EASY-capable FCFS
 schedulers. It integrates queued resource-time demand against predicted
@@ -67,10 +78,9 @@ non-protected job reports `estimated`, using the capacity profile remaining
 after protected reservations. Non-protected estimates do not themselves create
 reservations unless the caller explicitly requests an exact lookahead.
 
-The caller can choose the reporting scope: all waiting jobs (the default for
-experiments) or only the current backfill queue-depth prefix. This option
-filters returned records; it must not change the scheduler policy or the
-reservation projection used to calculate them.
+The caller can choose the reporting scope with `estimation_depth`: all waiting
+jobs (zero, the default) or an explicit queue prefix. It is independent of the
+scheduler's `backfill_queue_depth` and must not change scheduler policy.
 
 ## Exact lookahead
 
@@ -87,6 +97,11 @@ queue depth, planning horizon, periodic backfill ticks, capacity changes, and
 the state inherited by a completed warm start. It does not change the live
 simulation. Its cost is proportional to how far it advances, so it is suitable
 for accurate or bounded queries rather than every monitoring poll.
+
+In particular, a fork admits later backfill candidates exactly as the live
+scheduler would. Those candidates can consume capacity and change an earlier
+unreserved job's eventual start; the cheap first-fit query intentionally does
+not revise already reported estimates for that effect.
 
 The existing public checkpoint restart path is not itself the fork mechanism:
 it validates output identities and manages restart output segments. A private
