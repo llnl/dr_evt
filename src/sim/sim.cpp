@@ -1598,6 +1598,11 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(recorded.m_backfill_queue_depth,
                              m_params.m_backfill_queue_depth,
                              "backfill_queue_depth");
+    require_checkpoint_match(recorded.m_backfill_interval,
+                             m_params.m_backfill_interval, "backfill_interval");
+    require_checkpoint_match(recorded.m_planning_time_resolution,
+                             m_params.m_planning_time_resolution,
+                             "planning_time_resolution");
     require_checkpoint_match(recorded.m_node_release_delay,
                              m_params.m_node_release_delay,
                              "node_release_delay");
