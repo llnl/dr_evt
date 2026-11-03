@@ -366,7 +366,11 @@ public:
    * arrivals are not considered. Scheduled jobs
    * return their actual simulated start and end timestamps. Results preserve
    * request order and duplicate IDs. Cost is linear in the number of running
-   * plus pending jobs per pending job; nothing is cached.
+   * plus pending jobs per pending job; nothing is cached. The forecast uses
+   * half-open resource intervals and unrounded pending limits, whereas live
+   * backfill uses a strict completion-before-reservation test and may round
+   * planned releases to planning_time_resolution; use exact lookahead when
+   * those boundary details matter.
    * @param[in] job_idxs Identifiers returned by append_job() or append_jobs().
    * An empty vector returns the waiting jobs in scheduler queue order, limited
    * by estimation_depth; those queue entries need not have been appended.

@@ -48,6 +48,14 @@ backfill choice can delay an unreserved estimate.  This is why `estimated` is
 an optimistic opportunity rather than a guarantee, and why a scheduler-
 consistent answer requires exact lookahead.
 
+Two boundary differences are deliberate approximations. The query uses
+half-open resource intervals, so a forecast may reuse capacity exactly at a
+prior placement's end time. The live backfill admission test requires a
+candidate to complete strictly before a protected reservation. Also, pending
+forecast limits are used directly; the query does not round them to the
+scheduler's `planning_time_resolution` grid. Exact lookahead follows the live
+scheduler for both cases.
+
 `Simulation::get_prediction_horizon(utilization)` is a separate existing
 queue-level metric. It is currently available only to the EASY-capable FCFS
 schedulers. It integrates queued resource-time demand against predicted
