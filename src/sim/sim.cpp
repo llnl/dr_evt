@@ -2128,10 +2128,24 @@ template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::vector<Job_Status> result;
-  result.reserve(job_idxs.size());
   std::multimap<job_no_t, size_t> requested_pending_statuses;
-  for (const job_no_t job_idx : job_idxs) {
+  if (job_idxs.empty()) {
+    const size_t count = estimation_depth == 0
+                             ? pending_job_ids.size()
+                             : std::min(estimation_depth,
+                                        pending_job_ids.size());
+    result.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      const job_no_t job_idx = pending_job_ids[i];
+      requested_pending_statuses.emplace(job_idx, result.size());
+      result.push_back({job_idx, Job_State::PENDING, std::nullopt,
+                        std::nullopt, std::nullopt, Start_Time_Kind::NONE});
+    }
+  } else {
+    result.reserve(job_idxs.size());
+    for (const job_no_t job_idx : job_idxs) {
     if (job_idx < m_first_appended_job_idx ||
         job_idx - m_first_appended_job_idx >=
             m_appended_job_query_records.size() ||
@@ -2155,6 +2169,7 @@ BasicSimulation<TraceType>::get_job_statuses(
       requested_pending_statuses.emplace(job_idx, result.size());
     }
     result.push_back(status);
+    }
   }
   if (requested_pending_statuses.empty()) {
     return result;
@@ -2267,7 +2282,6 @@ BasicSimulation<TraceType>::get_job_statuses(
   // Jobs that are predicted to dispatch immediately also consume their
   // projected run window, while an out-of-horizon job remains an estimate and
   // cannot constrain later estimates.
-  const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::map<sim_time_t, num_nodes_t> reservation_profile = std::move(profile);
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;

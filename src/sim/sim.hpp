@@ -352,7 +352,7 @@ public:
   };
 
   /**
-   * @brief Query appended jobs by their stable identifiers.
+   * @brief Query selected appended jobs, or enumerate a waiting-queue prefix.
    * @details Pending jobs receive an on-demand reservation-aware start time.
    * The temporary capacity profile begins with current capacity and
    * running-job releases. It then retains the in-horizon reservations selected
@@ -368,11 +368,14 @@ public:
    * request order and duplicate IDs. Cost is linear in the number of running
    * plus pending jobs per pending job; nothing is cached.
    * @param[in] job_idxs Identifiers returned by append_job() or append_jobs().
+   * An empty vector returns the waiting jobs in scheduler queue order, limited
+   * by estimation_depth; those queue entries need not have been appended.
    * @param[in] estimation_depth Maximum number of waiting jobs, in scheduler
    * queue order, to receive a pending start-time result. Zero (the default)
    * covers the complete waiting queue. This affects query work and returned
    * pending timing only; it never changes scheduler configuration or state.
-   * @return One Job_Status per requested identifier, in request order.
+   * @return One Job_Status per requested identifier, in request order; with an
+   * empty job_idxs vector, one pending status per returned queue entry.
    * @throws std::out_of_range if an ID was not returned by append_job(s).
    */
   std::vector<Job_Status>

@@ -224,6 +224,13 @@ void test_expected_start_is_earliest_fit() {
   assert(bounded[2].start_time_kind == Simulation::Start_Time_Kind::NONE);
   assert(bounded[3].start_time_kind == Simulation::Start_Time_Kind::NONE);
 
+  const auto enumerated = sim.get_job_statuses({}, 2);
+  assert(enumerated.size() == 2);
+  assert(enumerated[0].job_idx == ids[0]);
+  assert(enumerated[1].job_idx == ids[1]);
+  assert(enumerated[0].expected_start_time == 0.0);
+  assert(enumerated[1].expected_start_time == 10.0);
+
   // After scheduling at t=0, A and C run; the head's projection is the
   // shadow time and D's projection is unchanged.
   sim.advance_to(0.0);
