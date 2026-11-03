@@ -144,6 +144,7 @@ capacity state and does not change the scheduler.
 `estimation_depth` limits temporary planning and returned pending timing to a
 queue prefix; zero, the default, considers the complete waiting queue. It does
 not change scheduler configuration or policy.
+An empty `job_idxs` list returns that waiting-queue prefix in scheduler order.
 
 ### `advance_to(target_time)`
 
@@ -389,6 +390,7 @@ utilization-scaled capacity profile after protected reservations are removed.
 jobs. `RESERVED` entries are protected scheduler reservations. Other entries
 are optimistic area estimates, not contiguous first-fit placements or start
 guarantees.
+It is a C++/Python API and is not currently exposed through the gRPC service.
 
 This method is available for the standard and Custom FCFS implementations with
 EASY backfilling. Call it after the current backfilling cycle completes. At

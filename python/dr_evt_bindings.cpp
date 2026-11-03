@@ -337,7 +337,8 @@ PYBIND11_MODULE(dr_evt, m) {
 
       .def("get_job_statuses", &Simulation::get_job_statuses,
            py::arg("job_idxs"), py::arg("estimation_depth") = 0,
-           "Return status snapshots for appended job IDs in request order. "
+           "Return status snapshots for appended job IDs in request order; "
+           "pass an empty job_idxs list to enumerate a waiting-queue prefix. "
            "Pending jobs have expected_start_time and start_time_kind; a "
            "protected scheduler reservation is RESERVED, otherwise the value "
            "is an ESTIMATED reservation-respecting fit. "

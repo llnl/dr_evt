@@ -186,6 +186,13 @@ changes neither the scheduler nor its reservation plan. Running and completed jo
 have `start_time` and `end_time`; rejected jobs have no timing. The compact
 timing record remains available after completed trace rows are flushed.
 
+Pass an empty `job_idxs` list to enumerate waiting jobs in scheduler queue
+order; `estimation_depth` then also limits the returned queue prefix.
+
+`get_queue_drain_start_times(utilization, estimation_depth=0)` is a separate
+fast resource-area approximation. It returns queue-order estimates without
+per-job first-fit placement; it is available through C++ and Python, not gRPC.
+
 `BackfillWindow` exposes `current_time`, `available_nodes`,
 `shadow_time`, and an ordered list of `ResourceRelease` values. Each release
 contains `time` and `nodes_released`.

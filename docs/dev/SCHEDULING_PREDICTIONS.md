@@ -149,7 +149,8 @@ that each individual job has a contiguous feasible interval.
 
 ## Per-job fast estimates
 
-A later per-job approximation can reuse the same residual profile. For an
+`Simulation::get_queue_drain_start_times(utilization, estimation_depth)`
+reuses the same residual profile. For an
 unreserved job `j`, drain the unreserved work ahead of `j` in scheduler order,
 without counting protected jobs a second time. The resulting time estimates
 when `j` may start. A stronger but still inexpensive variant scans profile
@@ -169,6 +170,7 @@ The APIs have distinct cost and purpose:
 | `get_fcfs_head_shadow_time()` | Core scheduler head-reservation state | Existing scheduler state |
 | `get_backfill_window()` | Core FCFS/EASY capacity and release snapshot | On-demand snapshot |
 | `get_job_statuses()` | Common cheap per-job start-time reporting for EASY, hybrid, and conservative | Profile sweep over selected queue prefix |
+| `get_queue_drain_start_times(utilization, estimation_depth)` | Fast per-job resource-area start approximation | Resource-area sweep over selected queue prefix |
 | `get_prediction_horizon(utilization)` | Aggregate experimental queue-drain horizon | Resource-area event sweep |
 | Lookahead API (new) | Policy-exact per-job starts | Output-free side simulation |
 
@@ -178,7 +180,7 @@ scheduler's reservation projection) or `estimated` (from the
 reservation-aware profile). Existing scheduled jobs continue to return their
 actual start and end times.
 
-The query gains an estimation-depth option. It controls how many waiting jobs
+The query's estimation-depth option controls how many waiting jobs
 receive pending start-time results, while preserving a status record for every
 requested ID. A depth of zero means the complete waiting queue and is the
 default; a finite depth limits reported estimates to that queue prefix. The
@@ -212,5 +214,6 @@ Tests should cover the following independently:
    to running releases and capacity changes.
 7. No prediction query mutates live scheduling state or creates output.
 
-The existing status and EASY prediction-horizon tests provide starting
-coverage, but new tests are required before enabling the proposed APIs.
+Status, queue-drain, and EASY prediction-horizon tests cover the implemented
+APIs. Exact-lookahead and generalized queue-drain extensions remain design
+work and require their own tests before implementation.
