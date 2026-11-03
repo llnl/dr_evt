@@ -129,7 +129,7 @@ message DR_EVT_Params {
         uint64 reservation_depth = 37;
 
         // Eligible waiting jobs, head included, examined per backfill pass
-        // by every built-in scheduler. Zero leaves the scan unlimited.
+        // by every scheduler. Zero leaves the scan unlimited.
         uint64 backfill_queue_depth = 41;
 
         // Seconds between periodic EASY, conservative, or hybrid backfill

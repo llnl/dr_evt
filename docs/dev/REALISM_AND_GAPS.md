@@ -47,7 +47,7 @@ Each item describes the code on this branch.
 - **Scan and planning bounds.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
   caps how many waiting jobs one pass inspects (default unlimited), under
-  every built-in policy and ordering.
+  every policy and ordering, including the custom EASY selector.
   [`--planning_horizon`](../user-guide/command-line.md#--planning_horizon-seconds)
   drops reservations that would start beyond the horizon in event-driven and
   periodic mode. Such a job consumes neither a queue-depth nor a reservation

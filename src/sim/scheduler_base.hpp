@@ -415,7 +415,7 @@ protected:
  * @param[in] reservation_depth Waiting jobs that hold reservations under
  * HYBRID backfilling; must be positive with HYBRID and is ignored otherwise.
  * @param[in] backfill_queue_depth Eligible waiting jobs, head included,
- * examined per backfill pass by every built-in scheduler; zero is unlimited.
+ * examined per backfill pass by every scheduler; zero is unlimited.
  * @param[in] backfill_interval Seconds between additional hybrid evaluations;
  * zero retains event-driven evaluation only. The planning horizon is not a
  * construction parameter; set it with SchedulerBase::set_planning_horizon().

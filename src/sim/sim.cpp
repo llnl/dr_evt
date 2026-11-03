@@ -383,6 +383,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
       m_rng(m_params.m_seed), m_queue_length_sum(0), m_queue_length_samples(0),
       m_queue_length_peak(0) {
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
+  m_custom_scheduler->set_backfill_queue_depth(
+      m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -418,6 +420,8 @@ BasicSimulation<TraceType>::BasicSimulation(
     throw std::invalid_argument("custom scheduler must not be null");
   }
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
+  m_custom_scheduler->set_backfill_queue_depth(
+      m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -1480,6 +1484,13 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
                              m_params.m_run_time_stddev, "run_time_stddev");
     require_checkpoint_match(recorded.m_planning_horizon,
                              m_params.m_planning_horizon, "planning_horizon");
+    // Both depths decide which jobs a pass examines or protects, so a restart
+    // must not continue with different values.
+    require_checkpoint_match(recorded.m_reservation_depth,
+                             m_params.m_reservation_depth, "reservation_depth");
+    require_checkpoint_match(recorded.m_backfill_queue_depth,
+                             m_params.m_backfill_queue_depth,
+                             "backfill_queue_depth");
     require_checkpoint_match(recorded.m_node_release_delay,
                              m_params.m_node_release_delay,
                              "node_release_delay");

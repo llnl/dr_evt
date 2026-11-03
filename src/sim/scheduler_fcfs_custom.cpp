@@ -294,7 +294,12 @@ backfill_candidates_t CustomFCFSScheduler::find_backfill_candidates_from(
   // fitting job is a candidate (Slurm bf_window).
   const bool head_within_horizon =
       reservation_within_horizon(reservation_time, current_time);
-  for (size_t i = std::max<size_t>(1, begin_idx); i < m_eligible_end_idx; ++i) {
+  // The queue depth is counted from the head, as in the built-in FCFS
+  // schedulers, before any feasibility test or the candidate cap.
+  const size_t scan_end =
+      queue_depth_scan_end(m_wait_queue, 1, m_eligible_end_idx,
+                           m_backfill_queue_depth, head_within_horizon);
+  for (size_t i = std::max<size_t>(1, begin_idx); i < scan_end; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed || job.nodes_requested > available_nodes) {
       continue;
@@ -368,8 +373,13 @@ CustomFCFSScheduler::schedule(num_nodes_t free_nodes,
       m_wait_queue.front().nodes_requested, available_nodes,
       effective_running_jobs, current_time);
 
+  // Scanning only new arrivals is unsafe with a queue depth: a start moves
+  // older, never-examined jobs into the window. The depth bounds the full
+  // scan, so it stays cheap.
   const size_t candidate_begin =
-      m_reevaluate_all_candidates ? 1 : m_newly_eligible_begin_idx;
+      (m_reevaluate_all_candidates || m_backfill_queue_depth != 0)
+          ? 1
+          : m_newly_eligible_begin_idx;
   const auto candidates = find_backfill_candidates_from(
       candidate_begin, available_nodes, current_time, m_fcfs_reservation_time);
   if (candidates.empty()) {

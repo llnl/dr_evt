@@ -105,7 +105,7 @@ message InitRequest {
     // must be positive with hybrid and is ignored otherwise.
     uint64 reservation_depth = 19;
     // Eligible waiting jobs, head included, examined per backfill pass by
-    // every built-in scheduler. Zero leaves the scan unlimited.
+    // every scheduler. Zero leaves the scan unlimited.
     uint64 backfill_queue_depth = 23;
 
     // Seconds between periodic EASY, conservative, or hybrid backfill

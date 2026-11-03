@@ -13,7 +13,10 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <memory>
 #include <stdexcept>
+#include <vector>
 
 using namespace dr_evt;
 
@@ -348,6 +351,70 @@ void test_matches_default_circular_easy() {
          custom.get_statistics().jobs_completed);
 }
 
+// --backfill_queue_depth bounds the custom scheduler's scan before the
+// candidate cap, exactly as in the built-in FCFS EASY scheduler: with the
+// lowest-cost (job order) selector both produce the same schedule, whether
+// the cap admits one feasible job or many.
+void test_queue_depth_matches_fcfs_easy() {
+  constexpr const char *trace_path = "/tmp/dr_evt_custom_scheduler_depth.csv";
+  {
+    std::ofstream trace(trace_path);
+    trace << "job_submit_time,num_nodes,time_limit\n";
+  }
+
+  struct InputJob {
+    sim_time_t submit_time;
+    num_nodes_t nodes;
+    tdiff_t run_time;
+  };
+  std::vector<InputJob> jobs;
+  unsigned long state = 12345;
+  const auto next = [&state](unsigned long bound) {
+    state = state * 6364136223846793005UL + 1442695040888963407UL;
+    return (state >> 33) % bound;
+  };
+  sim_time_t submit = 0.0;
+  for (int i = 0; i < 400; ++i) {
+    submit += static_cast<sim_time_t>(next(40));
+    jobs.push_back({submit, static_cast<num_nodes_t>(1 + next(60)),
+                    static_cast<tdiff_t>(10 + next(500))});
+  }
+
+  const auto run = [&](size_t depth, size_t max_candidates, bool use_custom) {
+    Sim_Params params;
+    params.m_infile = trace_path;
+    params.m_total_nodes = 100;
+    params.m_trace_format = "simple";
+    params.m_timestamp_format = "epoch";
+    params.m_run_time_mode = RunTimeMode::LIMIT;
+    params.m_backfill_policy = BackfillPolicy::EASY;
+    params.m_queue_impl = QueueImplementation::CIRCULAR;
+    params.m_num_max_candidates = max_candidates;
+    params.m_backfill_queue_depth = depth;
+    std::unique_ptr<Simulation> sim =
+        use_custom ? std::make_unique<Simulation>(params, cost_from_job_order,
+                                                  select_lowest_cost)
+                   : std::make_unique<Simulation>(params);
+    sim->get_trace().load_data(0);
+    for (const auto &job : jobs) {
+      sim->append_job(job.submit_time, job.nodes, kTestQueue, job.run_time);
+    }
+    sim->advance_to(std::numeric_limits<sim_time_t>::max());
+    std::vector<sim_time_t> starts;
+    for (job_no_t id = 0; id < jobs.size(); ++id) {
+      starts.push_back(sim->get_trace().job_at(id).get_begin_time().first);
+    }
+    return starts;
+  };
+
+  const auto unlimited = run(0, 1, false);
+  const auto limited = run(3, 1, false);
+  // The depth must matter for this workload, or the comparison proves nothing.
+  assert(unlimited != limited);
+  assert(run(3, 1, true) == limited);
+  assert(run(3, 64, true) == limited);
+}
+
 int write_custom_schedule(const char *input_path, const char *output_path,
                           num_nodes_t total_nodes) {
   Sim_Params params;
@@ -387,6 +454,7 @@ int main(int argc, char **argv) {
   test_batch_resource_area_accounting();
   test_warm_start_resource_area_accounting();
   test_matches_default_circular_easy();
+  test_queue_depth_matches_fcfs_easy();
   std::cout << "Custom scheduler tests passed\n";
   return 0;
 }

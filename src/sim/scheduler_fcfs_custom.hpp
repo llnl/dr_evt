@@ -81,6 +81,9 @@ protected:
   sim_time_t m_resource_area_start;
   /// Free nodes after the most recently settled scheduling cycle.
   num_nodes_t m_accounted_available_nodes;
+  /// Jobs examined per backfill pass, head included, before the feasible
+  /// candidates are capped by m_num_max_candidates; zero is unlimited.
+  size_t m_backfill_queue_depth = 0;
 
   /** Close the resource-accounting interval ending at current_time. */
   void advance_resource_accounting_to(sim_time_t current_time);
@@ -212,9 +215,21 @@ public:
   }
 
   /**
+   * @brief Bound the jobs examined per backfill pass (--backfill_queue_depth).
+   * @details Applied before feasibility testing, the same way as in the
+   * built-in FCFS schedulers; num_max_candidates then caps the feasible jobs
+   * offered to the selector. The two limits act at different stages.
+   * @param[in] depth Jobs examined per pass, head included; zero is unlimited.
+   */
+  void set_backfill_queue_depth(size_t depth) {
+    m_backfill_queue_depth = depth;
+  }
+
+  /**
    * @brief Identify feasible backfill jobs without changing queue state.
    * @details The queue must already be synchronized and have a blocked FCFS
-   * head at index zero. Candidates retain FCFS order and are capped by the
+   * head at index zero. Only the first jobs within the backfill queue depth
+   * are examined. Candidates retain FCFS order and are capped by the
    * constructor's num_max_candidates value.
    */
   backfill_candidates_t

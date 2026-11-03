@@ -128,7 +128,7 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readwrite("backfill_queue_depth",
                      &Sim_Params::m_backfill_queue_depth,
                      "int: Eligible waiting jobs, head included, examined "
-                     "per backfill pass by every built-in scheduler; 0 is "
+                     "per backfill pass by every scheduler; 0 is "
                      "unlimited.")
       .def_readwrite("backfill_interval", &Sim_Params::m_backfill_interval,
                      "float: Seconds between periodic backfill passes; FCFS "
