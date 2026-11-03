@@ -2214,74 +2214,12 @@ BasicSimulation<TraceType>::get_job_statuses(
     }
   }
 
-  // Insert a segment boundary at t, inheriting the enclosing segment's value.
-  const auto split_at = [](std::map<sim_time_t, num_nodes_t> &target,
-                           sim_time_t t) {
-    auto lb = target.lower_bound(t);
-    if (lb == target.end() || lb->first != t) {
-      target.emplace_hint(lb, t, std::prev(lb)->second);
-    }
-  };
-
-  const auto earliest_fit = [](const std::map<sim_time_t, num_nodes_t> &target,
-                               num_nodes_t nodes, tdiff_t limit,
-                               sim_time_t start) -> std::optional<sim_time_t> {
-    if (target.empty()) {
-      return std::nullopt;
-    }
-    auto segment = std::prev(target.upper_bound(start));
-    for (;;) {
-      auto scan = segment;
-      while (scan != target.end() &&
-             (scan == segment || scan->first < start + limit) &&
-             scan->second >= nodes) {
-        ++scan;
-      }
-      if (scan == target.end() ||
-          (scan != segment && scan->first >= start + limit)) {
-        return start;
-      }
-      do {
-        ++scan;
-      } while (scan != target.end() && scan->second < nodes);
-      if (scan == target.end()) {
-        return std::nullopt;
-      }
-      segment = scan;
-      start = scan->first;
-    }
-  };
-
-  const auto reserve = [&split_at](std::map<sim_time_t, num_nodes_t> &target,
-                                   sim_time_t start, num_nodes_t nodes,
-                                   tdiff_t limit) {
-    if (limit <= 0) {
-      return;
-    }
-    split_at(target, start);
-    split_at(target, start + limit);
-    for (auto it = target.find(start);
-         it != target.end() && it->first < start + limit; ++it) {
-      it->second -= nodes;
-    }
-    auto start_boundary = target.find(start);
-    if (start_boundary != target.begin() &&
-        std::prev(start_boundary)->second == start_boundary->second) {
-      target.erase(start_boundary);
-    }
-    auto end_boundary = target.find(start + limit);
-    if (end_boundary != target.begin() &&
-        std::prev(end_boundary)->second == end_boundary->second) {
-      target.erase(end_boundary);
-    }
-  };
-
   // Build a query-local reservation plan. It never changes the scheduler, but
   // it follows the configured backfill policy: blocked in-horizon EASY head,
   // HYBRID prefix, or CONSERVATIVE queue retain capacity in this profile.
   // Every projected job consumes its run window in this query-local serial
   // forecast. An out-of-horizon job remains ESTIMATED rather than RESERVED.
-  std::map<sim_time_t, num_nodes_t> reservation_profile = std::move(profile);
+  Reservation_Timeline reservation_profile(std::move(profile));
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   size_t projected_count = 0;
@@ -2296,8 +2234,7 @@ BasicSimulation<TraceType>::get_job_statuses(
     const tdiff_t limit = record.get_limit_time();
     const sim_time_t earliest = std::max(
         m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
-    const auto start =
-        earliest_fit(reservation_profile, nodes, limit, earliest);
+    const auto start = reservation_profile.earliest_fit(nodes, limit, earliest);
     if (!start) {
       continue;
     }
@@ -2340,7 +2277,7 @@ BasicSimulation<TraceType>::get_job_statuses(
     // next queue job is considered. RESERVED identifies a policy-protected
     // placement; ESTIMATED remains a non-binding forecast, but still keeps
     // this query's queue-order projection serial.
-    reserve(reservation_profile, *start, nodes, limit);
+    reservation_profile.reserve(*start, nodes, limit);
   }
 
   return result;

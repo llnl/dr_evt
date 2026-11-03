@@ -27,15 +27,13 @@
 # - Job 4 starts later at t=100
 #
 # CONSERVATIVE BACKFILLING:
-# - Checks ALL waiting jobs (2, 3, 4)
-# - Job 2 reservation: t=50 ✓
-# - Job 3 reservation: t=50 ✓
-# - Job 4 reservation: t=0 (could start immediately)
-# - Job 5 ends at 40 > Job 4's reservation of 0 ❌
-# - CONSERVATIVE REJECTS Job 5
-# - Job 4 and Job 5 both start at t=100
+# - Chains Job 2 at t=50, Job 3 at t=50, then Job 4 at t=100.
+# - Job 5 ends at t=40, before the first protected reservation at t=50.
+# - CONSERVATIVE therefore accepts Job 5 at t=0 without delaying the chain.
 #
-# Key difference: Job 5 starts at t=0 (EASY) vs t=100 (CONSERVATIVE)
+# This case confirms a safe backfill remains admissible under the accumulated
+# resource-time plan; the dedicated chained_reservations fixture checks the
+# later-reservation case directly.
 ################################################################################
 
 set -e
@@ -200,7 +198,7 @@ for i, (expected, actual) in enumerate(zip(cons_expected, cons_actual)):
 print("-" * 70)
 print()
 
-# Critical difference: Job 5
+# Critical chained-plan check: Job 5 is safe before the first reservation.
 print("Critical Behavioral Check:")
 print("-" * 70)
 job5_easy = easy_actual[5]['start']
@@ -213,15 +211,15 @@ print(f"  EASY:         starts at t={job5_easy:.1f} (expected t={job5_easy_exp:.
 print(f"  CONSERVATIVE: starts at t={job5_cons:.1f} (expected t={job5_cons_exp:.1f})")
 print()
 
-if job5_easy == 0.0 and job5_cons == 100.0:
+if job5_easy == 0.0 and job5_cons == 0.0:
     print("✅ CORRECT: EASY backfilled Job 5 at t=0")
-    print("✅ CORRECT: CONSERVATIVE delayed Job 5 until t=100")
+    print("✅ CORRECT: CONSERVATIVE backfilled Job 5 at t=0")
     print()
     print("Explanation:")
     print("  - EASY only checks Job 2's reservation (t=50)")
     print("  - Job 5 ends at t=40 < 50, so EASY accepts")
-    print("  - CONSERVATIVE checks ALL jobs, including Job 4 (reservation at t=0)")
-    print("  - Job 5 would end at t=40 > 0, so CONSERVATIVE rejects to protect Job 4")
+    print("  - CONSERVATIVE chains Job 2, Job 3, and Job 4 at 50, 50, and 100")
+    print("  - Job 5 ends at t=40, before the first protected reservation")
     behavior_pass = True
 else:
     print(f"❌ UNEXPECTED: Job 5 timing doesn't match expected behavior")
@@ -244,7 +242,7 @@ else:
     if not cons_pass:
         print("  - CONSERVATIVE schedule doesn't match expected")
     if not behavior_pass:
-        print("  - Key behavioral difference not observed")
+        print("  - Safe chained-plan backfill was not observed")
     sys.exit(1)
 
 PYTHON_SCRIPT

@@ -352,6 +352,43 @@ void test_expected_start_covers_unreserved_waiting_jobs() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// The reservation planner must retain the node-time interval of each earlier
+// protected job.  Otherwise J is incorrectly reserved at t=50 (after A),
+// and C is refused because it ends after that false reservation.  A chained
+// plan puts H at 100, J at 150, and lets C run immediately.
+void test_chained_conservative_reservations_allow_early_backfill() {
+  std::cout << "\n=== Chained conservative reservation regression ==="
+            << std::endl;
+  for (const auto policy : {BackfillPolicy::CONSERVATIVE,
+                            BackfillPolicy::HYBRID}) {
+    auto params = make_params();
+    params.m_backfill_policy = policy;
+    if (policy == BackfillPolicy::HYBRID) {
+      params.m_reservation_depth = 2;
+    }
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+    const auto a = sim.append_job(0.0, 40, kTestQueueInput, 50.0);
+    const auto b = sim.append_job(0.0, 50, kTestQueueInput, 100.0);
+    const auto head = sim.append_job(0.0, 100, kTestQueueInput, 50.0);
+    const auto later = sim.append_job(0.0, 20, kTestQueueInput, 200.0);
+    const auto candidate = sim.append_job(0.0, 10, kTestQueueInput, 70.0);
+
+    sim.advance_to(0.0);
+    const auto statuses = sim.get_job_statuses({a, b, head, later, candidate});
+    assert(statuses[2].expected_start_time == 100.0);
+    assert(statuses[3].expected_start_time == 150.0);
+    assert(statuses[4].state == Simulation::Job_State::RUNNING);
+    assert(statuses[4].start_time == 0.0);
+
+    sim.advance_to(150.0);
+    const auto later_status = sim.get_job_statuses({later}).front();
+    assert(later_status.state == Simulation::Job_State::RUNNING);
+    assert(later_status.start_time == 150.0);
+  }
+  std::cout << "  PASSED" << std::endl;
+}
+
 void test_append_reclaims_before_growing() {
   std::cout << "\n=== Test 2: append_job() reclaims before growing ==="
             << std::endl;
@@ -1733,6 +1770,7 @@ int main() {
     test_appended_job_statuses();
     test_expected_start_is_earliest_fit();
     test_expected_start_covers_unreserved_waiting_jobs();
+    test_chained_conservative_reservations_allow_early_backfill();
     test_append_reclaims_before_growing();
     test_append_rejects_past_submit_time();
     test_append_jobs_batch();

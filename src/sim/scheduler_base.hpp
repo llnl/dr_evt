@@ -15,12 +15,14 @@
 #include "trace/job_record.hpp"
 #include "trace/trace.hpp"
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <vector>
+#include <utility>
 
 namespace dr_evt {
 
@@ -39,6 +41,79 @@ struct Running_Job {
 };
 
 using running_jobs_t = std::map<job_no_t, Running_Job>;
+
+/**
+ * @brief Mutable free-node timeline used for reservation planning.
+ * @details Each entry begins a constant-capacity segment.  A reservation
+ * subtracts its nodes for its complete planned interval, so later searches
+ * see the resource-time commitments made by earlier reservations.
+ */
+class Reservation_Timeline {
+  std::map<sim_time_t, num_nodes_t> m_free_nodes;
+
+  void split_at(sim_time_t time) {
+    auto boundary = m_free_nodes.lower_bound(time);
+    if (boundary == m_free_nodes.end() || boundary->first != time) {
+      m_free_nodes.emplace_hint(boundary, time, std::prev(boundary)->second);
+    }
+  }
+
+public:
+  explicit Reservation_Timeline(std::map<sim_time_t, num_nodes_t> free_nodes)
+      : m_free_nodes(std::move(free_nodes)) {}
+
+  /** Find the earliest start whose whole interval has the requested nodes. */
+  std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
+                                         sim_time_t start) const {
+    if (m_free_nodes.empty()) {
+      return std::nullopt;
+    }
+    auto segment = std::prev(m_free_nodes.upper_bound(start));
+    for (;;) {
+      auto scan = segment;
+      while (scan != m_free_nodes.end() &&
+             (scan == segment || scan->first < start + duration) &&
+             scan->second >= nodes) {
+        ++scan;
+      }
+      if (scan == m_free_nodes.end() ||
+          (scan != segment && scan->first >= start + duration)) {
+        return start;
+      }
+      do {
+        ++scan;
+      } while (scan != m_free_nodes.end() && scan->second < nodes);
+      if (scan == m_free_nodes.end()) {
+        return std::nullopt;
+      }
+      segment = scan;
+      start = scan->first;
+    }
+  }
+
+  /** Reserve nodes over [start, start + duration). */
+  void reserve(sim_time_t start, num_nodes_t nodes, tdiff_t duration) {
+    if (duration <= 0) {
+      return;
+    }
+    split_at(start);
+    split_at(start + duration);
+    for (auto segment = m_free_nodes.find(start);
+         segment != m_free_nodes.end() &&
+         segment->first < start + duration; ++segment) {
+      segment->second -= nodes;
+    }
+    const auto coalesce = [this](sim_time_t time) {
+      auto boundary = m_free_nodes.find(time);
+      if (boundary != m_free_nodes.begin() &&
+          std::prev(boundary)->second == boundary->second) {
+        m_free_nodes.erase(boundary);
+      }
+    };
+    coalesce(start);
+    coalesce(start + duration);
+  }
+};
 
 /**
  * @brief Abstract interface shared by all job schedulers.
@@ -355,6 +430,11 @@ protected:
                                         num_nodes_t free_nodes,
                                         const running_jobs_t &running_jobs,
                                         sim_time_t current_time);
+
+  /** Build the free-node profile shared by reservation searches. */
+  Reservation_Timeline reservation_timeline(
+      num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+      sim_time_t current_time) const;
 };
 
 /**

@@ -209,12 +209,66 @@ class ConservativeBackfillingScheduler:
         if backfill_pos >= len(self.wait_queue):
             return None
 
-        earliest_reservation = float('inf')
-        reserved = 0
+        # Keep a private free-node profile for this pass.  Each protected job
+        # consumes its complete planned interval before the next reservation
+        # is found; adding only a future release would leave its nodes free.
+        # Candidates are visited in queue order, so retain and extend this
+        # prefix plan until a newly started backfill job changes the effective
+        # running set.  Rebuilding every prefix made large differential traces
+        # cubic in queue length.
+        cache_key = (id(timeline), frozenset(exclude_jobs))
+        cache = getattr(self, '_conservative_plan_cache', {})
+        cached = cache.get(cache_key)
+        if cached is None:
+            cached = {
+                'plan': list(timeline), 'processed': 0, 'reserved': 0,
+                'earliest': float('inf'),
+            }
+            cache[cache_key] = cached
+            self._conservative_plan_cache = cache
+        plan = cached['plan']
+
+        def earliest_fit(job: Job) -> Optional[float]:
+            start = self.current_time
+            while True:
+                segment = next((i for i, (time, _) in enumerate(plan)
+                                if time <= start and
+                                (i + 1 == len(plan) or plan[i + 1][0] > start)),
+                               None)
+                if segment is None:
+                    return None
+                end = self.planned_end(start, job.duration)
+                i = segment
+                while i < len(plan) and (i == segment or plan[i][0] < end):
+                    if plan[i][1] < job.nodes:
+                        break
+                    i += 1
+                if i == len(plan) or (i != segment and plan[i][0] >= end):
+                    return start
+                while i < len(plan) and plan[i][1] < job.nodes:
+                    i += 1
+                if i == len(plan):
+                    return None
+                start = plan[i][0]
+
+        def reserve(start: float, job: Job) -> None:
+            end = self.planned_end(start, job.duration)
+            def split(time: float) -> None:
+                if any(entry_time == time for entry_time, _ in plan):
+                    return
+                for index, (entry_time, available) in enumerate(plan):
+                    if index + 1 == len(plan) or plan[index + 1][0] > time:
+                        plan.insert(index + 1, (time, available))
+                        return
+            split(start)
+            split(end)
+            for index, (time, available) in enumerate(plan):
+                if start <= time < end:
+                    plan[index] = (time, available - job.nodes)
 
         # Check the reserved jobs ahead of this position: all of them, or
         # only the first reservation_depth when a depth is configured
-        for i in range(backfill_pos):
+        for i in range(cached['processed'], backfill_pos):
             if i >= len(self.wait_queue):
                 break
             job = self.wait_queue[i]
@@ -222,17 +276,23 @@ class ConservativeBackfillingScheduler:
             # Skip jobs that were already backfilled
             if job.idx in exclude_jobs:
                 continue
-            if self.reservation_depth and reserved >= self.reservation_depth:
+            if (self.reservation_depth and
+                    cached['reserved'] >= self.reservation_depth):
                 break
 
-            # Calculate reservation using effective running jobs
-            reservation = self.calculate_job_reservation_time_from_timeline(job, timeline)
+            reservation = earliest_fit(job)
+            if reservation is None:
+                continue
             if reservation - self.current_time > self.planning_horizon:
                 continue
-            reserved += 1
-            earliest_reservation = min(earliest_reservation, reservation)
+            cached['reserved'] += 1
+            cached['earliest'] = min(cached['earliest'], reservation)
+            reserve(reservation, job)
 
-        return earliest_reservation if earliest_reservation < float('inf') else None
+        cached['processed'] = backfill_pos
+
+        return (cached['earliest'] if cached['earliest'] < float('inf')
+                else None)
 
     def calculate_job_reservation_time_with_running(self, job: Job, effective_running: dict) -> float:
         """
@@ -270,6 +330,8 @@ class ConservativeBackfillingScheduler:
         2. Start any jobs from the front that fit now (cascading)
         3. Other jobs can backfill if they fit AND finish before ANY waiting job's reservation
         """
+        # Reservation-prefix caches are valid only for this scheduling pass.
+        self._conservative_plan_cache = {}
         free_nodes = self.get_free_nodes()
         started = False
 
