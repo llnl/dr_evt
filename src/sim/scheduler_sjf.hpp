@@ -27,8 +27,11 @@ class SJFScheduler : public SchedulerBase {
 public:
   /** @brief Construct a shortest-job-first scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] backfill_policy Rule governing lower-priority candidates. */
-  SJFScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy);
+   * @param[in] backfill_policy Rule governing lower-priority candidates.
+   * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
+   * included; zero is unlimited. */
+  SJFScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy,
+               size_t backfill_queue_depth = 0);
 
   /** @brief Add an existing trace job to the duration-ordered wait queue.
    * @param[in] job_id Stable Trace identifier.
@@ -115,6 +118,9 @@ private:
 
   /// Latest time to which arrival eligibility has been synchronized.
   sim_time_t m_current_tracked_time;
+
+  /// Jobs examined per backfill pass, head included; zero is unlimited.
+  size_t m_backfill_queue_depth;
 
   /** @brief Add newly arrived jobs to the eligibility set. @param[in]
    * current_time New scheduler time. */

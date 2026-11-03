@@ -32,6 +32,7 @@ set_full_path(THIS_DIR_SOURCES
     scheduler_circular_fcfs_conservative.cpp
     scheduler_circular_fcfs_periodic_hybrid.cpp
     scheduler_block_fcfs.cpp
+    scheduler_block_fcfs_depth.cpp
     scheduler_circular_fcfs.cpp
     scheduler_sjf.cpp
     scheduler_ljf.cpp

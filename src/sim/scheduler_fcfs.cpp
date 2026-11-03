@@ -176,8 +176,12 @@ FCFSScheduler::schedule(num_nodes_t free_nodes,
 
   // Try backfilling with remaining eligible jobs. These can be at any
   // position (not just the front), so pop_front() doesn't apply here -
-  // keep the lazy mark-and-defer-to-GC removal for this part.
-  for (size_t i = 1; i < m_eligible_end_idx; ++i) {
+  // keep the lazy mark-and-defer-to-GC removal for this part. A queue depth
+  // fixes the scan end up front, leaving the loop body unchanged.
+  const size_t scan_end =
+      queue_depth_scan_end(m_wait_queue, 1, m_eligible_end_idx,
+                           m_backfill_queue_depth, head_within_horizon);
+  for (size_t i = 1; i < scan_end; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed)
       continue;

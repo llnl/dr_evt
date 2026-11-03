@@ -127,8 +127,9 @@ PYBIND11_MODULE(dr_evt, m) {
                      "otherwise. 1 reproduces EASY.")
       .def_readwrite("backfill_queue_depth",
                      &Sim_Params::m_backfill_queue_depth,
-                     "int: Eligible waiting jobs examined per HYBRID or "
-                     "CONSERVATIVE backfill pass; 0 is unlimited.")
+                     "int: Eligible waiting jobs, head included, examined "
+                     "per backfill pass by every built-in scheduler; 0 is "
+                     "unlimited.")
       .def_readwrite("backfill_interval", &Sim_Params::m_backfill_interval,
                      "float: Seconds between periodic backfill passes; FCFS "
                      "dispatch stays event-driven. 0 (default) backfills at "

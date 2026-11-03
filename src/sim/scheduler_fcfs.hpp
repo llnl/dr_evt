@@ -57,15 +57,21 @@ private:
   sim_time_t m_current_tracked_time;
   /// Removed entries inside the eligible prefix of m_wait_queue.
   size_t m_removed_count;
+  /// Jobs examined per backfill pass, head included; zero is unlimited.
+  size_t m_backfill_queue_depth;
 
 public:
   /** @brief Construct an FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
    * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
+   * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
+   * included; zero is unlimited.
    */
-  FCFSScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy)
+  FCFSScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
+                size_t backfill_queue_depth = 0)
       : SchedulerBase(total_nodes, bf_policy), m_eligible_end_idx(0),
-        m_current_tracked_time(0.0), m_removed_count(0) {}
+        m_current_tracked_time(0.0), m_removed_count(0),
+        m_backfill_queue_depth(backfill_queue_depth) {}
 
   /** @copydoc SchedulerBase::insert_job */
   void insert_job(job_no_t job_id, sim_time_t submit_time,

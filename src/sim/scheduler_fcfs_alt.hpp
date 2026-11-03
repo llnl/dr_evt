@@ -36,8 +36,11 @@ class FCFSAltScheduler : public SchedulerBase {
 public:
   /** @brief Construct the map-backed reference FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] backfill_policy Rule governing jobs behind the FCFS head. */
-  FCFSAltScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy);
+   * @param[in] backfill_policy Rule governing jobs behind the FCFS head.
+   * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
+   * included; zero is unlimited. */
+  FCFSAltScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy,
+                   size_t backfill_queue_depth = 0);
 
   /** @brief Add an existing trace job to the arrival-ordered wait queue.
    * @param[in] job_id Stable Trace identifier.
@@ -117,6 +120,9 @@ private:
 
   /// Latest time to which arrival eligibility has been synchronized.
   sim_time_t m_current_tracked_time;
+
+  /// Jobs examined per backfill pass, head included; zero is unlimited.
+  size_t m_backfill_queue_depth;
 
   /** @brief Add newly arrived jobs to the eligibility set. @param[in]
    * current_time New scheduler time. */

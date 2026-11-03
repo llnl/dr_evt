@@ -100,10 +100,11 @@ public:
    * @details
    * A waiting job whose projected reservation starts more than this many
    * seconds after the current time is not planned in that pass: it does not
-   * block backfill candidates and does not consume a hybrid reservation-depth
-   * slot. It still consumes a backfill queue-depth scan slot, keeps its queue
-   * position, and is re-evaluated on the next pass. Applies to event-driven
-   * and periodic scheduling alike.
+   * block backfill candidates and consumes neither a hybrid reservation-depth
+   * slot nor a backfill queue-depth scan slot. It keeps its queue position
+   * and is re-evaluated on the next pass. Under EASY only the head holds a
+   * reservation, so only the head is exempted. Applies to event-driven and
+   * periodic scheduling alike.
    * @param[in] horizon Look-ahead in seconds; numeric_limits<tdiff_t>::max()
    * leaves planning unbounded.
    * @throws std::invalid_argument if the horizon is negative or not finite.
@@ -307,6 +308,42 @@ protected:
   }
 
   /**
+   * @brief Find where an EASY candidate scan stops under a queue depth.
+   * @details Implements --backfill_queue_depth for the index-based EASY scans:
+   * the blocked head consumes one slot when its reservation is planned
+   * (inside the planning horizon), and every waiting job behind it that the
+   * scan visits consumes one, whether or not it can start. Lazily removed
+   * entries are skipped and consume nothing. Because a candidate is counted
+   * before it is tested, the end index can be computed before the scan, so
+   * the scan loop itself is unchanged and an unlimited depth costs nothing.
+   * @tparam Queue Random-access container whose entries have a `removed` flag.
+   * @param[in] queue Wait queue in scheduling order.
+   * @param[in] begin First candidate index (the entry after the head).
+   * @param[in] end One past the last eligible index.
+   * @param[in] queue_depth Jobs examined per pass, head included; zero is
+   * unlimited.
+   * @param[in] head_planned Whether the blocked head's reservation is inside
+   * the planning horizon and therefore consumes a slot.
+   * @return Index at which the candidate scan stops, in [begin, end].
+   */
+  template <typename Queue>
+  static size_t queue_depth_scan_end(const Queue &queue, size_t begin,
+                                     size_t end, size_t queue_depth,
+                                     bool head_planned) {
+    if (queue_depth == 0) {
+      return end;
+    }
+    size_t remaining = queue_depth - (head_planned ? 1 : 0);
+    size_t i = begin;
+    for (; i < end && remaining > 0; ++i) {
+      if (!queue[i].removed) {
+        --remaining;
+      }
+    }
+    return i;
+  }
+
+  /**
    * @brief Publish the scheduled capacity outlook used by reservations.
    * @details
    * The simulation calls this before every scheduling pass. Projections
@@ -377,8 +414,8 @@ protected:
  * @param[in] wait_queue_overflow Behavior when a circular queue is full.
  * @param[in] reservation_depth Waiting jobs that hold reservations under
  * HYBRID backfilling; must be positive with HYBRID and is ignored otherwise.
- * @param[in] backfill_queue_depth Eligible waiting jobs examined per hybrid
- * or conservative backfill pass; zero is unlimited.
+ * @param[in] backfill_queue_depth Eligible waiting jobs, head included,
+ * examined per backfill pass by every built-in scheduler; zero is unlimited.
  * @param[in] backfill_interval Seconds between additional hybrid evaluations;
  * zero retains event-driven evaluation only. The planning horizon is not a
  * construction parameter; set it with SchedulerBase::set_planning_horizon().

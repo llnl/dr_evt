@@ -188,6 +188,14 @@ jobs:
           echo "========================================"
           ./tests/run_planning_horizon_tests.sh
 
+      - name: Run Backfill Queue Depth Tests
+        id: queue-depth
+        run: |
+          echo "========================================"
+          echo "Running Backfill Queue Depth Tests (EASY schedulers vs Python reference)"
+          echo "========================================"
+          ./tests/run_backfill_queue_depth_tests.sh
+
       - name: Run Queue Implementation Differential Tests
         id: queue-impl
         run: |

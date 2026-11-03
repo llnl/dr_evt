@@ -15,9 +15,10 @@
 namespace dr_evt {
 
 SJFScheduler::SJFScheduler(num_nodes_t total_nodes,
-                           BackfillPolicy backfill_policy)
-    : SchedulerBase(total_nodes, backfill_policy), m_current_tracked_time(0.0) {
-}
+                           BackfillPolicy backfill_policy,
+                           size_t backfill_queue_depth)
+    : SchedulerBase(total_nodes, backfill_policy), m_current_tracked_time(0.0),
+      m_backfill_queue_depth(backfill_queue_depth) {}
 
 void SJFScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
                               tdiff_t run_time, num_nodes_t nodes) {
@@ -117,44 +118,55 @@ std::vector<job_no_t> SJFScheduler::schedule(num_nodes_t free_nodes,
   const bool head_within_horizon =
       reservation_within_horizon(reservation_time, current_time);
 
-  // Scan in SJF order (shortest first) for backfill candidates
-  for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
-    if (it == fcfs_head_it)
+  // Scan in SJF order (shortest first) for backfill candidates. Every candidate that
+  // qualifies is started in this one call, as in the index-based FCFS
+  // schedulers, so --backfill_queue_depth counts the same jobs whichever
+  // scheduler runs. Starting a candidate leaves the window unchanged: it ends
+  // no later than the head's reservation, so its nodes are back in time.
+  std::vector<job_no_t> started;
+  num_nodes_t available_nodes = free_nodes;
+  size_t examined = head_within_horizon ? 1 : 0;
+  for (auto it = m_wait_queue.begin();
+       it != m_wait_queue.end() && available_nodes > 0;) {
+    if (it == fcfs_head_it) {
+      ++it;
       continue; // Skip FCFS head
+    }
 
     const JobEntry &entry = it->second;
-    if (m_eligible_jobs.count(entry.job_id) == 0)
+    if (m_eligible_jobs.count(entry.job_id) == 0) {
+      ++it;
       continue;
+    }
+    if (m_backfill_queue_depth != 0) {
+      if (examined >= m_backfill_queue_depth)
+        break; // Queue depth reached for this pass.
+      ++examined;
+    }
 
     // Check backfill constraints
-    bool fits_nodes = (entry.nodes <= free_nodes);
+    bool fits_nodes = (entry.nodes <= available_nodes);
     bool fits_window =
         !head_within_horizon ||
         (release_estimate(current_time, entry.run_time) <= backfill_window);
 
-    if (m_backfill_policy == BackfillPolicy::EASY) {
-      // EASY: must fit both nodes AND window
-      if (fits_nodes && fits_window) {
-        // Found backfill candidate - copy id out before erasing,
-        // same reasoning as the head case above.
-        job_no_t id = entry.job_id;
-        m_eligible_jobs.erase(id);
-        m_wait_queue.erase(it);
-        return {id};
-      }
-    } else if (m_backfill_policy == BackfillPolicy::CONSERVATIVE) {
-      // CONSERVATIVE: must not delay ANY waiting job
-      // For now, only allow if fits window (conservative approximation)
-      if (fits_nodes && fits_window) {
-        job_no_t id = entry.job_id;
-        m_eligible_jobs.erase(id);
-        m_wait_queue.erase(it);
-        return {id};
-      }
+    // EASY must fit both nodes and window. CONSERVATIVE uses the same test
+    // here (conservative approximation).
+    if ((m_backfill_policy == BackfillPolicy::EASY ||
+         m_backfill_policy == BackfillPolicy::CONSERVATIVE) &&
+        fits_nodes && fits_window) {
+      // Copy out what's needed before erasing invalidates entry.
+      const job_no_t id = entry.job_id;
+      available_nodes -= entry.nodes;
+      m_eligible_jobs.erase(id);
+      it = m_wait_queue.erase(it);
+      started.push_back(id);
+      continue;
     }
+    ++it;
   }
 
-  return {}; // No backfill candidates found
+  return started;
 }
 
 } // namespace dr_evt
