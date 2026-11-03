@@ -138,6 +138,7 @@ Their scheduling semantics are documented in
 | `get_fcfs_head_shadow_time()` | Return the FCFS-head reservation time, or `-1` when no head waits or no projected release or scheduled capacity change lets it start. |
 | `get_backfill_window()` | Return the current FCFS/EASY reservation snapshot, including all running-job releases. |
 | `get_prediction_horizon(utilization)` | On demand, estimate the supported FCFS/EASY waiting-queue drain time from the shadow time. |
+| `get_queue_drain_start_times(utilization, estimation_depth=0)` | Return queue-order resource-area start approximations; protected reservations are exact, other results are optimistic. |
 | `get_statistics()` | Return a `Statistics` snapshot. |
 | `write_simulated_trace()` | Write the configured job-schedule output. |
 | `print_stats()` | Print summary statistics. |
@@ -173,9 +174,24 @@ A pending `JobStatus` has `state == JobState.PENDING` and an
 releases, and the scheduler's current queue order. Each pending job is placed
 at its earliest fit for its whole time limit after the jobs ahead of it are
 reserved, so a short job behind a blocked head may be projected before the
-head. Running and completed jobs
+head. `JobStatus.start_time_kind` is `StartTimeKind.RESERVED` for a protected
+scheduler reservation and `StartTimeKind.ESTIMATED` for a non-binding fit
+that respects protected reservations. Every projected placement consumes its
+requested time window before the next queue job is placed; estimates are still
+non-binding forecasts based on requested time limits, not start guarantees.
+Pass `estimation_depth` to
+`get_job_statuses()` to limit temporary planning and pending timing to a queue
+prefix; zero is the default and considers the complete waiting queue. This
+changes neither the scheduler nor its reservation plan. Running and completed jobs
 have `start_time` and `end_time`; rejected jobs have no timing. The compact
 timing record remains available after completed trace rows are flushed.
+
+Pass an empty `job_idxs` list to enumerate waiting jobs in scheduler queue
+order; `estimation_depth` then also limits the returned queue prefix.
+
+`get_queue_drain_start_times(utilization, estimation_depth=0)` is a separate
+fast resource-area approximation. It returns queue-order estimates without
+per-job first-fit placement; it is available through C++ and Python, not gRPC.
 
 `BackfillWindow` exposes `current_time`, `available_nodes`,
 `shadow_time`, and an ordered list of `ResourceRelease` values. Each release

@@ -812,8 +812,8 @@ void BasicSimulation<TraceType>::run_warm_start() {
   // order and wait accounting. Inherited waiters are observed arriving at the
   // boundary so their already elapsed submit time never moves the clock back.
   for (const job_no_t job_no : inherited_waiters) {
-    const sim_time_t submit = convert_epoch<sim_time_t>(
-        m_trace.job_at(job_no).get_submit_time());
+    const sim_time_t submit =
+        convert_epoch<sim_time_t>(m_trace.job_at(job_no).get_submit_time());
     submit_job(job_no, submit, sim_start_time);
   }
   for (job_no_t job_no = first_job; job_no < jobs_end; ++job_no) {
@@ -2138,17 +2138,58 @@ void BasicSimulation<TraceType>::record_appended_job_start(job_no_t job_idx) {
 template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
-    const std::vector<job_no_t> &job_idxs) const {
-  std::map<job_no_t, sim_time_t> expected_starts;
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  const auto pending_job_ids = m_scheduler->pending_job_ids();
+  std::vector<Job_Status> result;
+  std::multimap<job_no_t, size_t> requested_pending_statuses;
+  if (job_idxs.empty()) {
+    const size_t count = estimation_depth == 0
+                             ? pending_job_ids.size()
+                             : std::min(estimation_depth,
+                                        pending_job_ids.size());
+    result.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      const job_no_t job_idx = pending_job_ids[i];
+      requested_pending_statuses.emplace(job_idx, result.size());
+      result.push_back({job_idx, Job_State::PENDING, std::nullopt,
+                        std::nullopt, std::nullopt, Start_Time_Kind::NONE});
+    }
+  } else {
+    result.reserve(job_idxs.size());
+    for (const job_no_t job_idx : job_idxs) {
+    if (job_idx < m_first_appended_job_idx ||
+        job_idx - m_first_appended_job_idx >=
+            m_appended_job_query_records.size() ||
+        !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
+             .tracked) {
+      throw std::out_of_range("No appended job with job_idx=" +
+                              std::to_string(job_idx));
+    }
+    const auto &job =
+        m_appended_job_query_records[job_idx - m_first_appended_job_idx];
+    Job_Status status{job_idx,      Job_State::PENDING, std::nullopt,
+                      std::nullopt, std::nullopt,       Start_Time_Kind::NONE};
+    if (job.rejected) {
+      status.state = Job_State::REJECTED;
+    } else if (job.scheduled) {
+      status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
+                                                    : Job_State::RUNNING;
+      status.start_time = job.start_time;
+      status.end_time = job.end_time;
+    } else {
+      requested_pending_statuses.emplace(job_idx, result.size());
+    }
+    result.push_back(status);
+    }
+  }
+  if (requested_pending_statuses.empty()) {
+    return result;
+  }
 
   // Free-node profile: each key starts a segment that keeps its value until
-  // the next key. Seeded from running-job releases at their limit times and
-  // the scheduled capacity changes still ahead, the same timeline the
-  // schedulers reserve against. Pending jobs are then placed in queue order
-  // at their earliest fit for their full time limit, and each placement is
-  // carved out of the profile, so a short job behind a blocked head may be
-  // projected ahead of it, as a backfill scheduler's own reservation walk
-  // would do.
+  // the next key. It is seeded from running-job releases and future capacity
+  // changes, then extended by this query's temporary immediate-dispatch and
+  // policy reservation windows. Nothing is retained by the live scheduler.
   std::map<sim_time_t, num_nodes_t> profile;
   {
     // Signed deltas: releases add, capacity reductions subtract. The balance
@@ -2184,98 +2225,277 @@ BasicSimulation<TraceType>::get_job_statuses(
     }
   }
 
-  // Insert a segment boundary at t, inheriting the enclosing segment's value.
-  const auto split_at = [&profile](sim_time_t t) {
-    auto lb = profile.lower_bound(t);
-    if (lb == profile.end() || lb->first != t) {
-      profile.emplace_hint(lb, t, std::prev(lb)->second);
-    }
-  };
+  // Build a query-local reservation plan. It never changes the scheduler, but
+  // it follows the configured backfill policy: blocked in-horizon EASY head,
+  // HYBRID prefix, or CONSERVATIVE queue retain capacity in this profile.
+  // Every projected job consumes its run window in this query-local serial
+  // forecast. An out-of-horizon job remains ESTIMATED rather than RESERVED.
+  Reservation_Timeline reservation_profile(std::move(profile));
+  bool easy_blocked_head_seen = false;
+  size_t hybrid_reserved = 0;
+  size_t projected_count = 0;
 
-  for (const job_no_t pending_id : m_scheduler->pending_job_ids()) {
+  for (const job_no_t pending_id : pending_job_ids) {
+    if (estimation_depth != 0 && projected_count >= estimation_depth) {
+      break;
+    }
+    ++projected_count;
     const auto &record = m_trace.job_at(pending_id);
     const num_nodes_t nodes = record.get_num_nodes();
     const tdiff_t limit = record.get_limit_time();
-    sim_time_t start = std::max(
+    const sim_time_t earliest = std::max(
         m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
+    const auto start = reservation_profile.earliest_fit(nodes, limit, earliest);
+    if (!start) {
+      continue;
+    }
 
-    // Earliest fit: scan segments covering [start, start + limit); on the
-    // first segment that is too small, restart from the next segment that
-    // is large enough. Every segment is visited at most once per job.
-    auto segment = std::prev(profile.upper_bound(start));
-    bool fits = true;
+    const bool starts_now = *start <= m_current_time;
+    const bool within_horizon =
+        *start - m_current_time <= m_params.m_planning_horizon;
+    bool reserved = false;
+    switch (m_params.m_backfill_policy) {
+    case BackfillPolicy::EASY:
+      if (!starts_now && !easy_blocked_head_seen) {
+        easy_blocked_head_seen = true;
+        reserved = within_horizon;
+      }
+      break;
+    case BackfillPolicy::HYBRID:
+      reserved = !starts_now && within_horizon &&
+                 hybrid_reserved < m_params.m_reservation_depth;
+      if (reserved) {
+        ++hybrid_reserved;
+      }
+      break;
+    case BackfillPolicy::CONSERVATIVE:
+      reserved = !starts_now && within_horizon;
+      break;
+    case BackfillPolicy::NONE:
+      break;
+    }
+
+    const auto [first, last] =
+        requested_pending_statuses.equal_range(pending_id);
+    for (auto requested = first; requested != last; ++requested) {
+      auto &status = result[requested->second];
+      status.expected_start_time = *start;
+      status.start_time_kind =
+          reserved ? Start_Time_Kind::RESERVED : Start_Time_Kind::ESTIMATED;
+    }
+
+    // Every placement consumes its projected whole-duration window before the
+    // next queue job is considered. RESERVED identifies a policy-protected
+    // placement; ESTIMATED remains a non-binding forecast, but still keeps
+    // this query's queue-order projection serial.
+    reservation_profile.reserve(*start, nodes, limit);
+  }
+
+  return result;
+}
+
+template <typename TraceType>
+std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>
+BasicSimulation<TraceType>::get_queue_drain_start_times(
+    double utilization, size_t estimation_depth) const {
+  if (!std::isfinite(utilization) || utilization < 0.0 || utilization > 1.0) {
+    throw std::invalid_argument("utilization must be finite and in [0, 1]");
+  }
+  const double usable_fraction = utilization == 0.0 ? 1.0 : utilization;
+
+  std::map<sim_time_t, std::int64_t> deltas;
+  for (const auto &[job_idx, running] : m_running_jobs) {
+    (void)job_idx;
+    const sim_time_t end = running.start_time + running.run_time;
+    if (end > m_current_time) {
+      deltas[end] += static_cast<std::int64_t>(running.nodes);
+    }
+  }
+  num_nodes_t reference_capacity = m_current_capacity;
+  for (size_t i = m_next_capacity_change; i < m_capacity_changes.size(); ++i) {
+    const auto &change = m_capacity_changes[i];
+    if (change.time > m_current_time) {
+      deltas[change.time] += static_cast<std::int64_t>(change.total_nodes) -
+                             static_cast<std::int64_t>(reference_capacity);
+    }
+    reference_capacity = change.total_nodes;
+  }
+  std::map<sim_time_t, num_nodes_t> profile;
+  std::int64_t balance = static_cast<std::int64_t>(m_current_capacity) -
+                         static_cast<std::int64_t>(get_nodes_occupied());
+  const auto clamp = [](std::int64_t value) {
+    return value > 0 ? static_cast<num_nodes_t>(value) : num_nodes_t{0};
+  };
+  profile[m_current_time] = clamp(balance);
+  for (const auto &[time, delta] : deltas) {
+    balance += delta;
+    profile[time] = clamp(balance);
+  }
+
+  const auto split_at = [](std::map<sim_time_t, num_nodes_t> &target,
+                           sim_time_t t) {
+    auto lb = target.lower_bound(t);
+    if (lb == target.end() || lb->first != t) {
+      target.emplace_hint(lb, t, std::prev(lb)->second);
+    }
+  };
+  const auto earliest_fit = [](const std::map<sim_time_t, num_nodes_t> &target,
+                               num_nodes_t nodes, tdiff_t limit,
+                               sim_time_t start) -> std::optional<sim_time_t> {
+    auto segment = std::prev(target.upper_bound(start));
     for (;;) {
       auto scan = segment;
-      while (scan != profile.end() &&
+      while (scan != target.end() &&
              (scan == segment || scan->first < start + limit) &&
              scan->second >= nodes) {
         ++scan;
       }
-      if (scan == profile.end() ||
+      if (scan == target.end() ||
           (scan != segment && scan->first >= start + limit)) {
-        break;
+        return start;
       }
       do {
         ++scan;
-      } while (scan != profile.end() && scan->second < nodes);
-      if (scan == profile.end()) {
-        fits = false;
-        break;
+      } while (scan != target.end() && scan->second < nodes);
+      if (scan == target.end()) {
+        return std::nullopt;
       }
       segment = scan;
       start = scan->first;
     }
-    if (!fits) {
-      continue;
-    }
-
-    const bool is_appended =
-        pending_id >= m_first_appended_job_idx &&
-        pending_id - m_first_appended_job_idx <
-            m_appended_job_query_records.size() &&
-        m_appended_job_query_records[pending_id - m_first_appended_job_idx]
-            .tracked;
-    if (is_appended) {
-      expected_starts[pending_id] = start;
-    }
+  };
+  const auto reserve = [&split_at](std::map<sim_time_t, num_nodes_t> &target,
+                                   sim_time_t start, num_nodes_t nodes,
+                                   tdiff_t limit) {
     if (limit <= 0) {
-      continue; // Nothing to reserve for a zero-length placement.
+      return;
     }
-    split_at(start);
-    split_at(start + limit);
-    for (auto it = profile.find(start);
-         it != profile.end() && it->first < start + limit; ++it) {
+    split_at(target, start);
+    split_at(target, start + limit);
+    for (auto it = target.find(start);
+         it != target.end() && it->first < start + limit; ++it) {
       it->second -= nodes;
     }
+  };
+
+  const auto pending_job_ids = m_scheduler->pending_job_ids();
+  struct Pending_Plan {
+    job_no_t job_idx;
+    num_nodes_t nodes;
+    tdiff_t limit;
+    std::optional<sim_time_t> reservation;
+    bool reserved;
+  };
+  std::vector<Pending_Plan> plans;
+  const size_t result_count =
+      estimation_depth == 0
+          ? pending_job_ids.size()
+          : std::min(estimation_depth, pending_job_ids.size());
+  plans.reserve(result_count);
+
+  // Reserve only the policy-protected jobs.  Unreserved jobs contribute to
+  // cumulative demand below, rather than receiving individual placements.
+  bool easy_blocked_head_seen = false;
+  size_t hybrid_reserved = 0;
+  for (size_t queue_pos = 0; queue_pos < result_count; ++queue_pos) {
+    const job_no_t pending_id = pending_job_ids[queue_pos];
+    const auto &record = m_trace.job_at(pending_id);
+    const num_nodes_t nodes = record.get_num_nodes();
+    const tdiff_t limit = record.get_limit_time();
+    const sim_time_t earliest = std::max(
+        m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
+    bool reserved = false;
+    std::optional<sim_time_t> reservation;
+    const bool may_reserve =
+        m_params.m_backfill_policy == BackfillPolicy::CONSERVATIVE ||
+        (m_params.m_backfill_policy == BackfillPolicy::HYBRID &&
+         hybrid_reserved < m_params.m_reservation_depth) ||
+        (m_params.m_backfill_policy == BackfillPolicy::EASY &&
+         !easy_blocked_head_seen);
+    if (may_reserve) {
+      reservation = earliest_fit(profile, nodes, limit, earliest);
+      const bool starts_now = reservation && *reservation <= m_current_time;
+      const bool within_horizon =
+          reservation &&
+          *reservation - m_current_time <= m_params.m_planning_horizon;
+      if (m_params.m_backfill_policy == BackfillPolicy::EASY) {
+        if (!starts_now) {
+          easy_blocked_head_seen = true;
+          reserved = within_horizon;
+        }
+      } else if (m_params.m_backfill_policy == BackfillPolicy::HYBRID) {
+        reserved = !starts_now && within_horizon;
+        if (reserved)
+          ++hybrid_reserved;
+      } else if (m_params.m_backfill_policy == BackfillPolicy::CONSERVATIVE) {
+        reserved = !starts_now && within_horizon;
+      }
+      if (reserved)
+        reserve(profile, *reservation, nodes, limit);
+    }
+    plans.push_back({pending_id, nodes, limit, reservation, reserved});
   }
 
-  std::vector<Job_Status> result;
-  result.reserve(job_idxs.size());
-  for (const job_no_t job_idx : job_idxs) {
-    if (job_idx < m_first_appended_job_idx ||
-        job_idx - m_first_appended_job_idx >=
-            m_appended_job_query_records.size() ||
-        !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
-             .tracked) {
-      throw std::out_of_range("No appended job with job_idx=" +
-                              std::to_string(job_idx));
+  std::vector<Queue_Drain_Start_Estimate> result;
+  result.reserve(plans.size());
+  double unreserved_area = 0.0;
+  sim_time_t area_time = m_current_time;
+  double accumulated_area = 0.0;
+  auto area_segment = profile.begin();
+  const auto time_for_area = [&](double target) {
+    while (target > accumulated_area) {
+      auto next = std::next(area_segment);
+      const double rate = usable_fraction * area_segment->second;
+      if (next == profile.end()) {
+        if (rate == 0.0) {
+          return std::numeric_limits<sim_time_t>::infinity();
+        }
+        area_time += (target - accumulated_area) / rate;
+        accumulated_area = target;
+        return area_time;
+      }
+      const double area = rate * (next->first - area_time);
+      if (target <= accumulated_area + area) {
+        if (rate == 0.0) {
+          area_time = next->first;
+          area_segment = next;
+          continue;
+        }
+        area_time += (target - accumulated_area) / rate;
+        accumulated_area = target;
+        return area_time;
+      }
+      accumulated_area += area;
+      area_time = next->first;
+      area_segment = next;
     }
-    const auto &job =
-        m_appended_job_query_records[job_idx - m_first_appended_job_idx];
-    Job_Status status{job_idx, Job_State::PENDING, std::nullopt, std::nullopt,
-                      std::nullopt};
-    if (job.rejected) {
-      status.state = Job_State::REJECTED;
-    } else if (job.scheduled) {
-      status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
-                                                    : Job_State::RUNNING;
-      status.start_time = job.start_time;
-      status.end_time = job.end_time;
-    } else if (const auto it = expected_starts.find(job_idx);
-               it != expected_starts.end()) {
-      status.expected_start_time = it->second;
+    return area_time;
+  };
+  const auto first_node_feasible_time = [&profile](sim_time_t start,
+                                                   num_nodes_t nodes) {
+    auto segment = std::prev(profile.upper_bound(start));
+    if (segment->second >= nodes) {
+      return start;
     }
-    result.push_back(status);
+    do {
+      ++segment;
+    } while (segment != profile.end() && segment->second < nodes);
+    return segment == profile.end()
+               ? std::numeric_limits<sim_time_t>::infinity()
+               : segment->first;
+  };
+
+  for (const auto &plan : plans) {
+    if (plan.reserved) {
+      result.push_back(
+          {plan.job_idx, *plan.reservation, Start_Time_Kind::RESERVED});
+    } else {
+      const sim_time_t area_start = time_for_area(unreserved_area);
+      result.push_back({plan.job_idx,
+                        first_node_feasible_time(area_start, plan.nodes),
+                        Start_Time_Kind::ESTIMATED});
+      unreserved_area += static_cast<double>(plan.nodes) * plan.limit;
+    }
   }
   return result;
 }
@@ -2891,10 +3111,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
 
     if constexpr (PeriodicBackfill) {
       if (m_next_backfill_evaluation <= m_current_time) {
-        const auto missed_ticks = static_cast<size_t>(
-            std::floor((m_current_time - m_next_backfill_evaluation) /
-                       m_params.m_backfill_interval)) +
-                                 1;
+        const auto missed_ticks =
+            static_cast<size_t>(
+                std::floor((m_current_time - m_next_backfill_evaluation) /
+                           m_params.m_backfill_interval)) +
+            1;
         m_next_backfill_evaluation +=
             missed_ticks * m_params.m_backfill_interval;
       }

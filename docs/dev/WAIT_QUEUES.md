@@ -105,7 +105,7 @@ or an additional differential-correctness result.
 | Implementation | Time (s) | vs circular | Correctness |
 | --- | ---: | ---: | --- |
 | `circular` | 3.6385 ± 0.0026 | 1.00× | periodic scheduler only |
-| Python reference | N/A | N/A | skipped |
+| Python reference | 77.7686 ± 0.4932 | 21.37× | PASS |
 
 Reproduce the current benchmark modes with:
 

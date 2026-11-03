@@ -235,6 +235,13 @@ def test_streaming_api(result):
         assert pending[0].state == dr_evt.JobState.PENDING
         assert pending[0].expected_start_time == 50.0
         assert pending[1].expected_start_time == 0.0
+        assert pending[1].start_time_kind == dr_evt.StartTimeKind.ESTIMATED
+        limited = sim.get_job_statuses([first_id, second_id],
+                                       estimation_depth=1)
+        assert limited[0].expected_start_time == 0.0
+        assert limited[0].start_time_kind == dr_evt.StartTimeKind.ESTIMATED
+        assert limited[1].expected_start_time is None
+        assert limited[1].start_time_kind == dr_evt.StartTimeKind.NONE
         sim.advance_to(0.0)
         active = sim.get_job_statuses([first_id, second_id])
         assert active[0].state == dr_evt.JobState.RUNNING
@@ -246,7 +253,7 @@ def test_streaming_api(result):
         stats = sim.get_statistics()
         assert stats.jobs_submitted == 3, f"jobs_submitted={stats.jobs_submitted}"
         assert stats.jobs_started == 1, f"jobs_started={stats.jobs_started}"
-        result.record_pass("append_job, status query, and advance_to")
+        result.record_pass("append_job, status query kinds/depth, and advance_to")
 
         # Test run_until_exclusive: the job at t=25..35 lies strictly before
         # the target and must be processed (a no-op would leave the clock
@@ -375,6 +382,10 @@ def test_backfill_window_api(result):
         standard.append_job(0.0, 50, QUEUE_INPUT, 8.0)
         standard.advance_to(0.0)
         assert standard.get_prediction_horizon(0.5) == 8.0
+        starts = standard.get_queue_drain_start_times(1.0, estimation_depth=1)
+        assert len(starts) == 1
+        assert starts[0].expected_start_time == 40.0
+        assert starts[0].start_time_kind == dr_evt.StartTimeKind.RESERVED
         result.record_pass("Backfill window snapshot")
     except Exception as e:
         result.record_fail("Backfill window API", str(e))
@@ -739,7 +750,9 @@ def test_periodic_backfill(result):
         sim.append_job(0.0, 90, QUEUE_INPUT, 30.0)
         head = sim.append_job(0.0, 50, QUEUE_INPUT, 10.0)
         sim.advance_to(0.0)
-        assert sim.get_job_statuses([head])[0].expected_start_time == 60.0
+        head_status = sim.get_job_statuses([head])[0]
+        assert head_status.expected_start_time == 60.0
+        assert head_status.start_time_kind == dr_evt.StartTimeKind.RESERVED
         result.record_pass("planning_time_resolution rounds planned run times")
     except Exception as e:
         result.record_fail("Periodic backfill", str(e))

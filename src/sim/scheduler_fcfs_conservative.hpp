@@ -147,16 +147,16 @@ private:
   void mark_removed(job_no_t job_id);
 
   /**
-   * @brief Calculate the reservation that a candidate must preserve.
-   * @details Takes the earliest reservation among the waiting jobs ahead of
-   * the candidate. Under HYBRID only the first m_reservation_depth waiting
-   * jobs are considered; a candidate deeper than that must not delay them
-   * but is free to pass jobs that hold no reservation.
+   * @brief Calculate the earliest start in the protected reservation plan.
+   * @details Places protected waiting jobs ahead of the candidate into a
+   * temporary resource-time plan in queue order. Under HYBRID only the first
+   * m_reservation_depth waiting jobs are planned; a candidate deeper than
+   * that must not delay any interval in that plan.
    * @param[in] job_index Candidate position in FCFS queue order.
    * @param[in] available_nodes Nodes free at current_time.
    * @param[in] running_jobs Active jobs with start time, runtime, and nodes.
    * @param[in] current_time Projection time.
-   * @return Earliest preserved reservation as sim_time_t.
+   * @return Earliest start in the chained protected plan as sim_time_t.
    */
   sim_time_t calculate_conservative_window(size_t job_index,
                                            num_nodes_t available_nodes,

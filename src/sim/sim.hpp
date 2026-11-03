@@ -321,37 +321,92 @@ public:
   /** Lifecycle state returned by get_job_statuses(). */
   enum class Job_State { PENDING, RUNNING, COMPLETED, REJECTED };
 
+  /** Source of a pending job's reported start time. */
+  enum class Start_Time_Kind { NONE, RESERVED, ESTIMATED };
+
   /** Point-in-time status of one job created by append_job(s). */
   struct Job_Status {
     job_no_t job_idx;
     Job_State state;
     std::optional<sim_time_t> start_time;
     std::optional<sim_time_t> end_time;
+    /**
+     * @brief Reservation-derived or estimated start while the job is pending.
+     *
+     * Inspect start_time_kind to distinguish a protected scheduler reservation
+     * from a non-binding estimate. Every waiting job can be considered,
+     * including jobs beyond a conservative/hybrid backfill queue-depth limit
+     * and jobs whose potential reservation is beyond the planning horizon; a
+     * job with no feasible placement has no forecast. A later scheduler pass,
+     * arrival, capacity change, or backfill decision can change an estimate.
+     */
     std::optional<sim_time_t> expected_start_time;
+    Start_Time_Kind start_time_kind = Start_Time_Kind::NONE;
+  };
+
+  /** @brief Resource-area approximation for one waiting job. */
+  struct Queue_Drain_Start_Estimate {
+    job_no_t job_idx;
+    sim_time_t expected_start_time;
+    Start_Time_Kind start_time_kind;
   };
 
   /**
-   * @brief Query appended jobs by their stable identifiers.
-   * @details Pending jobs receive an on-demand projected start. The free-node
-   * profile starts from current capacity and running-job releases at their
-   * time limits, the same estimate the schedulers reserve against. The wait
-   * queue is then walked in scheduler order and each job is placed at the
-   * earliest time, at or after its submit time, where enough nodes stay free
-   * for its whole time limit; that placement is reserved before the next job
-   * is placed. A short job behind a blocked head can therefore be projected
-   * ahead of the head, as in a backfill scheduler's reservation walk. The
-   * queue head's projection equals get_fcfs_head_shadow_time(). Scheduled
-   * capacity changes are part of the profile; future arrivals are not
-   * considered. Scheduled jobs
+   * @brief Query selected appended jobs, or enumerate a waiting-queue prefix.
+   * @details Pending jobs receive an on-demand reservation-aware start time.
+   * The temporary capacity profile begins with current capacity and
+   * running-job releases. It then retains the in-horizon reservations selected
+   * by the configured EASY, HYBRID, or CONSERVATIVE policy. A protected job is
+   * reported as RESERVED; another job receives an ESTIMATED earliest fit that
+   * respects retained reservations. The query considers the entire waiting
+   * queue by default and never mutates scheduler state. A finite
+   * estimation_depth bounds the temporary projection and suppresses pending
+   * timing outside its queue prefix. Scheduled capacity changes are part of
+   * the profile; future
+   * arrivals are not considered. Scheduled jobs
    * return their actual simulated start and end timestamps. Results preserve
    * request order and duplicate IDs. Cost is linear in the number of running
-   * plus pending jobs per pending job; nothing is cached.
+   * plus pending jobs per pending job; nothing is cached. The forecast uses
+   * half-open resource intervals and unrounded pending limits, whereas live
+   * backfill uses a strict completion-before-reservation test and may round
+   * planned releases to planning_time_resolution; use exact lookahead when
+   * those boundary details matter.
    * @param[in] job_idxs Identifiers returned by append_job() or append_jobs().
-   * @return One Job_Status per requested identifier, in request order.
+   * An empty vector returns the waiting jobs in scheduler queue order, limited
+   * by estimation_depth; those queue entries need not have been appended.
+   * @param[in] estimation_depth Maximum number of waiting jobs, in scheduler
+   * queue order, to receive a pending start-time result. Zero (the default)
+   * covers the complete waiting queue. This affects query work and returned
+   * pending timing only; it never changes scheduler configuration or state.
+   * @return One Job_Status per requested identifier, in request order; with an
+   * empty job_idxs vector, one pending status per returned queue entry.
    * @throws std::out_of_range if an ID was not returned by append_job(s).
    */
   std::vector<Job_Status>
-  get_job_statuses(const std::vector<job_no_t> &job_idxs) const;
+  get_job_statuses(const std::vector<job_no_t> &job_idxs,
+                   size_t estimation_depth = 0) const;
+
+  /**
+   * @brief Approximate pending-job starts from cumulative resource-time area.
+   * @details Protected EASY, hybrid, and conservative reservation windows are
+   * removed from the available-resource profile.  Each unreserved job is then
+   * assigned the time at which utilization-scaled free resource area covers
+   * the unreserved queued node-time ahead of it.  This is faster than a
+   * first-fit placement for every unreserved job, but it is not a guarantee:
+   * it does not model fragmentation or future backfill choices.  A protected
+   * job returns its reservation with kind RESERVED.  The query is on demand
+   * and does not retain state in the scheduler.
+   * @param[in] utilization Expected usable-capacity factor in (0, 1], or zero
+   * to use one.
+   * @param[in] estimation_depth Maximum waiting-queue prefix to return; zero
+   * covers the entire waiting queue.
+   * @return Estimates in scheduler queue order.
+   * @throws std::invalid_argument if utilization is not finite or is outside
+   * [0, 1].
+   */
+  std::vector<Queue_Drain_Start_Estimate>
+  get_queue_drain_start_times(double utilization,
+                              size_t estimation_depth = 0) const;
 
 protected:
   /**

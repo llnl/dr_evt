@@ -287,6 +287,9 @@ message AppendJobsResponse {
 // request with ErrorResponse.
 message GetJobStatusesRequest {
     repeated uint32 job_idx = 1;
+    // Maximum waiting-queue prefix to temporarily plan and report. Zero
+    // (default) considers every waiting job; this does not alter scheduling.
+    uint64 estimation_depth = 2;
 }
 
 enum JobState {
@@ -295,6 +298,12 @@ enum JobState {
     JOB_STATE_RUNNING = 2;
     JOB_STATE_COMPLETED = 3;
     JOB_STATE_REJECTED = 4;
+}
+
+enum StartTimeKind {
+    START_TIME_KIND_NONE = 0;
+    START_TIME_KIND_RESERVED = 1;
+    START_TIME_KIND_ESTIMATED = 2;
 }
 
 message ScheduledJobTimes {
@@ -309,12 +318,12 @@ message JobStatus {
         // Present once the scheduler has started the job. end_time is the
         // simulated completion time and may still be in the future.
         ScheduledJobTimes scheduled = 3;
-        // Present while pending when a capacity projection is available:
-        // the earliest time the job fits for its whole time limit, given
-        // running-job releases at their time limits and the projected
-        // reservations of jobs ahead of it in the queue.
+        // Present while pending when a reservation-derived or estimated start
+        // is available. start_time_kind distinguishes a protected scheduler
+        // reservation from an estimate that respects retained reservations.
         double expected_start_time = 4;
     }
+    StartTimeKind start_time_kind = 5;
 }
 
 message GetJobStatusesResponse {

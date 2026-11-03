@@ -8,12 +8,12 @@ import tempfile
 from pathlib import Path
 
 
-def run_reference(source_dir, trace, outdir, *options):
+def run_reference(source_dir, trace, outdir, *options, nodes="10"):
     # A bounded run time turns a scheduler that never terminates into a
     # failure instead of a hang.
     subprocess.run(
         [sys.executable, source_dir / "scripts" / "python_conservative_scheduler.py",
-         source_dir / trace, "--nodes", "10", "--outdir", outdir, *options],
+         source_dir / trace, "--nodes", nodes, "--outdir", outdir, *options],
         check=True,
         capture_output=True,
         text=True,
@@ -66,6 +66,15 @@ def main():
         )
         assert [(row["start_time"], row["end_time"]) for row in rejected] == [
             ("0.0", "100.0"), ("", ""), ("100.0", "200.0"), ("200.0", "300.0")]
+
+        chained = run_reference(
+            source_dir, "tests/test_traces/feature/chained_reservations.csv",
+            outdir, nodes="100",
+        )
+        # H occupies 100 nodes from 100--150 in the temporary plan, so J is
+        # reserved at 150 and C can backfill from zero through 70.
+        assert [row["start_time"] for row in chained] == [
+            "0.0", "0.0", "100.0", "150.0", "0.0"]
 
 
 if __name__ == "__main__":

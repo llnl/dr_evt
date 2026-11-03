@@ -73,6 +73,8 @@ CircularBufferFCFSConservativeScheduler::calculate_conservative_window(
   const size_t depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t reserved = 0;
+  auto plan =
+      reservation_timeline(available_nodes, running_jobs, current_time);
   for (size_t i = 0; i < job_index; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed) {
@@ -81,12 +83,20 @@ CircularBufferFCFSConservativeScheduler::calculate_conservative_window(
     if (depth != 0 && reserved >= depth) {
       break;
     }
-    const sim_time_t job_reservation = calculate_fcfs_reservation(
-        job.nodes_requested, available_nodes, running_jobs, current_time);
+    const tdiff_t duration =
+        release_estimate(current_time, job.run_time_estimate);
+    const auto reservation = plan.earliest_fit(job.nodes_requested, duration,
+                                               current_time);
+    if (!reservation) {
+      continue;
+    }
+    const sim_time_t job_reservation = *reservation;
     if (!reservation_within_horizon(job_reservation, current_time)) {
       continue;
     }
     ++reserved;
+    plan.reserve(job_reservation, job.nodes_requested,
+                 release_estimate(job_reservation, job.run_time_estimate));
     earliest_conflict = std::min(earliest_conflict, job_reservation);
   }
   return earliest_conflict;
