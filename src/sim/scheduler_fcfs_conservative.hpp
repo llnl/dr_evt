@@ -70,6 +70,12 @@ private:
   /// Waiting jobs that hold reservations under HYBRID backfilling.
   size_t m_reservation_depth;
   size_t m_backfill_queue_depth;
+  /// Timestamp for the shared backfill queue-depth accounting cycle.
+  sim_time_t m_backfill_depth_time;
+  /// Eligible in-horizon jobs examined in the current accounting cycle.
+  size_t m_backfill_depth_examined;
+  /// Whether the blocked FCFS head has consumed its slot in that cycle.
+  bool m_backfill_depth_head_accounted;
 
 public:
   /** @brief Construct a conservative-backfill FCFS scheduler.
@@ -79,14 +85,16 @@ public:
    * @param[in] reservation_depth Number of waiting jobs, in queue order, that
    * hold reservations under HYBRID backfilling; ignored otherwise.
    * @param[in] backfill_queue_depth Eligible waiting jobs examined per
-   * backfill pass; zero is unlimited. */
+   * scheduling timestamp; zero is unlimited. */
   FCFSConservativeScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
                             size_t reservation_depth = 0,
                             size_t backfill_queue_depth = 0)
       : SchedulerBase(total_nodes, bf_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0),
         m_reservation_depth(reservation_depth),
-        m_backfill_queue_depth(backfill_queue_depth) {}
+        m_backfill_queue_depth(backfill_queue_depth),
+        m_backfill_depth_time(std::numeric_limits<sim_time_t>::lowest()),
+        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {}
 
   /** @copydoc SchedulerBase::insert_job */
   void insert_job(job_no_t job_id, sim_time_t submit_time,

@@ -254,17 +254,18 @@ This setting has no effect on the built-in `easy`, `hybrid`, or
 Maximum number of eligible waiting jobs, including the blocked FCFS head, that
 a scheduler examines in one scheduling pass. It applies to `easy`,
 `conservative`, and `hybrid` backfilling, to FCFS, SJF, and LJF ordering, to
-every queue implementation, and to the experimental custom-EASY selector. Jobs beyond that prefix are not tested for
-backfill in that pass. `0` leaves the scan unlimited. This is a
-pre-feasibility queue scan limit: a job counts toward the depth even when it
-cannot fit or cannot complete before its reservation window. Under `easy`
-only the head holds a reservation, so only the head is exempted by
-`--planning_horizon`; every other job examined counts.
+every queue implementation, and to the experimental custom-EASY selector.
+Jobs beyond that prefix are not tested for backfill in that pass. `0` leaves
+the scan unlimited. This is a pre-feasibility queue scan limit: a job counts
+toward the depth even when it cannot fit or cannot complete before its
+reservation window. Under `easy` only the head holds a reservation, so only
+the head is exempted by `--planning_horizon`; every other job examined counts.
 
-A pass is one call of the scheduler. When a pass starts jobs, the simulator
-runs another pass at the same time, and that pass starts its count again, so
-in one time step the scheduler can examine more jobs than the depth. This
-matches the Python reference schedulers.
+Conservative and hybrid backfill share their count across repeated
+`schedule()` calls at one simulation timestamp, then reset it when time
+advances. The other scheduler paths reset their count for each scheduling
+pass. This gives the reservation-based policies one Slurm-style backfill-cycle
+budget while retaining event-driven FCFS dispatch.
 
 In short, `--backfill_queue_depth` controls how much of the queue a scheduler
 considers; `--num_max_candidates` controls how many already-feasible jobs the

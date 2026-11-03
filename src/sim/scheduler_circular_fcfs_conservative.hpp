@@ -49,6 +49,12 @@ protected:
   size_t m_removed_count;
   size_t m_reservation_depth;
   size_t m_backfill_queue_depth;
+  /// Timestamp for the shared backfill queue-depth accounting cycle.
+  sim_time_t m_backfill_depth_time;
+  /// Eligible in-horizon jobs examined in the current accounting cycle.
+  size_t m_backfill_depth_examined;
+  /// Whether the blocked FCFS head has consumed its slot in that cycle.
+  bool m_backfill_depth_head_accounted;
 
 public:
   /**
@@ -60,7 +66,7 @@ public:
    * @param[in] overflow_policy Action when the queue is full.
    * @param[in] reservation_depth Reservations retained by hybrid backfill.
    * @param[in] backfill_queue_depth Eligible waiting jobs examined per
-   * backfill pass; zero is unlimited.
+   * scheduling timestamp; zero is unlimited.
    */
   CircularBufferFCFSConservativeScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
@@ -73,7 +79,9 @@ public:
         m_overflow_policy(overflow_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0),
         m_reservation_depth(reservation_depth),
-        m_backfill_queue_depth(backfill_queue_depth) {}
+        m_backfill_queue_depth(backfill_queue_depth),
+        m_backfill_depth_time(std::numeric_limits<sim_time_t>::lowest()),
+        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {}
 
   void insert_job(job_no_t job_id, sim_time_t submit_time,
                   tdiff_t run_time_estimate,

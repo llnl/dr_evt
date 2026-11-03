@@ -178,12 +178,12 @@ modeling Fluxion's external resource-status notification path.
 
 ## Remaining differences
 
-- **Backfill queue-depth accounting.** `--backfill_queue_depth` currently
-  resets for each scheduler invocation. Repeated backfill calls at one
-  simulation timestamp can therefore inspect more than the configured limit.
-  The intended model retains event-driven FCFS dispatch but shares this count
-  across all backfill work at the same timestamp, treating it as one
-  Slurm-style backfill cycle.
+- **Backfill queue-depth accounting.** Conservative and hybrid
+  `--backfill_queue_depth` scans are shared across all backfill work at one
+  simulation timestamp and reset only when time advances. Other scheduler
+  paths reset their count for each invocation. The reservation-based policies
+  therefore model one Slurm-style backfill cycle while retaining event-driven
+  FCFS dispatch.
 
 | Aspect | DR_EVT | Difference and bias |
 |---|---|---|

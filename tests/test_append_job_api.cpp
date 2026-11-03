@@ -1102,6 +1102,54 @@ void test_planning_horizon_event_driven() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// Repeated scheduler passes at one event timestamp must share the configured
+// queue-depth budget. Here D starts in the first pass after H and C consume
+// the three slots; the old per-pass accounting then reset and incorrectly
+// started E at t=0.1 in the next pass. E is reconsidered after D completes at
+// t=1.1, when the timestamp (and therefore the depth budget) changes.
+void test_backfill_queue_depth_is_shared_per_timestamp() {
+  std::cout << "\n=== Backfill queue depth: one budget per timestamp ==="
+            << std::endl;
+
+  for (const auto queue_impl :
+       {QueueImplementation::CIRCULAR, QueueImplementation::DEQUE}) {
+    for (const auto policy :
+         {BackfillPolicy::CONSERVATIVE, BackfillPolicy::HYBRID}) {
+      auto params = make_params();
+      params.m_total_nodes = 3;
+      params.m_queue_impl = queue_impl;
+      params.m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
+      params.m_backfill_policy = policy;
+      params.m_reservation_depth = 1;
+      params.m_backfill_queue_depth = 3;
+      Simulation sim(params);
+      sim.get_trace().load_data(0);
+
+      // A leaves two free nodes until t=10, blocking the three-node head H.
+      (void)sim.append_job(0.0, 1, kTestQueueInput, 10.0);
+      // Move past A's START event so it is represented in the scheduler's
+      // running-job timeline before H's reservation is projected.
+      sim.advance_to(0.1);
+      (void)sim.append_job(0.1, 3, kTestQueueInput, 10.0); // H
+      (void)sim.append_job(0.1, 2, kTestQueueInput, 20.0); // C: cannot fit
+      (void)sim.append_job(0.1, 1, kTestQueueInput, 1.0);  // D: starts now
+      const auto e = sim.append_job(0.1, 1, kTestQueueInput, 1.0);
+
+      sim.advance_to(0.1);
+      const auto at_first_timestamp = sim.get_job_statuses({e}).front();
+      assert(at_first_timestamp.state == Simulation::Job_State::PENDING);
+
+      sim.advance_to(1.1);
+      const auto at_next_timestamp = sim.get_job_statuses({e}).front();
+      assert(at_next_timestamp.state == Simulation::Job_State::RUNNING);
+      assert(at_next_timestamp.start_time.has_value());
+      assert(approx_equal(*at_next_timestamp.start_time, 1.1));
+    }
+  }
+
+  std::cout << "  PASSED" << std::endl;
+}
+
 // A finite streaming advance must consume capacity changes even if no jobs
 // exist yet. Capacity zero then pauses a newly appended job until the increase
 // at t=20. Once that job finishes, draining an otherwise empty simulation to
@@ -1858,6 +1906,7 @@ int main() {
     test_capacity_schedule_across_streaming_advances();
     test_reservations_follow_capacity_schedule();
     test_planning_horizon_event_driven();
+    test_backfill_queue_depth_is_shared_per_timestamp();
     test_submit_job_records_busy_nodes();
     test_append_jobs_memory_pressure();
     test_resource_area_and_time_accounted_utilization();
