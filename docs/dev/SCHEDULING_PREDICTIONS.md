@@ -98,6 +98,8 @@ jobs' actual start times with an explicit `started`, `rejected`, or
 `capacity_unreachable` outcome. A non-empty list accepts appended-job IDs; an empty list enumerates
 the current waiting-queue prefix, matching
 `get_job_statuses()`. Zero depth selects the whole current prefix.
+`estimation_depth` applies only to empty-list enumeration; explicitly
+requested IDs are always returned.
 
 The clone is synchronous and unbounded in this first version: it runs until
 the requested starts are known or the known work drains. Its snapshot uses no

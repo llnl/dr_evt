@@ -407,8 +407,9 @@ public:
    * continuation through ordinary scheduler events.  It never changes this
    * simulation, its output streams, Redis state, or checkpoint files.
    * An empty ID list enumerates the current waiting-queue prefix; zero depth
-   * selects the complete prefix.  The initial implementation runs until the
-   * requested starts are known or the clone drains.
+   * selects the complete prefix. With explicit IDs, every requested ID is
+   * returned and estimation_depth is ignored. The initial implementation runs
+   * until the requested starts are known or the clone drains.
    */
   std::vector<Exact_Start_Result>
   get_exact_job_start_times(const std::vector<job_no_t> &job_idxs,

@@ -411,6 +411,9 @@ void test_exact_lookahead_replays_without_mutating_live_state() {
   assert(exact[1].start_time == 0.0);
   assert(exact[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
   assert(exact[1].outcome == Simulation::Exact_Start_Outcome::STARTED);
+  const auto explicit_depth =
+      sim.get_exact_job_start_times({head, candidate}, 1);
+  assert(explicit_depth.size() == 2);
   const auto never = sim.get_exact_job_start_times({impossible});
   assert(never[0].outcome == Simulation::Exact_Start_Outcome::REJECTED);
   assert(!never[0].start_time.has_value());

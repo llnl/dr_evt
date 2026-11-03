@@ -178,6 +178,13 @@ modeling Fluxion's external resource-status notification path.
 
 ## Remaining differences
 
+- **Backfill queue-depth accounting.** `--backfill_queue_depth` currently
+  resets for each scheduler invocation. Repeated backfill calls at one
+  simulation timestamp can therefore inspect more than the configured limit.
+  The intended model retains event-driven FCFS dispatch but shares this count
+  across all backfill work at the same timestamp, treating it as one
+  Slurm-style backfill cycle.
+
 | Aspect | DR_EVT | Difference and bias |
 |---|---|---|
 | Evaluation trigger | Event-driven by default | Slurm and LSF backfill periodically. Default DR_EVT backfill reacts sooner, so waits of backfillable jobs are optimistic. `--backfill_interval` removes this. |
