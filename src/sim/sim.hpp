@@ -386,6 +386,21 @@ public:
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth = 0) const;
 
+#if defined(DR_EVT_HAS_SER20)
+  /**
+   * @brief Replay an isolated copy of the scheduler to obtain exact starts.
+   * @details Unlike get_job_statuses(), this advances a private in-memory
+   * continuation through ordinary scheduler events.  It never changes this
+   * simulation, its output streams, Redis state, or checkpoint files.
+   * An empty ID list enumerates the current waiting-queue prefix; zero depth
+   * selects the complete prefix.  The initial implementation runs until the
+   * requested starts are known or the clone drains.
+   */
+  std::vector<Job_Status>
+  get_exact_job_start_times(const std::vector<job_no_t> &job_idxs,
+                            size_t estimation_depth = 0) const;
+#endif
+
   /**
    * @brief Approximate pending-job starts from cumulative resource-time area.
    * @details Protected EASY, hybrid, and conservative reservation windows are
@@ -409,6 +424,10 @@ public:
                               size_t estimation_depth = 0) const;
 
 protected:
+#if defined(DR_EVT_HAS_SER20)
+  void save_checkpoint_impl(std::ostream &output, bool preserve_outputs);
+  void load_checkpoint_impl(std::istream &input, bool restore_outputs);
+#endif
   /**
    * @brief Validate an existing job and enqueue it in the scheduler.
    *

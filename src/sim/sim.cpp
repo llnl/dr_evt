@@ -17,6 +17,8 @@
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
+#include "utils/streambuff.hpp"
+#include "utils/streamvec.hpp"
 #if defined(DR_EVT_HAS_SER20)
 #include "utils/state_io_ser20.hpp"
 #endif
@@ -1116,6 +1118,12 @@ void BasicSimulation<TraceType>::flush_completed_jobs() {
 #if defined(DR_EVT_HAS_SER20)
 template <typename TraceType>
 void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
+  save_checkpoint_impl(output, true);
+}
+
+template <typename TraceType>
+void BasicSimulation<TraceType>::save_checkpoint_impl(
+    std::ostream &output, bool preserve_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
@@ -1131,9 +1139,11 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
     if (m_trace.dcols().get_trace_mode() != TraceMode::SIMULATION) {
       throw std::logic_error("checkpointing requires simulation-mode input");
     }
-    const bool redis_output = !m_params.m_redis_uri.empty();
-    bool simulated_output_open = m_trace.m_simulated_trace_ofs.is_open();
-    bool resource_output_open = m_trace.m_resource_trace_ofs.is_open();
+    const bool redis_output = preserve_outputs && !m_params.m_redis_uri.empty();
+    bool simulated_output_open =
+        preserve_outputs && m_trace.m_simulated_trace_ofs.is_open();
+    bool resource_output_open =
+        preserve_outputs && m_trace.m_resource_trace_ofs.is_open();
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)
     simulated_output_open =
         simulated_output_open || m_trace.m_redis_output != nullptr;
@@ -1141,8 +1151,10 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
                            (m_trace.m_redis_output != nullptr &&
                             m_trace.m_redis_output->resource_trace_active());
 #endif
-    m_trace.flush_simulated_trace_buffer(true);
-    if (resource_output_open) {
+    if (preserve_outputs) {
+      m_trace.flush_simulated_trace_buffer(true);
+    }
+    if (preserve_outputs && resource_output_open) {
       m_trace.flush_resource_history();
       m_trace.m_resource_trace_ofs.flush();
     }
@@ -1426,6 +1438,12 @@ void BasicSimulation<TraceType>::save_checkpoint(const std::string &filename) {
 
 template <typename TraceType>
 void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
+  load_checkpoint_impl(input, true);
+}
+
+template <typename TraceType>
+void BasicSimulation<TraceType>::load_checkpoint_impl(
+    std::istream &input, bool restore_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
@@ -1876,7 +1894,7 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
     }
     m_scheduler->m_fcfs_reservation_time = reservation_time;
 
-    if (redis_output) {
+    if (restore_outputs && redis_output) {
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)
       m_trace.m_redis_output.reset();
       RedisCheckpointBoundary native_boundary;
@@ -1900,12 +1918,12 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
 #else
       throw std::logic_error("Redis checkpoint requires Redis support");
 #endif
-    } else if (simulated_output_open) {
+    } else if (restore_outputs && simulated_output_open) {
       const auto filename = m_params.get_outfile();
       start_restart_output_segment(filename, simulated_output_bytes,
                                    m_trace.m_simulated_trace_ofs);
     }
-    if (!redis_output && resource_output_open) {
+    if (restore_outputs && !redis_output && resource_output_open) {
       const auto filename = m_params.get_resource_trace();
       start_restart_output_segment(filename, resource_output_bytes,
                                    m_trace.m_resource_trace_ofs);
@@ -2293,6 +2311,55 @@ BasicSimulation<TraceType>::get_job_statuses(
 
   return result;
 }
+
+#if defined(DR_EVT_HAS_SER20)
+template <typename TraceType>
+std::vector<typename BasicSimulation<TraceType>::Job_Status>
+BasicSimulation<TraceType>::get_exact_job_start_times(
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  // Capture enumeration IDs before replay: the clone drains its wait queue.
+  std::vector<job_no_t> requested = job_idxs;
+  if (requested.empty()) {
+    const auto pending = m_scheduler->pending_job_ids();
+    const size_t count = estimation_depth == 0
+                             ? pending.size()
+                             : std::min(estimation_depth, pending.size());
+    requested.assign(pending.begin(), pending.begin() + count);
+  }
+  if (requested.empty()) {
+    return {};
+  }
+
+  // The normal checkpoint API deliberately flushes output.  Lookahead uses
+  // the same complete state encoding in its output-free mode instead.
+  // Reuse storage on this caller thread. ostreamvec grows the vector only
+  // when the previous snapshot capacity is insufficient, unlike stringstream.
+  thread_local std::vector<char> snapshot;
+  if (snapshot.capacity() == 0) {
+    snapshot.reserve(1024 * 1024);
+  }
+  {
+    ostreamvec<char> snapshot_buffer(snapshot);
+    std::ostream output(&snapshot_buffer);
+    const_cast<BasicSimulation *>(this)->save_checkpoint_impl(output, false);
+  }
+  istreambuff<char> snapshot_buffer(
+      std::span<const char>{snapshot.data(), snapshot.size()});
+  std::istream input(&snapshot_buffer);
+  BasicSimulation clone(m_params);
+  clone.load_checkpoint_impl(input, false);
+  clone.m_params.set_outfile("");
+  clone.m_params.set_resource_trace("");
+  clone.m_params.m_redis_uri.clear();
+  clone.m_params.m_redis_key_prefix.clear();
+  clone.m_params.m_checkpoint_file.clear();
+  clone.m_params.m_checkpoint_interval_jobs = 0;
+  clone.m_has_automatic_checkpoint = false;
+
+  clone.advance_to(std::numeric_limits<sim_time_t>::max());
+  return clone.get_job_statuses(requested);
+}
+#endif
 
 template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>

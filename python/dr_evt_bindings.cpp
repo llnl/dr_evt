@@ -348,6 +348,14 @@ PYBIND11_MODULE(dr_evt, m) {
            "complete waiting queue. "
            "Scheduled jobs have start_time and end_time.")
 
+#if defined(DR_EVT_HAS_SER20)
+      .def("get_exact_job_start_times", &Simulation::get_exact_job_start_times,
+           py::arg("job_idxs"), py::arg("estimation_depth") = 0,
+           "Replay an output-free in-memory clone to return exact scheduler "
+           "start times. This synchronous query runs until requested jobs "
+           "start or the clone drains; it does not mutate the live simulation.")
+#endif
+
       // Streaming API - Time advancement
       .def("run_until_exclusive", &Simulation::run_until_exclusive,
            py::arg("target_time"),
