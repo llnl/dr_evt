@@ -1,6 +1,7 @@
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/sim.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -13,6 +14,10 @@ int main(int argc, char **argv) {
   const size_t jobs = argc > 1 ? std::strtoull(argv[1], nullptr, 10) : 10000;
   const size_t repetitions =
       argc > 2 ? std::strtoull(argv[2], nullptr, 10) : 1000;
+  const size_t estimation_depth =
+      argc > 3 ? std::strtoull(argv[3], nullptr, 10) : 0;
+  const size_t requested =
+      argc > 4 ? std::strtoull(argv[4], nullptr, 10) : jobs;
   const char *trace = "/tmp/benchmark_job_statuses.csv";
   std::ofstream(trace) << "job_submit_time,num_nodes,time_limit\n";
   Sim_Params params;
@@ -43,12 +48,14 @@ int main(int argc, char **argv) {
                                  "1",
 #endif
                                  10.0));
+  ids.resize(std::min(requested, ids.size()));
   const auto begin = std::chrono::steady_clock::now();
   for (size_t i = 0; i < repetitions; ++i)
-    (void)sim.get_job_statuses(ids);
+    (void)sim.get_job_statuses(ids, estimation_depth);
   const auto elapsed = std::chrono::duration<double>(
       std::chrono::steady_clock::now() - begin).count();
-  std::cout << "jobs=" << jobs << " repetitions=" << repetitions
+  std::cout << "jobs=" << jobs << " requested=" << ids.size()
+            << " depth=" << estimation_depth << " repetitions=" << repetitions
             << " seconds=" << elapsed << '\n';
   (void)running;
 }

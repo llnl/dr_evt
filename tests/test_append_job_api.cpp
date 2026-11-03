@@ -211,6 +211,23 @@ void test_expected_start_is_earliest_fit() {
   assert(projected[3].start_time_kind ==
          Simulation::Start_Time_Kind::ESTIMATED);
 
+  // Every projected placement is retained in the temporary profile. With the
+  // cluster occupied through t=100, the head starts at 100, the first 60-node
+  // job starts at 150 after the head, and the second starts at 350 after that
+  // 60-node placement releases its nodes.
+  Sim_Params chained_params = make_params();
+  Simulation chained(chained_params);
+  chained.get_trace().load_data(0);
+  const auto chained_ids = chained.append_jobs(
+      {{0.0, 100, kTestQueueInput, 100.0},
+       {0.0, 100, kTestQueueInput, 50.0},
+       {0.0, 60, kTestQueueInput, 200.0},
+       {0.0, 60, kTestQueueInput, 10.0}});
+  const auto chained_statuses = chained.get_job_statuses(chained_ids);
+  assert(chained_statuses[1].expected_start_time == 100.0);
+  assert(chained_statuses[2].expected_start_time == 150.0);
+  assert(chained_statuses[3].expected_start_time == 350.0);
+
   // A finite query depth limits only pending start-time results. Statuses
   // remain request-order preserving for the complete caller-supplied list.
   const auto bounded = sim.get_job_statuses(ids, 2);
