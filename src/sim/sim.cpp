@@ -2217,6 +2217,16 @@ BasicSimulation<TraceType>::get_job_statuses(
          it != target.end() && it->first < start + limit; ++it) {
       it->second -= nodes;
     }
+    auto start_boundary = target.find(start);
+    if (start_boundary != target.begin() &&
+        std::prev(start_boundary)->second == start_boundary->second) {
+      target.erase(start_boundary);
+    }
+    auto end_boundary = target.find(start + limit);
+    if (end_boundary != target.begin() &&
+        std::prev(end_boundary)->second == end_boundary->second) {
+      target.erase(end_boundary);
+    }
   };
 
   // Build a query-local reservation plan. It never changes the scheduler, but
