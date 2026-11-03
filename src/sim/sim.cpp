@@ -2227,8 +2227,11 @@ BasicSimulation<TraceType>::get_job_statuses(
   // cannot constrain later estimates.
   const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::map<sim_time_t, num_nodes_t> reservation_profile = std::move(profile);
-  std::map<job_no_t, sim_time_t> expected_starts;
-  std::map<job_no_t, Start_Time_Kind> expected_kinds;
+  struct Pending_Estimate {
+    sim_time_t start;
+    Start_Time_Kind kind;
+  };
+  std::map<job_no_t, Pending_Estimate> expected_starts;
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   size_t projected_count = 0;
@@ -2281,9 +2284,9 @@ BasicSimulation<TraceType>::get_job_statuses(
         m_appended_job_query_records[pending_id - m_first_appended_job_idx]
             .tracked;
     if (is_appended) {
-      expected_starts[pending_id] = *start;
-      expected_kinds[pending_id] =
-          reserved ? Start_Time_Kind::RESERVED : Start_Time_Kind::ESTIMATED;
+      expected_starts[pending_id] = {*start, reserved
+                                                 ? Start_Time_Kind::RESERVED
+                                                 : Start_Time_Kind::ESTIMATED};
     }
 
     // A start-now placement is a predicted immediate dispatch and must affect
@@ -2319,8 +2322,8 @@ BasicSimulation<TraceType>::get_job_statuses(
       status.end_time = job.end_time;
     } else if (const auto it = expected_starts.find(job_idx);
                it != expected_starts.end()) {
-      status.expected_start_time = it->second;
-      status.start_time_kind = expected_kinds.at(job_idx);
+      status.expected_start_time = it->second.start;
+      status.start_time_kind = it->second.kind;
     }
     result.push_back(status);
   }
