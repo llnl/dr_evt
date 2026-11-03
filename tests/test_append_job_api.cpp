@@ -983,6 +983,9 @@ void test_planning_horizon_event_driven() {
         assert(approx_equal(sim.get_fcfs_head_shadow_time(), 2000.0));
       } else {
         assert(statuses[1].state == Simulation::Job_State::PENDING);
+        assert(statuses[0].start_time_kind ==
+               Simulation::Start_Time_Kind::RESERVED);
+        assert(approx_equal(*statuses[0].expected_start_time, 1000.0));
         assert(approx_equal(sim.get_fcfs_head_shadow_time(), 1000.0));
       }
       sim.advance_to(std::numeric_limits<sim_time_t>::max());
