@@ -2128,6 +2128,35 @@ template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  std::vector<Job_Status> result;
+  result.reserve(job_idxs.size());
+  std::multimap<job_no_t, size_t> requested_pending_statuses;
+  for (const job_no_t job_idx : job_idxs) {
+    if (job_idx < m_first_appended_job_idx ||
+        job_idx - m_first_appended_job_idx >=
+            m_appended_job_query_records.size() ||
+        !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
+             .tracked) {
+      throw std::out_of_range("No appended job with job_idx=" +
+                              std::to_string(job_idx));
+    }
+    const auto &job =
+        m_appended_job_query_records[job_idx - m_first_appended_job_idx];
+    Job_Status status{job_idx,      Job_State::PENDING, std::nullopt,
+                      std::nullopt, std::nullopt,       Start_Time_Kind::NONE};
+    if (job.rejected) {
+      status.state = Job_State::REJECTED;
+    } else if (job.scheduled) {
+      status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
+                                                    : Job_State::RUNNING;
+      status.start_time = job.start_time;
+      status.end_time = job.end_time;
+    } else {
+      requested_pending_statuses.emplace(job_idx, result.size());
+    }
+    result.push_back(status);
+  }
+
   // Free-node profile: each key starts a segment that keeps its value until
   // the next key. It is seeded from running-job releases and future capacity
   // changes, then extended by this query's temporary immediate-dispatch and
@@ -2237,11 +2266,6 @@ BasicSimulation<TraceType>::get_job_statuses(
   // cannot constrain later estimates.
   const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::map<sim_time_t, num_nodes_t> reservation_profile = std::move(profile);
-  struct Pending_Estimate {
-    sim_time_t start;
-    Start_Time_Kind kind;
-  };
-  std::map<job_no_t, Pending_Estimate> expected_starts;
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   size_t projected_count = 0;
@@ -2287,16 +2311,13 @@ BasicSimulation<TraceType>::get_job_statuses(
       break;
     }
 
-    const bool is_appended =
-        pending_id >= m_first_appended_job_idx &&
-        pending_id - m_first_appended_job_idx <
-            m_appended_job_query_records.size() &&
-        m_appended_job_query_records[pending_id - m_first_appended_job_idx]
-            .tracked;
-    if (is_appended) {
-      expected_starts[pending_id] = {*start, reserved
-                                                 ? Start_Time_Kind::RESERVED
-                                                 : Start_Time_Kind::ESTIMATED};
+    const auto [first, last] =
+        requested_pending_statuses.equal_range(pending_id);
+    for (auto requested = first; requested != last; ++requested) {
+      auto &status = result[requested->second];
+      status.expected_start_time = *start;
+      status.start_time_kind =
+          reserved ? Start_Time_Kind::RESERVED : Start_Time_Kind::ESTIMATED;
     }
 
     // A start-now placement is a predicted immediate dispatch and must affect
@@ -2308,35 +2329,6 @@ BasicSimulation<TraceType>::get_job_statuses(
     }
   }
 
-  std::vector<Job_Status> result;
-  result.reserve(job_idxs.size());
-  for (const job_no_t job_idx : job_idxs) {
-    if (job_idx < m_first_appended_job_idx ||
-        job_idx - m_first_appended_job_idx >=
-            m_appended_job_query_records.size() ||
-        !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
-             .tracked) {
-      throw std::out_of_range("No appended job with job_idx=" +
-                              std::to_string(job_idx));
-    }
-    const auto &job =
-        m_appended_job_query_records[job_idx - m_first_appended_job_idx];
-    Job_Status status{job_idx,      Job_State::PENDING, std::nullopt,
-                      std::nullopt, std::nullopt,       Start_Time_Kind::NONE};
-    if (job.rejected) {
-      status.state = Job_State::REJECTED;
-    } else if (job.scheduled) {
-      status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
-                                                    : Job_State::RUNNING;
-      status.start_time = job.start_time;
-      status.end_time = job.end_time;
-    } else if (const auto it = expected_starts.find(job_idx);
-               it != expected_starts.end()) {
-      status.expected_start_time = it->second.start;
-      status.start_time_kind = it->second.kind;
-    }
-    result.push_back(status);
-  }
   return result;
 }
 
