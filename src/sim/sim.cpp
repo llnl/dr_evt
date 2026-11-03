@@ -83,6 +83,21 @@ template <typename TraceType> constexpr std::uint8_t checkpoint_trace_kind() {
 constexpr std::uint64_t checkpoint_collection_limit = 100000000;
 constexpr std::uint64_t checkpoint_string_limit = 64 * 1024 * 1024;
 
+/** Sum archive scalar widths at compile time for in-memory snapshots. */
+template <typename... Ts> consteval size_t checkpoint_scalar_bytes() {
+  return (sizeof(Ts) + ... + size_t{0});
+}
+
+// This is the fixed scalar portion common to every runnable snapshot. Dynamic
+// parameter strings and container payloads are added from their live counts
+// at the call site.
+constexpr size_t lookahead_snapshot_fixed_bytes = checkpoint_scalar_bytes<
+    decltype(checkpoint_magic), std::uint32_t, std::uint8_t, std::uint32_t,
+    bool, sim_time_t, sim_time_t, bool, num_nodes_t, size_t, num_nodes_t,
+    tdiff_t, sim_time_t, num_jobs_t, num_jobs_t, num_jobs_t, sim_time_t,
+    size_t, num_jobs_t, bool, sim_time_t, size_t, tdiff_t, sim_time_t, size_t,
+    size_t, size_t, job_no_t>();
+
 /** Output-only Redis state sampled when a checkpoint is explicitly written. */
 struct CheckpointRedisBoundary {
   std::uint64_t job_csv_bytes = 0;
@@ -2335,8 +2350,37 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
   // Reuse storage on this caller thread. ostreamvec grows the vector only
   // when the previous snapshot capacity is insufficient, unlike stringstream.
   thread_local std::vector<char> snapshot;
-  if (snapshot.capacity() == 0) {
-    snapshot.reserve(1024 * 1024);
+  const auto saturating_add = [](size_t total, size_t count, size_t width) {
+    if (count > (std::numeric_limits<size_t>::max() - total) / width) {
+      return std::numeric_limits<size_t>::max();
+    }
+    return total + count * width;
+  };
+  // The archive also contains field tags, container counts, and variable
+  // strings, so this is deliberately an estimate with headroom rather than a
+  // promise of an exact serialized byte count.
+  size_t reserve_bytes = lookahead_snapshot_fixed_bytes;
+  reserve_bytes = saturating_add(reserve_bytes, m_trace.m_data.size(),
+                                 sizeof(typename TraceType::policy_type::record_type) +
+                                     32);
+  reserve_bytes = saturating_add(reserve_bytes, m_running_jobs.size(),
+                                 sizeof(running_jobs_t::value_type) + 32);
+  reserve_bytes = saturating_add(reserve_bytes,
+                                 m_scheduler->pending_job_ids().size(), 32);
+  reserve_bytes = saturating_add(reserve_bytes,
+                                 m_trace.pending_events().size(), 32);
+  reserve_bytes = saturating_add(reserve_bytes, m_capacity_changes.size(), 32);
+  reserve_bytes = saturating_add(
+      reserve_bytes, m_appended_job_query_records.size(),
+      sizeof(Appended_Job_Query_Record) + 16);
+  reserve_bytes = saturating_add(reserve_bytes,
+                                 m_trace.m_ctx.m_resource_history.size(),
+                                 64);
+  if (reserve_bytes < std::numeric_limits<size_t>::max() / 4) {
+    reserve_bytes += reserve_bytes / 4;
+  }
+  if (snapshot.capacity() < reserve_bytes) {
+    snapshot.reserve(reserve_bytes);
   }
   {
     ostreamvec<char> snapshot_buffer(snapshot);
