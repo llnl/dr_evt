@@ -46,11 +46,13 @@ Each item describes the code on this branch.
   projected completion time.
 - **Scan and planning bounds.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
-  caps how many waiting jobs one pass inspects (default unlimited).
+  caps how many waiting jobs one pass inspects (default unlimited), under
+  every policy and ordering, including the custom EASY selector.
   [`--planning_horizon`](../user-guide/command-line.md#--planning_horizon-seconds)
   drops reservations that would start beyond the horizon in event-driven and
   periodic mode. Such a job consumes neither a queue-depth nor a reservation
-  slot, remains queued, and is reconsidered on the next pass. This is a
+  slot, remains queued, and is reconsidered on the next pass. Under EASY
+  only the head holds a reservation, so only the head can be exempted. This is a
   practical approximation of external resource-status notifications that
   DR_EVT does not simulate.
   [`--planning_time_resolution`](../user-guide/command-line.md#--planning_time_resolution-seconds)
@@ -209,6 +211,11 @@ separate behavioral distinction.
   where an out-of-horizon head does not consume the candidate scan slot;
   explicit unlimited horizon remains byte-identical on all 34 correctness
   workloads (`tests/run_planning_horizon_tests.sh`).
+- **Queue depth under EASY.** With a queue depth, with and without a planning
+  horizon, the deque, circular, block, and multimap FCFS schedulers and the
+  EASY mode of both conservative schedulers match the Python EASY reference;
+  a depth of 1 equals no backfilling for FCFS, SJF, and LJF
+  (`tests/run_backfill_queue_depth_tests.sh`).
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).
 - **RAPS.** The [comparison helper](../../scripts/compare_with_raps.py) joins

@@ -78,7 +78,8 @@ class EasyBackfillingScheduler:
 
     def __init__(self, total_nodes: int, verbose: bool = False,
                  release_delay: float = 0.0,
-                 planning_horizon: float = float('inf')):
+                 planning_horizon: float = float('inf'),
+                 backfill_queue_depth: int = 0):
         self.total_nodes = total_nodes
         self.verbose = verbose
         # Node release delay (constant model, block release): after a job
@@ -94,6 +95,10 @@ class EasyBackfillingScheduler:
         # planned: it holds no reservation, so candidates are not tested
         # against it (Slurm bf_window). Infinity plans every reservation.
         self.planning_horizon = planning_horizon
+        # Waiting jobs examined in one backfill pass, the blocked head
+        # included when its reservation is planned; 0 means unlimited.
+        # Matches the simulator's --backfill_queue_depth.
+        self.backfill_queue_depth = backfill_queue_depth
 
         # State
         self.current_time = 0.0
@@ -193,6 +198,7 @@ class EasyBackfillingScheduler:
         sum) on every loop iteration.
         """
         free_nodes = self.get_free_nodes()
+        started = False
 
         # Step 1: keep starting the front of the queue as long as it fits.
         while self.wait_queue and self.wait_queue[0].nodes <= free_nodes:
@@ -200,9 +206,10 @@ class EasyBackfillingScheduler:
             self.log(f"Starting FCFS head job {head.idx}")
             self.start_job(head)
             free_nodes -= head.nodes
+            started = True
 
         if not self.wait_queue:
-            return
+            return started
 
         # Step 2/3: the head is now genuinely blocked - compute one
         # reservation and try to backfill the rest of the queue against it.
@@ -220,9 +227,16 @@ class EasyBackfillingScheduler:
         # mutates it during the loop; we only build the separate
         # `remaining` list and reassign self.wait_queue after the loop ends.
         remaining = [self.wait_queue[0]]
+        # Queue depth: the planned head takes one slot, and every job behind
+        # it that is visited takes one, whether or not it can start.
+        examined = 1 if head_within_horizon else 0
         for i, job in enumerate(self.wait_queue):
             if i == 0:
                 continue  # head - already handled above, skip
+            if self.backfill_queue_depth and examined >= self.backfill_queue_depth:
+                remaining.extend(self.wait_queue[i:])
+                break
+            examined += 1
             if job.nodes <= free_nodes:
                 # Tested on its projected end; the release delay is not
                 # planned for, the same as for the reservation above.
@@ -233,6 +247,7 @@ class EasyBackfillingScheduler:
                     self.log(f"Backfilling job {job.idx} (ends at {job_end} < reservation {reservation_time})")
                     self.start_job(job)
                     free_nodes -= job.nodes
+                    started = True
                     continue  # started - don't keep it in the queue
                 else:
                     # Would interfere with FCFS head reservation
@@ -240,6 +255,7 @@ class EasyBackfillingScheduler:
             remaining.append(job)
 
         self.wait_queue = remaining
+        return started
 
     def start_job(self, job: Job):
         """Start a job immediately"""
@@ -344,7 +360,11 @@ class EasyBackfillingScheduler:
                 elif evt.type == 'RELEASE':
                     self.handle_release(evt.job_idx)
 
-            self.try_start_jobs()
+            # The simulator calls schedule() again at the same time step
+            # while a call starts jobs; each call is a fresh pass with its
+            # own queue depth. Without a depth a repeat starts nothing.
+            while self.try_start_jobs():
+                pass
 
         # Return jobs with simulation results
         return list(job_map.values())
@@ -440,7 +460,7 @@ def write_resource_trace(jobs: List[Job], filename: str, total_nodes: int,
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python_reference_scheduler.py <trace.csv> [--verbose] [--nodes N] [--outdir DIR] [--release-delay SECONDS] [--planning-horizon SECONDS]")
+        print("Usage: python_reference_scheduler.py <trace.csv> [--verbose] [--nodes N] [--outdir DIR] [--release-delay SECONDS] [--planning-horizon SECONDS] [--backfill-queue-depth N]")
         print()
         print("Python reference EASY backfilling scheduler for verification")
         print()
@@ -458,6 +478,10 @@ def main():
         print("               this far ahead; candidates are then not tested")
         print("               against it. Matches the simulator's")
         print("               --planning_horizon (default: unlimited).")
+        print("  --backfill-queue-depth N")
+        print("               Examine at most N waiting jobs per backfill pass,")
+        print("               head included. Matches the simulator's")
+        print("               --backfill_queue_depth (default: 0 = unlimited).")
         print()
         print("Generates reference output for EASY backfilling verification")
         print("Output files are written to /tmp by default to avoid directory pollution")
@@ -495,12 +519,21 @@ def main():
             print("--planning-horizon must be nonnegative", file=sys.stderr)
             sys.exit(1)
 
+    backfill_queue_depth = 0
+    if '--backfill-queue-depth' in sys.argv:
+        idx = sys.argv.index('--backfill-queue-depth')
+        backfill_queue_depth = int(sys.argv[idx + 1])
+        if backfill_queue_depth < 0:
+            print("--backfill-queue-depth must be nonnegative", file=sys.stderr)
+            sys.exit(1)
+
     print(f"=== Python Reference EASY Backfilling Scheduler ===", file=sys.stderr)
     print(f"Trace: {trace_file}", file=sys.stderr)
     print(f"Total nodes: {total_nodes}", file=sys.stderr)
     print(f"Output directory: {outdir}", file=sys.stderr)
     print(f"Node release delay: {release_delay}", file=sys.stderr)
     print(f"Planning horizon: {planning_horizon}", file=sys.stderr)
+    print(f"Queue depth: {backfill_queue_depth or 'all'}", file=sys.stderr)
     print(f"Verbose: {verbose}", file=sys.stderr)
     print(file=sys.stderr)
 
@@ -511,7 +544,8 @@ def main():
     # Run scheduler
     scheduler = EasyBackfillingScheduler(total_nodes, verbose=verbose,
                                          release_delay=release_delay,
-                                         planning_horizon=planning_horizon)
+                                         planning_horizon=planning_horizon,
+                                         backfill_queue_depth=backfill_queue_depth)
     jobs = scheduler.simulate(jobs)
 
     # Write output files to specified directory

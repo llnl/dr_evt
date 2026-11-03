@@ -155,8 +155,11 @@ FCFSConservativeScheduler::schedule(num_nodes_t free_nodes,
       return jobs_to_run;
     }
 
-    // Try backfilling with remaining eligible jobs
-    for (size_t i = 1; i < m_eligible_end_idx; ++i) {
+    // Try backfilling with remaining eligible jobs, up to the queue depth.
+    const size_t scan_end =
+        queue_depth_scan_end(m_wait_queue, 1, m_eligible_end_idx,
+                             m_backfill_queue_depth, head_within_horizon);
+    for (size_t i = 1; i < scan_end; ++i) {
       const auto &job = m_wait_queue[i];
       if (job.removed)
         continue;

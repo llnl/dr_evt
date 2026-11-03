@@ -132,11 +132,13 @@ void append_restarted_workload(Simulation &simulation) {
 
 /** @brief Verify restart matches uninterrupted execution for one scheduler. */
 void test_exact_continuation_case(QueueImplementation queue_impl,
-                                  PriorityPolicy priority_policy) {
+                                  PriorityPolicy priority_policy,
+                                  size_t queue_depth = 0) {
   auto params = make_params();
   params.m_queue_impl = queue_impl;
   params.m_priority_policy = priority_policy;
   params.m_block_size = 4;
+  params.m_backfill_queue_depth = queue_depth;
 
   Simulation uninterrupted(params);
   populate_checkpoint_workload(uninterrupted);
@@ -208,17 +210,22 @@ void test_exact_continuation_case(QueueImplementation queue_impl,
   }
 }
 
-/** @brief Verify exact continuation for every standard scheduler backend. */
+/** @brief Verify exact continuation for every standard scheduler backend,
+ * with an unlimited and a bounded backfill queue depth. */
 void test_exact_continuation() {
-  for (const auto queue_impl :
-       {QueueImplementation::CIRCULAR, QueueImplementation::DEQUE,
-        QueueImplementation::MULTIMAP, QueueImplementation::BLOCK}) {
-    test_exact_continuation_case(queue_impl, PriorityPolicy::FCFS);
-  }
-  for (const auto priority_policy :
-       {PriorityPolicy::SJF, PriorityPolicy::LJF}) {
-    test_exact_continuation_case(QueueImplementation::CIRCULAR,
-                                 priority_policy);
+  for (const size_t queue_depth : {size_t{0}, size_t{2}}) {
+    for (const auto queue_impl :
+         {QueueImplementation::CIRCULAR, QueueImplementation::DEQUE,
+          QueueImplementation::MULTIMAP, QueueImplementation::BLOCK}) {
+      test_exact_continuation_case(queue_impl, PriorityPolicy::FCFS,
+                                   queue_depth);
+    }
+    for (const auto priority_policy :
+         {PriorityPolicy::SJF, PriorityPolicy::LJF,
+          PriorityPolicy::FCFS_CONSERVATIVE}) {
+      test_exact_continuation_case(QueueImplementation::CIRCULAR,
+                                   priority_policy, queue_depth);
+    }
   }
 }
 
@@ -253,10 +260,11 @@ void test_loaded_jobs_remain_unsubmitted() {
 }
 
 /** @brief Verify callback-based Custom FCFS resumes with supplied callbacks. */
-void test_custom_scheduler_continuation() {
+void test_custom_scheduler_continuation(size_t queue_depth) {
   auto params = make_params();
   params.m_backfill_policy = BackfillPolicy::EASY;
   params.m_num_max_candidates = 4;
+  params.m_backfill_queue_depth = queue_depth;
   size_t cost_calls = 0;
   const job_cost_function_t cost_function =
       [&cost_calls](job_no_t job, sim_time_t, tdiff_t, num_nodes_t) {
@@ -658,6 +666,27 @@ void test_rejected_checkpoints() {
     horizon_rejected = true;
   }
   assert(horizon_rejected);
+
+  // The scan and reservation depths decide which jobs each pass examines
+  // and protects, so a restart must use the values the checkpoint recorded.
+  for (const bool reservation : {false, true}) {
+    auto depth_params = make_params();
+    if (reservation) {
+      depth_params.m_reservation_depth = 2;
+    } else {
+      depth_params.m_backfill_queue_depth = 2;
+    }
+    Simulation other_depth(depth_params);
+    checkpoint.clear();
+    checkpoint.seekg(0);
+    bool depth_rejected = false;
+    try {
+      other_depth.load_checkpoint(checkpoint);
+    } catch (const std::runtime_error &) {
+      depth_rejected = true;
+    }
+    assert(depth_rejected);
+  }
 }
 
 /** @brief Verify Pcon records, live totals, and resource output survive
@@ -756,7 +785,8 @@ int main() {
   write_empty_trace();
   test_exact_continuation();
   test_loaded_jobs_remain_unsubmitted();
-  test_custom_scheduler_continuation();
+  test_custom_scheduler_continuation(0);
+  test_custom_scheduler_continuation(2);
   test_periodic_backfill_continuation();
   test_output_continuation();
   test_progressive_output_continuation();

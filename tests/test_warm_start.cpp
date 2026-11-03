@@ -127,7 +127,7 @@ run_trace(const std::string &trace, double sim_start_time, unsigned total_nodes,
           double max_time = -1.0, double backfill_interval = 0.0,
           WarmStartWaitQueuePolicy warm_start_wait_queue =
               WarmStartWaitQueuePolicy::DROP,
-          size_t reservation_depth = 0) {
+          size_t reservation_depth = 0, size_t backfill_queue_depth = 0) {
   const std::string stem = "run_" + std::to_string(run_number++);
   const auto trace_path = work_dir / (stem + ".csv");
   const auto job_path = work_dir / (stem + ".jobs.csv");
@@ -154,6 +154,7 @@ run_trace(const std::string &trace, double sim_start_time, unsigned total_nodes,
   params.m_backfill_interval = backfill_interval;
   params.m_warm_start_wait_queue = warm_start_wait_queue;
   params.m_reservation_depth = reservation_depth;
+  params.m_backfill_queue_depth = backfill_queue_depth;
   params.m_block_size = 4;
   params.m_job_flush_interval = 100000;
   params.m_resource_history_capacity = 100000;
@@ -473,15 +474,18 @@ void compare_equivalent(const std::string &warm_trace,
                         double sim_start_time, unsigned total_nodes,
                         size_t seed_count, PriorityPolicy priority,
                         BackfillPolicy backfill, QueueImplementation queue,
-                        double backfill_interval = 0.0) {
+                        double backfill_interval = 0.0,
+                        size_t backfill_queue_depth = 0) {
   const auto warm =
       run_trace(warm_trace, sim_start_time, total_nodes, priority, backfill,
                 queue, {}, RunTimeMode::ACTUAL, DistributionType::NORMAL, 1.0,
-                0.0, -1.0, backfill_interval);
+                0.0, -1.0, backfill_interval, WarmStartWaitQueuePolicy::DROP, 0,
+                backfill_queue_depth);
   const auto reference =
       run_trace(reference_trace, 0.0, total_nodes, priority, backfill, queue,
                 {}, RunTimeMode::ACTUAL, DistributionType::NORMAL, 1.0, 0.0,
-                -1.0, backfill_interval);
+                -1.0, backfill_interval, WarmStartWaitQueuePolicy::DROP, 0,
+                backfill_queue_depth);
   const auto reference_jobs = without_seed_jobs(reference.jobs, seed_count);
   assert(warm.jobs.size() == reference_jobs.size());
   for (size_t i = 0; i < warm.jobs.size(); ++i) {
@@ -566,6 +570,61 @@ void test_every_policy_and_queue() {
                          PriorityPolicy::FCFS_CONSERVATIVE, backfill, queue);
     }
   }
+}
+
+// --backfill_queue_depth after a warm start. A historical job holds 8 of 10
+// nodes until t=20. At the boundary H (10 nodes) is blocked, A (4 nodes) does
+// not fit, and B (2 nodes, 5 s) can backfill. A depth of 2 stops the scan at
+// A, so B waits; unlimited, B starts at the boundary. Each warm run must
+// match the cold run seeded with the boundary state.
+void test_queue_depth_after_warm_start() {
+  const std::string warm =
+      "job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit\n"
+      "0,0,20,8,0,20\n"
+      "10,20,25,10,0,5\n"
+      "10,25,55,4,0,30\n"
+      "10,10,15,2,0,5\n";
+  const std::string reference =
+      "job_submit_time,num_nodes,time_limit,actual_run_time\n"
+      "10,8,10,10\n"
+      "10,10,5,5\n"
+      "10,4,30,30\n"
+      "10,2,5,5\n";
+
+  struct Case {
+    PriorityPolicy priority;
+    QueueImplementation queue;
+  };
+  const Case cases[] = {
+      {PriorityPolicy::FCFS, QueueImplementation::CIRCULAR},
+      {PriorityPolicy::FCFS, QueueImplementation::DEQUE},
+      {PriorityPolicy::FCFS, QueueImplementation::BLOCK},
+      {PriorityPolicy::FCFS_ALT, QueueImplementation::MULTIMAP},
+      {PriorityPolicy::FCFS_CONSERVATIVE, QueueImplementation::CIRCULAR},
+      {PriorityPolicy::FCFS_CONSERVATIVE, QueueImplementation::DEQUE},
+  };
+  // SJF and LJF are not listed: in the cold reference the seed that stands
+  // for the running historical job competes in duration order and does not
+  // start first, so the seeded cold run is not equivalent for them.
+  for (const auto &c : cases) {
+    for (const size_t depth : {size_t{0}, size_t{2}}) {
+      compare_equivalent(warm, reference, 10.0, 10, 1, c.priority,
+                         BackfillPolicy::EASY, c.queue, 0.0, depth);
+    }
+  }
+
+  // The depth must change this workload, or the comparisons prove little.
+  const auto run = [&](size_t depth) {
+    return run_trace(warm, 10.0, 10, PriorityPolicy::FCFS,
+                     BackfillPolicy::EASY, QueueImplementation::CIRCULAR, {},
+                     RunTimeMode::ACTUAL, DistributionType::NORMAL, 1.0, 0.0,
+                     -1.0, 0.0, WarmStartWaitQueuePolicy::DROP, 0, depth);
+  };
+  const auto unlimited = run(0);
+  const auto limited = run(2);
+  assert(unlimited.jobs.size() == 3 && limited.jobs.size() == 3);
+  expect_close(unlimited.jobs[2].begin, 10.0);
+  assert(limited.jobs[2].begin > 10.0);
 }
 
 // Periodic backfill under warm start. Ticks are anchored at the boundary
@@ -796,6 +855,7 @@ int main() {
     test_fractional_boundary();
     test_runtime_mode_applies_only_to_simulated_jobs();
     test_every_policy_and_queue();
+  test_queue_depth_after_warm_start();
     test_periodic_backfill();
     test_seeded_random_differential();
     test_self_consistent_replay_warm_start();

@@ -20,7 +20,7 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | System | `--warm_start_wait_queue MODE` | Select `inherit` (default) or legacy `drop` handling for jobs waiting at a replay warm-start boundary. |
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
-| Scheduling | `--backfill_queue_depth N` | Cap jobs inspected by built-in hybrid or conservative backfill. |
+| Scheduling | `--backfill_queue_depth N` | Cap jobs inspected per backfill pass by every scheduler, including the custom-EASY selector. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
 | Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
@@ -241,7 +241,8 @@ Maximum number of feasible jobs offered to the callback-driven experimental
 custom-EASY scheduler in one selection decision. The scheduler scans its
 eligible queue, performs resource and reservation-window feasibility checks,
 then offers at most `COUNT` feasible jobs to the callback. It does not limit
-how many waiting jobs are scanned. `COUNT` must be greater than zero.
+how many waiting jobs are scanned; `--backfill_queue_depth` does that, before
+the feasibility checks. `COUNT` must be greater than zero.
 
 This setting has no effect on the built-in `easy`, `hybrid`, or
 `conservative` schedulers.
@@ -251,16 +252,25 @@ This setting has no effect on the built-in `easy`, `hybrid`, or
 ### `--backfill_queue_depth N`
 
 Maximum number of eligible waiting jobs, including the blocked FCFS head, that
-the built-in hybrid or conservative scheduler examines in one scheduling pass.
-Jobs beyond that prefix are not tested for backfill in that pass. `0` leaves
-the scan unlimited. This is a pre-feasibility queue scan limit: a job counts
-toward the depth even when it cannot fit or cannot complete before its
-reservation window. It has no effect on the experimental custom-EASY selector.
+a scheduler examines in one scheduling pass. It applies to `easy`,
+`conservative`, and `hybrid` backfilling, to FCFS, SJF, and LJF ordering, to
+every queue implementation, and to the experimental custom-EASY selector. Jobs beyond that prefix are not tested for
+backfill in that pass. `0` leaves the scan unlimited. This is a
+pre-feasibility queue scan limit: a job counts toward the depth even when it
+cannot fit or cannot complete before its reservation window. Under `easy`
+only the head holds a reservation, so only the head is exempted by
+`--planning_horizon`; every other job examined counts.
 
-In short, `--backfill_queue_depth` controls how much of the queue the built-in
-hybrid/conservative scheduler considers; `--num_max_candidates` controls how
-many already-feasible jobs the custom-EASY callback can choose from. The two
-settings apply to separate scheduler paths and are never combined. This is
+A pass is one call of the scheduler. When a pass starts jobs, the simulator
+runs another pass at the same time, and that pass starts its count again, so
+in one time step the scheduler can examine more jobs than the depth. This
+matches the Python reference schedulers.
+
+In short, `--backfill_queue_depth` controls how much of the queue a scheduler
+considers; `--num_max_candidates` controls how many already-feasible jobs the
+custom-EASY callback can choose from. They are separate options acting at
+different stages: in the custom-EASY selector the depth bounds the scan first,
+then the candidate cap applies to the feasible jobs found. This is
 independent of `--reservation_depth`, which limits only the earlier jobs whose
 reservations must be protected.
 

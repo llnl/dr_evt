@@ -11,8 +11,10 @@
 
 #include "sim/scheduler_block_fcfs.hpp"
 #include <algorithm>
+#include <utility>
 
 namespace dr_evt {
+
 
 template <size_t BlockSize>
 void BlockQueueFCFSScheduler<BlockSize>::insert_job(
@@ -137,6 +139,15 @@ BlockQueueFCFSScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
           ? m_fcfs_reservation_time
           : std::numeric_limits<sim_time_t>::max();
 
+  if (m_backfill_queue_depth != 0) {
+    // Values are passed and the result returned, so no local escapes and the
+    // default search loop below compiles as it did before.
+    return backfill_with_queue_depth(
+        planned_reservation != std::numeric_limits<sim_time_t>::max(),
+        planned_reservation, current_time, available_nodes,
+        std::move(jobs_to_run));
+  }
+
   // Step 3: Backfill
   while (available_nodes > 0) {
     tdiff_t backfill_run_time = 0.0;
@@ -167,6 +178,7 @@ BlockQueueFCFSScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
 
   return jobs_to_run;
 }
+
 
 // Explicit template instantiations
 template class BlockQueueFCFSScheduler<4>;

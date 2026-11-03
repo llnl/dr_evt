@@ -817,10 +817,12 @@ void test_planning_horizon_event_driven() {
       {BackfillPolicy::EASY, 0, 0, PriorityPolicy::FCFS, "easy"},
       // A one-job scan depth proves that the out-of-horizon head does not
       // consume the only slot needed by C.
+      {BackfillPolicy::EASY, 0, 1, PriorityPolicy::FCFS, "easy, depth 1"},
       {BackfillPolicy::HYBRID, 1, 1, PriorityPolicy::FCFS, "hybrid"},
       {BackfillPolicy::CONSERVATIVE, 0, 1, PriorityPolicy::FCFS,
        "conservative"},
       {BackfillPolicy::EASY, 0, 0, PriorityPolicy::SJF, "sjf"},
+      {BackfillPolicy::EASY, 0, 1, PriorityPolicy::SJF, "sjf, depth 1"},
   };
   for (const auto &c : cases) {
     for (const double horizon :

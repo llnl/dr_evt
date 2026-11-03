@@ -77,13 +77,13 @@ selects the first candidate in vector order when multiple costs are equal.
 `num_max_candidates` is not a wait-queue scan limit. It applies only after the
 custom EASY scheduler has tested jobs for resource and reservation-window
 feasibility, and it limits the feasible jobs offered to the callback. In
-contrast, `backfill_queue_depth` bounds how many waiting jobs the built-in
-hybrid or conservative scheduler examines before feasibility testing. They are
-separate current scheduler paths, not two limits applied together:
+contrast, `backfill_queue_depth` bounds how many waiting jobs a scheduler
+(EASY, conservative, hybrid, or the custom EASY selector) examines before
+feasibility testing. They are separate options that act at different stages:
 
 ```text
-built-in hybrid/conservative: waiting queue → backfill_queue_depth → feasibility
-custom EASY selector:           waiting queue → feasibility
+built-in schedulers:            waiting queue → backfill_queue_depth → feasibility
+custom EASY selector:           waiting queue → backfill_queue_depth → feasibility
                                → num_max_candidates → callback selection
 ```
 

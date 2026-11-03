@@ -149,7 +149,10 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
     if (available_nodes == 0) {
       return jobs_to_run;
     }
-    for (size_t i = 1; i < m_eligible_end_idx; ++i) {
+    const size_t scan_end = queue_depth_scan_end(
+        m_wait_queue, 1, m_eligible_end_idx, m_backfill_queue_depth,
+        head_reservation_within_horizon);
+    for (size_t i = 1; i < scan_end; ++i) {
       const auto &job = m_wait_queue[i];
       if (job.removed || job.nodes_requested > available_nodes) {
         continue;

@@ -75,6 +75,8 @@ private:
   sim_time_t m_current_tracked_time;
   /// Removed entries inside the eligible prefix of m_wait_queue.
   size_t m_removed_count;
+  /// Jobs examined per backfill pass, head included; zero is unlimited.
+  size_t m_backfill_queue_depth;
 
 public:
   /**
@@ -86,16 +88,20 @@ public:
    * @param[in] initial_capacity Initial wait-queue capacity; zero derives one
    * from initial_job_count.
    * @param[in] overflow_policy Action to take when that capacity is exhausted.
+   * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
+   * included; zero is unlimited.
    */
   CircularBufferFCFSScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
       BackfillPolicy bf_policy, size_t initial_capacity = 0,
-      CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW)
+      CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW,
+      size_t backfill_queue_depth = 0)
       : SchedulerBase(total_nodes, bf_policy),
         m_wait_queue(initial_capacity != 0 ? initial_capacity
                                            : initial_job_count),
         m_overflow_policy(overflow_policy), m_eligible_end_idx(0),
-        m_current_tracked_time(0.0), m_removed_count(0) {}
+        m_current_tracked_time(0.0), m_removed_count(0),
+        m_backfill_queue_depth(backfill_queue_depth) {}
 
   /** @copydoc SchedulerBase::insert_job */
   void insert_job(job_no_t job_id, sim_time_t submit_time,
