@@ -218,11 +218,11 @@ void test_expected_start_is_earliest_fit() {
   Sim_Params chained_params = make_params();
   Simulation chained(chained_params);
   chained.get_trace().load_data(0);
-  const auto chained_ids = chained.append_jobs(
-      {{0.0, 100, kTestQueueInput, 100.0},
-       {0.0, 100, kTestQueueInput, 50.0},
-       {0.0, 60, kTestQueueInput, 200.0},
-       {0.0, 60, kTestQueueInput, 10.0}});
+  const auto chained_ids =
+      chained.append_jobs({{0.0, 100, kTestQueueInput, 100.0},
+                           {0.0, 100, kTestQueueInput, 50.0},
+                           {0.0, 60, kTestQueueInput, 200.0},
+                           {0.0, 60, kTestQueueInput, 10.0}});
   const auto chained_statuses = chained.get_job_statuses(chained_ids);
   assert(chained_statuses[1].expected_start_time == 100.0);
   assert(chained_statuses[2].expected_start_time == 150.0);
@@ -359,8 +359,8 @@ void test_expected_start_covers_unreserved_waiting_jobs() {
 void test_chained_conservative_reservations_allow_early_backfill() {
   std::cout << "\n=== Chained conservative reservation regression ==="
             << std::endl;
-  for (const auto policy : {BackfillPolicy::CONSERVATIVE,
-                            BackfillPolicy::HYBRID}) {
+  for (const auto policy :
+       {BackfillPolicy::CONSERVATIVE, BackfillPolicy::HYBRID}) {
     auto params = make_params();
     params.m_backfill_policy = policy;
     if (policy == BackfillPolicy::HYBRID) {
@@ -412,7 +412,7 @@ void test_exact_lookahead_replays_without_mutating_live_state() {
   assert(exact[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
   assert(exact[1].outcome == Simulation::Exact_Start_Outcome::STARTED);
   const auto never = sim.get_exact_job_start_times({impossible});
-  assert(never[0].outcome == Simulation::Exact_Start_Outcome::NEVER_FEASIBLE);
+  assert(never[0].outcome == Simulation::Exact_Start_Outcome::REJECTED);
   assert(!never[0].start_time.has_value());
 
   // The lookahead clone drains independently; the live simulation remains at
@@ -428,6 +428,25 @@ void test_exact_lookahead_replays_without_mutating_live_state() {
   assert(enumerated[0].job_idx == head);
   assert(enumerated[0].start_time == 10.0);
   assert(enumerated[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
+
+  // A request accepted by the physical machine limit can still become
+  // unreachable when its scheduled capacity falls below the request.
+  const std::string capacity_file = "/tmp/test_exact_lookahead_capacity.csv";
+  {
+    std::ofstream capacity(capacity_file);
+    capacity << "time,total_nodes\n0,4\n";
+  }
+  auto reduced_params = make_params();
+  reduced_params.m_total_nodes = 10;
+  reduced_params.m_capacity_schedule = capacity_file;
+  Simulation reduced(reduced_params);
+  reduced.get_trace().load_data(0);
+  const auto constrained = reduced.append_job(0.0, 8, kTestQueueInput, 1.0);
+  reduced.advance_to(0.0);
+  const auto unreachable = reduced.get_exact_job_start_times({constrained});
+  assert(unreachable[0].outcome ==
+         Simulation::Exact_Start_Outcome::CAPACITY_UNREACHABLE);
+  assert(!unreachable[0].start_time.has_value());
   std::cout << "  PASSED" << std::endl;
 }
 #endif

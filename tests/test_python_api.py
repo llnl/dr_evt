@@ -793,7 +793,7 @@ def test_exact_lookahead(result):
             dr_evt.ExactStartOutcome.STARTED,
         ]
         never = sim.get_exact_job_start_times([impossible])[0]
-        assert never.outcome == dr_evt.ExactStartOutcome.NEVER_FEASIBLE
+        assert never.outcome == dr_evt.ExactStartOutcome.REJECTED
         assert never.start_time is None
         assert sim.get_current_time() == before
         enumerated = sim.get_exact_job_start_times([], 1)

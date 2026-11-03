@@ -90,7 +90,9 @@ PYBIND11_MODULE(dr_evt, m) {
 
   py::enum_<Simulation::Exact_Start_Outcome>(m, "ExactStartOutcome")
       .value("STARTED", Simulation::Exact_Start_Outcome::STARTED)
-      .value("NEVER_FEASIBLE", Simulation::Exact_Start_Outcome::NEVER_FEASIBLE);
+      .value("REJECTED", Simulation::Exact_Start_Outcome::REJECTED)
+      .value("CAPACITY_UNREACHABLE",
+             Simulation::Exact_Start_Outcome::CAPACITY_UNREACHABLE);
 
   // Mutable configuration populated before constructing Simulation.
   py::class_<Sim_Params>(m, "SimParams")

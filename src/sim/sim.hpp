@@ -352,7 +352,11 @@ public:
   };
 
   /** Completion state of one synchronous exact-lookahead request. */
-  enum class Exact_Start_Outcome { STARTED, NEVER_FEASIBLE };
+  enum class Exact_Start_Outcome {
+    STARTED,
+    REJECTED,
+    CAPACITY_UNREACHABLE,
+  };
 
   /** Exact start returned by an output-free scheduler replay. */
   struct Exact_Start_Result {

@@ -94,8 +94,8 @@ scheduler's `backfill_queue_depth` and must not change scheduler policy.
 `Simulation::get_exact_job_start_times(job_ids, estimation_depth)` clones the
 complete runnable simulation state into an in-memory binary buffer and drains
 that clone through the ordinary scheduler event loop. It returns the cloned
-jobs' actual start times with an explicit `started` or `never_feasible`
-outcome. A non-empty list accepts appended-job IDs; an empty list enumerates
+jobs' actual start times with an explicit `started`, `rejected`, or
+`capacity_unreachable` outcome. A non-empty list accepts appended-job IDs; an empty list enumerates
 the current waiting-queue prefix, matching
 `get_job_statuses()`. Zero depth selects the whole current prefix.
 

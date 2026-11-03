@@ -94,9 +94,9 @@ template <typename... Ts> consteval size_t checkpoint_scalar_bytes() {
 constexpr size_t lookahead_snapshot_fixed_bytes = checkpoint_scalar_bytes<
     decltype(checkpoint_magic), std::uint32_t, std::uint8_t, std::uint32_t,
     bool, sim_time_t, sim_time_t, bool, num_nodes_t, size_t, num_nodes_t,
-    tdiff_t, sim_time_t, num_jobs_t, num_jobs_t, num_jobs_t, sim_time_t,
-    size_t, num_jobs_t, bool, sim_time_t, size_t, tdiff_t, sim_time_t, size_t,
-    size_t, size_t, job_no_t>();
+    tdiff_t, sim_time_t, num_jobs_t, num_jobs_t, num_jobs_t, sim_time_t, size_t,
+    num_jobs_t, bool, sim_time_t, size_t, tdiff_t, sim_time_t, size_t, size_t,
+    size_t, job_no_t>();
 
 /** Output-only Redis state sampled when a checkpoint is explicitly written. */
 struct CheckpointRedisBoundary {
@@ -1137,8 +1137,8 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
 }
 
 template <typename TraceType>
-void BasicSimulation<TraceType>::save_checkpoint_impl(
-    std::ostream &output, bool preserve_outputs) {
+void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
+                                                      bool preserve_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
@@ -1457,8 +1457,8 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
 }
 
 template <typename TraceType>
-void BasicSimulation<TraceType>::load_checkpoint_impl(
-    std::istream &input, bool restore_outputs) {
+void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
+                                                      bool restore_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
@@ -2176,43 +2176,44 @@ BasicSimulation<TraceType>::get_job_statuses(
   std::vector<Job_Status> result;
   std::multimap<job_no_t, size_t> requested_pending_statuses;
   if (job_idxs.empty()) {
-    const size_t count = estimation_depth == 0
-                             ? pending_job_ids.size()
-                             : std::min(estimation_depth,
-                                        pending_job_ids.size());
+    const size_t count =
+        estimation_depth == 0
+            ? pending_job_ids.size()
+            : std::min(estimation_depth, pending_job_ids.size());
     result.reserve(count);
     for (size_t i = 0; i < count; ++i) {
       const job_no_t job_idx = pending_job_ids[i];
       requested_pending_statuses.emplace(job_idx, result.size());
-      result.push_back({job_idx, Job_State::PENDING, std::nullopt,
-                        std::nullopt, std::nullopt, Start_Time_Kind::NONE});
+      result.push_back({job_idx, Job_State::PENDING, std::nullopt, std::nullopt,
+                        std::nullopt, Start_Time_Kind::NONE});
     }
   } else {
     result.reserve(job_idxs.size());
     for (const job_no_t job_idx : job_idxs) {
-    if (job_idx < m_first_appended_job_idx ||
-        job_idx - m_first_appended_job_idx >=
-            m_appended_job_query_records.size() ||
-        !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
-             .tracked) {
-      throw std::out_of_range("No appended job with job_idx=" +
-                              std::to_string(job_idx));
-    }
-    const auto &job =
-        m_appended_job_query_records[job_idx - m_first_appended_job_idx];
-    Job_Status status{job_idx,      Job_State::PENDING, std::nullopt,
-                      std::nullopt, std::nullopt,       Start_Time_Kind::NONE};
-    if (job.rejected) {
-      status.state = Job_State::REJECTED;
-    } else if (job.scheduled) {
-      status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
-                                                    : Job_State::RUNNING;
-      status.start_time = job.start_time;
-      status.end_time = job.end_time;
-    } else {
-      requested_pending_statuses.emplace(job_idx, result.size());
-    }
-    result.push_back(status);
+      if (job_idx < m_first_appended_job_idx ||
+          job_idx - m_first_appended_job_idx >=
+              m_appended_job_query_records.size() ||
+          !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
+               .tracked) {
+        throw std::out_of_range("No appended job with job_idx=" +
+                                std::to_string(job_idx));
+      }
+      const auto &job =
+          m_appended_job_query_records[job_idx - m_first_appended_job_idx];
+      Job_Status status{job_idx,      Job_State::PENDING,
+                        std::nullopt, std::nullopt,
+                        std::nullopt, Start_Time_Kind::NONE};
+      if (job.rejected) {
+        status.state = Job_State::REJECTED;
+      } else if (job.scheduled) {
+        status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
+                                                      : Job_State::RUNNING;
+        status.start_time = job.start_time;
+        status.end_time = job.end_time;
+      } else {
+        requested_pending_statuses.emplace(job_idx, result.size());
+      }
+      result.push_back(status);
     }
   }
   if (requested_pending_statuses.empty()) {
@@ -2360,22 +2361,21 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
   // strings, so this is deliberately an estimate with headroom rather than a
   // promise of an exact serialized byte count.
   size_t reserve_bytes = lookahead_snapshot_fixed_bytes;
-  reserve_bytes = saturating_add(reserve_bytes, m_trace.m_data.size(),
-                                 sizeof(typename TraceType::policy_type::record_type) +
-                                     32);
+  reserve_bytes =
+      saturating_add(reserve_bytes, m_trace.m_data.size(),
+                     sizeof(typename TraceType::policy_type::record_type) + 32);
   reserve_bytes = saturating_add(reserve_bytes, m_running_jobs.size(),
                                  sizeof(running_jobs_t::value_type) + 32);
-  reserve_bytes = saturating_add(reserve_bytes,
-                                 m_scheduler->pending_job_ids().size(), 32);
-  reserve_bytes = saturating_add(reserve_bytes,
-                                 m_trace.pending_events().size(), 32);
+  reserve_bytes =
+      saturating_add(reserve_bytes, m_scheduler->pending_job_ids().size(), 32);
+  reserve_bytes =
+      saturating_add(reserve_bytes, m_trace.pending_events().size(), 32);
   reserve_bytes = saturating_add(reserve_bytes, m_capacity_changes.size(), 32);
-  reserve_bytes = saturating_add(
-      reserve_bytes, m_appended_job_query_records.size(),
-      sizeof(Appended_Job_Query_Record) + 16);
+  reserve_bytes =
+      saturating_add(reserve_bytes, m_appended_job_query_records.size(),
+                     sizeof(Appended_Job_Query_Record) + 16);
   reserve_bytes = saturating_add(reserve_bytes,
-                                 m_trace.m_ctx.m_resource_history.size(),
-                                 64);
+                                 m_trace.m_ctx.m_resource_history.size(), 64);
   if (reserve_bytes < std::numeric_limits<size_t>::max() / 4) {
     reserve_bytes += reserve_bytes / 4;
   }
@@ -2407,11 +2407,13 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
     for (const job_no_t job_idx : requested) {
       const auto &job = clone.m_trace.job_at(job_idx);
       const bool started = job.is_scheduled();
-      result.push_back({job_idx, started ? Exact_Start_Outcome::STARTED
-                                         : Exact_Start_Outcome::NEVER_FEASIBLE,
-                        started ? std::optional<sim_time_t>(
-                                      convert_epoch<sim_time_t>(job.get_begin_time()))
-                                : std::nullopt});
+      result.push_back(
+          {job_idx,
+           started ? Exact_Start_Outcome::STARTED
+                   : Exact_Start_Outcome::CAPACITY_UNREACHABLE,
+           started ? std::optional<sim_time_t>(
+                         convert_epoch<sim_time_t>(job.get_begin_time()))
+                   : std::nullopt});
     }
     return result;
   }
@@ -2419,10 +2421,11 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
   std::vector<Exact_Start_Result> result;
   result.reserve(statuses.size());
   for (const auto &status : statuses) {
-    result.push_back({status.job_idx,
-                      status.start_time ? Exact_Start_Outcome::STARTED
-                                        : Exact_Start_Outcome::NEVER_FEASIBLE,
-                      status.start_time});
+    const auto outcome = status.start_time ? Exact_Start_Outcome::STARTED
+                         : status.state == Job_State::REJECTED
+                             ? Exact_Start_Outcome::REJECTED
+                             : Exact_Start_Outcome::CAPACITY_UNREACHABLE;
+    result.push_back({status.job_idx, outcome, status.start_time});
   }
   return result;
 }
