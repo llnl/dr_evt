@@ -351,6 +351,16 @@ public:
     Start_Time_Kind start_time_kind;
   };
 
+  /** Completion state of one synchronous exact-lookahead request. */
+  enum class Exact_Start_Outcome { STARTED, NEVER_FEASIBLE };
+
+  /** Exact start returned by an output-free scheduler replay. */
+  struct Exact_Start_Result {
+    job_no_t job_idx;
+    Exact_Start_Outcome outcome;
+    std::optional<sim_time_t> start_time;
+  };
+
   /**
    * @brief Query selected appended jobs, or enumerate a waiting-queue prefix.
    * @details Pending jobs receive an on-demand reservation-aware start time.
@@ -396,7 +406,7 @@ public:
    * selects the complete prefix.  The initial implementation runs until the
    * requested starts are known or the clone drains.
    */
-  std::vector<Job_Status>
+  std::vector<Exact_Start_Result>
   get_exact_job_start_times(const std::vector<job_no_t> &job_idxs,
                             size_t estimation_depth = 0) const;
 #endif

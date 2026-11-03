@@ -88,6 +88,10 @@ PYBIND11_MODULE(dr_evt, m) {
       .value("RESERVED", Simulation::Start_Time_Kind::RESERVED)
       .value("ESTIMATED", Simulation::Start_Time_Kind::ESTIMATED);
 
+  py::enum_<Simulation::Exact_Start_Outcome>(m, "ExactStartOutcome")
+      .value("STARTED", Simulation::Exact_Start_Outcome::STARTED)
+      .value("NEVER_FEASIBLE", Simulation::Exact_Start_Outcome::NEVER_FEASIBLE);
+
   // Mutable configuration populated before constructing Simulation.
   py::class_<Sim_Params>(m, "SimParams")
       .def(py::init<>(), "Creates a configuration with DR_EVT default values.")
@@ -280,6 +284,11 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readonly("start_time_kind", &Simulation::Job_Status::start_time_kind,
                     "StartTimeKind: NONE, RESERVED, or ESTIMATED source of a "
                     "pending start time.");
+
+  py::class_<Simulation::Exact_Start_Result>(m, "ExactStartResult")
+      .def_readonly("job_idx", &Simulation::Exact_Start_Result::job_idx)
+      .def_readonly("outcome", &Simulation::Exact_Start_Result::outcome)
+      .def_readonly("start_time", &Simulation::Exact_Start_Result::start_time);
 
   py::class_<Simulation::Queue_Drain_Start_Estimate>(m,
                                                      "QueueDrainStartEstimate")

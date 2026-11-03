@@ -5,8 +5,8 @@
 This document records the design for exposing scheduler timing information to
 streaming clients and experiments. It separates a scheduler reservation from a
 start-time estimate and from an aggregate queue-drain estimate. The common
-cheap per-job query and resource-area per-job approximation are implemented;
-exact lookahead remains design work.
+cheap per-job query, resource-area per-job approximation, and synchronous
+in-memory exact lookahead are implemented.
 
 The design must not add persistent prediction state or work to the normal
 scheduling path. Prediction work is performed only when a caller asks for it.
@@ -90,6 +90,20 @@ jobs (zero, the default) or an explicit queue prefix. It is independent of the
 scheduler's `backfill_queue_depth` and must not change scheduler policy.
 
 ## Exact lookahead
+
+`Simulation::get_exact_job_start_times(job_ids, estimation_depth)` clones the
+complete runnable simulation state into an in-memory binary buffer and drains
+that clone through the ordinary scheduler event loop. It returns the cloned
+jobs' actual start times with an explicit `started` or `never_feasible`
+outcome. A non-empty list accepts appended-job IDs; an empty list enumerates
+the current waiting-queue prefix, matching
+`get_job_statuses()`. Zero depth selects the whole current prefix.
+
+The clone is synchronous and unbounded in this first version: it runs until
+the requested starts are known or the known work drains. Its snapshot uses no
+filesystem checkpoint and does not flush live CSV output, write Redis state,
+or trigger automatic checkpoint output. The snapshot buffer is thread-local,
+reused between calls, and preallocated from the live state size estimate.
 
 An exact estimate can be produced by forking the current simulation in memory
 and advancing the fork with the ordinary event loop and scheduler. The fork
@@ -180,7 +194,7 @@ The APIs have distinct cost and purpose:
 | `get_job_statuses()` | Common cheap per-job start-time reporting for EASY, hybrid, and conservative | Profile sweep over selected queue prefix |
 | `get_queue_drain_start_times(utilization, estimation_depth)` | Fast per-job resource-area start approximation | Resource-area sweep over selected queue prefix |
 | `get_prediction_horizon(utilization)` | Aggregate experimental queue-drain horizon | Resource-area event sweep |
-| Lookahead API (new) | Policy-exact per-job starts | Output-free side simulation |
+| `get_exact_job_start_times()` | Policy-exact per-job starts | Output-free in-memory replay |
 
 `get_job_statuses()` remains the common lifecycle-status API. Its pending-job
 result will identify whether its reported start time is `reserved` (from the

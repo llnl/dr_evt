@@ -389,6 +389,49 @@ void test_chained_conservative_reservations_allow_early_backfill() {
   std::cout << "  PASSED" << std::endl;
 }
 
+#if defined(DR_EVT_HAS_SER20)
+void test_exact_lookahead_replays_without_mutating_live_state() {
+  std::cout << "\n=== Exact lookahead clone ===" << std::endl;
+  auto params = make_params();
+  params.m_total_nodes = 10;
+  params.m_backfill_policy = BackfillPolicy::EASY;
+  Simulation sim(params);
+  sim.get_trace().load_data(0);
+  const auto running = sim.append_job(0.0, 6, kTestQueueInput, 10.0);
+  const auto head = sim.append_job(0.0, 10, kTestQueueInput, 100.0);
+  const auto candidate = sim.append_job(0.0, 2, kTestQueueInput, 5.0);
+  const auto impossible = sim.append_job(0.0, 11, kTestQueueInput, 1.0);
+  sim.advance_to(0.0);
+
+  const auto before_time = sim.get_current_time();
+  const auto before = sim.get_job_statuses({running, head, candidate});
+  const auto exact = sim.get_exact_job_start_times({head, candidate});
+  assert(exact.size() == 2);
+  assert(exact[0].start_time == 10.0);
+  assert(exact[1].start_time == 0.0);
+  assert(exact[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
+  assert(exact[1].outcome == Simulation::Exact_Start_Outcome::STARTED);
+  const auto never = sim.get_exact_job_start_times({impossible});
+  assert(never[0].outcome == Simulation::Exact_Start_Outcome::NEVER_FEASIBLE);
+  assert(!never[0].start_time.has_value());
+
+  // The lookahead clone drains independently; the live simulation remains at
+  // its original event boundary with the same status records.
+  assert(sim.get_current_time() == before_time);
+  const auto after = sim.get_job_statuses({running, head, candidate});
+  assert(after[0].state == before[0].state);
+  assert(after[1].state == before[1].state);
+  assert(after[2].state == before[2].state);
+
+  const auto enumerated = sim.get_exact_job_start_times({}, 1);
+  assert(enumerated.size() == 1);
+  assert(enumerated[0].job_idx == head);
+  assert(enumerated[0].start_time == 10.0);
+  assert(enumerated[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
+  std::cout << "  PASSED" << std::endl;
+}
+#endif
+
 void test_append_reclaims_before_growing() {
   std::cout << "\n=== Test 2: append_job() reclaims before growing ==="
             << std::endl;
@@ -1773,6 +1816,9 @@ int main() {
     test_expected_start_is_earliest_fit();
     test_expected_start_covers_unreserved_waiting_jobs();
     test_chained_conservative_reservations_allow_early_backfill();
+#if defined(DR_EVT_HAS_SER20)
+    test_exact_lookahead_replays_without_mutating_live_state();
+#endif
     test_append_reclaims_before_growing();
     test_append_rejects_past_submit_time();
     test_append_jobs_batch();

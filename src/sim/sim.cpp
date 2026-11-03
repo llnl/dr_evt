@@ -2329,7 +2329,7 @@ BasicSimulation<TraceType>::get_job_statuses(
 
 #if defined(DR_EVT_HAS_SER20)
 template <typename TraceType>
-std::vector<typename BasicSimulation<TraceType>::Job_Status>
+std::vector<typename BasicSimulation<TraceType>::Exact_Start_Result>
 BasicSimulation<TraceType>::get_exact_job_start_times(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
   // Capture enumeration IDs before replay: the clone drains its wait queue.
@@ -2401,7 +2401,30 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
   clone.m_has_automatic_checkpoint = false;
 
   clone.advance_to(std::numeric_limits<sim_time_t>::max());
-  return clone.get_job_statuses(requested);
+  if (job_idxs.empty()) {
+    std::vector<Exact_Start_Result> result;
+    result.reserve(requested.size());
+    for (const job_no_t job_idx : requested) {
+      const auto &job = clone.m_trace.job_at(job_idx);
+      const bool started = job.is_scheduled();
+      result.push_back({job_idx, started ? Exact_Start_Outcome::STARTED
+                                         : Exact_Start_Outcome::NEVER_FEASIBLE,
+                        started ? std::optional<sim_time_t>(
+                                      convert_epoch<sim_time_t>(job.get_begin_time()))
+                                : std::nullopt});
+    }
+    return result;
+  }
+  const auto statuses = clone.get_job_statuses(requested);
+  std::vector<Exact_Start_Result> result;
+  result.reserve(statuses.size());
+  for (const auto &status : statuses) {
+    result.push_back({status.job_idx,
+                      status.start_time ? Exact_Start_Outcome::STARTED
+                                        : Exact_Start_Outcome::NEVER_FEASIBLE,
+                      status.start_time});
+  }
+  return result;
 }
 #endif
 
