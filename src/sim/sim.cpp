@@ -2156,6 +2156,9 @@ BasicSimulation<TraceType>::get_job_statuses(
     }
     result.push_back(status);
   }
+  if (requested_pending_statuses.empty()) {
+    return result;
+  }
 
   // Free-node profile: each key starts a segment that keeps its value until
   // the next key. It is seeded from running-job releases and future capacity
