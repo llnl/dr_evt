@@ -101,6 +101,33 @@ CircularBufferFCFSConservativeScheduler::calculate_conservative_window(
   return earliest_conflict;
 }
 
+size_t CircularBufferFCFSConservativeScheduler::shared_easy_scan_end(
+    size_t begin, size_t end, bool head_planned, sim_time_t current_time) {
+  if (m_backfill_queue_depth == 0) {
+    return end;
+  }
+  if (m_backfill_depth_time != current_time) {
+    m_backfill_depth_time = current_time;
+    m_backfill_depth_examined = 0;
+    m_backfill_depth_head_accounted = false;
+  }
+  if (head_planned && !m_backfill_depth_head_accounted) {
+    ++m_backfill_depth_examined;
+    m_backfill_depth_head_accounted = true;
+  }
+  size_t remaining = m_backfill_queue_depth > m_backfill_depth_examined
+                         ? m_backfill_queue_depth - m_backfill_depth_examined
+                         : 0;
+  size_t i = begin;
+  for (; i < end && remaining > 0; ++i) {
+    if (!m_wait_queue[i].removed) {
+      --remaining;
+      ++m_backfill_depth_examined;
+    }
+  }
+  return i;
+}
+
 std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
@@ -158,9 +185,14 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
     if (available_nodes == 0) {
       return jobs_to_run;
     }
-    const size_t scan_end = queue_depth_scan_end(
-        m_wait_queue, 1, m_eligible_end_idx, m_backfill_queue_depth,
-        head_reservation_within_horizon);
+    const size_t scan_end =
+        m_share_easy_depth_across_passes
+            ? shared_easy_scan_end(1, m_eligible_end_idx,
+                                   head_reservation_within_horizon,
+                                   current_time)
+            : queue_depth_scan_end(m_wait_queue, 1, m_eligible_end_idx,
+                                   m_backfill_queue_depth,
+                                   head_reservation_within_horizon);
     for (size_t i = 1; i < scan_end; ++i) {
       const auto &job = m_wait_queue[i];
       if (job.removed || job.nodes_requested > available_nodes) {

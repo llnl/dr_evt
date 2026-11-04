@@ -36,8 +36,8 @@ public:
    * @param[in] overflow_policy Action when the queue is full.
    * @param[in] backfill_policy EASY, conservative, or hybrid policy.
    * @param[in] reservation_depth Waiting jobs protected by reservations.
-   * @param[in] backfill_queue_depth Eligible jobs examined per pass; zero is
-   * unlimited.
+   * @param[in] backfill_queue_depth Eligible jobs examined per backfill cycle,
+   * that is per tick under every policy; zero is unlimited.
    */
   CircularBufferFCFSPeriodicHybridScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
@@ -46,7 +46,10 @@ public:
       size_t backfill_queue_depth)
       : CircularBufferFCFSConservativeScheduler(
             total_nodes, initial_job_count, backfill_policy, initial_capacity,
-            overflow_policy, reservation_depth, backfill_queue_depth) {}
+            overflow_policy, reservation_depth, backfill_queue_depth) {
+    // One tick is one backfill cycle for every policy, EASY included.
+    m_share_easy_depth_across_passes = true;
+  }
 
   /**
    * @brief Perform an event-driven FCFS pass without backfill scanning.

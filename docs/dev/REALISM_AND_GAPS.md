@@ -28,9 +28,10 @@ Each item describes the code on this branch.
   until no further job can start. With
   [`--backfill_interval`](../user-guide/command-line.md#--backfill_interval-seconds)
   FCFS dispatch of the queue head stays event-driven while backfill runs only
-  at periodic ticks. Ticks start one interval after the first event (or after
-  the warm-start boundary) and keep their cadence; a tick that passes while
-  nothing is waiting does nothing.
+  at periodic ticks, as in Slurm. One tick is one backfill cycle. Ticks start
+  one interval after the first event (or after the warm-start boundary) and
+  keep their cadence; a tick that passes while nothing is waiting does
+  nothing.
 - **Reservations.** Under EASY the head's reservation is the earliest time
   enough nodes become free, projected from running-job time limits and future
   scheduled-capacity changes; a candidate starts only if it fits now and its
@@ -46,8 +47,13 @@ Each item describes the code on this branch.
   projected completion time.
 - **Scan and planning bounds.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
-  caps how many waiting jobs one pass inspects (default unlimited), under
-  every policy and ordering, including the custom EASY selector.
+  caps how many waiting jobs one backfill cycle inspects (default
+  unlimited), under every policy and ordering, including the custom EASY
+  selector. With `--backfill_interval` all backfill passes at one tick share
+  the count, which restarts at the next tick, and the event-driven FCFS head
+  dispatch between ticks scans no candidates and uses none of it. Without an
+  interval, the accounting is described under
+  [Remaining differences](#remaining-differences).
   [`--planning_horizon`](../user-guide/command-line.md#--planning_horizon-seconds)
   drops reservations that would start beyond the horizon in event-driven and
   periodic mode. Such a job consumes neither a queue-depth nor a reservation
@@ -110,8 +116,12 @@ its plan each iteration ([`slurm.conf(5)`](https://slurm.schedmd.com/slurm.conf.
 | `default_queue_depth` | 100 | Jobs the main scheduler tries after a completion or other routine event. |
 | `sched_interval` | 60 s | Period of the main scheduler's full pass. |
 
+Each backfill iteration starts its count of tested jobs at zero, so
+`bf_max_job_test` bounds one iteration rather than each scheduling event.
 DR_EVT's event-driven head dispatch corresponds to the main scheduler; its
-periodic backfill corresponds to the plugin.
+periodic backfill corresponds to the plugin, and with `--backfill_interval`
+the `--backfill_queue_depth` count restarts at each tick, as it does at each
+Slurm iteration.
 
 ### Flux (Fluxion)
 
@@ -119,7 +129,12 @@ Fluxion is event-driven like DR_EVT: a scheduling-relevant event triggers a
 fresh reservation plan
 ([`queue_policy_bf_base_impl.hpp` at 3b49d19](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp)).
 It examines at most `queue-depth` jobs per cycle and yields after six jobs,
-plans in integer seconds, and places jobs on a resource graph.
+plans in integer seconds, and places jobs on a resource graph. The count of
+scheduled jobs is
+[reset when a scheduling loop starts](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp#L52-L80)
+and kept while that loop resumes after its yields, so the depth bounds one
+loop, and events start the loops. DR_EVT's closest analogue is the batch of
+events at one timestamp.
 
 Fluxion keeps a blocked list for jobs whose allocation-or-reservation attempt
 fails, including requests affected by down resources. The
@@ -178,12 +193,15 @@ modeling Fluxion's external resource-status notification path.
 
 ## Remaining differences
 
-- **Backfill queue-depth accounting.** Conservative and hybrid
-  `--backfill_queue_depth` scans are shared across all backfill work at one
-  simulation timestamp and reset only when time advances. Other scheduler
-  paths reset their count for each invocation. The reservation-based policies
-  therefore model one Slurm-style backfill cycle while retaining event-driven
-  FCFS dispatch.
+- **Backfill queue-depth accounting.** `--backfill_queue_depth` counts the
+  jobs examined in one backfill cycle. With `--backfill_interval`, the Slurm
+  model, one tick is one cycle for every policy: all backfill passes at the
+  tick share one count and it resets at the next tick. Without an interval,
+  the Flux-like event-driven model, the simulator repeats passes at one
+  timestamp until nothing more starts. Conservative and hybrid share one
+  count across those passes. EASY, SJF, LJF, and the custom selector start
+  the count again in each pass, so at one timestamp they can examine more
+  jobs than the depth. Sharing the count in those paths is future work.
 
 | Aspect | DR_EVT | Difference and bias |
 |---|---|---|
@@ -221,7 +239,9 @@ separate behavioral distinction.
 - **Queue depth under EASY.** With a queue depth, with and without a planning
   horizon, the deque, circular, block, and multimap FCFS schedulers and the
   EASY mode of both conservative schedulers match the Python EASY reference;
-  a depth of 1 equals no backfilling for FCFS, SJF, and LJF
+  a depth of 1 equals no backfilling for FCFS, SJF, and LJF; and periodic
+  EASY equals periodic hybrid with one reservation under the same depth,
+  because both share the count within a tick
   (`tests/run_backfill_queue_depth_tests.sh`).
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).

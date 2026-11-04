@@ -261,11 +261,17 @@ toward the depth even when it cannot fit or cannot complete before its
 reservation window. Under `easy` only the head holds a reservation, so only
 the head is exempted by `--planning_horizon`; every other job examined counts.
 
-Conservative and hybrid backfill share their count across repeated
-`schedule()` calls at one simulation timestamp, then reset it when time
-advances. The other scheduler paths reset their count for each scheduling
-pass. This gives the reservation-based policies one Slurm-style backfill-cycle
-budget while retaining event-driven FCFS dispatch.
+The count belongs to one backfill cycle. With `--backfill_interval`, one tick
+is one cycle for every policy: all backfill passes at that tick share the
+count, and it resets at the next tick. FCFS head dispatch between ticks stays
+event-driven, scans no candidates, and uses none of it. This is how Slurm
+counts `bf_max_job_test` per backfill iteration.
+
+Without `--backfill_interval`, the simulator repeats scheduler passes at one
+simulation timestamp until nothing more starts. Conservative and hybrid
+backfill share their count across those passes and reset it when time
+advances. EASY, SJF, LJF, and the custom selector start the count again in
+each pass, so at one timestamp they can examine more jobs than the depth.
 
 In short, `--backfill_queue_depth` controls how much of the queue a scheduler
 considers; `--num_max_candidates` controls how many already-feasible jobs the

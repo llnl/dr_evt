@@ -1102,6 +1102,60 @@ void test_planning_horizon_event_driven() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// Periodic backfill is one cycle per tick, as in Slurm: FCFS dispatch stays
+// event-driven and never scans for backfill, and every backfill pass at a
+// tick shares one queue-depth budget that resets at the next tick. With depth
+// 3, H (the blocked head), C, and D use the budget at the tick at t=5 and D
+// starts. The repeated pass at the same tick must not start E from a reset
+// budget; E waits for FCFS dispatch at t=20. EASY and hybrid with one
+// reservation behave identically.
+void test_periodic_backfill_queue_depth_is_one_cycle_per_tick() {
+  std::cout << "\n=== Periodic backfill queue depth: one budget per tick ==="
+            << std::endl;
+
+  for (const auto policy : {BackfillPolicy::EASY, BackfillPolicy::HYBRID}) {
+    auto params = make_params();
+    params.m_total_nodes = 3;
+    params.m_queue_impl = QueueImplementation::CIRCULAR;
+    params.m_backfill_policy = policy;
+    params.m_reservation_depth = 1;
+    params.m_backfill_interval = 5.0;
+    params.m_backfill_queue_depth = 3;
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+
+    // A leaves two free nodes until t=10, blocking the three-node head H.
+    (void)sim.append_job(0.0, 1, kTestQueueInput, 10.0);
+    sim.advance_to(0.1);
+    (void)sim.append_job(0.1, 3, kTestQueueInput, 10.0); // H
+    // C ends after H's slot, so it cannot backfill.
+    (void)sim.append_job(0.1, 2, kTestQueueInput, 20.0);
+    const auto d = sim.append_job(0.1, 1, kTestQueueInput, 1.0); // D: backfills
+    const auto e = sim.append_job(0.1, 1, kTestQueueInput, 1.0); // E: next tick
+
+    // No backfill happens before the first tick.
+    sim.advance_to(4.9);
+    assert(sim.get_job_statuses({d}).front().state ==
+           Simulation::Job_State::PENDING);
+
+    sim.advance_to(5.0);
+    const auto d_status = sim.get_job_statuses({d}).front();
+    assert(d_status.start_time.has_value());
+    assert(approx_equal(*d_status.start_time, 5.0));
+    assert(sim.get_job_statuses({e}).front().state ==
+           Simulation::Job_State::PENDING);
+
+    // A ends at t=10 and H starts by FCFS dispatch; the next tick at t=10
+    // finds no free node, so E starts only when H ends at t=20.
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
+    const auto e_status = sim.get_job_statuses({e}).front();
+    assert(e_status.start_time.has_value());
+    assert(approx_equal(*e_status.start_time, 20.0));
+  }
+
+  std::cout << "  PASSED" << std::endl;
+}
+
 // Repeated scheduler passes at one event timestamp must share the configured
 // queue-depth budget. Here D starts in the first pass after H and C consume
 // the three slots; the old per-pass accounting then reset and incorrectly
@@ -1907,6 +1961,7 @@ int main() {
     test_reservations_follow_capacity_schedule();
     test_planning_horizon_event_driven();
     test_backfill_queue_depth_is_shared_per_timestamp();
+    test_periodic_backfill_queue_depth_is_one_cycle_per_tick();
     test_submit_job_records_busy_nodes();
     test_append_jobs_memory_pressure();
     test_resource_area_and_time_accounted_utilization();

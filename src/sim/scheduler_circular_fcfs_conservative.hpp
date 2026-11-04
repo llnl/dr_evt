@@ -55,6 +55,28 @@ protected:
   size_t m_backfill_depth_examined;
   /// Whether the blocked FCFS head has consumed its slot in that cycle.
   bool m_backfill_depth_head_accounted;
+  /// True when one backfill cycle spans every pass at a timestamp for the EASY
+  /// scan as well. Conservative and hybrid scans always share their count;
+  /// the periodic subclass sets this so that all policies treat one tick as
+  /// one cycle, the way Slurm resets bf_max_job_test per backfill iteration.
+  bool m_share_easy_depth_across_passes = false;
+
+  /**
+   * @brief End of the EASY candidate scan, sharing the depth across passes.
+   * @details Starts a new accounting cycle when time has advanced, charges an
+   * in-horizon blocked head once per cycle, then charges every eligible job
+   * the scan will examine against the remaining budget. A later pass at the
+   * same timestamp therefore continues from the count left by the earlier
+   * pass instead of starting from zero.
+   * @param[in] begin First candidate index (the entry after the head).
+   * @param[in] end One past the last eligible index.
+   * @param[in] head_planned Whether the head's reservation is inside the
+   * planning horizon and therefore consumes a slot.
+   * @param[in] current_time Timestamp of the pass.
+   * @return Index at which the candidate scan stops, in [begin, end].
+   */
+  size_t shared_easy_scan_end(size_t begin, size_t end, bool head_planned,
+                              sim_time_t current_time);
 
 public:
   /**
