@@ -5,19 +5,18 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_block_fcfs.cpp
+/** @file scheduler_fcfs_easy_block.cpp
  * @brief Scheduling implementation for the block-based FCFS queue.
  */
 
-#include "sim/scheduler_block_fcfs.hpp"
+#include "sim/scheduler_fcfs_easy_block.hpp"
 #include <algorithm>
 #include <utility>
 
 namespace dr_evt {
 
-
 template <size_t BlockSize>
-void BlockQueueFCFSScheduler<BlockSize>::insert_job(
+void FCFSEasyBlockScheduler<BlockSize>::insert_job(
     job_no_t job_id, sim_time_t submit_time, tdiff_t run_time_estimate,
     num_nodes_t nodes_requested) {
   m_wait_queue.insert_job(job_id, submit_time, run_time_estimate,
@@ -30,7 +29,7 @@ void BlockQueueFCFSScheduler<BlockSize>::insert_job(
 }
 
 template <size_t BlockSize>
-void BlockQueueFCFSScheduler<BlockSize>::sync_to(sim_time_t current_time) {
+void FCFSEasyBlockScheduler<BlockSize>::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return;
   }
@@ -43,7 +42,7 @@ void BlockQueueFCFSScheduler<BlockSize>::sync_to(sim_time_t current_time) {
 }
 
 template <size_t BlockSize>
-sim_time_t BlockQueueFCFSScheduler<BlockSize>::get_next_arrival_time() {
+sim_time_t FCFSEasyBlockScheduler<BlockSize>::get_next_arrival_time() {
   for (size_t i = m_eligible_end_idx; i < m_job_order.size(); ++i) {
     if (!m_job_order[i].removed) {
       return m_job_order[i].submit_time;
@@ -54,9 +53,9 @@ sim_time_t BlockQueueFCFSScheduler<BlockSize>::get_next_arrival_time() {
 
 template <size_t BlockSize>
 std::vector<job_no_t>
-BlockQueueFCFSScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
-                                             const running_jobs_t &running_jobs,
-                                             sim_time_t current_time) {
+FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
+                                            const running_jobs_t &running_jobs,
+                                            sim_time_t current_time) {
   sync_to(current_time);
 
   if (!has_eligible_jobs()) {
@@ -142,10 +141,10 @@ BlockQueueFCFSScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
   if (m_backfill_queue_depth != 0) {
     // Values are passed and the result returned, so no local escapes and the
     // default search loop below compiles as it did before.
-    return backfill_with_queue_depth(
-        planned_reservation != std::numeric_limits<sim_time_t>::max(),
-        planned_reservation, current_time, available_nodes,
-        std::move(jobs_to_run));
+    return backfill_with_queue_depth(planned_reservation !=
+                                         std::numeric_limits<sim_time_t>::max(),
+                                     planned_reservation, current_time,
+                                     available_nodes, std::move(jobs_to_run));
   }
 
   // Step 3: Backfill
@@ -179,14 +178,13 @@ BlockQueueFCFSScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
   return jobs_to_run;
 }
 
-
 // Explicit template instantiations
-template class BlockQueueFCFSScheduler<4>;
-template class BlockQueueFCFSScheduler<8>;
-template class BlockQueueFCFSScheduler<16>;
-template class BlockQueueFCFSScheduler<32>;
-template class BlockQueueFCFSScheduler<64>;
-template class BlockQueueFCFSScheduler<128>;
-template class BlockQueueFCFSScheduler<256>;
+template class FCFSEasyBlockScheduler<4>;
+template class FCFSEasyBlockScheduler<8>;
+template class FCFSEasyBlockScheduler<16>;
+template class FCFSEasyBlockScheduler<32>;
+template class FCFSEasyBlockScheduler<64>;
+template class FCFSEasyBlockScheduler<128>;
+template class FCFSEasyBlockScheduler<256>;
 
 } // namespace dr_evt

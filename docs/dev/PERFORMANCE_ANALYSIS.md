@@ -60,7 +60,7 @@ the named function itself. Inclusive rows must not be added indiscriminately.
 
 ## Scheduler-level breakdown
 
-`CircularBufferFCFSScheduler::schedule()` accounted for 84.41% of all
+`FCFSEasyCircularScheduler::schedule()` accounted for 84.41% of all
 recorded cycles. Its call tree divides into three parts:
 
 | Scheduler work | All recorded cycles | Share of scheduler |
@@ -90,7 +90,7 @@ effective_running_jobs[job.job_id] = {
     current_time, job.run_time_estimate, job.nodes_requested};
 ```
 
-See `src/sim/scheduler_circular_fcfs.cpp`, lines 70-86.
+See `src/sim/scheduler_fcfs_easy_circular.cpp`, lines 70-86.
 
 The remaining 2.18% direct cost includes consuming runnable jobs from the queue,
 scanning eligible jobs for EASY backfill candidates, maintaining lazy-removal

@@ -7,16 +7,16 @@ set_full_path(THIS_DIR_HEADERS
     scheduler_policies.hpp
     schedule_windows.hpp
     scheduler_base.hpp
-    scheduler_fcfs.hpp
-    scheduler_fcfs_custom.hpp
-    scheduler_fcfs_alt.hpp
-    scheduler_fcfs_conservative.hpp
-    scheduler_circular_fcfs_conservative.hpp
-    scheduler_circular_fcfs_periodic_hybrid.hpp
-    scheduler_block_fcfs.hpp
-    scheduler_circular_fcfs.hpp
-    scheduler_sjf.hpp
-    scheduler_ljf.hpp
+    scheduler_fcfs_easy_deque.hpp
+    scheduler_fcfs_easy_custom.hpp
+    scheduler_fcfs_easy_multimap.hpp
+    scheduler_fcfs_hybrid_deque.hpp
+    scheduler_fcfs_hybrid_circular.hpp
+    scheduler_fcfs_periodic_hybrid_circular.hpp
+    scheduler_fcfs_easy_block.hpp
+    scheduler_fcfs_easy_circular.hpp
+    scheduler_sjf_easy.hpp
+    scheduler_ljf_easy.hpp
     block_wait_queue.hpp
     sim.hpp
 )
@@ -25,17 +25,17 @@ set_full_path(THIS_DIR_SOURCES
     capacity_schedule.cpp
     schedule_windows.cpp
     scheduler_base.cpp
-    scheduler_fcfs.cpp
-    scheduler_fcfs_custom.cpp
-    scheduler_fcfs_alt.cpp
-    scheduler_fcfs_conservative.cpp
-    scheduler_circular_fcfs_conservative.cpp
-    scheduler_circular_fcfs_periodic_hybrid.cpp
-    scheduler_block_fcfs.cpp
-    scheduler_block_fcfs_depth.cpp
-    scheduler_circular_fcfs.cpp
-    scheduler_sjf.cpp
-    scheduler_ljf.cpp
+    scheduler_fcfs_easy_deque.cpp
+    scheduler_fcfs_easy_custom.cpp
+    scheduler_fcfs_easy_multimap.cpp
+    scheduler_fcfs_hybrid_deque.cpp
+    scheduler_fcfs_hybrid_circular.cpp
+    scheduler_fcfs_periodic_hybrid_circular.cpp
+    scheduler_fcfs_easy_block.cpp
+    scheduler_fcfs_easy_block_depth.cpp
+    scheduler_fcfs_easy_circular.cpp
+    scheduler_sjf_easy.cpp
+    scheduler_ljf_easy.cpp
     block_wait_queue.cpp
     sim.cpp
 )

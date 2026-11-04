@@ -33,15 +33,15 @@ Top-level ``src``
 - `multi_platform_runs.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/multi_platform_runs.hpp>`_
 - `schedule_windows.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/schedule_windows.cpp>`_, `schedule_windows.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/schedule_windows.hpp>`_
 - `scheduler_base.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_base.cpp>`_, `scheduler_base.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_base.hpp>`_
-- `scheduler_block_fcfs.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_block_fcfs.cpp>`_, `scheduler_block_fcfs.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_block_fcfs.hpp>`_
-- `scheduler_circular_fcfs.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_circular_fcfs.cpp>`_, `scheduler_circular_fcfs.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_circular_fcfs.hpp>`_
-- `scheduler_fcfs.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs.cpp>`_, `scheduler_fcfs.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs.hpp>`_
-- `scheduler_fcfs_alt.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_alt.cpp>`_, `scheduler_fcfs_alt.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_alt.hpp>`_
-- `scheduler_fcfs_conservative.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_conservative.cpp>`_, `scheduler_fcfs_conservative.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_conservative.hpp>`_
-- `scheduler_fcfs_custom.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_custom.cpp>`_, `scheduler_fcfs_custom.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_custom.hpp>`_
-- `scheduler_ljf.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf.cpp>`_, `scheduler_ljf.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf.hpp>`_
+- `scheduler_fcfs_easy_block.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_block.cpp>`_, `scheduler_fcfs_easy_block.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_block.hpp>`_
+- `scheduler_fcfs_easy_circular.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_circular.cpp>`_, `scheduler_fcfs_easy_circular.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_circular.hpp>`_
+- `scheduler_fcfs_easy_custom.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_custom.cpp>`_, `scheduler_fcfs_easy_custom.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_custom.hpp>`_
+- `scheduler_fcfs_easy_deque.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_deque.cpp>`_, `scheduler_fcfs_easy_deque.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_deque.hpp>`_
+- `scheduler_fcfs_easy_multimap.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_multimap.cpp>`_, `scheduler_fcfs_easy_multimap.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_multimap.hpp>`_
+- `scheduler_fcfs_hybrid_deque.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid_deque.cpp>`_, `scheduler_fcfs_hybrid_deque.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid_deque.hpp>`_
+- `scheduler_ljf_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf_easy.cpp>`_, `scheduler_ljf_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf_easy.hpp>`_
 - `scheduler_policies.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_policies.hpp>`_
-- `scheduler_sjf.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf.cpp>`_, `scheduler_sjf.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf.hpp>`_
+- `scheduler_sjf_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf_easy.cpp>`_, `scheduler_sjf_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf_easy.hpp>`_
 - `sim.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.cpp>`_, `sim.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.hpp>`_
 
 ``src/trace``

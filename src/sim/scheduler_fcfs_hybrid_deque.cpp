@@ -5,16 +5,16 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_conservative.cpp
- * @brief Conservative-reservation FCFS scheduling implementation.
+/** @file scheduler_fcfs_hybrid_deque.cpp
+ * @brief Deque-backed hybrid-reservation FCFS scheduling implementation.
  */
 
-#include "sim/scheduler_fcfs_conservative.hpp"
+#include "sim/scheduler_fcfs_hybrid_deque.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-void FCFSConservativeScheduler::sync_to(sim_time_t current_time) {
+void FCFSHybridDequeScheduler::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return;
   }
@@ -27,7 +27,7 @@ void FCFSConservativeScheduler::sync_to(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-void FCFSConservativeScheduler::mark_removed(job_no_t job_id) {
+void FCFSHybridDequeScheduler::mark_removed(job_no_t job_id) {
   for (auto &entry : m_wait_queue) {
     if (entry.job_id == job_id && !entry.removed) {
       entry.removed = true;
@@ -37,7 +37,7 @@ void FCFSConservativeScheduler::mark_removed(job_no_t job_id) {
   }
 }
 
-sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
+sim_time_t FCFSHybridDequeScheduler::calculate_hybrid_window(
     size_t backfill_index, num_nodes_t available_nodes,
     const running_jobs_t &running_jobs, sim_time_t current_time) {
   // For conservative backfilling, we need to ensure the backfill job
@@ -86,9 +86,9 @@ sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
 }
 
 std::vector<job_no_t>
-FCFSConservativeScheduler::schedule(num_nodes_t free_nodes,
-                                    const running_jobs_t &running_jobs,
-                                    sim_time_t current_time) {
+FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
+                                   const running_jobs_t &running_jobs,
+                                   sim_time_t current_time) {
   // Sync eligibility tracking
   sync_to(current_time);
 
@@ -154,106 +154,65 @@ FCFSConservativeScheduler::schedule(num_nodes_t free_nodes,
   m_fcfs_reservation_time = calculate_fcfs_reservation(
       m_wait_queue.front().nodes_requested, available_nodes,
       effective_running_jobs, current_time);
-  if (m_backfill_policy == BackfillPolicy::EASY) {
-    // EASY backfilling: Only consider the head job's reservation
-    const bool head_within_horizon =
-        reservation_within_horizon(m_fcfs_reservation_time, current_time);
+  if (available_nodes == 0) {
+    return jobs_to_run;
+  }
 
-    // The reservation remains part of the public FCFS snapshot. No candidate
-    // can start when FCFS has consumed all free nodes.
-    if (available_nodes == 0) {
-      return jobs_to_run;
-    }
+  // CONSERVATIVE backfilling: Must not delay ANY waiting job.
+  // HYBRID: must not delay the first m_reservation_depth waiting jobs.
 
-    // Try backfilling with remaining eligible jobs, up to the queue depth.
-    const size_t scan_end =
-        queue_depth_scan_end(m_wait_queue, 1, m_eligible_end_idx,
-                             m_backfill_queue_depth, head_within_horizon);
-    for (size_t i = 1; i < scan_end; ++i) {
-      const auto &job = m_wait_queue[i];
-      if (job.removed)
-        continue;
+  // Share one depth budget across every backfill pass at this timestamp.
+  // Jobs with no reservation in the planning horizon stay in queue but do
+  // not consume a scan slot. Their projection is recomputed on every pass,
+  // which captures ordinary resource releases and capacity changes without
+  // modeling an external blocked-list notification.
+  if (m_backfill_depth_time != current_time) {
+    m_backfill_depth_time = current_time;
+    m_backfill_depth_examined = 0;
+    m_backfill_depth_head_accounted = false;
+  }
+  if (reservation_within_horizon(m_fcfs_reservation_time, current_time) &&
+      !m_backfill_depth_head_accounted) {
+    ++m_backfill_depth_examined;
+    m_backfill_depth_head_accounted = true;
+  }
+  for (size_t i = 1; i < m_eligible_end_idx; ++i) {
+    const auto &job = m_wait_queue[i];
+    if (job.removed)
+      continue;
+    const sim_time_t job_reservation =
+        calculate_fcfs_reservation(job.nodes_requested, available_nodes,
+                                   effective_running_jobs, current_time);
+    if (!reservation_within_horizon(job_reservation, current_time))
+      continue;
+    if (m_backfill_queue_depth != 0 &&
+        m_backfill_depth_examined >= m_backfill_queue_depth)
+      break;
+    ++m_backfill_depth_examined;
 
-      // Check resource fit
-      if (job.nodes_requested > available_nodes)
-        continue;
+    // Check resource fit
+    if (job.nodes_requested > available_nodes)
+      continue;
 
-      // Check if job completes before head's reservation; an unplanned head
-      // (beyond the horizon) does not constrain candidates.
-      if (!head_within_horizon ||
-          current_time + release_estimate(current_time, job.run_time_estimate) <
-              m_fcfs_reservation_time) {
-        jobs_to_run.push_back(job.job_id);
-        available_nodes -= job.nodes_requested;
-        m_wait_queue[i].removed = true;
-        ++m_removed_count;
+    // Calculate the window: earliest in-horizon reservation ahead.
+    sim_time_t hybrid_window = calculate_hybrid_window(
+        i, available_nodes, effective_running_jobs, current_time);
 
-        if (available_nodes == 0)
-          break;
-      }
-    }
-  } else if (m_backfill_policy == BackfillPolicy::CONSERVATIVE ||
-             m_backfill_policy == BackfillPolicy::HYBRID) {
-    if (available_nodes == 0) {
-      return jobs_to_run;
-    }
+    // Job can backfill if it completes before ANY job ahead needs to start
+    if (current_time + release_estimate(current_time, job.run_time_estimate) <
+        hybrid_window) {
+      jobs_to_run.push_back(job.job_id);
+      available_nodes -= job.nodes_requested;
+      m_wait_queue[i].removed = true;
+      ++m_removed_count;
 
-    // CONSERVATIVE backfilling: Must not delay ANY waiting job.
-    // HYBRID: must not delay the first m_reservation_depth waiting jobs.
+      // Update effective running jobs for next iteration
+      effective_running_jobs[job.job_id] = {
+          current_time, release_estimate(current_time, job.run_time_estimate),
+          job.nodes_requested};
 
-    // Share one depth budget across every backfill pass at this timestamp.
-    // Jobs with no reservation in the planning horizon stay in queue but do
-    // not consume a scan slot. Their projection is recomputed on every pass,
-    // which captures ordinary resource releases and capacity changes without
-    // modeling an external blocked-list notification.
-    if (m_backfill_depth_time != current_time) {
-      m_backfill_depth_time = current_time;
-      m_backfill_depth_examined = 0;
-      m_backfill_depth_head_accounted = false;
-    }
-    if (reservation_within_horizon(m_fcfs_reservation_time, current_time) &&
-        !m_backfill_depth_head_accounted) {
-      ++m_backfill_depth_examined;
-      m_backfill_depth_head_accounted = true;
-    }
-    for (size_t i = 1; i < m_eligible_end_idx; ++i) {
-      const auto &job = m_wait_queue[i];
-      if (job.removed)
-        continue;
-      const sim_time_t job_reservation =
-          calculate_fcfs_reservation(job.nodes_requested, available_nodes,
-                                     effective_running_jobs, current_time);
-      if (!reservation_within_horizon(job_reservation, current_time))
-        continue;
-      if (m_backfill_queue_depth != 0 &&
-          m_backfill_depth_examined >= m_backfill_queue_depth)
+      if (available_nodes == 0)
         break;
-      ++m_backfill_depth_examined;
-
-      // Check resource fit
-      if (job.nodes_requested > available_nodes)
-        continue;
-
-      // Calculate conservative window: earliest in-horizon reservation ahead.
-      sim_time_t conservative_window = calculate_conservative_window(
-          i, available_nodes, effective_running_jobs, current_time);
-
-      // Job can backfill if it completes before ANY job ahead needs to start
-      if (current_time + release_estimate(current_time, job.run_time_estimate) <
-          conservative_window) {
-        jobs_to_run.push_back(job.job_id);
-        available_nodes -= job.nodes_requested;
-        m_wait_queue[i].removed = true;
-        ++m_removed_count;
-
-        // Update effective running jobs for next iteration
-        effective_running_jobs[job.job_id] = {
-            current_time, release_estimate(current_time, job.run_time_estimate),
-            job.nodes_requested};
-
-        if (available_nodes == 0)
-          break;
-      }
     }
   }
 

@@ -144,12 +144,12 @@ identical placements from the two implementations.
 The core `Simulation` sees one pool of `sum_k C_k` nodes. The scheduler
 enforces the partition internally:
 
-- `MultiSystemBackfillScheduler` derives from `CustomFCFSScheduler` only so
+- `MultiSystemBackfillScheduler` derives from `FCFSEasyCustomScheduler` only so
   that it can be injected through the existing constructor
-  `BasicSimulation(Sim_Params, std::unique_ptr<CustomFCFSScheduler>)`
+  `BasicSimulation(Sim_Params, std::unique_ptr<FCFSEasyCustomScheduler>)`
   (`src/sim/sim.hpp:167`). It overrides every virtual of the scheduler
   interface and keeps its own deque wait queue, modelled on
-  `FCFSConservativeScheduler`. The inherited circular buffer and resource
+  `FCFSHybridDequeScheduler`. The inherited circular buffer and resource
   accounting stay unused; the core's calls into them are harmless.
 - It records `job -> (system, demand)` for every job it starts. On each
   pass it rebuilds per-system usage and projected releases by walking the

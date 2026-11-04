@@ -32,7 +32,7 @@
 #include "params/sim_params.hpp"
 #include "sim/capacity_schedule.hpp"
 #include "sim/scheduler_base.hpp"
-#include "sim/scheduler_fcfs_custom.hpp"
+#include "sim/scheduler_fcfs_easy_custom.hpp"
 #include "trace/dr_event.hpp"
 #include "trace/trace.hpp"
 #include "utils/rngen.hpp"
@@ -64,7 +64,7 @@ protected:
   std::unique_ptr<SchedulerBase> m_scheduler;
 
   /// Non-owning pointer set only by the Custom-FCFS constructor.
-  CustomFCFSScheduler *m_custom_scheduler;
+  FCFSEasyCustomScheduler *m_custom_scheduler;
 
   /// Event queue (submit, start, end events)
   event_q_t m_event_queue;
@@ -171,7 +171,7 @@ public:
 
   /** Construct a simulation with a configured Custom-FCFS subclass. */
   BasicSimulation(Sim_Params params,
-                  std::unique_ptr<CustomFCFSScheduler> scheduler);
+                  std::unique_ptr<FCFSEasyCustomScheduler> scheduler);
 
   /**
    * @brief Run a complete batch simulation for the configured trace.
@@ -529,7 +529,7 @@ public:
   /**
    * @brief Return Custom-FCFS time-accounted resource usage in node-seconds.
    * @details Available only when this simulation was constructed with the
-   * CustomFCFSScheduler callback constructor. Accounting occurs once per
+   * FCFSEasyCustomScheduler callback constructor. Accounting occurs once per
    * settled scheduling timestamp and includes the elapsed portion of the
    * current interval for finite snapshots.
    * @return Resource area in node-seconds.
@@ -834,7 +834,7 @@ protected:
   template <bool AccountResources, bool WarmStage = false,
             bool PeriodicBackfill = false>
   void advance_to_impl(sim_time_t target_time,
-                       CustomFCFSScheduler *custom_scheduler);
+                       FCFSEasyCustomScheduler *custom_scheduler);
 
   /** Seed replay jobs active before m_params.m_sim_start_time, then reschedule
    * post-boundary work through the ordinary scheduler. */

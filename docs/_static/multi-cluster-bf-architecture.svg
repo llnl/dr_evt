@@ -74,7 +74,7 @@
   <!-- Scheduler box: x 740..1040 -->
   <rect x="740" y="40" width="300" height="420" class="exp"/>
   <text x="890" y="62" text-anchor="middle" class="title">MultiSystemBackfillScheduler</text>
-  <text x="754" y="82" class="small">derives from CustomFCFSScheduler only</text>
+  <text x="754" y="82" class="small">derives from FCFSEasyCustomScheduler only</text>
   <text x="754" y="96" class="small">to use the injection constructor</text>
 
   <rect x="754" y="108" width="272" height="56" class="box"/>

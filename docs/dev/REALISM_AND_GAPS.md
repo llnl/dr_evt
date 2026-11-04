@@ -1,9 +1,10 @@
 # Realism and Known Gaps
 
-DR_EVT models the core behavior of a batch scheduler, not a production
-scheduler: when scheduling decisions are evaluated, which reservations
-backfill protects, how many jobs hold reservations, what the scheduler knows
-about run times, and when a finished job's nodes become reusable. This page
+DR_EVT models the core behavior of a batch scheduler: when scheduling
+decisions are evaluated, which reservations backfill protects, how many jobs
+hold reservations, how far down the queue backfill looks, how far ahead
+reservations are planned, what the scheduler knows about run times, and when a
+finished job's nodes become reusable. This page
 states how those parts of the model relate to Slurm, Flux (Fluxion), and IBM
 Spectrum LSF, which option reproduces each production setting, and which
 differences remain and in which direction they bias results. The policies
@@ -22,48 +23,80 @@ experimental hooks listed at the end.
 
 Each item describes the code on this branch.
 
-- **Evaluation trigger.** By default a scheduling pass runs after every state
-  change: a batch of completions, a batch of arrivals, or a capacity change.
-  All events sharing a timestamp are applied first, then the pass repeats
-  until no further job can start. With
-  [`--backfill_interval`](../user-guide/command-line.md#--backfill_interval-seconds)
-  FCFS dispatch of the queue head stays event-driven while backfill runs only
-  at periodic ticks. Ticks start one interval after the first event (or after
-  the warm-start boundary) and keep their cadence; a tick that passes while
-  nothing is waiting does nothing.
-- **Reservations.** Under EASY the head's reservation is the earliest time
-  enough nodes become free, projected from running-job time limits and future
-  scheduled-capacity changes; a candidate starts only if it fits now and its
-  projected completion is strictly before that reservation. Conservative
-  protects every earlier waiting job, hybrid the first
-  [`--reservation_depth`](../user-guide/command-line.md#--reservation_depth-n)
-  of them, selected with
-  [`--backfill_policy`](../user-guide/command-line.md#-b---backfill_policy-policy).
-  Reservations are recomputed on every pass rather than carried over, as Slurm
-  does; jobs started earlier in the same pass are included when later
-  candidates are tested. FCFS implementations use the strict boundary above;
-  SJF and LJF retain their historical inclusive boundary at an exactly equal
-  projected completion time.
-- **Scan and planning bounds.**
+- **Reservations and backfill policies.** Waiting jobs are ordered by
+  submission time (FCFS), or by estimated run time under SJF and LJF
+  ([`--priority_policy`](../user-guide/command-line.md#-p---priority_policy-policy)).
+  The job at the front, the head, starts as soon as enough nodes are free.
+  When the head does not fit, nodes would otherwise sit idle until it does.
+  Backfilling lets a later job start out of order if it fits now and does not
+  delay the jobs that hold reservations. A reservation is the earliest time a
+  waiting job is projected to start, computed from the running jobs' time
+  limits and any scheduled capacity changes. The backfill policy, set with
+  [`--backfill_policy`](../user-guide/command-line.md#-b---backfill_policy-policy),
+  decides how many jobs hold reservations:
+  - EASY reserves for the head only.
+  - Conservative reserves for every waiting job.
+  - Hybrid reserves for the first
+    [`--reservation_depth`](../user-guide/command-line.md#--reservation_depth-n)
+    waiting jobs. Depth 1 equals EASY and an unlimited depth equals
+    conservative.
+
+  A backfill candidate starts only if its projected completion is strictly
+  before the earliest reservation it must protect. Reservations are recomputed
+  on every pass rather than carried over, as Slurm does, and jobs started
+  earlier in the same pass are included when later candidates are tested. SJF
+  and LJF keep their historical inclusive test, which also admits a candidate
+  that completes exactly at the reservation.
+- **When the scheduler runs.** There are two modes.
+  - *Event-driven*, the default, as in Fluxion. Three kinds of events change
+    scheduling state: a job completes, a job arrives, or scheduled capacity
+    changes. All events at the same timestamp form one batch: they are applied
+    together, and only then does the scheduler run. It repeats scheduling
+    passes until a pass starts no job; each pass starts jobs in queue order
+    and then backfills. These passes together are the scheduling cycle for
+    that timestamp.
+  - *Periodic backfill*, with
+    [`--backfill_interval`](../user-guide/command-line.md#--backfill_interval-seconds),
+    as in Slurm. Starting jobs in queue order stays event-driven: after each
+    batch the head starts as soon as it fits, and so does each following job
+    that fits in turn. A job holding a reservation therefore starts as soon as
+    its turn comes and it fits, without waiting for a tick. Backfill, which
+    starts a job ahead of one still waiting, runs only at periodic ticks, and
+    one tick is one backfill cycle. Ticks start one interval after the first
+    event (or after the warm-start boundary) and keep their cadence; a tick
+    that passes while nothing is waiting does nothing. Periodic EASY runs as
+    hybrid with reservation depth 1.
+- **Queue depth.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
-  caps how many waiting jobs one pass inspects (default unlimited), under
-  every policy and ordering, including the custom EASY selector.
+  caps how many waiting jobs, the head included, one backfill cycle examines
+  (default unlimited), under every policy and ordering, including the custom
+  EASY selector. A job counts when it is examined, whether or not it fits. In
+  periodic mode the cycle is one tick: all backfill passes at the tick share
+  the count, it restarts at the next tick, and in-order starts between ticks
+  use none of it. In event-driven mode the cycle is all the passes at one
+  timestamp for conservative and hybrid; the separate EASY implementations
+  differ, as described under [Remaining differences](#remaining-differences).
+- **Planning horizon.**
   [`--planning_horizon`](../user-guide/command-line.md#--planning_horizon-seconds)
-  drops reservations that would start beyond the horizon in event-driven and
-  periodic mode. Such a job consumes neither a queue-depth nor a reservation
-  slot, remains queued, and is reconsidered on the next pass. Under EASY
-  only the head holds a reservation, so only the head can be exempted. This is a
-  practical approximation of external resource-status notifications that
-  DR_EVT does not simulate.
+  stops planning reservations that would start more than the horizon after the
+  current time, in both modes, as Slurm's `bf_window` does. Such a job holds no
+  reservation and uses no reservation-depth slot. It keeps its queue position
+  and is reconsidered on the next pass, so released nodes or a capacity change
+  can bring it back within the horizon. Whether it uses a queue-depth slot
+  follows the system each mode reproduces: it does in periodic mode, as in
+  Slurm, and does not in event-driven mode, as for a job Fluxion blocks (see
+  [Out-of-horizon accounting](#out-of-horizon-accounting)).
+- **Planning time resolution.**
   [`--planning_time_resolution`](../user-guide/command-line.md#--planning_time_resolution-seconds)
-  rounds each projected release up to a grid once its start is known; the
-  clock and actual execution stay exact.
+  rounds each projected release up to a grid once its start is known, as
+  Slurm's `bf_resolution` does; the clock and actual execution stay exact.
 - **Run-time knowledge.** The scheduler plans with the requested time limit.
   The observed run time comes from the trace or from a sampled distribution
   ([run-time options](../user-guide/command-line.md#simulation-mode-options))
   and never exceeds the limit, which is equivalent to killing a job at its
-  limit. An early completion triggers a new pass but does not revise earlier
-  decisions.
+  limit. A job that ends before its limit frees its nodes at that moment and
+  the scheduler runs again, so waiting jobs can start earlier than their
+  reservations. Jobs that already started keep their start times.
 - **Node reuse.** By default a finished job's nodes are reusable at once.
   [`--node_release_delay`](../user-guide/command-line.md#--node_release_delay-seconds)
   holds them for a sampled cleanup time
@@ -71,9 +104,7 @@ Each item describes the code on this branch.
   a job released when its slowest node is), while planning still projects
   releases at the time limit, as production schedulers do. Replayed history is
   never delayed.
-- **Priority and resources.** FCFS by submission time, or SJF/LJF by estimated
-  run time ([`--priority_policy`](../user-guide/command-line.md#-p---priority_policy-policy)).
-  One pool of identical nodes
+- **Resources.** One pool of identical nodes
   ([`--total_nodes`](../user-guide/command-line.md#-n---total_nodes-count)),
   optionally varied over time with
   [`--capacity_schedule`](../user-guide/command-line.md#--capacity_schedule-filename);
@@ -89,171 +120,218 @@ and Lassen (LSF); Slurm runs on most other LC clusters.
 
 ### Slurm
 
-Slurm's main scheduler "runs in a limited fashion every time that any event
-happens which could enable a job to start (e.g. job submit, job terminate,
-etc.)", rate-limited by `sched_min_interval`, plus a full pass every
-`sched_interval`; it considers jobs in strict priority order and "once any
-job or job array task in a partition is left pending, no other jobs in that
-partition will be scheduled". It does not backfill. The backfill plugin
-(`SchedulerType=sched/backfill`, the default) runs periodically and rebuilds
-its plan each iteration ([`slurm.conf(5)`](https://slurm.schedmd.com/slurm.conf.html),
-[Scheduling Configuration Guide](https://slurm.schedmd.com/sched_config.html)):
+Slurm schedules with two components. The main scheduler starts jobs in
+strict priority order and does not backfill. It runs after any event that
+could let a job start, such as a submission or a completion, but then
+considers at most `default_queue_depth` jobs, and it runs no more often than
+`sched_min_interval` allows. It also runs a full pass over the queue every
+`sched_interval`. In each partition it stops at the first job that cannot
+start, so no lower-priority job in that partition starts ahead of it. In the
+documentation's words, it "runs in a limited fashion every time that any
+event happens which could enable a job to start", and "once any job or job
+array task in a partition is left pending, no other jobs in that partition
+will be scheduled".
 
-| Parameter | Default | Meaning (from `slurm.conf(5)`) |
+The second component, the backfill plugin (`SchedulerType=sched/backfill`,
+the default), runs periodically and rebuilds its plan in every iteration
+([`slurm.conf(5)`](https://slurm.schedmd.com/slurm.conf.html),
+[Scheduling Configuration Guide](https://slurm.schedmd.com/sched_config.html)).
+The settings that matter here:
+
+| Parameter | Default | Meaning (paraphrased from `slurm.conf(5)`) |
 |---|---|---|
-| `bf_interval` | 30 s | "The number of seconds between backfill iterations." |
-| `bf_window` | 1440 min | "The number of minutes into the future to look when considering jobs to schedule." |
-| `bf_resolution` | 60 s | "The number of seconds in the resolution of data maintained about when jobs begin and end." |
-| `bf_max_job_test` | 500 (100 in older releases) | "The maximum number of jobs to attempt backfill scheduling for (i.e. the queue depth)." |
-| `bf_job_part_count_reserve` | 0 | Highest-priority jobs per partition that receive reservations; 0 plans every tested job that cannot start. |
-| `bf_max_time` | `bf_interval` | Wall time one backfill iteration may spend. |
-| `default_queue_depth` | 100 | Jobs the main scheduler tries after a completion or other routine event. |
-| `sched_interval` | 60 s | Period of the main scheduler's full pass. |
+| `bf_interval` | 30 s | Time between backfill iterations. |
+| `bf_window` | 1440 min | How far ahead backfill plans. A job that would start later gets no reservation. |
+| `bf_resolution` | 60 s | Time grid for planned start and end times. |
+| `bf_max_job_test` | 500 (100 in older releases) | Most jobs one backfill iteration tests, that is, the queue depth. |
+| `bf_job_part_count_reserve` | 0 | How many highest-priority jobs per partition get reservations. 0 means every tested job that cannot start gets one. |
+| `bf_max_time` | `bf_interval` | Most wall time one backfill iteration may spend. |
+| `default_queue_depth` | 100 | Most jobs the main scheduler tries after a submission, completion, or similar event. |
+| `sched_interval` | 60 s | Time between the main scheduler's full passes. |
 
-DR_EVT's event-driven head dispatch corresponds to the main scheduler; its
-periodic backfill corresponds to the plugin.
+Each backfill iteration counts tested jobs from zero, so `bf_max_job_test`
+limits one iteration, not one scheduling event. DR_EVT's periodic mode follows
+the same split: its event-driven in-order starts play the main scheduler's
+role, its backfill at ticks plays the plugin's role, and the
+`--backfill_queue_depth` count restarts at every tick.
 
 ### Flux (Fluxion)
 
-Fluxion is event-driven like DR_EVT: a scheduling-relevant event triggers a
-fresh reservation plan
+Fluxion is event-driven like DR_EVT's default mode. An event such as a job
+submission or completion starts a scheduling loop. The loop walks the pending
+queue in priority order and, for each job, either allocates resources now or
+reserves its earliest future start
 ([`queue_policy_bf_base_impl.hpp` at 3b49d19](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp)).
-It examines at most `queue-depth` jobs per cycle and yields after six jobs,
-plans in integer seconds, and places jobs on a resource graph.
+A loop examines at most `queue-depth` jobs. It yields to Flux's event loop
+after every six jobs and later resumes where it stopped. Its count of examined
+jobs, `m_scheduled_cnt`, includes every job tried for allocation or
+reservation, and it is
+[reset only when a new loop starts](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp#L52-L80),
+so the depth limits one loop. In DR_EVT the closest match to one loop is the
+scheduling cycle after a batch of events: all the passes at one timestamp,
+before time advances. Fluxion plans in whole seconds and places jobs on a
+resource graph.
 
-Fluxion keeps a blocked list for jobs whose allocation-or-reservation attempt
-fails, including requests affected by down resources. The
-[`MATCH_ALLOCATE_ORELSE_RESERVE`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/resource/traversers/dfu.cpp#L106-L139)
-path searches the planner first and then makes a satisfiability check. On
+When a job can be neither started now nor reserved, Fluxion moves it to a
+blocked list so that it does not hold its place in the queue. The resource
+matcher's
+[allocate-or-reserve path](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/resource/traversers/dfu.cpp#L106-L139)
+first looks for resources now, then searches its planner for the earliest
+future time. If there is none, it checks whether the request could be met at
+all on the full resource set. If it could not, the job is rejected as
+unsatisfiable. If it could, for example when some nodes are down, the matcher
+returns `EBUSY`. On
 [`EBUSY`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp#L120-L141),
-the backfill policy moves a reservation candidate to `m_blocked` and removes
-it from `m_scheduled_cnt`; [`reconsider_blocked_jobs()`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/base/queue_policy_base.hpp#L188-L194)
-marks it for reconsideration. The base policy also requests that
-reconsideration after completion and reprioritization events, so this is not
-limited to a DR_EVT-style planning horizon.
+the backfill policy moves the job to `m_blocked` and subtracts it from
+`m_scheduled_cnt`, so it uses no queue depth.
+[`reconsider_blocked_jobs()`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/base/queue_policy_base.hpp#L188-L194)
+later returns blocked jobs to the pending queue. The base policy calls it
+after a job completes and after a priority change, and the source comment also
+names resource-status changes. Fluxion's planner covers all future time, so a
+job is blocked only when it cannot be placed at any time. DR_EVT's
+event-driven `--planning_horizon` counts a job that is merely too far ahead the
+same way.
 
-| Setting | Default or policy-fixed behavior | Meaning |
+| Setting | Default | Meaning |
 |---|---|---|
-| `queue-policy` | `fcfs`, `easy`, `conservative`, `hybrid` | Reservation depth 0, 1, all, or N. |
-| `queue-params.queue-depth` | 32 | Pending jobs considered per cycle. |
-| `policy-params.reservation-depth` | 64 under `hybrid` | Reserved higher-priority jobs per cycle; effectively capped by the queue depth. |
+| `queue-policy` | `fcfs` | One of `fcfs`, `easy`, `conservative`, and `hybrid`, which reserve for 0, 1, all, or N jobs. |
+| `queue-params.queue-depth` | 32 | Most pending jobs one scheduling loop examines. |
+| `policy-params.reservation-depth` | 64 | Under `hybrid`, how many higher-priority jobs get reservations in one loop. The queue depth caps it, so the default acts as 32. |
 
 ### IBM Spectrum LSF
 
-LSF schedules in periodic sessions of the `mbschd` daemon; LSF 10.1 defaults
-to `JOB_SCHEDULING_INTERVAL=5 45` in `lsb.params`, so a session that finishes
-early waits until five seconds have elapsed. Each session is a full pass over
-the pending queue. Backfilling requires a run limit on the candidate and works
-against slot reservations held for the highest-priority pending jobs
-(`SLOT_RESERVE`, `MAX_RESERVE_TIME`). When a finishing job's slots become
-reusable depends on post-execution processing. The reservation and
-post-execution statements are summarized from the IBM documentation and
-should be checked against the installed version.
+LSF schedules in sessions that the `mbschd` daemon runs periodically. In LSF
+10.1 the default `JOB_SCHEDULING_INTERVAL=5 45` in `lsb.params` makes each
+session last at least five seconds: a session that finishes early waits out
+the rest. Each session is one full pass over the pending queue. Because jobs
+start during sessions, in-order starts are periodic as well as backfill,
+unlike in Slurm, and DR_EVT has no setting that reproduces this. Backfilling
+requires the candidate to have a run limit, and it works around slot
+reservations held for the highest-priority pending jobs (`SLOT_RESERVE`,
+`MAX_RESERVE_TIME`). When a finished job's slots become reusable depends on
+post-execution processing. The reservation and post-execution statements are
+summarized from the IBM documentation and should be checked against the
+installed version.
 
 ## Reproducing a production configuration
 
-| Target | `--backfill_policy` | `--backfill_interval` | `--reservation_depth` | `--backfill_queue_depth` | `--planning_time_resolution` | `--planning_horizon` |
-|---|---|---:|---:|---:|---:|---:|
-| Slurm, reserve all tested jobs | `conservative` | `bf_interval` (30) | N/A | `bf_max_job_test` (500) | `bf_resolution` (60) | `bf_window` (86400) |
-| Slurm, reserve a fixed prefix | `hybrid` | `bf_interval` | `bf_job_part_count_reserve` | `bf_max_job_test` | `bf_resolution` | `bf_window` |
-| Slurm, head reservation only | `hybrid` | `bf_interval` | `1` | `bf_max_job_test` | `bf_resolution` | `bf_window` |
-| Fluxion hybrid | `hybrid` | `0` | `reservation-depth` | `queue-depth` (32) | `1` | N/A; DR_EVT retests rather than receiving blocked-list notifications |
+| DR_EVT option | Slurm, reserve all | Slurm, reserve N | Slurm, head only | Fluxion hybrid |
+|---|---|---|---|---|
+| `--backfill_policy` | `conservative` | `hybrid` | `hybrid` | `hybrid` |
+| `--reservation_depth` | not used | N | `1` | `reservation-depth` |
+| `--backfill_interval` | `bf_interval` (30) | `bf_interval` | `bf_interval` | `0` |
+| `--backfill_queue_depth` | `bf_max_job_test` (500) | `bf_max_job_test` | `bf_max_job_test` | `queue-depth` (32) |
+| `--planning_time_resolution` | `bf_resolution` (60) | `bf_resolution` | `bf_resolution` | `1` |
+| `--planning_horizon` | `bf_window` (86400) | `bf_window` | `bf_window` | unlimited |
 
-`--backfill_policy easy` equals `hybrid` with depth 1. These settings
-reproduce trigger and reservation behavior in the single-pool FCFS model;
-Slurm applies them per partition. Add `--node_release_delay` calibrated to
-the target system's cleanup time where node reuse matters.
+"Slurm, reserve all" is Slurm's default, `bf_job_part_count_reserve=0`.
+"Slurm, reserve N" sets `bf_job_part_count_reserve=N`. `--backfill_policy easy`
+is the same as `hybrid` with reservation depth 1. These settings reproduce
+when backfill runs and which jobs it protects, within DR_EVT's single pool of
+nodes; Slurm applies them per partition. Where node reuse matters, also set
+`--node_release_delay` to the target system's measured cleanup time.
 
 ### Out-of-horizon accounting
 
-| Planner | Job outside its current planning/allocatable scope | Reservation slot | Re-examination |
-|---|---|---|---|
-| Slurm `bf_window` | Counts toward `bf_max_job_test` | No reservation slot | Retested every pass |
-| Fluxion blocked list | Not counted (`--m_scheduled_cnt`) | No reservation slot | Reconsidered on Fluxion status, completion, or priority triggers |
-| DR_EVT `--planning_horizon` | Does not count toward `--backfill_queue_depth` | No reservation slot | Retested every pass |
+In every case below, the job holds no reservation and uses no reservation
+slot.
 
-DR_EVT leaves the job in its normal queue and recomputes its reservation each
-pass. This captures observable releases and scheduled capacity changes without
-modeling Fluxion's external resource-status notification path.
+| Planner | Uses a queue-depth slot | Re-examined |
+|---|---|---|
+| Slurm `bf_window` | Yes (`bf_max_job_test`) | Every backfill iteration |
+| Fluxion blocked list | No (`m_scheduled_cnt` decremented) | After a completion or priority change |
+| DR_EVT, periodic | Yes, as in Slurm | Every tick |
+| DR_EVT, event-driven | No, as in Fluxion | Every pass |
+
+DR_EVT keeps such a job in the queue and recomputes its reservation on every
+pass, so nodes freed by completions or by a scheduled capacity change can bring
+it back. It does not model the resource-status notifications Fluxion relies
+on.
 
 ## Remaining differences
 
-- **Backfill queue-depth accounting.** Conservative and hybrid
-  `--backfill_queue_depth` scans are shared across all backfill work at one
-  simulation timestamp and reset only when time advances. Other scheduler
-  paths reset their count for each invocation. The reservation-based policies
-  therefore model one Slurm-style backfill cycle while retaining event-driven
-  FCFS dispatch.
+- **Queue depth in event-driven EASY.** EASY is meant to equal hybrid with
+  reservation depth 1, but in event-driven mode their queue-depth counts
+  differ. Conservative and hybrid count once across all the passes at a
+  timestamp. The separate EASY, SJF, LJF, and custom-selector implementations
+  count from zero in every pass, so at one timestamp they can examine more
+  jobs than the depth. Aligning them is future work.
 
-| Aspect | DR_EVT | Difference and bias |
+| Aspect | DR_EVT | Difference and its effect |
 |---|---|---|
-| Evaluation trigger | Event-driven by default | Slurm and LSF backfill periodically. Default DR_EVT backfill reacts sooner, so waits of backfillable jobs are optimistic. `--backfill_interval` removes this. |
-| Planning grid and horizon | Exact and unlimited by default | Slurm grids planned times and bounds the window; Fluxion plans in whole seconds and uses blocked-list notifications. DR_EVT can match the grid and bound the planning window, but retests out-of-horizon jobs rather than modeling those notifications. |
-| Scan and reservation depth | Unlimited scan by default | Slurm and Fluxion cap both. Matching depths removes the difference. |
-| Node reuse | Immediate by default | Production nodes return after cleanup. `--node_release_delay` removes the optimism only to the degree it is calibrated. |
-| Eligible time | Submission time | Held or dependent jobs in a real trace become eligible later than they were submitted. Their simulated wait is counted from submission, which overstates it relative to the production record. |
-| Warm start | Inherited waiting queue | Jobs waiting before `--sim_start_time` are reconstructed by default; historical reservation state is not, so the first conservative or hybrid backfill decision can differ. `--warm_start_wait_queue drop` retains the legacy omission behavior. |
-| Resources and priority | One homogeneous pool, FCFS/SJF/LJF | Partitions, topology, and priority plugins are out of scope. |
+| When backfill runs | Event-driven by default | Slurm and LSF backfill periodically, so by default DR_EVT backfills sooner and backfilled jobs wait less than they would. `--backfill_interval` removes this. LSF also makes in-order starts periodic, which DR_EVT cannot reproduce. |
+| Planning grid | Exact by default | Slurm rounds planned times to a grid and Fluxion plans in whole seconds. `--planning_time_resolution` reproduces either. |
+| Scan and reservation depth | Unlimited by default | Slurm and Fluxion limit both. Setting the same depths removes the difference. |
+| Node reuse | Immediate by default | Production nodes return after cleanup. `--node_release_delay` removes this optimism only as far as it is calibrated. |
+| Eligible time | Submission time | Held or dependent jobs in a real trace became eligible after they were submitted. DR_EVT counts their wait from submission, so it overstates their wait compared with the production record. |
+| Warm start | Waiting queue rebuilt | Jobs waiting before `--sim_start_time` are rebuilt by default, but their past reservations are not, so the first conservative or hybrid decision after the boundary can differ. `--warm_start_wait_queue drop` keeps the old behavior of leaving them out. |
+| Resources and priority | One pool of identical nodes; FCFS, SJF, or LJF | Partitions, topology, and priority plugins are out of scope. |
 
-With default settings several rows can make DR_EVT backfilling more optimistic
-than a production scheduler. Matching interval, grid, horizon, and depths
-narrows those differences; the horizon re-examination approximation remains a
-separate behavioral distinction.
+With default settings, several of these rows make DR_EVT's backfilling more
+optimistic than a production scheduler's. Setting the interval, grid, horizon,
+and depths to match the target narrows those differences.
 
 ## Validation evidence
 
-- **Event-driven policies.** The 34 scheduler-correctness workloads match a
-  from-scratch Python reference exactly in schedule and resource trace
-  (`tests/run_scheduler_correctness_tests.sh`). This is a consistency check
-  between two implementations of the same model, not a comparison with a
-  production scheduler.
-- **Periodic backfill.** The same workloads under hybrid (depth 1) and
-  conservative backfill at 7 s and 30 s ticks match the Python reference in
-  schedule and resource trace, 136 runs
-  (`tests/run_periodic_backfill_tests.sh`), and warm start under periodic
-  backfill matches a cold run seeded with the boundary state
-  (`tests/test_warm_start.cpp`).
-- **Planning horizon.** EASY, hybrid, conservative, and SJF event-driven
-  cases are checked against the Python references, including a depth-one case
-  where an out-of-horizon head does not consume the candidate scan slot;
-  explicit unlimited horizon remains byte-identical on all 34 correctness
-  workloads (`tests/run_planning_horizon_tests.sh`).
-- **Queue depth under EASY.** With a queue depth, with and without a planning
-  horizon, the deque, circular, block, and multimap FCFS schedulers and the
-  EASY mode of both conservative schedulers match the Python EASY reference;
-  a depth of 1 equals no backfilling for FCFS, SJF, and LJF
+- **Event-driven policies.** The 34 scheduler-correctness workloads produce
+  exactly the same schedule and resource trace as an independent Python
+  implementation (`tests/run_scheduler_correctness_tests.sh`). This checks two
+  implementations of the same model against each other. It is not a
+  comparison with a production scheduler.
+- **Periodic backfill.** The same workloads, under hybrid with reservation
+  depth 1 and under conservative, with 7 s and 30 s ticks, match the Python
+  reference in schedule and resource trace in all 136 runs
+  (`tests/run_periodic_backfill_tests.sh`). A warm start in periodic mode
+  matches a cold run started from the same state (`tests/test_warm_start.cpp`).
+- **Planning horizon.** Event-driven EASY, hybrid, conservative, and SJF runs
+  with a horizon match the Python references. This includes a case with queue
+  depth 1, where an out-of-horizon head leaves its slot to the next job. An
+  explicit unlimited horizon gives byte-identical output on all 34 workloads
+  (`tests/run_planning_horizon_tests.sh`). How out-of-horizon jobs count
+  toward the queue depth in each mode is covered by a unit test
+  (`tests/test_append_job_api.cpp`) and by the Python reference test
+  (`tests/test_python_conservative_options.py`).
+- **Queue depth under EASY.** With a queue depth, with and without a horizon,
+  every FCFS EASY implementation (deque, circular, block, and multimap)
+  matches the Python EASY reference, as does the `fcfs_conservative` ordering,
+  which uses the same schedulers. A depth of 1 equals no backfilling for FCFS,
+  SJF, and LJF. Periodic EASY equals periodic hybrid with reservation depth 1
+  under the same depth, because it runs as that hybrid
   (`tests/run_backfill_queue_depth_tests.sh`).
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).
-- **RAPS.** The [comparison helper](../../scripts/compare_with_raps.py) joins
-  RAPS and DR_EVT start times for one job list. It is a manual tool, and RAPS
-  is not an oracle for reservation-preserving backfill: at RAPS commit
-  [3f21cd3](https://github.com/ExaDigiT/RAPS/tree/3f21cd35b7bf6a8f5decc41050c8d871809608ad)
-  three verified differences separate the two.
-  1. RAPS advances one second per iteration and detects a completion on the
-     iteration after the true end (`engine.py`, `prepare_timestep` and
-     `complete_timestep`), so dependent starts and ends shift one second
-     late and the lag compounds.
-  2. In [`find_backfill_job`](https://github.com/ExaDigiT/RAPS/blob/3f21cd35b7bf6a8f5decc41050c8d871809608ad/raps/schedulers/default.py#L150-L198)
-     running jobs are sorted by `time_limit` (line 167) and the shadow is the
-     `start_time + time_limit` of the last job needed (lines 172–177), not
-     the earliest projected end. The error is two-sided.
-  3. RAPS admits a candidate when `time_limit <= shadow - now` (line 202);
-     DR_EVT requires the projected end strictly before the shadow.
+- **RAPS.** The [comparison helper](../../scripts/compare_with_raps.py) runs
+  one job list through RAPS and DR_EVT and lines up the start times. It is a
+  manual tool, not part of CI. RAPS cannot serve as a correctness check for
+  DR_EVT's backfill: at RAPS commit
+  [3f21cd3](https://github.com/ExaDigiT/RAPS/tree/3f21cd35b7bf6a8f5decc41050c8d871809608ad),
+  three differences separate the two, each verified in the RAPS source.
+  1. RAPS advances in one-second steps and notices a completion one step after
+     the job really ends (`engine.py`, `prepare_timestep` and
+     `complete_timestep`). A job waiting for those nodes starts a second late,
+     ends a second late, and passes the delay on, so the lag compounds.
+  2. To find when the head can start, its shadow time,
+     [`find_backfill_job`](https://github.com/ExaDigiT/RAPS/blob/3f21cd35b7bf6a8f5decc41050c8d871809608ad/raps/schedulers/default.py#L150-L198)
+     sorts running jobs by time limit (line 167) and uses the start plus limit
+     of the last job it needs (lines 172–177), rather than the earliest time
+     enough nodes are free. The result can be too late or too early.
+  3. RAPS admits a candidate that ends exactly at the shadow time
+     (`time_limit <= shadow - now`, line 202); DR_EVT requires it to end
+     strictly before.
 
-  On the CTC SP2 archive trace the first two effects became visible from
-  roughly the 200th job on in a manual run against that commit.
+  On the CTC SP2 archive trace, the first two effects became visible from
+  roughly the 200th job in a manual run against that commit.
 
 ## Calibration and extensions
 
-- **Node release delay.** Calibration needs a measurement of the real cleanup
-  time. Flux records it per job as `t_inactive - t_cleanup`; a replay trace
-  bounds it from above by the gap before the freed nodes are next needed.
-- **Planning horizon.** Set it to the target's configured window (for example,
-  Slurm `bf_window`); its re-examination semantics are described above.
-- **Priority hooks.** The experimental external selector ranks backfill
-  candidates by a caller-supplied cost; extending the same callback to queue
-  ordering would allow priority experiments without changing the built-in
+- **Node release delay.** Calibrating it needs the real cleanup time. Flux
+  records it for each job as `t_inactive - t_cleanup`. A replay trace gives an
+  upper bound: the gap before the freed nodes are next used.
+- **Planning horizon.** Set it to the target's planning window, for example
+  Slurm's `bf_window`.
+- **Priority hooks.** The experimental external selector lets a caller rank
+  backfill candidates by its own cost. Extending the same callback to queue
+  order would allow priority experiments without changing the built-in
   policies.
 
 ## Sources
@@ -262,8 +340,10 @@ separate behavioral distinction.
   Scheduling Configuration Guide, read from the `master` branch of the
   SchedMD repository on 2026-10-30; pinned source:
   [`_attempt_backfill`](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L2126-L2150),
-  [`job_test_count` before the window test](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L2610-L2618),
-  and the [`backfill_window` comparison](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L3536-L3544).
+  the [`bf_max_job_test` check](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L2343-L2349),
+  the [increment of its counter, `job_test_cnt`](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L3067-L3071), and the
+  window checks [before](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L2910-L2915) and
+  [after](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L3536-L3544) node selection.
 - Flux: flux-sched at commit
   [3b49d19](https://github.com/flux-framework/flux-sched/tree/3b49d1998ed53836618e54188f45b52bc1aac811),
   `qmanager/policies/queue_policy_bf_base_impl.hpp`, the `easy`, `hybrid`,

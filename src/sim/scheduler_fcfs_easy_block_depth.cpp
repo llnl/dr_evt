@@ -5,14 +5,14 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_block_fcfs_depth.cpp
+/** @file scheduler_fcfs_easy_block_depth.cpp
  * @brief Block-queue FCFS backfill under --backfill_queue_depth.
  * @details Kept in its own translation unit: compiled together with
  * schedule(), this code consumed the compiler's per-file inlining budget and
  * the default block search lost about 10 percent of its speed.
  */
 
-#include "sim/scheduler_block_fcfs.hpp"
+#include "sim/scheduler_fcfs_easy_block.hpp"
 #include <stdexcept>
 
 namespace dr_evt {
@@ -22,7 +22,7 @@ namespace dr_evt {
 // scanned directly, as the deque scheduler does.
 template <size_t BlockSize>
 std::vector<job_no_t>
-BlockQueueFCFSScheduler<BlockSize>::backfill_with_queue_depth(
+FCFSEasyBlockScheduler<BlockSize>::backfill_with_queue_depth(
     bool head_planned, sim_time_t planned_reservation, sim_time_t current_time,
     num_nodes_t available_nodes, std::vector<job_no_t> jobs_to_run) {
   size_t head_index = 0;
@@ -57,25 +57,32 @@ BlockQueueFCFSScheduler<BlockSize>::backfill_with_queue_depth(
 
 // Explicit instantiations for the supported block sizes.
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<4>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<4>::backfill_with_queue_depth(bool, sim_time_t,
+                                                     sim_time_t, num_nodes_t,
+                                                     std::vector<job_no_t>);
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<8>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<8>::backfill_with_queue_depth(bool, sim_time_t,
+                                                     sim_time_t, num_nodes_t,
+                                                     std::vector<job_no_t>);
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<16>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<16>::backfill_with_queue_depth(bool, sim_time_t,
+                                                      sim_time_t, num_nodes_t,
+                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<32>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<32>::backfill_with_queue_depth(bool, sim_time_t,
+                                                      sim_time_t, num_nodes_t,
+                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<64>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<64>::backfill_with_queue_depth(bool, sim_time_t,
+                                                      sim_time_t, num_nodes_t,
+                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<128>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<128>::backfill_with_queue_depth(bool, sim_time_t,
+                                                       sim_time_t, num_nodes_t,
+                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
-BlockQueueFCFSScheduler<256>::backfill_with_queue_depth(
-    bool, sim_time_t, sim_time_t, num_nodes_t, std::vector<job_no_t>);
+FCFSEasyBlockScheduler<256>::backfill_with_queue_depth(bool, sim_time_t,
+                                                       sim_time_t, num_nodes_t,
+                                                       std::vector<job_no_t>);
 
 } // namespace dr_evt

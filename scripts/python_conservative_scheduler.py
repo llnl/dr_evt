@@ -377,11 +377,16 @@ class ConservativeBackfillingScheduler:
                     effective_running)
             reservation = self.calculate_job_reservation_time_from_timeline(
                 job, effective_timeline)
-            # Keep an out-of-horizon job in queue, but do not charge it to
-            # queue depth. Its reservation is recomputed on the next pass,
-            # reflecting ordinary releases and capacity changes without a
-            # persistent blocked-list state.
-            if reservation - self.current_time > self.planning_horizon:
+            # An out-of-horizon job stays queued and holds no reservation.
+            # Event-driven scheduling follows Fluxion, which takes a job it
+            # cannot reserve out of its scheduled count, so it is not charged
+            # to queue depth; its reservation is recomputed on the next pass.
+            # Periodic scheduling follows Slurm, which counts a tested job
+            # toward bf_max_job_test before it finds the planned start beyond
+            # bf_window, so such a job uses a depth slot.
+            in_horizon = (reservation - self.current_time <=
+                          self.planning_horizon)
+            if not in_horizon and self.backfill_interval <= 0.0:
                 remaining.append(job)
                 continue
             if pos == 0 and self.backfill_depth_head_accounted:
@@ -394,6 +399,9 @@ class ConservativeBackfillingScheduler:
                 self.backfill_depth_examined += 1
                 if pos == 0:
                     self.backfill_depth_head_accounted = True
+            if not in_horizon:
+                remaining.append(job)  # Counted, but cannot be backfilled.
+                continue
             # Check if job fits in available resources
             if job.nodes > free_nodes:
                 remaining.append(job)

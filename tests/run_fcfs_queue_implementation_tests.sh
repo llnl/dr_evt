@@ -129,7 +129,7 @@ run_correctness_tests() {
         # Detect run_time_mode
         run_time_mode=$(detect_run_time_mode "$test_file")
 
-        # Run with scheduler_fcfs (priority_policy=fcfs)
+        # Run with scheduler_fcfs_easy_deque (priority_policy=fcfs)
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs: $test_name"
         fi
@@ -145,7 +145,7 @@ run_correctness_tests() {
             --resource_trace "$fcfs_res" \
             > /dev/null 2>&1
 
-        # Run with scheduler_fcfs_alt (priority_policy=fcfs_alt)
+        # Run with scheduler_fcfs_easy_multimap (priority_policy=fcfs_alt)
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs_alt: $test_name"
         fi

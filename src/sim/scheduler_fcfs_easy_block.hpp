@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef DR_EVT_SIM_SCHEDULER_BLOCK_FCFS_HPP
-#define DR_EVT_SIM_SCHEDULER_BLOCK_FCFS_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_FCFS_EASY_BLOCK_HPP
+#define DR_EVT_SIM_SCHEDULER_FCFS_EASY_BLOCK_HPP
 
 #include "sim/block_wait_queue.hpp"
 #include "sim/scheduler_base.hpp"
@@ -21,21 +21,22 @@ namespace dr_evt {
  * FCFS (First-Come-First-Served) scheduler using BlockWaitQueue.
  *
  * Uses BlockWaitQueue for O(1) insert/remove and O(blocks) backfill search.
- * Maintains separate eligibility tracking (identical to FCFSScheduler).
+ * Maintains separate eligibility tracking (identical to
+ * FCFSEasyDequeScheduler).
  *
- * Key optimization over FCFSScheduler: BlockWaitQueue's
+ * Key optimization over FCFSEasyDequeScheduler: BlockWaitQueue's
  * find_backfill_candidate() uses block-level metadata pre-filtering for faster
  * backfill search.
  *
  * @tparam BlockSize Block size (must be power of 2)
  */
 template <size_t BlockSize>
-class BlockQueueFCFSScheduler : public SchedulerBase {
+class FCFSEasyBlockScheduler : public SchedulerBase {
 private:
   /// Block-indexed queue used for efficient candidate searches.
   BlockWaitQueue<BlockSize> m_wait_queue;
 
-  // Eligibility tracking (identical to FCFSScheduler)
+  // Eligibility tracking (identical to FCFSEasyDequeScheduler)
   struct JobArrival {
     /// Stable identifier of the Trace job represented by this arrival.
     job_no_t job_id;
@@ -68,8 +69,8 @@ public:
    * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
    * included; zero is unlimited.
    */
-  BlockQueueFCFSScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
-                          size_t backfill_queue_depth = 0)
+  FCFSEasyBlockScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
+                         size_t backfill_queue_depth = 0)
       : SchedulerBase(total_nodes, bf_policy), m_wait_queue(),
         m_eligible_end_idx(0), m_current_tracked_time(0.0), m_removed_count(0),
         m_backfill_queue_depth(backfill_queue_depth) {}
@@ -158,21 +159,20 @@ private:
    * @return jobs_to_run extended with the backfill starts.
    */
   std::vector<job_no_t>
-  backfill_with_queue_depth(bool head_planned,
-                            sim_time_t planned_reservation,
+  backfill_with_queue_depth(bool head_planned, sim_time_t planned_reservation,
                             sim_time_t current_time,
                             num_nodes_t available_nodes,
                             std::vector<job_no_t> jobs_to_run);
 };
 
 // Explicit template instantiations for common block sizes
-extern template class BlockQueueFCFSScheduler<32>;
-extern template class BlockQueueFCFSScheduler<64>;
-extern template class BlockQueueFCFSScheduler<128>;
-extern template class BlockQueueFCFSScheduler<256>;
+extern template class FCFSEasyBlockScheduler<32>;
+extern template class FCFSEasyBlockScheduler<64>;
+extern template class FCFSEasyBlockScheduler<128>;
+extern template class FCFSEasyBlockScheduler<256>;
 
 /**@}*/
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_BLOCK_FCFS_HPP
+#endif // DR_EVT_SIM_SCHEDULER_FCFS_EASY_BLOCK_HPP

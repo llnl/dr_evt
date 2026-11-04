@@ -38,7 +38,7 @@ enum class QueueImplementation {
 };
 
 /**
- * What CircularBufferFCFSScheduler does when an insert would exceed its
+ * What FCFSEasyCircularScheduler does when an insert would exceed its
  * wait queue's current capacity.
  */
 enum class CircularOverflowPolicy {

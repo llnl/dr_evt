@@ -5,12 +5,11 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_CONSERVATIVE_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_CONSERVATIVE_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_FCFS_EASY_DEQUE_HPP
+#define DR_EVT_SIM_SCHEDULER_FCFS_EASY_DEQUE_HPP
 
 #include "sim/scheduler_base.hpp"
 #include <deque>
-#include <vector>
 
 namespace dr_evt {
 
@@ -18,37 +17,28 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * FCFS scheduler with Conservative backfilling support.
+ * FCFS (First-Come-First-Served) scheduler with iterator tracking.
  *
- * Supports four backfill modes via BackfillPolicy:
- * - EASY: Only head job gets reservation (standard EASY backfilling)
- * - CONSERVATIVE: All waiting jobs get reservations; backfill cannot delay
- *   any of them
- * - HYBRID: The first reservation_depth waiting jobs get reservations and
- *   backfill cannot delay them; deeper jobs hold no reservation. Depth 1
- *   reproduces EASY. This is Slurm's bf_job_part_count_reserve behaviour and
- *   Fluxion's hybrid queue policy.
- * - NONE: No backfilling (strict FCFS order)
+ * Key optimization: Maintains iterator marking boundary between
+ * "eligible" (submit_time <= current_time) and "not yet eligible" jobs.
  *
- * This is the deque-backed implementation. The default conservative scheduler
- * uses CircularBufferFCFSConservativeScheduler; select
- * QueueImplementation::DEQUE to retain this unbounded queue.
+ * No rescanning or submit_time comparison in schedule().
  */
-class FCFSConservativeScheduler : public SchedulerBase {
+class FCFSEasyDequeScheduler : public SchedulerBase {
 private:
   struct JobEntry {
     /// Stable identifier of the Trace job represented by this entry.
     job_no_t job_id;
     /// Arrival time used to determine eligibility and FCFS order.
     sim_time_t submit_time;
-    /// Requested time limit used to preserve reservations.
+    /// Requested time limit used for reservation and backfill projection.
     tdiff_t run_time_estimate;
     /// Nodes requested when this job is started.
     num_nodes_t nodes_requested;
     /// True once selected for execution but retained for lazy deletion.
     bool removed;
 
-    /** @brief Initialize an unscheduled conservative-FCFS queue entry.
+    /** @brief Initialize an unscheduled FCFS queue entry.
      * @param[in] id Trace job identifier.
      * @param[in] submit Arrival time.
      * @param[in] run_time Requested runtime used for planning.
@@ -67,34 +57,21 @@ private:
   sim_time_t m_current_tracked_time;
   /// Removed entries inside the eligible prefix of m_wait_queue.
   size_t m_removed_count;
-  /// Waiting jobs that hold reservations under HYBRID backfilling.
-  size_t m_reservation_depth;
+  /// Jobs examined per backfill pass, head included; zero is unlimited.
   size_t m_backfill_queue_depth;
-  /// Timestamp for the shared backfill queue-depth accounting cycle.
-  sim_time_t m_backfill_depth_time;
-  /// Eligible in-horizon jobs examined in the current accounting cycle.
-  size_t m_backfill_depth_examined;
-  /// Whether the blocked FCFS head has consumed its slot in that cycle.
-  bool m_backfill_depth_head_accounted;
 
 public:
-  /** @brief Construct a conservative-backfill FCFS scheduler.
+  /** @brief Construct an FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] bf_policy Backfill setting; conservative and hybrid behavior
-   * are implemented by this class.
-   * @param[in] reservation_depth Number of waiting jobs, in queue order, that
-   * hold reservations under HYBRID backfilling; ignored otherwise.
-   * @param[in] backfill_queue_depth Eligible waiting jobs examined per
-   * scheduling timestamp; zero is unlimited. */
-  FCFSConservativeScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
-                            size_t reservation_depth = 0,
-                            size_t backfill_queue_depth = 0)
+   * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
+   * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
+   * included; zero is unlimited.
+   */
+  FCFSEasyDequeScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
+                         size_t backfill_queue_depth = 0)
       : SchedulerBase(total_nodes, bf_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0),
-        m_reservation_depth(reservation_depth),
-        m_backfill_queue_depth(backfill_queue_depth),
-        m_backfill_depth_time(std::numeric_limits<sim_time_t>::lowest()),
-        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {}
+        m_backfill_queue_depth(backfill_queue_depth) {}
 
   /** @copydoc SchedulerBase::insert_job */
   void insert_job(job_no_t job_id, sim_time_t submit_time,
@@ -103,6 +80,10 @@ public:
     m_wait_queue.emplace_back(job_id, submit_time, run_time_estimate,
                               nodes_requested);
 
+    // If this job is already eligible, advance index. Can jump by more
+    // than 1 in a single call: if this new job's submit_time is
+    // already <= current time, the sorted-submit-time invariant means
+    // every entry already in the deque becomes eligible too.
     if (submit_time <= m_current_tracked_time) {
       m_eligible_end_idx = m_wait_queue.size();
     }
@@ -113,16 +94,39 @@ public:
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override;
 
-  /** @copydoc SchedulerBase::sync_to */
+  /**
+   * Advance m_eligible_end_idx to reflect current_time. Idempotent and
+   * cheap to call redundantly (see body: early-returns if current_time
+   * hasn't advanced past what's already tracked). schedule() calls
+   * this unconditionally at its own top, so it stays correct
+   * regardless of whether an external caller already synced.
+   * @param[in] current_time Simulation time through which arrivals become
+   * eligible.
+   */
   void sync_to(sim_time_t current_time) override;
 
-  /** @copydoc SchedulerBase::active_job_count */
+  /**
+   * Count WAITING jobs (arrived but not scheduled), as of whatever
+   * time this scheduler was last synced to via sync_to(). Derived, not
+   * scanned: every removed entry lives within [0, m_eligible_end_idx)
+   * by construction (removal only ever happens to entries that are
+   * already eligible - see schedule() and mark_removed()), so
+   * "eligible minus removed" is exactly "waiting".
+   *
+   * Invariants:
+   * - m_wait_queue is sorted by submit_time (jobs inserted from sorted trace)
+   * - m_eligible_end_idx advances monotonically as time advances
+   * - removed flag is set either by mark_removed(), or directly within
+   *   schedule() at call sites where the index is already known (to
+   *   avoid mark_removed()'s O(n) linear re-scan by job id)
+   */
   size_t active_job_count() const override {
     return m_eligible_end_idx - m_removed_count;
   }
 
   /** @copydoc SchedulerBase::get_next_arrival_time */
   sim_time_t get_next_arrival_time() override {
+    // Next arrival is at m_eligible_end_idx or later
     for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
       if (!m_wait_queue[i].removed) {
         return m_wait_queue[i].submit_time;
@@ -145,35 +149,35 @@ public:
     return result;
   }
 
+  std::optional<tdiff_t> waiting_resource_area() const override {
+    tdiff_t area = 0.0;
+    for (size_t i = 0; i < m_eligible_end_idx; ++i) {
+      const auto &job = m_wait_queue[i];
+      if (!job.removed) {
+        area +=
+            static_cast<tdiff_t>(job.nodes_requested) * job.run_time_estimate;
+      }
+    }
+    return area;
+  }
+
 protected:
+  /**
+   * Return total size of wait queue (ALL jobs, all states).
+   * Includes future arrivals, waiting jobs, and scheduled (removed) jobs.
+   * Internal utility only - use active_job_count() externally.
+   */
   /** @copydoc SchedulerBase::wait_queue_size */
   size_t wait_queue_size() const override { return m_wait_queue.size(); }
 
 private:
-  /** @brief Lazily mark a scheduled queue entry as removed.
+  /** @brief Mark a scheduled queue entry without invalidating deque iterators.
    * @param[in] job_id Trace job identifier to mark. */
   void mark_removed(job_no_t job_id);
-
-  /**
-   * @brief Calculate the earliest start in the protected reservation plan.
-   * @details Places protected waiting jobs ahead of the candidate into a
-   * temporary resource-time plan in queue order. Under HYBRID only the first
-   * m_reservation_depth waiting jobs are planned; a candidate deeper than
-   * that must not delay any interval in that plan.
-   * @param[in] job_index Candidate position in FCFS queue order.
-   * @param[in] available_nodes Nodes free at current_time.
-   * @param[in] running_jobs Active jobs with start time, runtime, and nodes.
-   * @param[in] current_time Projection time.
-   * @return Earliest start in the chained protected plan as sim_time_t.
-   */
-  sim_time_t calculate_conservative_window(size_t job_index,
-                                           num_nodes_t available_nodes,
-                                           const running_jobs_t &running_jobs,
-                                           sim_time_t current_time);
 };
 
 /**@}*/
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_FCFS_CONSERVATIVE_HPP
+#endif // DR_EVT_SIM_SCHEDULER_FCFS_EASY_DEQUE_HPP

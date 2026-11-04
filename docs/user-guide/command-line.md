@@ -258,14 +258,24 @@ every queue implementation, and to the experimental custom-EASY selector.
 Jobs beyond that prefix are not tested for backfill in that pass. `0` leaves
 the scan unlimited. This is a pre-feasibility queue scan limit: a job counts
 toward the depth even when it cannot fit or cannot complete before its
-reservation window. Under `easy` only the head holds a reservation, so only
-the head is exempted by `--planning_horizon`; every other job examined counts.
+reservation window. In event-driven mode under `easy` only the head holds a
+reservation, so only the head is exempted by `--planning_horizon`; every other
+job examined counts.
 
-Conservative and hybrid backfill share their count across repeated
-`schedule()` calls at one simulation timestamp, then reset it when time
-advances. The other scheduler paths reset their count for each scheduling
-pass. This gives the reservation-based policies one Slurm-style backfill-cycle
-budget while retaining event-driven FCFS dispatch.
+The count belongs to one backfill cycle. With `--backfill_interval`, one tick
+is one cycle: all backfill passes at that tick share the count, and it resets
+at the next tick. FCFS head dispatch between ticks stays event-driven, scans no
+candidates, and uses none of it. This is how Slurm counts `bf_max_job_test` per
+backfill iteration. As in Slurm, a job whose reservation is beyond
+`--planning_horizon` still uses a slot, though it receives no reservation.
+
+Without `--backfill_interval`, the simulator repeats scheduler passes at one
+simulation timestamp until nothing more starts. Conservative and hybrid
+backfill share their count across those passes and reset it when time
+advances; a job beyond `--planning_horizon` does not use a slot, as a blocked
+job does not in Fluxion. EASY, SJF, LJF, and the custom selector start the
+count again in each pass, so at one timestamp they can examine more jobs than
+the depth.
 
 In short, `--backfill_queue_depth` controls how much of the queue a scheduler
 considers; `--num_max_candidates` controls how many already-feasible jobs the
@@ -279,11 +289,12 @@ reservations must be protected.
 
 ### `--backfill_interval SECONDS`
 
-Uses periodic EASY, conservative, or hybrid backfill while retaining
-event-driven FCFS dispatch. It is intended for Slurm-style trigger studies and
-uses the opt-in circular scheduler; it requires an enabled
-`--backfill_policy` and `--queue_impl circular`. `0` retains the default
-event-driven backfill behavior. Ticks start one interval after the first
+Uses periodic conservative or hybrid backfill while retaining event-driven
+FCFS dispatch. It is intended for Slurm-style trigger studies and uses the
+opt-in circular scheduler; it requires an enabled `--backfill_policy` and
+`--queue_impl circular`. There is no periodic EASY scheduler: `easy` runs as
+`hybrid` with `--reservation_depth 1`. `0` retains the default event-driven
+backfill behavior. Ticks start one interval after the first
 event, or after the `--sim_start_time` boundary in a warm start, and keep that
 cadence whether or not a job is waiting; a tick that passes while nothing waits
 does nothing. Progressive loading (`--infile_list`) keeps the cadence across
@@ -309,11 +320,13 @@ it at `0` for exact floating-point planning.
 Limits how far ahead the scheduler creates or protects reservations.
 A projected reservation whose start is more than `SECONDS` after the current
 planning time is treated as out of horizon: it does not block a backfill job
-and consumes neither a hybrid reservation-depth nor a
-`--backfill_queue_depth` scan slot. It keeps its queue position and is
+and uses no hybrid reservation-depth slot. It keeps its queue position and is
 re-evaluated on the next scheduling pass, so newly released resources or a
 scheduled capacity change can bring its reservation into the horizon. This
-applies to both event-driven and periodic scheduling.
+applies to both event-driven and periodic scheduling. Whether such a job uses
+a `--backfill_queue_depth` slot depends on the mode: it does in periodic mode,
+as in Slurm, and does not in event-driven mode, as for a blocked job in
+Fluxion.
 
 **Default:** unlimited (the largest `tdiff_t` value)
 
@@ -325,8 +338,8 @@ fits now and delays none of those `N`; it holds no reservation of its own.
 `N` must be positive with `hybrid` and is ignored by the other policies.
 `1` reproduces `easy`; a depth of at least the queue length is
 `conservative`. This is the behaviour of Slurm's `bf_job_part_count_reserve`
-and of Fluxion's `hybrid` queue policy with `reservation-depth`. Hybrid uses
-the conservative FCFS scheduler with either `fcfs` or `fcfs_conservative`
+and of Fluxion's `hybrid` queue policy with `reservation-depth`. Hybrid, and
+conservative as its unlimited-depth case, use the hybrid FCFS schedulers with either `fcfs` or `fcfs_conservative`
 ordering and is rejected with `sjf` or `ljf`.
 
 **Default:** `0`

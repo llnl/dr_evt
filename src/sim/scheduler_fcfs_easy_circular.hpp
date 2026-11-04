@@ -5,11 +5,13 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_FCFS_EASY_CIRCULAR_HPP
+#define DR_EVT_SIM_SCHEDULER_FCFS_EASY_CIRCULAR_HPP
 
 #include "sim/scheduler_base.hpp"
-#include <deque>
+#include <algorithm>
+#include <boost/circular_buffer.hpp>
+#include <stdexcept>
 
 namespace dr_evt {
 
@@ -17,14 +19,28 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * FCFS (First-Come-First-Served) scheduler with iterator tracking.
+ * FCFS scheduler using boost::circular_buffer instead of std::deque.
  *
- * Key optimization: Maintains iterator marking boundary between
- * "eligible" (submit_time <= current_time) and "not yet eligible" jobs.
+ * Identical in every other respect to FCFSEasyDequeScheduler (same JobEntry
+ * layout, same lazy-mark-and-compact removal, same pop_front() head
+ * consumption, same indexed backfill scan) - only the underlying
+ * container differs. boost::circular_buffer stores its elements in one
+ * contiguous block, unlike std::deque's fixed-size chunks, so indexed
+ * access (operator[], used throughout the backfill scan) is a direct
+ * offset rather than a chunk lookup followed by an offset within it.
  *
- * No rescanning or submit_time comparison in schedule().
+ * boost::circular_buffer has a fixed capacity, unlike std::deque, which
+ * grows automatically - a push_back() on a full buffer overwrites the
+ * oldest element rather than growing. initial_capacity sets that
+ * capacity explicitly (0 defaults to the initially known job count, large
+ * enough when each initial job is submitted once). A caller may instead
+ * choose a smaller
+ * capacity and let overflow_policy decide what happens if it's
+ * exceeded: ABORT throws, ending the simulation; GROW reallocates to a
+ * larger capacity via set_capacity(), which copies all existing
+ * entries over.
  */
-class FCFSScheduler : public SchedulerBase {
+class FCFSEasyCircularScheduler : public SchedulerBase {
 private:
   struct JobEntry {
     /// Stable identifier of the Trace job represented by this entry.
@@ -49,8 +65,10 @@ private:
           nodes_requested(nodes), removed(false) {}
   };
 
-  /// Submit-time-ordered jobs, including lazily removed entries.
-  std::deque<JobEntry> m_wait_queue;
+  /// Fixed-capacity FCFS queue, optionally enlarged on overflow.
+  boost::circular_buffer<JobEntry> m_wait_queue;
+  /// Action to take when m_wait_queue reaches capacity.
+  CircularOverflowPolicy m_overflow_policy;
   /// First queue index with submit_time later than m_current_tracked_time.
   size_t m_eligible_end_idx;
   /// Latest time to which arrival eligibility has been synchronized.
@@ -61,15 +79,27 @@ private:
   size_t m_backfill_queue_depth;
 
 public:
-  /** @brief Construct an FCFS scheduler.
+  /**
+   * @brief Construct an FCFS scheduler backed by a circular buffer.
    * @param[in] total_nodes Cluster capacity available for allocations.
+   * @param[in] initial_job_count Number of initially known jobs, used when
+   * initial_capacity is zero.
    * @param[in] bf_policy Rule governing jobs considered behind the FCFS head.
+   * @param[in] initial_capacity Initial wait-queue capacity; zero derives one
+   * from initial_job_count.
+   * @param[in] overflow_policy Action to take when that capacity is exhausted.
    * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
    * included; zero is unlimited.
    */
-  FCFSScheduler(num_nodes_t total_nodes, BackfillPolicy bf_policy,
-                size_t backfill_queue_depth = 0)
-      : SchedulerBase(total_nodes, bf_policy), m_eligible_end_idx(0),
+  FCFSEasyCircularScheduler(
+      num_nodes_t total_nodes, size_t initial_job_count,
+      BackfillPolicy bf_policy, size_t initial_capacity = 0,
+      CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW,
+      size_t backfill_queue_depth = 0)
+      : SchedulerBase(total_nodes, bf_policy),
+        m_wait_queue(initial_capacity != 0 ? initial_capacity
+                                           : initial_job_count),
+        m_overflow_policy(overflow_policy), m_eligible_end_idx(0),
         m_current_tracked_time(0.0), m_removed_count(0),
         m_backfill_queue_depth(backfill_queue_depth) {}
 
@@ -77,13 +107,29 @@ public:
   void insert_job(job_no_t job_id, sim_time_t submit_time,
                   tdiff_t run_time_estimate,
                   num_nodes_t nodes_requested) override {
-    m_wait_queue.emplace_back(job_id, submit_time, run_time_estimate,
-                              nodes_requested);
+    if (m_wait_queue.full()) {
+      if (m_overflow_policy == CircularOverflowPolicy::ABORT) {
+        throw std::runtime_error(
+            "FCFSEasyCircularScheduler: wait queue capacity (" +
+            std::to_string(m_wait_queue.capacity()) +
+            ") exceeded; "
+            "use --wait_queue_overflow grow or a larger --wait_queue_capacity");
+      }
+      // GROW: doubling matches std::vector's amortized-growth
+      // strategy. set_capacity() copies all existing entries over
+      // (confirmed: it only drops elements when shrinking below
+      // the current size, which never applies here).
+      m_wait_queue.set_capacity(
+          std::max<size_t>(m_wait_queue.capacity() * 2, 1));
+    }
+
+    m_wait_queue.push_back(
+        JobEntry(job_id, submit_time, run_time_estimate, nodes_requested));
 
     // If this job is already eligible, advance index. Can jump by more
     // than 1 in a single call: if this new job's submit_time is
     // already <= current time, the sorted-submit-time invariant means
-    // every entry already in the deque becomes eligible too.
+    // every entry already in the buffer becomes eligible too.
     if (submit_time <= m_current_tracked_time) {
       m_eligible_end_idx = m_wait_queue.size();
     }
@@ -94,39 +140,16 @@ public:
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override;
 
-  /**
-   * Advance m_eligible_end_idx to reflect current_time. Idempotent and
-   * cheap to call redundantly (see body: early-returns if current_time
-   * hasn't advanced past what's already tracked). schedule() calls
-   * this unconditionally at its own top, so it stays correct
-   * regardless of whether an external caller already synced.
-   * @param[in] current_time Simulation time through which arrivals become
-   * eligible.
-   */
+  /** @copydoc SchedulerBase::sync_to */
   void sync_to(sim_time_t current_time) override;
 
-  /**
-   * Count WAITING jobs (arrived but not scheduled), as of whatever
-   * time this scheduler was last synced to via sync_to(). Derived, not
-   * scanned: every removed entry lives within [0, m_eligible_end_idx)
-   * by construction (removal only ever happens to entries that are
-   * already eligible - see schedule() and mark_removed()), so
-   * "eligible minus removed" is exactly "waiting".
-   *
-   * Invariants:
-   * - m_wait_queue is sorted by submit_time (jobs inserted from sorted trace)
-   * - m_eligible_end_idx advances monotonically as time advances
-   * - removed flag is set either by mark_removed(), or directly within
-   *   schedule() at call sites where the index is already known (to
-   *   avoid mark_removed()'s O(n) linear re-scan by job id)
-   */
+  /** @copydoc SchedulerBase::active_job_count */
   size_t active_job_count() const override {
     return m_eligible_end_idx - m_removed_count;
   }
 
   /** @copydoc SchedulerBase::get_next_arrival_time */
   sim_time_t get_next_arrival_time() override {
-    // Next arrival is at m_eligible_end_idx or later
     for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
       if (!m_wait_queue[i].removed) {
         return m_wait_queue[i].submit_time;
@@ -162,16 +185,11 @@ public:
   }
 
 protected:
-  /**
-   * Return total size of wait queue (ALL jobs, all states).
-   * Includes future arrivals, waiting jobs, and scheduled (removed) jobs.
-   * Internal utility only - use active_job_count() externally.
-   */
   /** @copydoc SchedulerBase::wait_queue_size */
   size_t wait_queue_size() const override { return m_wait_queue.size(); }
 
 private:
-  /** @brief Mark a scheduled queue entry without invalidating deque iterators.
+  /** @brief Lazily mark a selected queue entry as removed.
    * @param[in] job_id Trace job identifier to mark. */
   void mark_removed(job_no_t job_id);
 };
@@ -180,4 +198,4 @@ private:
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_FCFS_HPP
+#endif // DR_EVT_SIM_SCHEDULER_FCFS_EASY_CIRCULAR_HPP

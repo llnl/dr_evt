@@ -276,8 +276,8 @@ public:
 
           // block_size/wait_queue_capacity: 0 means "use Sim_Params'
           // own constructor default" - handled by Sim_Params
-          // itself when constructing CircularBufferFCFSScheduler/
-          // BlockQueueFCFSScheduler, not by this function.
+          // itself when constructing FCFSEasyCircularScheduler/
+          // FCFSEasyBlockScheduler, not by this function.
           if (r.queue_impl().empty())
             sp.m_queue_impl = dr_evt::QueueImplementation::CIRCULAR;
           else if (r.queue_impl() == "circular")

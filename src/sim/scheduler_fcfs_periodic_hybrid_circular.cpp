@@ -5,12 +5,12 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#include "sim/scheduler_circular_fcfs_periodic_hybrid.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-std::vector<job_no_t> CircularBufferFCFSPeriodicHybridScheduler::schedule_event(
+std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
   sync_to(current_time);

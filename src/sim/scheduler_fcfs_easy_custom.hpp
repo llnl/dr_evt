@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_CUSTOM_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_CUSTOM_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_FCFS_EASY_CUSTOM_HPP
+#define DR_EVT_SIM_SCHEDULER_FCFS_EASY_CUSTOM_HPP
 
 #include "sim/scheduler_base.hpp"
 #include <boost/circular_buffer.hpp>
@@ -32,13 +32,13 @@ using backfill_selector_t =
  * @brief Customizable FCFS scheduler with externally selected backfilling.
  *
  * FCFS-head handling, circular-buffer growth, and EASY feasibility checks
- * match CircularBufferFCFSScheduler. When a job is inserted, a caller-provided
+ * match FCFSEasyCircularScheduler. When a job is inserted, a caller-provided
  * cost function computes the m_cost stored in its wait-queue entry. When the
  * head is blocked, up to num_max_candidates feasible (job_id, cost) pairs are
  * reported to a caller-provided selector. Only the candidate returned by that
  * selector is backfilled during the call.
  */
-class CustomFCFSScheduler : public SchedulerBase {
+class FCFSEasyCustomScheduler : public SchedulerBase {
 private:
   template <typename TraceType> friend class BasicSimulation;
 
@@ -115,7 +115,7 @@ protected:
    * The subclass must override select_backfill_candidate() and may insert
    * precomputed queue costs with insert_job_with_cost().
    */
-  CustomFCFSScheduler(
+  FCFSEasyCustomScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
       BackfillPolicy bf_policy, size_t num_max_candidates,
       size_t initial_capacity,
@@ -179,7 +179,7 @@ public:
    * one from initial_job_count.
    * @param[in] overflow_policy Action when the circular buffer is full.
    */
-  CustomFCFSScheduler(
+  FCFSEasyCustomScheduler(
       num_nodes_t total_nodes, size_t initial_job_count,
       BackfillPolicy bf_policy, size_t num_max_candidates,
       job_cost_function_t cost_function, backfill_selector_t selector,
@@ -269,4 +269,4 @@ private:
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_FCFS_CUSTOM_HPP
+#endif // DR_EVT_SIM_SCHEDULER_FCFS_EASY_CUSTOM_HPP

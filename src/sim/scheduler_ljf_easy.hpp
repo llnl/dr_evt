@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef DR_EVT_SIM_SCHEDULER_LJF_HPP
-#define DR_EVT_SIM_SCHEDULER_LJF_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_LJF_EASY_HPP
+#define DR_EVT_SIM_SCHEDULER_LJF_EASY_HPP
 
 #include "sim/scheduler_base.hpp"
 #include <map>
@@ -23,15 +23,15 @@ namespace dr_evt {
  * Uses std::map with descending order (longest run_time first),
  * plus tracking of eligibility boundary to avoid rescanning.
  */
-class LJFScheduler : public SchedulerBase {
+class LJFEasyScheduler : public SchedulerBase {
 public:
   /** @brief Construct a longest-job-first scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
    * @param[in] backfill_policy Rule governing lower-priority candidates.
    * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
    * included; zero is unlimited. */
-  LJFScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy,
-               size_t backfill_queue_depth = 0);
+  LJFEasyScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy,
+                   size_t backfill_queue_depth = 0);
 
   /** @brief Add an existing trace job to the duration-ordered wait queue.
    * @param[in] job_id Stable Trace identifier.
@@ -98,7 +98,7 @@ private:
     tdiff_t run_time;
     /// Nodes requested when this job is started.
     num_nodes_t nodes;
-    // No removed flag - see SJFScheduler for full reasoning.
+    // No removed flag - see SJFEasyScheduler for full reasoning.
     // schedule() erases scheduled entries from m_wait_queue
     // immediately via the iterator it already holds.
   };
@@ -140,4 +140,4 @@ private:
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_LJF_HPP
+#endif // DR_EVT_SIM_SCHEDULER_LJF_EASY_HPP

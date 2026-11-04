@@ -10,15 +10,15 @@
  */
 
 #include "sim/scheduler_base.hpp"
-#include "sim/scheduler_block_fcfs.hpp"
-#include "sim/scheduler_circular_fcfs.hpp"
-#include "sim/scheduler_circular_fcfs_conservative.hpp"
-#include "sim/scheduler_circular_fcfs_periodic_hybrid.hpp"
-#include "sim/scheduler_fcfs.hpp"
-#include "sim/scheduler_fcfs_alt.hpp"
-#include "sim/scheduler_fcfs_conservative.hpp"
-#include "sim/scheduler_ljf.hpp"
-#include "sim/scheduler_sjf.hpp"
+#include "sim/scheduler_fcfs_easy_block.hpp"
+#include "sim/scheduler_fcfs_easy_circular.hpp"
+#include "sim/scheduler_fcfs_easy_deque.hpp"
+#include "sim/scheduler_fcfs_easy_multimap.hpp"
+#include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_hybrid_deque.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
+#include "sim/scheduler_ljf_easy.hpp"
+#include "sim/scheduler_sjf_easy.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -160,20 +160,20 @@ const char *queue_impl_name(QueueImplementation impl) {
   }
 }
 
-std::unique_ptr<SchedulerBase> create_conservative_scheduler(
+std::unique_ptr<SchedulerBase> create_hybrid_scheduler(
     num_nodes_t total_nodes, size_t initial_job_count,
     BackfillPolicy backfill_policy, QueueImplementation queue_impl,
     size_t wait_queue_capacity, CircularOverflowPolicy wait_queue_overflow,
     size_t reservation_depth, size_t backfill_queue_depth) {
   if (queue_impl == QueueImplementation::DEQUE) {
-    return std::make_unique<FCFSConservativeScheduler>(
+    return std::make_unique<FCFSHybridDequeScheduler>(
         total_nodes, backfill_policy, reservation_depth, backfill_queue_depth);
   }
   if (queue_impl != QueueImplementation::CIRCULAR) {
     std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
               << "' not supported for FCFS_CONSERVATIVE, using circular\n";
   }
-  return std::make_unique<CircularBufferFCFSConservativeScheduler>(
+  return std::make_unique<FCFSHybridCircularScheduler>(
       total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
       wait_queue_overflow, reservation_depth, backfill_queue_depth);
 }
@@ -209,14 +209,23 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
     }
-    return std::make_unique<CircularBufferFCFSPeriodicHybridScheduler>(
+    // Periodic mode reproduces Slurm's backfill iteration, which reserves for
+    // a fixed number of jobs: hybrid, with conservative as the unlimited
+    // case. There is no periodic EASY scheduler; EASY is hybrid with
+    // reservation depth 1 and runs as such.
+    const BackfillPolicy periodic_policy =
+        backfill_policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID
+                                                : backfill_policy;
+    const size_t periodic_reservation_depth =
+        backfill_policy == BackfillPolicy::EASY ? 1 : reservation_depth;
+    return std::make_unique<FCFSPeriodicHybridCircularScheduler>(
         total_nodes, initial_job_count, wait_queue_capacity,
-        wait_queue_overflow, backfill_policy, reservation_depth,
+        wait_queue_overflow, periodic_policy, periodic_reservation_depth,
         backfill_queue_depth);
   }
   if (backfill_policy == BackfillPolicy::HYBRID) {
-    // Hybrid reservations are implemented by the conservative FCFS
-    // scheduler only; route FCFS there and reject other orderings.
+    // Hybrid reservations are implemented by the hybrid FCFS schedulers
+    // only; route FCFS there and reject other orderings.
     if (reservation_depth == 0) {
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
@@ -226,10 +235,18 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument(
           "hybrid backfilling is supported with FCFS ordering only");
     }
-    return create_conservative_scheduler(
-        total_nodes, initial_job_count, backfill_policy, queue_impl,
-        wait_queue_capacity, wait_queue_overflow, reservation_depth,
-        backfill_queue_depth);
+    return create_hybrid_scheduler(total_nodes, initial_job_count,
+                                   backfill_policy, queue_impl,
+                                   wait_queue_capacity, wait_queue_overflow,
+                                   reservation_depth, backfill_queue_depth);
+  }
+
+  // The hybrid classes implement the conservative and hybrid reservation
+  // policies only. EASY has its own FCFS implementations, so the
+  // FCFS_CONSERVATIVE ordering (FCFS order) with EASY is served by them.
+  if (priority_policy == PriorityPolicy::FCFS_CONSERVATIVE &&
+      backfill_policy == BackfillPolicy::EASY) {
+    priority_policy = PriorityPolicy::FCFS;
   }
 
   switch (priority_policy) {
@@ -263,25 +280,25 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       // ASan). A switch has no captured state.
       switch (log2_size) {
       case 2:
-        return std::make_unique<BlockQueueFCFSScheduler<4>>(
+        return std::make_unique<FCFSEasyBlockScheduler<4>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       case 3:
-        return std::make_unique<BlockQueueFCFSScheduler<8>>(
+        return std::make_unique<FCFSEasyBlockScheduler<8>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       case 4:
-        return std::make_unique<BlockQueueFCFSScheduler<16>>(
+        return std::make_unique<FCFSEasyBlockScheduler<16>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       case 5:
-        return std::make_unique<BlockQueueFCFSScheduler<32>>(
+        return std::make_unique<FCFSEasyBlockScheduler<32>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       case 6:
-        return std::make_unique<BlockQueueFCFSScheduler<64>>(
+        return std::make_unique<FCFSEasyBlockScheduler<64>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       case 7:
-        return std::make_unique<BlockQueueFCFSScheduler<128>>(
+        return std::make_unique<FCFSEasyBlockScheduler<128>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       case 8:
-        return std::make_unique<BlockQueueFCFSScheduler<256>>(
+        return std::make_unique<FCFSEasyBlockScheduler<256>>(
             total_nodes, backfill_policy, backfill_queue_depth);
       default:
         std::cerr << "Error: block_size " << block_size
@@ -289,13 +306,13 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
         std::exit(1);
       }
     } else if (queue_impl == QueueImplementation::MULTIMAP) {
-      return std::make_unique<FCFSAltScheduler>(total_nodes, backfill_policy,
-                                              backfill_queue_depth);
+      return std::make_unique<FCFSEasyMultimapScheduler>(
+          total_nodes, backfill_policy, backfill_queue_depth);
     } else if (queue_impl == QueueImplementation::DEQUE) {
-      return std::make_unique<FCFSScheduler>(total_nodes, backfill_policy,
-                                           backfill_queue_depth);
+      return std::make_unique<FCFSEasyDequeScheduler>(
+          total_nodes, backfill_policy, backfill_queue_depth);
     } else if (queue_impl == QueueImplementation::CIRCULAR) {
-      return std::make_unique<CircularBufferFCFSScheduler>(
+      return std::make_unique<FCFSEasyCircularScheduler>(
           total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
           wait_queue_overflow, backfill_queue_depth);
     } else {
@@ -316,14 +333,14 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                 << "' not supported for FCFS_ALT, using multimap\n";
     }
-    return std::make_unique<FCFSAltScheduler>(total_nodes, backfill_policy,
-                                              backfill_queue_depth);
+    return std::make_unique<FCFSEasyMultimapScheduler>(
+        total_nodes, backfill_policy, backfill_queue_depth);
 
   case PriorityPolicy::FCFS_CONSERVATIVE:
-    return create_conservative_scheduler(
-        total_nodes, initial_job_count, backfill_policy, queue_impl,
-        wait_queue_capacity, wait_queue_overflow, reservation_depth,
-        backfill_queue_depth);
+    return create_hybrid_scheduler(total_nodes, initial_job_count,
+                                   backfill_policy, queue_impl,
+                                   wait_queue_capacity, wait_queue_overflow,
+                                   reservation_depth, backfill_queue_depth);
 
   case PriorityPolicy::SJF:
     // SJF only uses multimap (already efficient)
@@ -331,8 +348,8 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                 << "' not supported for SJF, using default multimap\n";
     }
-    return std::make_unique<SJFScheduler>(total_nodes, backfill_policy,
-                                          backfill_queue_depth);
+    return std::make_unique<SJFEasyScheduler>(total_nodes, backfill_policy,
+                                              backfill_queue_depth);
 
   case PriorityPolicy::LJF:
     // LJF only uses multimap (already efficient)
@@ -340,13 +357,13 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
                 << "' not supported for LJF, using default multimap\n";
     }
-    return std::make_unique<LJFScheduler>(total_nodes, backfill_policy,
-                                          backfill_queue_depth);
+    return std::make_unique<LJFEasyScheduler>(total_nodes, backfill_policy,
+                                              backfill_queue_depth);
 
   default:
     // Default to FCFS with deque
-    return std::make_unique<FCFSScheduler>(total_nodes, backfill_policy,
-                                           backfill_queue_depth);
+    return std::make_unique<FCFSEasyDequeScheduler>(
+        total_nodes, backfill_policy, backfill_queue_depth);
   }
 }
 

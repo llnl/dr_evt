@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 #define DR_EVT_HAS_CONFIG 1
-#include "sim/scheduler_fcfs_custom.hpp"
+#include "sim/scheduler_fcfs_easy_custom.hpp"
 #include "sim/sim.hpp"
 #include <algorithm>
 #include <cassert>
@@ -51,8 +51,9 @@ void test_external_backfill_selection() {
     return select_lowest_cost(candidates);
   };
 
-  CustomFCFSScheduler scheduler(100, 0, BackfillPolicy::EASY, 2,
-                                cost_from_job_order, observe_and_select_lowest);
+  FCFSEasyCustomScheduler scheduler(100, 0, BackfillPolicy::EASY, 2,
+                                    cost_from_job_order,
+                                    observe_and_select_lowest);
   scheduler.insert_job(0, 0.0, 100.0, 70);
   scheduler.insert_job(1, 0.0, 200.0, 50);
   scheduler.insert_job(2, 0.0, 50.0, 20);
@@ -69,7 +70,7 @@ void test_external_backfill_selection() {
 }
 
 void test_selector_must_return_a_candidate() {
-  CustomFCFSScheduler scheduler(
+  FCFSEasyCustomScheduler scheduler(
       100, 0, BackfillPolicy::EASY, 1,
       [](job_no_t, sim_time_t, tdiff_t, num_nodes_t) { return 0; },
       [](const backfill_candidates_t &) {
@@ -138,11 +139,11 @@ void test_arrival_scans_only_new_jobs() {
   assert((selections[2] == backfill_candidates_t{{2, 2}}));
 }
 
-class ObservingCustomScheduler final : public CustomFCFSScheduler {
+class ObservingCustomScheduler final : public FCFSEasyCustomScheduler {
 public:
   ObservingCustomScheduler()
-      : CustomFCFSScheduler(100, 0, BackfillPolicy::EASY, 2,
-                            cost_from_job_order, select_lowest_cost) {}
+      : FCFSEasyCustomScheduler(100, 0, BackfillPolicy::EASY, 2,
+                                cost_from_job_order, select_lowest_cost) {}
 
   size_t selection_calls = 0;
   size_t arrival_updates = 0;
@@ -171,7 +172,7 @@ protected:
       const backfill_candidates_t &candidates, num_nodes_t available_nodes,
       const running_jobs_t &running_jobs, sim_time_t current_time) override {
     ++selection_calls;
-    return CustomFCFSScheduler::select_backfill_candidate(
+    return FCFSEasyCustomScheduler::select_backfill_candidate(
         candidates, available_nodes, running_jobs, current_time);
   }
 
