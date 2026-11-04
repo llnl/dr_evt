@@ -19,7 +19,7 @@
 #ifndef DR_EVT_EXPERIMENTAL_MULTI_SYSTEM_BACKFILL_SCHEDULER_HPP
 #define DR_EVT_EXPERIMENTAL_MULTI_SYSTEM_BACKFILL_SCHEDULER_HPP
 
-#include "sim/scheduler_fcfs_custom.hpp"
+#include "sim/scheduler_fcfs_easy_custom.hpp"
 #include <deque>
 #include <limits>
 #include <string>
@@ -208,9 +208,9 @@ private:
 /**
  * @brief FCFS scheduler over several systems with spatial backfilling.
  * @details
- * Derives from CustomFCFSScheduler only so that it can be injected through
+ * Derives from FCFSEasyCustomScheduler only so that it can be injected through
  * the existing `BasicSimulation(Sim_Params,
- * std::unique_ptr<CustomFCFSScheduler>)` constructor. Every virtual of the
+ * std::unique_ptr<FCFSEasyCustomScheduler>)` constructor. Every virtual of the
  * scheduler interface is overridden here; the inherited circular buffer and
  * resource accounting stay unused.
  *
@@ -219,7 +219,7 @@ private:
  * the largest system are rejected in insert_job() because the core only
  * rejects jobs larger than the summed capacity.
  */
-class MultiSystemBackfillScheduler : public CustomFCFSScheduler {
+class MultiSystemBackfillScheduler : public FCFSEasyCustomScheduler {
 public:
   /// Where a started job was placed and what it consumes there.
   struct Placement {

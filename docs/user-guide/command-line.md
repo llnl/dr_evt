@@ -338,8 +338,8 @@ fits now and delays none of those `N`; it holds no reservation of its own.
 `N` must be positive with `hybrid` and is ignored by the other policies.
 `1` reproduces `easy`; a depth of at least the queue length is
 `conservative`. This is the behaviour of Slurm's `bf_job_part_count_reserve`
-and of Fluxion's `hybrid` queue policy with `reservation-depth`. Hybrid uses
-the conservative FCFS scheduler with either `fcfs` or `fcfs_conservative`
+and of Fluxion's `hybrid` queue policy with `reservation-depth`. Hybrid, and
+conservative as its unlimited-depth case, use the hybrid FCFS schedulers with either `fcfs` or `fcfs_conservative`
 ordering and is rejected with `sjf` or `ljf`.
 
 **Default:** `0`

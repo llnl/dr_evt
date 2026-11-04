@@ -5,38 +5,25 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_alt.cpp
- * @brief Differential-testing implementation of FCFS scheduling.
+/** @file scheduler_ljf_easy.cpp
+ * @brief Longest-job-first scheduling implementation.
  */
 
-#include "sim/scheduler_fcfs_alt.hpp"
+#include "sim/scheduler_ljf_easy.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-std::optional<tdiff_t> FCFSAltScheduler::waiting_resource_area() const {
-  tdiff_t area = 0.0;
-  for (const auto &[submit_time, job] : m_wait_queue) {
-    (void)submit_time;
-    if (m_eligible_jobs.contains(job.job_id)) {
-      area += static_cast<tdiff_t>(job.nodes) * job.run_time;
-    }
-  }
-  return area;
-}
-
-FCFSAltScheduler::FCFSAltScheduler(num_nodes_t total_nodes,
+LJFEasyScheduler::LJFEasyScheduler(num_nodes_t total_nodes,
                                    BackfillPolicy backfill_policy,
                                    size_t backfill_queue_depth)
     : SchedulerBase(total_nodes, backfill_policy), m_current_tracked_time(0.0),
       m_backfill_queue_depth(backfill_queue_depth) {}
 
-void FCFSAltScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
+void LJFEasyScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
                                   tdiff_t run_time, num_nodes_t nodes) {
   JobEntry entry{job_id, submit_time, run_time, nodes};
-
-  // KEY DIFFERENCE: Order by submit_time (FCFS) instead of run_time (SJF)
-  m_wait_queue.insert({submit_time, entry});
+  m_wait_queue.insert({run_time, entry});
 
   // If already eligible, add to eligible set
   if (submit_time <= m_current_tracked_time) {
@@ -44,7 +31,7 @@ void FCFSAltScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
   }
 }
 
-void FCFSAltScheduler::update_eligible_jobs(sim_time_t current_time) {
+void LJFEasyScheduler::update_eligible_jobs(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return; // Time hasn't advanced
   }
@@ -61,24 +48,29 @@ void FCFSAltScheduler::update_eligible_jobs(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-std::multimap<sim_time_t, FCFSAltScheduler::JobEntry>::iterator
-FCFSAltScheduler::find_fcfs_head() {
-  // FCFS head = first eligible job in submit_time order
-  // Since multimap is ordered by submit_time, just find first eligible
+std::multimap<tdiff_t, LJFEasyScheduler::JobEntry,
+              LJFEasyScheduler::DescendingRunTime>::iterator
+LJFEasyScheduler::find_fcfs_head() {
+  // FCFS head = eligible job with earliest submit_time
+  auto fcfs_it = m_wait_queue.end();
+  sim_time_t earliest_submit = std::numeric_limits<sim_time_t>::max();
+
   for (auto it = m_wait_queue.begin(); it != m_wait_queue.end(); ++it) {
     const JobEntry &entry = it->second;
     if (m_eligible_jobs.count(entry.job_id) == 0)
       continue;
 
-    // Found first eligible job (earliest submit_time)
-    return it;
+    if (entry.submit_time < earliest_submit) {
+      earliest_submit = entry.submit_time;
+      fcfs_it = it;
+    }
   }
 
-  return m_wait_queue.end();
+  return fcfs_it;
 }
 
 std::vector<job_no_t>
-FCFSAltScheduler::schedule(num_nodes_t free_nodes,
+LJFEasyScheduler::schedule(num_nodes_t free_nodes,
                            const running_jobs_t &running_jobs,
                            sim_time_t current_time) {
   // Update eligibility tracking
@@ -102,7 +94,8 @@ FCFSAltScheduler::schedule(num_nodes_t free_nodes,
   // Check if FCFS head can run
   if (head_nodes <= free_nodes) {
     // Start FCFS head - erase immediately rather than lazily marking
-    // (see SJFScheduler for full reasoning).
+    // (see SJFEasyScheduler for full reasoning: multimap erase-by-iterator
+    // is O(1) amortized regardless of tree position).
     m_eligible_jobs.erase(head_job_id);
     m_wait_queue.erase(fcfs_head_it);
     return {head_job_id};
@@ -112,23 +105,23 @@ FCFSAltScheduler::schedule(num_nodes_t free_nodes,
   // Calculate FCFS reservation time
   m_fcfs_reservation_time = calculate_fcfs_reservation(
       head_nodes, free_nodes, running_jobs, current_time);
+  const sim_time_t reservation_time = m_fcfs_reservation_time;
 
-  if (m_fcfs_reservation_time <= current_time) {
+  if (reservation_time <= current_time) {
     return {}; // No valid reservation window
   }
 
-  tdiff_t backfill_window = m_fcfs_reservation_time - current_time;
+  tdiff_t backfill_window = reservation_time - current_time;
   // A head reserved beyond the planning horizon is not planned, so the
   // window does not constrain candidates (Slurm bf_window).
   const bool head_within_horizon =
-      reservation_within_horizon(m_fcfs_reservation_time, current_time);
+      reservation_within_horizon(reservation_time, current_time);
 
-  // Scan in FCFS order (earliest submit_time first) for backfill candidates.
-  // Every candidate that qualifies is started in this one call, as in the
-  // index-based FCFS schedulers, so --backfill_queue_depth counts the same
-  // jobs whichever implementation runs. Starting a candidate leaves the
-  // window unchanged: it ends before the head's reservation, so its nodes
-  // are back before the head needs them.
+  // Scan in LJF order (longest first) for backfill candidates. Every candidate
+  // that qualifies is started in this one call, as in the index-based FCFS
+  // schedulers, so --backfill_queue_depth counts the same jobs whichever
+  // scheduler runs. Starting a candidate leaves the window unchanged: it ends
+  // no later than the head's reservation, so its nodes are back in time.
   std::vector<job_no_t> started;
   num_nodes_t available_nodes = free_nodes;
   size_t examined = head_within_horizon ? 1 : 0;
@@ -152,19 +145,12 @@ FCFSAltScheduler::schedule(num_nodes_t free_nodes,
 
     // Check backfill constraints
     bool fits_nodes = (entry.nodes <= available_nodes);
-
-    // IMPORTANT: Use strict < (not <=) because resources don't become available
-    // instantly when a job completes. If a backfill job would complete exactly
-    // at the reservation time, the FCFS head must wait for that completion
-    // event to be processed first, causing a delay. Therefore, backfill jobs
-    // must complete BEFORE (not at) the reservation time.
     bool fits_window =
         !head_within_horizon ||
-        (release_estimate(current_time, entry.run_time) < backfill_window);
+        (release_estimate(current_time, entry.run_time) <= backfill_window);
 
     // EASY must fit both nodes and window. CONSERVATIVE uses the same test
-    // here (conservative approximation; the conservative schedulers
-    // implement the full rule).
+    // here (conservative approximation).
     if ((m_backfill_policy == BackfillPolicy::EASY ||
          m_backfill_policy == BackfillPolicy::CONSERVATIVE) &&
         fits_nodes && fits_window) {

@@ -5,21 +5,40 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_conservative.cpp
- * @brief Conservative-reservation FCFS scheduling implementation.
+/** @file scheduler_fcfs_hybrid_circular.cpp
+ * @brief Circular-buffer hybrid-reservation FCFS scheduling implementation.
  */
 
-#include "sim/scheduler_fcfs_conservative.hpp"
+#include "sim/scheduler_fcfs_hybrid_circular.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-void FCFSConservativeScheduler::sync_to(sim_time_t current_time) {
+void FCFSHybridCircularScheduler::insert_job(job_no_t job_id,
+                                             sim_time_t submit_time,
+                                             tdiff_t run_time_estimate,
+                                             num_nodes_t nodes_requested) {
+  if (m_wait_queue.full()) {
+    if (m_overflow_policy == CircularOverflowPolicy::ABORT) {
+      throw std::runtime_error(
+          "FCFSHybridCircularScheduler: wait queue capacity (" +
+          std::to_string(m_wait_queue.capacity()) +
+          ") exceeded; use --wait_queue_overflow grow or a larger "
+          "--wait_queue_capacity");
+    }
+    m_wait_queue.set_capacity(std::max<size_t>(m_wait_queue.capacity() * 2, 1));
+  }
+  m_wait_queue.push_back(
+      JobEntry(job_id, submit_time, run_time_estimate, nodes_requested));
+  if (submit_time <= m_current_tracked_time) {
+    m_eligible_end_idx = m_wait_queue.size();
+  }
+}
+
+void FCFSHybridCircularScheduler::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return;
   }
-
-  // Advance index to mark newly eligible jobs
   while (m_eligible_end_idx < m_wait_queue.size() &&
          m_wait_queue[m_eligible_end_idx].submit_time <= current_time) {
     ++m_eligible_end_idx;
@@ -27,41 +46,41 @@ void FCFSConservativeScheduler::sync_to(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-void FCFSConservativeScheduler::mark_removed(job_no_t job_id) {
-  for (auto &entry : m_wait_queue) {
-    if (entry.job_id == job_id && !entry.removed) {
-      entry.removed = true;
-      ++m_removed_count;
-      return;
+sim_time_t FCFSHybridCircularScheduler::get_next_arrival_time() {
+  for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
+    if (!m_wait_queue[i].removed) {
+      return m_wait_queue[i].submit_time;
     }
   }
+  return std::numeric_limits<sim_time_t>::max();
 }
 
-sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
-    size_t backfill_index, num_nodes_t available_nodes,
+std::vector<job_no_t> FCFSHybridCircularScheduler::pending_job_ids() const {
+  std::vector<job_no_t> result;
+  for (const auto &job : m_wait_queue) {
+    if (!job.removed) {
+      result.push_back(job.job_id);
+    }
+  }
+  return result;
+}
+
+sim_time_t FCFSHybridCircularScheduler::calculate_hybrid_window(
+    size_t job_index, num_nodes_t available_nodes,
     const running_jobs_t &running_jobs, sim_time_t current_time) {
-  // For conservative backfilling, we need to ensure the backfill job
-  // doesn't delay ANY waiting job that came before it.
-  // Calculate reservation time for each job ahead of this one.
-
   sim_time_t earliest_conflict = std::numeric_limits<sim_time_t>::max();
-
-  // Check the reserved jobs ahead of this backfill candidate: every waiting
-  // job ahead of it under CONSERVATIVE, or only the first
-  // m_reservation_depth of them under HYBRID.
   const size_t depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t reserved = 0;
   auto plan = reservation_timeline(available_nodes, running_jobs, current_time);
-  for (size_t i = 0; i < backfill_index; ++i) {
+  for (size_t i = 0; i < job_index; ++i) {
     const auto &job = m_wait_queue[i];
-    if (job.removed)
+    if (job.removed) {
       continue;
-    if (depth != 0 && reserved >= depth)
+    }
+    if (depth != 0 && reserved >= depth) {
       break;
-
-    // Place each protected waiting job into the same temporary resource-time
-    // plan before calculating the next reservation.
+    }
     const tdiff_t duration =
         release_estimate(current_time, job.run_time_estimate);
     const auto reservation =
@@ -70,56 +89,43 @@ sim_time_t FCFSConservativeScheduler::calculate_conservative_window(
       continue;
     }
     const sim_time_t job_reservation = *reservation;
-    // Beyond the planning horizon the job is not planned: no reservation
-    // and no reservation-depth slot (Slurm bf_window).
-    if (!reservation_within_horizon(job_reservation, current_time))
+    if (!reservation_within_horizon(job_reservation, current_time)) {
       continue;
+    }
     ++reserved;
     plan.reserve(job_reservation, job.nodes_requested,
                  release_estimate(job_reservation, job.run_time_estimate));
-
-    // Track the earliest reservation time
     earliest_conflict = std::min(earliest_conflict, job_reservation);
   }
-
   return earliest_conflict;
 }
 
 std::vector<job_no_t>
-FCFSConservativeScheduler::schedule(num_nodes_t free_nodes,
-                                    const running_jobs_t &running_jobs,
-                                    sim_time_t current_time) {
-  // Sync eligibility tracking
+FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
+                                      const running_jobs_t &running_jobs,
+                                      sim_time_t current_time) {
   sync_to(current_time);
-
-  // Garbage collection: compact queue if >50% is garbage
   if (m_removed_count > 0 && m_removed_count * 2 > m_wait_queue.size()) {
     size_t eligible_removed = 0;
-    for (size_t idx = 0; idx < m_eligible_end_idx && idx < m_wait_queue.size();
-         ++idx) {
-      if (m_wait_queue[idx].removed) {
+    for (size_t i = 0; i < m_eligible_end_idx && i < m_wait_queue.size(); ++i) {
+      if (m_wait_queue[i].removed) {
         ++eligible_removed;
       }
     }
-
-    auto new_end =
+    const auto new_end =
         std::remove_if(m_wait_queue.begin(), m_wait_queue.end(),
                        [](const JobEntry &entry) { return entry.removed; });
-
     m_wait_queue.erase(new_end, m_wait_queue.end());
     m_eligible_end_idx -= eligible_removed;
     m_removed_count = 0;
   }
-
   if (m_eligible_end_idx == 0) {
-    return {}; // No eligible jobs
+    return {};
   }
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
   running_jobs_t effective_running_jobs = running_jobs;
-
-  // Step 1: Start jobs from the front of the queue (FCFS order)
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
           m_wait_queue.front().nodes_requested <= available_nodes)) {
@@ -136,86 +142,76 @@ FCFSConservativeScheduler::schedule(num_nodes_t free_nodes,
     m_wait_queue.pop_front();
     --m_eligible_end_idx;
   }
-
-  if (active_job_count() == 0) {
+  if (active_job_count() == 0 || m_backfill_policy == BackfillPolicy::NONE) {
     return jobs_to_run;
   }
 
-  // Step 2: Check if backfilling is disabled
-  if (m_backfill_policy == BackfillPolicy::NONE) {
-    // No backfilling - strict FCFS order only
-    return jobs_to_run;
-  }
-
-  // Step 3: Try backfilling based on policy
-  // Update effective running jobs to include jobs just started
   // The blocked head's projection is kept for every policy so that
   // get_fcfs_head_shadow_time() reports it whether or not it is planned.
   m_fcfs_reservation_time = calculate_fcfs_reservation(
       m_wait_queue.front().nodes_requested, available_nodes,
       effective_running_jobs, current_time);
+
   if (available_nodes == 0) {
     return jobs_to_run;
   }
 
-  // CONSERVATIVE backfilling: Must not delay ANY waiting job.
-  // HYBRID: must not delay the first m_reservation_depth waiting jobs.
-
   // Share one depth budget across every backfill pass at this timestamp.
-  // Jobs with no reservation in the planning horizon stay in queue but do
-  // not consume a scan slot. Their projection is recomputed on every pass,
-  // which captures ordinary resource releases and capacity changes without
-  // modeling an external blocked-list notification.
+  // A job beyond the planning horizon stays queued, holds no reservation, and
+  // is projected again on the next pass instead of requiring blocked-list
+  // state. Whether it also uses a depth slot is the subclass's choice.
+  const bool horizon_job_uses_slot = horizon_skipped_job_uses_depth_slot();
   if (m_backfill_depth_time != current_time) {
     m_backfill_depth_time = current_time;
     m_backfill_depth_examined = 0;
     m_backfill_depth_head_accounted = false;
   }
-  if (reservation_within_horizon(m_fcfs_reservation_time, current_time) &&
+  if ((horizon_job_uses_slot ||
+       reservation_within_horizon(m_fcfs_reservation_time, current_time)) &&
       !m_backfill_depth_head_accounted) {
     ++m_backfill_depth_examined;
     m_backfill_depth_head_accounted = true;
   }
   for (size_t i = 1; i < m_eligible_end_idx; ++i) {
     const auto &job = m_wait_queue[i];
-    if (job.removed)
+    if (job.removed) {
       continue;
+    }
     const sim_time_t job_reservation =
         calculate_fcfs_reservation(job.nodes_requested, available_nodes,
                                    effective_running_jobs, current_time);
-    if (!reservation_within_horizon(job_reservation, current_time))
+    const bool in_horizon =
+        reservation_within_horizon(job_reservation, current_time);
+    if (!in_horizon && !horizon_job_uses_slot) {
       continue;
+    }
     if (m_backfill_queue_depth != 0 &&
-        m_backfill_depth_examined >= m_backfill_queue_depth)
+        m_backfill_depth_examined >= m_backfill_queue_depth) {
       break;
+    }
     ++m_backfill_depth_examined;
-
-    // Check resource fit
-    if (job.nodes_requested > available_nodes)
+    if (!in_horizon) {
+      continue; // Counted, but it holds no reservation and cannot backfill.
+    }
+    if (job.nodes_requested > available_nodes) {
       continue;
-
-    // Calculate conservative window: earliest in-horizon reservation ahead.
-    sim_time_t conservative_window = calculate_conservative_window(
+    }
+    const sim_time_t hybrid_window = calculate_hybrid_window(
         i, available_nodes, effective_running_jobs, current_time);
-
-    // Job can backfill if it completes before ANY job ahead needs to start
     if (current_time + release_estimate(current_time, job.run_time_estimate) <
-        conservative_window) {
+        hybrid_window) {
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
       m_wait_queue[i].removed = true;
       ++m_removed_count;
-
-      // Update effective running jobs for next iteration
       effective_running_jobs[job.job_id] = {
           current_time, release_estimate(current_time, job.run_time_estimate),
           job.nodes_requested};
-
-      if (available_nodes == 0)
+      if (available_nodes == 0) {
         break;
+      }
     }
   }
-
   return jobs_to_run;
 }
 

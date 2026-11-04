@@ -478,7 +478,7 @@ protected:
  * @brief Construct the scheduler selected by the configured policies.
  * @details
  * Selects an FCFS implementation when FCFS is requested (including the
- * queue implementation and overflow settings), the conservative FCFS
+ * queue implementation and overflow settings), the hybrid FCFS
  * implementation when required by the backfill policy, or the SJF/LJF
  * priority scheduler. Scheduling fields are copied into each implementation's
  * wait queue as jobs are submitted; the scheduler does not retain a Trace.

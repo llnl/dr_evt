@@ -5,16 +5,16 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_circular_fcfs.cpp
+/** @file scheduler_fcfs_easy_circular.cpp
  * @brief Scheduling implementation for the circular-buffer FCFS queue.
  */
 
-#include "sim/scheduler_circular_fcfs.hpp"
+#include "sim/scheduler_fcfs_easy_circular.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-void CircularBufferFCFSScheduler::sync_to(sim_time_t current_time) {
+void FCFSEasyCircularScheduler::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return;
   }
@@ -26,7 +26,7 @@ void CircularBufferFCFSScheduler::sync_to(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-void CircularBufferFCFSScheduler::mark_removed(job_no_t job_id) {
+void FCFSEasyCircularScheduler::mark_removed(job_no_t job_id) {
   for (auto &entry : m_wait_queue) {
     if (entry.job_id == job_id && !entry.removed) {
       entry.removed = true;
@@ -37,13 +37,13 @@ void CircularBufferFCFSScheduler::mark_removed(job_no_t job_id) {
 }
 
 std::vector<job_no_t>
-CircularBufferFCFSScheduler::schedule(num_nodes_t free_nodes,
-                                      const running_jobs_t &running_jobs,
-                                      sim_time_t current_time) {
+FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
+                                    const running_jobs_t &running_jobs,
+                                    sim_time_t current_time) {
   sync_to(current_time);
 
   // Garbage collection: compact queue if >50% is garbage. Same
-  // approach as FCFSScheduler, but no pointer-subtraction pitfall to
+  // approach as FCFSEasyDequeScheduler, but no pointer-subtraction pitfall to
   // avoid here - operator[] is used throughout instead.
   if (m_removed_count > 0 && m_removed_count * 2 > m_wait_queue.size()) {
     size_t eligible_removed = 0;
@@ -73,7 +73,7 @@ CircularBufferFCFSScheduler::schedule(num_nodes_t free_nodes,
 
   // Step 1: consume the front of the eligible queue with pop_front()
   // (O(1) on a circular_buffer, same as on a deque) instead of
-  // scanning by index. See FCFSScheduler::schedule() for the full
+  // scanning by index. See FCFSEasyDequeScheduler::schedule() for the full
   // reasoning - identical here.
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
@@ -101,7 +101,7 @@ CircularBufferFCFSScheduler::schedule(num_nodes_t free_nodes,
   }
 
   // FCFS head is now genuinely at the front and blocked - calculate
-  // reservation for backfilling. See FCFSScheduler::schedule() for
+  // reservation for backfilling. See FCFSEasyDequeScheduler::schedule() for
   // why effective_running_jobs must include jobs_to_run.
   m_fcfs_reservation_time = calculate_fcfs_reservation(
       m_wait_queue.front().nodes_requested, available_nodes,
@@ -132,7 +132,7 @@ CircularBufferFCFSScheduler::schedule(num_nodes_t free_nodes,
     if (job.nodes_requested > available_nodes)
       continue;
 
-    // IMPORTANT: strict < (not <=) - see FCFSScheduler::schedule()
+    // IMPORTANT: strict < (not <=) - see FCFSEasyDequeScheduler::schedule()
     // for why. Backfill jobs must complete BEFORE the reservation
     // time, not at it.
     if (!head_within_horizon ||

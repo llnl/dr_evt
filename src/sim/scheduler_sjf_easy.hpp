@@ -5,8 +5,8 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_ALT_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_ALT_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_SJF_EASY_HPP
+#define DR_EVT_SIM_SCHEDULER_SJF_EASY_HPP
 
 #include "sim/scheduler_base.hpp"
 #include <map>
@@ -18,34 +18,25 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * Alternative FCFS scheduler implementation for differential testing
+ * Shortest Job First (SJF) scheduler with iterator tracking
  *
- * Based on SJF scheduler framework but uses submit_time ordering instead of
- * run_time. This provides an independent implementation to verify
- * scheduler_fcfs correctness.
- *
- * Key difference from scheduler_fcfs:
- * - Uses std::multimap ordered by submit_time (not deque)
- * - Different internal data structure for queue management
- * - Should produce IDENTICAL results to scheduler_fcfs
- *
- * Purpose: Differential testing - if both implementations produce same results,
- * high confidence in correctness of both.
+ * Uses std::multimap ordered by run_time for priority,
+ * plus tracking of eligibility boundary to avoid rescanning.
  */
-class FCFSAltScheduler : public SchedulerBase {
+class SJFEasyScheduler : public SchedulerBase {
 public:
-  /** @brief Construct the map-backed reference FCFS scheduler.
+  /** @brief Construct a shortest-job-first scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
-   * @param[in] backfill_policy Rule governing jobs behind the FCFS head.
+   * @param[in] backfill_policy Rule governing lower-priority candidates.
    * @param[in] backfill_queue_depth Jobs examined per backfill pass, head
    * included; zero is unlimited. */
-  FCFSAltScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy,
+  SJFEasyScheduler(num_nodes_t total_nodes, BackfillPolicy backfill_policy,
                    size_t backfill_queue_depth = 0);
 
-  /** @brief Add an existing trace job to the arrival-ordered wait queue.
+  /** @brief Add an existing trace job to the duration-ordered wait queue.
    * @param[in] job_id Stable Trace identifier.
-   * @param[in] submit_time Arrival time and primary ordering key.
-   * @param[in] run_time Requested limit used for reservation checks.
+   * @param[in] submit_time Arrival time controlling eligibility.
+   * @param[in] run_time Requested limit used as the SJF key.
    * @param[in] nodes Requested node count used for fit checks. */
   void insert_job(job_no_t job_id, sim_time_t submit_time, tdiff_t run_time,
                   num_nodes_t nodes) override;
@@ -87,13 +78,11 @@ public:
   std::vector<job_no_t> pending_job_ids() const override {
     std::vector<job_no_t> result;
     result.reserve(m_wait_queue.size());
-    for (const auto &[time, job] : m_wait_queue) {
+    for (const auto &[runtime, job] : m_wait_queue) {
       result.push_back(job.job_id);
     }
     return result;
   }
-
-  std::optional<tdiff_t> waiting_resource_area() const override;
 
 protected:
   /** @copydoc SchedulerBase::wait_queue_size */
@@ -103,17 +92,26 @@ private:
   struct JobEntry {
     /// Stable identifier of the Trace job represented by this entry.
     job_no_t job_id;
-    /// Arrival time; also the alternative implementation's priority key.
+    /// Arrival time used to determine eligibility.
     sim_time_t submit_time;
-    /// Requested time limit used for reservation and backfill projection.
+    /// Requested time limit; also the SJF priority key.
     tdiff_t run_time;
     /// Nodes requested when this job is started.
     num_nodes_t nodes;
-    // No removed flag - see SJFScheduler for full reasoning.
+    // No removed flag: schedule() erases scheduled entries from
+    // m_wait_queue immediately via the iterator it already holds
+    // (multimap erase-by-iterator is O(1), so there's no benefit to
+    // lazy deletion the way there is for a sequential container).
+    // m_eligible_jobs is the single source of truth for "still
+    // waiting" - every read site that used to check .removed was
+    // either already also checking m_eligible_jobs membership
+    // (redundant), or checking it in a context where a removed
+    // entry could never appear anyway (see the accompanying patch
+    // notes for the specific reasoning at each site).
   };
 
-  /// Jobs ordered by arrival time, then stable Trace job identifier.
-  std::multimap<sim_time_t, JobEntry> m_wait_queue;
+  /// Jobs ordered by shortest estimate, then stable Trace job identifier.
+  std::multimap<tdiff_t, JobEntry> m_wait_queue;
 
   /// Identifiers of arrived jobs still waiting to be scheduled.
   std::set<job_no_t> m_eligible_jobs;
@@ -130,11 +128,11 @@ private:
 
   /** @brief Find the earliest-arriving eligible job. @return Iterator to the
    * FCFS head. */
-  std::multimap<sim_time_t, JobEntry>::iterator find_fcfs_head();
+  std::multimap<tdiff_t, JobEntry>::iterator find_fcfs_head();
 };
 
 /**@}*/
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_FCFS_ALT_HPP
+#endif // DR_EVT_SIM_SCHEDULER_SJF_EASY_HPP

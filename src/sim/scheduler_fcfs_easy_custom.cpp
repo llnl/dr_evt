@@ -5,7 +5,7 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-#include "sim/scheduler_fcfs_custom.hpp"
+#include "sim/scheduler_fcfs_easy_custom.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -14,32 +14,30 @@
 
 namespace dr_evt {
 
-CustomFCFSScheduler::CustomFCFSScheduler(
+FCFSEasyCustomScheduler::FCFSEasyCustomScheduler(
     num_nodes_t total_nodes, size_t initial_job_count, BackfillPolicy bf_policy,
     size_t num_max_candidates, job_cost_function_t cost_function,
     backfill_selector_t selector, size_t initial_capacity,
     CircularOverflowPolicy overflow_policy)
-    : CustomFCFSScheduler(total_nodes, initial_job_count, bf_policy,
-                          num_max_candidates, initial_capacity,
-                          overflow_policy) {
+    : FCFSEasyCustomScheduler(total_nodes, initial_job_count, bf_policy,
+                              num_max_candidates, initial_capacity,
+                              overflow_policy) {
   m_job_cost_function = std::move(cost_function);
   m_backfill_selector = std::move(selector);
   if (!m_job_cost_function) {
     throw std::invalid_argument(
-        "CustomFCFSScheduler requires a job cost function");
+        "FCFSEasyCustomScheduler requires a job cost function");
   }
   if (!m_backfill_selector) {
     throw std::invalid_argument(
-        "CustomFCFSScheduler requires a backfill selector");
+        "FCFSEasyCustomScheduler requires a backfill selector");
   }
 }
 
-CustomFCFSScheduler::CustomFCFSScheduler(num_nodes_t total_nodes,
-                                         size_t initial_job_count,
-                                         BackfillPolicy bf_policy,
-                                         size_t num_max_candidates,
-                                         size_t initial_capacity,
-                                         CircularOverflowPolicy overflow_policy)
+FCFSEasyCustomScheduler::FCFSEasyCustomScheduler(
+    num_nodes_t total_nodes, size_t initial_job_count, BackfillPolicy bf_policy,
+    size_t num_max_candidates, size_t initial_capacity,
+    CircularOverflowPolicy overflow_policy)
     : SchedulerBase(total_nodes, bf_policy),
       m_wait_queue(initial_capacity != 0 ? initial_capacity
                                          : initial_job_count),
@@ -52,15 +50,15 @@ CustomFCFSScheduler::CustomFCFSScheduler(num_nodes_t total_nodes,
       m_accounted_available_nodes(total_nodes) {
   if (m_num_max_candidates == 0) {
     throw std::invalid_argument(
-        "CustomFCFSScheduler requires num_max_candidates > 0");
+        "FCFSEasyCustomScheduler requires num_max_candidates > 0");
   }
   if (m_backfill_policy == BackfillPolicy::CONSERVATIVE) {
     throw std::invalid_argument(
-        "CustomFCFSScheduler supports EASY or NONE backfilling");
+        "FCFSEasyCustomScheduler supports EASY or NONE backfilling");
   }
 }
 
-void CustomFCFSScheduler::advance_resource_accounting_to(
+void FCFSEasyCustomScheduler::advance_resource_accounting_to(
     sim_time_t current_time) {
   if (current_time < m_resource_area_time) {
     throw std::logic_error("resource accounting cannot move backward in time");
@@ -75,18 +73,19 @@ void CustomFCFSScheduler::advance_resource_accounting_to(
   m_resource_area_time = current_time;
 }
 
-void CustomFCFSScheduler::commit_available_nodes(num_nodes_t available_nodes) {
+void FCFSEasyCustomScheduler::commit_available_nodes(
+    num_nodes_t available_nodes) {
   if (available_nodes > m_total_nodes) {
     throw std::logic_error("available nodes exceed total system capacity");
   }
   m_accounted_available_nodes = available_nodes;
 }
 
-void CustomFCFSScheduler::reset_resource_accounting() {
+void FCFSEasyCustomScheduler::reset_resource_accounting() {
   reset_resource_accounting(0.0, m_total_nodes);
 }
 
-void CustomFCFSScheduler::reset_resource_accounting(
+void FCFSEasyCustomScheduler::reset_resource_accounting(
     sim_time_t start_time, num_nodes_t available_nodes) {
   if (!std::isfinite(start_time) || start_time < 0.0) {
     throw std::invalid_argument(
@@ -103,7 +102,7 @@ void CustomFCFSScheduler::reset_resource_accounting(
 }
 
 tdiff_t
-CustomFCFSScheduler::resource_area_through(sim_time_t through_time) const {
+FCFSEasyCustomScheduler::resource_area_through(sim_time_t through_time) const {
   tdiff_t area = m_resource_area;
   if (std::isfinite(through_time) && through_time > m_resource_area_time) {
     const num_nodes_t allocated_nodes =
@@ -114,7 +113,8 @@ CustomFCFSScheduler::resource_area_through(sim_time_t through_time) const {
   return area;
 }
 
-double CustomFCFSScheduler::utilization_through(sim_time_t through_time) const {
+double
+FCFSEasyCustomScheduler::utilization_through(sim_time_t through_time) const {
   const sim_time_t duration = through_time - m_resource_area_start;
   if (m_total_nodes == 0 || duration <= 0.0) {
     return 0.0;
@@ -123,7 +123,7 @@ double CustomFCFSScheduler::utilization_through(sim_time_t through_time) const {
          (static_cast<double>(m_total_nodes) * duration);
 }
 
-std::optional<tdiff_t> CustomFCFSScheduler::waiting_resource_area() const {
+std::optional<tdiff_t> FCFSEasyCustomScheduler::waiting_resource_area() const {
   tdiff_t area = 0.0;
   for (size_t i = 0; i < m_eligible_end_idx; ++i) {
     const auto &job = m_wait_queue[i];
@@ -134,20 +134,20 @@ std::optional<tdiff_t> CustomFCFSScheduler::waiting_resource_area() const {
   return area;
 }
 
-std::optional<job_no_t> CustomFCFSScheduler::select_backfill_candidate(
+std::optional<job_no_t> FCFSEasyCustomScheduler::select_backfill_candidate(
     const backfill_candidates_t &candidates, num_nodes_t available_nodes,
     const running_jobs_t &effective_running_jobs, sim_time_t current_time) {
   (void)available_nodes;
   (void)effective_running_jobs;
   (void)current_time;
   if (!m_backfill_selector) {
-    throw std::logic_error(
-        "CustomFCFSScheduler subclass did not implement candidate selection");
+    throw std::logic_error("FCFSEasyCustomScheduler subclass did not implement "
+                           "candidate selection");
   }
   return m_backfill_selector(candidates);
 }
 
-void CustomFCFSScheduler::on_jobs_became_eligible(
+void FCFSEasyCustomScheduler::on_jobs_became_eligible(
     size_t newly_eligible_begin, size_t eligible_end,
     num_nodes_t available_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
@@ -158,7 +158,7 @@ void CustomFCFSScheduler::on_jobs_became_eligible(
   (void)current_time;
 }
 
-void CustomFCFSScheduler::on_backfill_candidates_ready(
+void FCFSEasyCustomScheduler::on_backfill_candidates_ready(
     const backfill_candidates_t &candidates, num_nodes_t available_nodes,
     const running_jobs_t &effective_running_jobs, sim_time_t current_time,
     bool fcfs_jobs_started) {
@@ -169,7 +169,7 @@ void CustomFCFSScheduler::on_backfill_candidates_ready(
   (void)fcfs_jobs_started;
 }
 
-void CustomFCFSScheduler::on_scheduling_cycle_complete(
+void FCFSEasyCustomScheduler::on_scheduling_cycle_complete(
     num_nodes_t available_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
   (void)available_nodes;
@@ -177,35 +177,36 @@ void CustomFCFSScheduler::on_scheduling_cycle_complete(
   (void)current_time;
 }
 
-void CustomFCFSScheduler::finish_scheduling_cycle(
+void FCFSEasyCustomScheduler::finish_scheduling_cycle(
     num_nodes_t available_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
   on_scheduling_cycle_complete(available_nodes, running_jobs, current_time);
   complete_candidate_scan();
 }
 
-void CustomFCFSScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
-                                     tdiff_t run_time_estimate,
-                                     num_nodes_t nodes_requested) {
+void FCFSEasyCustomScheduler::insert_job(job_no_t job_id,
+                                         sim_time_t submit_time,
+                                         tdiff_t run_time_estimate,
+                                         num_nodes_t nodes_requested) {
   if (!m_job_cost_function) {
     throw std::logic_error(
-        "CustomFCFSScheduler subclass must use insert_job_with_cost");
+        "FCFSEasyCustomScheduler subclass must use insert_job_with_cost");
   }
   insert_job_with_cost(job_id, submit_time, run_time_estimate, nodes_requested,
                        m_job_cost_function(job_id, submit_time,
                                            run_time_estimate, nodes_requested));
 }
 
-void CustomFCFSScheduler::insert_job_with_cost(job_no_t job_id,
-                                               sim_time_t submit_time,
-                                               tdiff_t run_time_estimate,
-                                               num_nodes_t nodes_requested,
-                                               job_cost_t cost) {
+void FCFSEasyCustomScheduler::insert_job_with_cost(job_no_t job_id,
+                                                   sim_time_t submit_time,
+                                                   tdiff_t run_time_estimate,
+                                                   num_nodes_t nodes_requested,
+                                                   job_cost_t cost) {
   if (m_wait_queue.full()) {
     if (m_overflow_policy == CircularOverflowPolicy::ABORT) {
-      throw std::runtime_error("CustomFCFSScheduler: wait queue capacity (" +
-                               std::to_string(m_wait_queue.capacity()) +
-                               ") exceeded");
+      throw std::runtime_error(
+          "FCFSEasyCustomScheduler: wait queue capacity (" +
+          std::to_string(m_wait_queue.capacity()) + ") exceeded");
     }
     m_wait_queue.set_capacity(std::max<size_t>(m_wait_queue.capacity() * 2, 1));
   }
@@ -221,7 +222,7 @@ void CustomFCFSScheduler::insert_job_with_cost(job_no_t job_id,
   }
 }
 
-void CustomFCFSScheduler::sync_to(sim_time_t current_time) {
+void FCFSEasyCustomScheduler::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return;
   }
@@ -238,7 +239,7 @@ void CustomFCFSScheduler::sync_to(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-sim_time_t CustomFCFSScheduler::get_next_arrival_time() {
+sim_time_t FCFSEasyCustomScheduler::get_next_arrival_time() {
   for (size_t i = m_eligible_end_idx; i < m_wait_queue.size(); ++i) {
     if (!m_wait_queue[i].removed) {
       return m_wait_queue[i].submit_time;
@@ -247,7 +248,7 @@ sim_time_t CustomFCFSScheduler::get_next_arrival_time() {
   return std::numeric_limits<sim_time_t>::max();
 }
 
-void CustomFCFSScheduler::compact_if_needed() {
+void FCFSEasyCustomScheduler::compact_if_needed() {
   if (m_removed_count == 0 || m_removed_count * 2 <= m_wait_queue.size()) {
     return;
   }
@@ -271,14 +272,14 @@ void CustomFCFSScheduler::compact_if_needed() {
   m_removed_count = 0;
 }
 
-backfill_candidates_t CustomFCFSScheduler::find_backfill_candidates(
+backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates(
     num_nodes_t available_nodes, sim_time_t current_time,
     sim_time_t reservation_time) const {
   return find_backfill_candidates_from(1, available_nodes, current_time,
                                        reservation_time);
 }
 
-backfill_candidates_t CustomFCFSScheduler::find_backfill_candidates_from(
+backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates_from(
     size_t begin_idx, num_nodes_t available_nodes, sim_time_t current_time,
     sim_time_t reservation_time) const {
   backfill_candidates_t candidates;
@@ -318,9 +319,9 @@ backfill_candidates_t CustomFCFSScheduler::find_backfill_candidates_from(
 }
 
 std::vector<job_no_t>
-CustomFCFSScheduler::schedule(num_nodes_t free_nodes,
-                              const running_jobs_t &running_jobs,
-                              sim_time_t current_time) {
+FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
+                                  const running_jobs_t &running_jobs,
+                                  sim_time_t current_time) {
   sync_to(current_time);
   compact_if_needed();
 

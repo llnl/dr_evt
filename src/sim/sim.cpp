@@ -13,7 +13,7 @@
 
 #include "sim/sim.hpp"
 #include "sim/block_wait_queue.hpp"
-#include "sim/scheduler_circular_fcfs_periodic_hybrid.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
@@ -406,12 +406,13 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
     : m_params(std::move(params)),
       m_trace(m_params.m_infile, m_params.m_trace_format,
               m_params.m_timestamp_format, m_params.m_timezone),
-      m_scheduler(std::make_unique<CustomFCFSScheduler>(
+      m_scheduler(std::make_unique<FCFSEasyCustomScheduler>(
           m_params.m_total_nodes, m_trace.data().size(),
           m_params.m_backfill_policy, m_params.m_num_max_candidates,
           std::move(cost_function), std::move(selector),
           m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow)),
-      m_custom_scheduler(static_cast<CustomFCFSScheduler *>(m_scheduler.get())),
+      m_custom_scheduler(
+          static_cast<FCFSEasyCustomScheduler *>(m_scheduler.get())),
       m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -440,12 +441,13 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
 
 template <typename TraceType>
 BasicSimulation<TraceType>::BasicSimulation(
-    Sim_Params params, std::unique_ptr<CustomFCFSScheduler> scheduler)
+    Sim_Params params, std::unique_ptr<FCFSEasyCustomScheduler> scheduler)
     : m_params(std::move(params)),
       m_trace(m_params.m_infile, m_params.m_trace_format,
               m_params.m_timestamp_format, m_params.m_timezone),
       m_scheduler(std::move(scheduler)),
-      m_custom_scheduler(static_cast<CustomFCFSScheduler *>(m_scheduler.get())),
+      m_custom_scheduler(
+          static_cast<FCFSEasyCustomScheduler *>(m_scheduler.get())),
       m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -1213,7 +1215,7 @@ void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
     if (m_custom_scheduler != nullptr &&
-        typeid(*m_custom_scheduler) != typeid(CustomFCFSScheduler)) {
+        typeid(*m_custom_scheduler) != typeid(FCFSEasyCustomScheduler)) {
       throw std::logic_error(
           "checkpointing is not supported for custom scheduler subclasses");
     }
@@ -1537,7 +1539,7 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
     if (m_custom_scheduler != nullptr &&
-        typeid(*m_custom_scheduler) != typeid(CustomFCFSScheduler)) {
+        typeid(*m_custom_scheduler) != typeid(FCFSEasyCustomScheduler)) {
       throw std::logic_error(
           "checkpointing is not supported for custom scheduler subclasses");
     }
@@ -1720,8 +1722,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
         const auto cost = reader.value<job_cost_t>();
         const auto removed = reader.value<bool>();
         m_custom_scheduler->m_wait_queue.push_back(
-            CustomFCFSScheduler::JobEntry(job_id, submit_time, run_time, nodes,
-                                          cost));
+            FCFSEasyCustomScheduler::JobEntry(job_id, submit_time, run_time,
+                                              nodes, cost));
         m_custom_scheduler->m_wait_queue.back().removed = removed;
       }
       const auto overflow_policy = reader.enumeration<CircularOverflowPolicy>();
@@ -2906,16 +2908,15 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
 template <typename TraceType>
 template <bool AccountResources, bool WarmStage, bool PeriodicBackfill>
 void BasicSimulation<TraceType>::advance_to_impl(
-    sim_time_t target_time, CustomFCFSScheduler *custom_scheduler) {
+    sim_time_t target_time, FCFSEasyCustomScheduler *custom_scheduler) {
   if constexpr (!AccountResources) {
     (void)custom_scheduler;
   }
   constexpr bool periodic_backfill = PeriodicBackfill;
-  CircularBufferFCFSPeriodicHybridScheduler *periodic_scheduler = nullptr;
+  FCFSPeriodicHybridCircularScheduler *periodic_scheduler = nullptr;
   if constexpr (PeriodicBackfill) {
     periodic_scheduler =
-        static_cast<CircularBufferFCFSPeriodicHybridScheduler *>(
-            m_scheduler.get());
+        static_cast<FCFSPeriodicHybridCircularScheduler *>(m_scheduler.get());
   }
 
   // Validate precondition

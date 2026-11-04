@@ -34,7 +34,7 @@ The corresponding flags are
 ## Implementation
 
 The scheduler is implemented in
-`src/sim/scheduler_circular_fcfs.{hpp,cpp}` and constructed by the scheduler
+`src/sim/scheduler_fcfs_easy_circular.{hpp,cpp}` and constructed by the scheduler
 factory in `src/sim/scheduler_base.cpp`. Configuration parsing lives in
 `src/params/sim_params.{hpp,cpp}`.
 

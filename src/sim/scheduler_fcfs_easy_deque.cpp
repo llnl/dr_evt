@@ -5,16 +5,16 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs.cpp
+/** @file scheduler_fcfs_easy_deque.cpp
  * @brief Event-time synchronization and selection for the deque FCFS scheduler.
  */
 
-#include "sim/scheduler_fcfs.hpp"
+#include "sim/scheduler_fcfs_easy_deque.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-void FCFSScheduler::sync_to(sim_time_t current_time) {
+void FCFSEasyDequeScheduler::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return; // Time hasn't advanced - nothing to do, and skips
             // unconditionally setting m_current_tracked_time below,
@@ -30,7 +30,7 @@ void FCFSScheduler::sync_to(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-void FCFSScheduler::mark_removed(job_no_t job_id) {
+void FCFSEasyDequeScheduler::mark_removed(job_no_t job_id) {
   // Mark job as removed - actual deletion deferred to garbage collection
   for (auto &entry : m_wait_queue) {
     if (entry.job_id == job_id && !entry.removed) {
@@ -42,9 +42,9 @@ void FCFSScheduler::mark_removed(job_no_t job_id) {
 }
 
 std::vector<job_no_t>
-FCFSScheduler::schedule(num_nodes_t free_nodes,
-                        const running_jobs_t &running_jobs,
-                        sim_time_t current_time) {
+FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) {
   // Sync eligibility tracking - unconditional, so schedule() stays
   // correct regardless of whether an external caller already synced
   // (redundant call is cheap, see sync_to()'s own early-return).

@@ -1201,8 +1201,8 @@ void test_horizon_skipped_jobs_and_queue_depth() {
 }
 
 // FCFS_CONSERVATIVE ordering with the EASY policy is served by the FCFS EASY
-// schedulers, because the conservative classes implement conservative and
-// hybrid reservations only. The head is protected and a short job backfills.
+// schedulers, because the hybrid classes implement conservative and hybrid
+// reservations only. The head is protected and a short job backfills.
 void test_fcfs_conservative_ordering_with_easy() {
   std::cout << "\n=== fcfs_conservative ordering with EASY ===" << std::endl;
 

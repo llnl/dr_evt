@@ -5,23 +5,23 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_sjf.cpp
+/** @file scheduler_sjf_easy.cpp
  * @brief Shortest-job-first scheduling implementation.
  */
 
-#include "sim/scheduler_sjf.hpp"
+#include "sim/scheduler_sjf_easy.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-SJFScheduler::SJFScheduler(num_nodes_t total_nodes,
-                           BackfillPolicy backfill_policy,
-                           size_t backfill_queue_depth)
+SJFEasyScheduler::SJFEasyScheduler(num_nodes_t total_nodes,
+                                   BackfillPolicy backfill_policy,
+                                   size_t backfill_queue_depth)
     : SchedulerBase(total_nodes, backfill_policy), m_current_tracked_time(0.0),
       m_backfill_queue_depth(backfill_queue_depth) {}
 
-void SJFScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
-                              tdiff_t run_time, num_nodes_t nodes) {
+void SJFEasyScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
+                                  tdiff_t run_time, num_nodes_t nodes) {
   JobEntry entry{job_id, submit_time, run_time, nodes};
   m_wait_queue.insert({run_time, entry});
 
@@ -31,7 +31,7 @@ void SJFScheduler::insert_job(job_no_t job_id, sim_time_t submit_time,
   }
 }
 
-void SJFScheduler::update_eligible_jobs(sim_time_t current_time) {
+void SJFEasyScheduler::update_eligible_jobs(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return; // Time hasn't advanced
   }
@@ -48,8 +48,8 @@ void SJFScheduler::update_eligible_jobs(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-std::multimap<tdiff_t, SJFScheduler::JobEntry>::iterator
-SJFScheduler::find_fcfs_head() {
+std::multimap<tdiff_t, SJFEasyScheduler::JobEntry>::iterator
+SJFEasyScheduler::find_fcfs_head() {
   // FCFS head = eligible job with earliest submit_time
   auto fcfs_it = m_wait_queue.end();
   sim_time_t earliest_submit = std::numeric_limits<sim_time_t>::max();
@@ -68,9 +68,10 @@ SJFScheduler::find_fcfs_head() {
   return fcfs_it;
 }
 
-std::vector<job_no_t> SJFScheduler::schedule(num_nodes_t free_nodes,
-                                             const running_jobs_t &running_jobs,
-                                             sim_time_t current_time) {
+std::vector<job_no_t>
+SJFEasyScheduler::schedule(num_nodes_t free_nodes,
+                           const running_jobs_t &running_jobs,
+                           sim_time_t current_time) {
   // Update eligibility tracking
   update_eligible_jobs(current_time);
 
@@ -95,7 +96,7 @@ std::vector<job_no_t> SJFScheduler::schedule(num_nodes_t free_nodes,
     // multimap::erase(iterator) is O(1) amortized regardless of the
     // node's position in the tree, unlike erasing from the middle of
     // a sequential container, so there's no performance reason to
-    // defer this the way FCFSScheduler's deque-based lazy deletion
+    // defer this the way FCFSEasyDequeScheduler's deque-based lazy deletion
     // was worth doing.
     m_eligible_jobs.erase(head_job_id);
     m_wait_queue.erase(fcfs_head_it);
@@ -118,8 +119,8 @@ std::vector<job_no_t> SJFScheduler::schedule(num_nodes_t free_nodes,
   const bool head_within_horizon =
       reservation_within_horizon(reservation_time, current_time);
 
-  // Scan in SJF order (shortest first) for backfill candidates. Every candidate that
-  // qualifies is started in this one call, as in the index-based FCFS
+  // Scan in SJF order (shortest first) for backfill candidates. Every candidate
+  // that qualifies is started in this one call, as in the index-based FCFS
   // schedulers, so --backfill_queue_depth counts the same jobs whichever
   // scheduler runs. Starting a candidate leaves the window unchanged: it ends
   // no later than the head's reservation, so its nodes are back in time.
