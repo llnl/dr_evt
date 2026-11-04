@@ -11,11 +11,13 @@
 # 1. Every FCFS scheduler implementation running EASY with a queue depth
 #    matches the Python EASY reference given the same depth, with and without
 #    a planning horizon: deque, circular, and block queues, the multimap
-#    fcfs_alt scheduler, and the EASY mode of both conservative schedulers.
+#    fcfs_alt scheduler, and the fcfs_conservative ordering with EASY, which
+#    selects the FCFS EASY schedulers.
 # 2. A depth of 1 leaves only the head, so EASY must equal
 #    --backfill_policy none for FCFS, fcfs_alt, SJF, and LJF.
 # 3. Periodic EASY with a depth equals periodic hybrid with reservation
-#    depth 1 and the same depth.
+#    depth 1 and the same depth: there is no periodic EASY scheduler, and
+#    EASY runs as hybrid with reservation depth 1.
 # 4. SJF and LJF complete the workload with a depth.
 
 set -e
@@ -90,8 +92,8 @@ IMPLEMENTATIONS=(
     "fcfs circular|--priority_policy fcfs --queue_impl circular"
     "fcfs block|--priority_policy fcfs --queue_impl block"
     "fcfs_alt|--priority_policy fcfs_alt"
-    "fcfs_conservative easy, circular|--priority_policy fcfs_conservative --queue_impl circular"
-    "fcfs_conservative easy, deque|--priority_policy fcfs_conservative --queue_impl deque"
+    "fcfs_conservative ordering with easy, circular|--priority_policy fcfs_conservative --queue_impl circular"
+    "fcfs_conservative ordering with easy, deque|--priority_policy fcfs_conservative --queue_impl deque"
 )
 
 for SETTING in "2|" "8|" "8|2000"; do

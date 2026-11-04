@@ -94,6 +94,32 @@ def main():
         )
         assert per_timestamp[4]["start_time"] == "1.0"
 
+        # A planning horizon makes the blocked head and the second job
+        # unplannable (their reservations are at t=1000, beyond 50 s). With a
+        # depth of 2, event-driven scheduling follows Fluxion and does not
+        # charge them, so the small job behind them starts at once. Periodic
+        # scheduling follows Slurm, which counts both jobs as tested, so the
+        # depth is spent before the small job and it waits for the large job's
+        # nodes to come back.
+        horizon_trace = outdir / "horizon_counts_toward_depth.csv"
+        horizon_trace.write_text(
+            "job_submit_time,num_nodes,time_limit\n"
+            "0,6,1000\n"
+            "0,10,10\n"
+            "0,8,5\n"
+            "0,2,5\n"
+        )
+        horizon_options = ("--reservation-depth", "1",
+                           "--backfill-queue-depth", "2",
+                           "--planning-horizon", "50")
+        event_driven = run_reference(
+            source_dir, horizon_trace, outdir, *horizon_options)
+        assert event_driven[3]["start_time"] == "0.0"
+        periodic = run_reference(
+            source_dir, horizon_trace, outdir, *horizon_options,
+            "--backfill-interval", "10")
+        assert float(periodic[3]["start_time"]) >= 1000.0
+
 
 if __name__ == "__main__":
     main()

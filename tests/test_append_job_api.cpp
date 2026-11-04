@@ -1156,6 +1156,83 @@ void test_periodic_backfill_queue_depth_is_one_cycle_per_tick() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// A job whose reservation lies beyond the planning horizon holds no
+// reservation in either mode. Whether it also uses a queue-depth slot follows
+// the system being reproduced. Event-driven scheduling follows Fluxion, which
+// takes an unreservable job out of its scheduled count, so the small job
+// behind it is examined at once. Periodic scheduling follows Slurm, which
+// counts every tested job toward bf_max_job_test before it learns the planned
+// start is beyond bf_window, so the blocked head and the second job spend the
+// depth of 2 and the small job is never examined.
+void test_horizon_skipped_jobs_and_queue_depth() {
+  std::cout << "\n=== Out-of-horizon jobs and the queue depth ===" << std::endl;
+
+  for (const double interval : {0.0, 10.0}) {
+    auto params = make_params();
+    params.m_total_nodes = 10;
+    params.m_queue_impl = QueueImplementation::CIRCULAR;
+    params.m_backfill_policy = BackfillPolicy::HYBRID;
+    params.m_reservation_depth = 1;
+    params.m_backfill_queue_depth = 2;
+    params.m_planning_horizon = 50.0;
+    params.m_backfill_interval = interval;
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+
+    // A leaves four nodes free until t=1000, so every blocked job's
+    // reservation is beyond the 50 s horizon.
+    (void)sim.append_job(0.0, 6, kTestQueueInput, 1000.0);
+    sim.advance_to(0.1);
+    (void)sim.append_job(0.1, 10, kTestQueueInput, 10.0); // H: blocked head
+    (void)sim.append_job(0.1, 8, kTestQueueInput, 5.0);   // C1: cannot fit
+    const auto c2 = sim.append_job(0.1, 2, kTestQueueInput, 5.0); // C2: fits
+    sim.advance_to(25.0);
+
+    const auto status = sim.get_job_statuses({c2}).front();
+    if (interval == 0.0) {
+      assert(status.start_time.has_value());
+      assert(approx_equal(*status.start_time, 0.1));
+    } else {
+      assert(status.state == Simulation::Job_State::PENDING);
+    }
+  }
+
+  std::cout << "  PASSED" << std::endl;
+}
+
+// FCFS_CONSERVATIVE ordering with the EASY policy is served by the FCFS EASY
+// schedulers, because the conservative classes implement conservative and
+// hybrid reservations only. The head is protected and a short job backfills.
+void test_fcfs_conservative_ordering_with_easy() {
+  std::cout << "\n=== fcfs_conservative ordering with EASY ===" << std::endl;
+
+  for (const auto queue_impl :
+       {QueueImplementation::CIRCULAR, QueueImplementation::DEQUE}) {
+    auto params = make_params();
+    params.m_queue_impl = queue_impl;
+    params.m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
+    params.m_backfill_policy = BackfillPolicy::EASY;
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+    (void)sim.append_job(0.0, 90, kTestQueueInput, 100.0);
+    sim.advance_to(0.1);
+    const auto head = sim.append_job(0.1, 100, kTestQueueInput, 10.0);
+    const auto shorter = sim.append_job(0.1, 10, kTestQueueInput, 50.0);
+    const auto longer = sim.append_job(0.1, 10, kTestQueueInput, 500.0);
+    sim.advance_to(0.1);
+
+    assert(sim.get_job_statuses({head}).front().state ==
+           Simulation::Job_State::PENDING);
+    assert(sim.get_job_statuses({shorter}).front().state ==
+           Simulation::Job_State::RUNNING);
+    assert(sim.get_job_statuses({longer}).front().state ==
+           Simulation::Job_State::PENDING); // would delay the head
+    assert(approx_equal(sim.get_fcfs_head_shadow_time(), 100.0));
+  }
+
+  std::cout << "  PASSED" << std::endl;
+}
+
 // Repeated scheduler passes at one event timestamp must share the configured
 // queue-depth budget. Here D starts in the first pass after H and C consume
 // the three slots; the old per-pass accounting then reset and incorrectly
@@ -1962,6 +2039,8 @@ int main() {
     test_planning_horizon_event_driven();
     test_backfill_queue_depth_is_shared_per_timestamp();
     test_periodic_backfill_queue_depth_is_one_cycle_per_tick();
+    test_horizon_skipped_jobs_and_queue_depth();
+    test_fcfs_conservative_ordering_with_easy();
     test_submit_job_records_busy_nodes();
     test_append_jobs_memory_pressure();
     test_resource_area_and_time_accounted_utilization();

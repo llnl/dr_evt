@@ -10,6 +10,7 @@
 
 #include "sim/scheduler_base.hpp"
 #include <deque>
+#include <stdexcept>
 #include <vector>
 
 namespace dr_evt {
@@ -20,8 +21,8 @@ namespace dr_evt {
 /**
  * FCFS scheduler with Conservative backfilling support.
  *
- * Supports four backfill modes via BackfillPolicy:
- * - EASY: Only head job gets reservation (standard EASY backfilling)
+ * Supports three backfill modes via BackfillPolicy. EASY is not one of them;
+ * it has its own FCFS schedulers, and constructing this class with EASY throws.
  * - CONSERVATIVE: All waiting jobs get reservations; backfill cannot delay
  *   any of them
  * - HYBRID: The first reservation_depth waiting jobs get reservations and
@@ -81,7 +82,8 @@ public:
   /** @brief Construct a conservative-backfill FCFS scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
    * @param[in] bf_policy Backfill setting; conservative and hybrid behavior
-   * are implemented by this class.
+   * are implemented by this class. EASY has its own FCFS scheduler.
+   * @throws std::invalid_argument if bf_policy is EASY.
    * @param[in] reservation_depth Number of waiting jobs, in queue order, that
    * hold reservations under HYBRID backfilling; ignored otherwise.
    * @param[in] backfill_queue_depth Eligible waiting jobs examined per
@@ -94,7 +96,12 @@ public:
         m_reservation_depth(reservation_depth),
         m_backfill_queue_depth(backfill_queue_depth),
         m_backfill_depth_time(std::numeric_limits<sim_time_t>::lowest()),
-        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {}
+        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {
+    if (bf_policy == BackfillPolicy::EASY) {
+      throw std::invalid_argument(
+          "the conservative deque scheduler does not implement EASY");
+    }
+  }
 
   /** @copydoc SchedulerBase::insert_job */
   void insert_job(job_no_t job_id, sim_time_t submit_time,

@@ -56,11 +56,12 @@ Each item describes the code on this branch.
   [Remaining differences](#remaining-differences).
   [`--planning_horizon`](../user-guide/command-line.md#--planning_horizon-seconds)
   drops reservations that would start beyond the horizon in event-driven and
-  periodic mode. Such a job consumes neither a queue-depth nor a reservation
-  slot, remains queued, and is reconsidered on the next pass. Under EASY
-  only the head holds a reservation, so only the head can be exempted. This is a
-  practical approximation of external resource-status notifications that
-  DR_EVT does not simulate.
+  periodic mode. Such a job holds no reservation and uses no reservation
+  slot, remains queued, and is reconsidered on the next pass. Whether it uses a
+  queue-depth slot follows the system being reproduced: yes in periodic mode,
+  as in Slurm, and no in event-driven mode, where it stands in for a job that
+  Fluxion blocks. This is a practical approximation of external
+  resource-status notifications that DR_EVT does not simulate.
   [`--planning_time_resolution`](../user-guide/command-line.md#--planning_time_resolution-seconds)
   rounds each projected release up to a grid once its start is known; the
   clock and actual execution stay exact.
@@ -185,7 +186,8 @@ the target system's cleanup time where node reuse matters.
 |---|---|---|---|
 | Slurm `bf_window` | Counts toward `bf_max_job_test` | No reservation slot | Retested every pass |
 | Fluxion blocked list | Not counted (`--m_scheduled_cnt`) | No reservation slot | Reconsidered on Fluxion status, completion, or priority triggers |
-| DR_EVT `--planning_horizon` | Does not count toward `--backfill_queue_depth` | No reservation slot | Retested every pass |
+| DR_EVT `--planning_horizon`, periodic | Counts toward `--backfill_queue_depth`, as in Slurm | No reservation slot | Retested every pass |
+| DR_EVT `--planning_horizon`, event-driven | Does not count toward `--backfill_queue_depth`, as a blocked job in Fluxion | No reservation slot | Retested every pass |
 
 DR_EVT leaves the job in its normal queue and recomputes its reservation each
 pass. This captures observable releases and scheduled capacity changes without
@@ -195,13 +197,15 @@ modeling Fluxion's external resource-status notification path.
 
 - **Backfill queue-depth accounting.** `--backfill_queue_depth` counts the
   jobs examined in one backfill cycle. With `--backfill_interval`, the Slurm
-  model, one tick is one cycle for every policy: all backfill passes at the
-  tick share one count and it resets at the next tick. Without an interval,
-  the Flux-like event-driven model, the simulator repeats passes at one
-  timestamp until nothing more starts. Conservative and hybrid share one
-  count across those passes. EASY, SJF, LJF, and the custom selector start
-  the count again in each pass, so at one timestamp they can examine more
-  jobs than the depth. Sharing the count in those paths is future work.
+  model, one tick is one cycle: all backfill passes at the tick share one
+  count and it resets at the next tick. Periodic EASY runs as hybrid with
+  reservation depth 1, so it follows the same rule. Without an interval, the
+  Flux-like event-driven model, the simulator repeats passes at one timestamp
+  until nothing more starts. Conservative and hybrid share one count across
+  those passes. The separate EASY, SJF, LJF, and custom-selector
+  implementations start the count again in each pass, so at one timestamp they
+  can examine more jobs than the depth, unlike hybrid with reservation depth
+  1, which EASY is meant to equal. Aligning them is future work.
 
 | Aspect | DR_EVT | Difference and bias |
 |---|---|---|
@@ -238,10 +242,11 @@ separate behavioral distinction.
   workloads (`tests/run_planning_horizon_tests.sh`).
 - **Queue depth under EASY.** With a queue depth, with and without a planning
   horizon, the deque, circular, block, and multimap FCFS schedulers and the
-  EASY mode of both conservative schedulers match the Python EASY reference;
-  a depth of 1 equals no backfilling for FCFS, SJF, and LJF; and periodic
-  EASY equals periodic hybrid with one reservation under the same depth,
-  because both share the count within a tick
+  `fcfs_conservative` ordering with EASY, which selects the FCFS EASY
+  schedulers, match the Python EASY reference; a depth of 1 equals no
+  backfilling for FCFS, SJF, and LJF; and periodic EASY equals periodic hybrid
+  with one reservation under the same depth, because periodic EASY runs as
+  that hybrid
   (`tests/run_backfill_queue_depth_tests.sh`).
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).

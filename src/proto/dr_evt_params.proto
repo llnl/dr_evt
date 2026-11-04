@@ -132,8 +132,9 @@ message DR_EVT_Params {
         // by every scheduler. Zero leaves the scan unlimited.
         uint64 backfill_queue_depth = 41;
 
-        // Seconds between periodic EASY, conservative, or hybrid backfill
-        // evaluations. Zero keeps event-driven backfill behavior.
+        // Seconds between periodic conservative or hybrid backfill
+        // evaluations (EASY runs as hybrid with reservation depth 1). Zero
+        // keeps event-driven backfill behavior.
         double backfill_interval = 42;
 
         // Planning time-limit grid for scheduler projections; zero is exact.

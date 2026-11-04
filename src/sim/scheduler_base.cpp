@@ -209,9 +209,18 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
     }
+    // Periodic mode reproduces Slurm's backfill iteration, which reserves for
+    // a fixed number of jobs: hybrid, with conservative as the unlimited
+    // case. There is no periodic EASY scheduler; EASY is hybrid with
+    // reservation depth 1 and runs as such.
+    const BackfillPolicy periodic_policy =
+        backfill_policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID
+                                                : backfill_policy;
+    const size_t periodic_reservation_depth =
+        backfill_policy == BackfillPolicy::EASY ? 1 : reservation_depth;
     return std::make_unique<CircularBufferFCFSPeriodicHybridScheduler>(
         total_nodes, initial_job_count, wait_queue_capacity,
-        wait_queue_overflow, backfill_policy, reservation_depth,
+        wait_queue_overflow, periodic_policy, periodic_reservation_depth,
         backfill_queue_depth);
   }
   if (backfill_policy == BackfillPolicy::HYBRID) {
@@ -230,6 +239,14 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
         total_nodes, initial_job_count, backfill_policy, queue_impl,
         wait_queue_capacity, wait_queue_overflow, reservation_depth,
         backfill_queue_depth);
+  }
+
+  // The conservative classes implement the conservative and hybrid
+  // reservation policies only. EASY has its own FCFS implementations, so the
+  // FCFS_CONSERVATIVE ordering (FCFS order) with EASY is served by them.
+  if (priority_policy == PriorityPolicy::FCFS_CONSERVATIVE &&
+      backfill_policy == BackfillPolicy::EASY) {
+    priority_policy = PriorityPolicy::FCFS;
   }
 
   switch (priority_policy) {

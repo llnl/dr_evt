@@ -55,35 +55,16 @@ protected:
   size_t m_backfill_depth_examined;
   /// Whether the blocked FCFS head has consumed its slot in that cycle.
   bool m_backfill_depth_head_accounted;
-  /// True when one backfill cycle spans every pass at a timestamp for the EASY
-  /// scan as well. Conservative and hybrid scans always share their count;
-  /// the periodic subclass sets this so that all policies treat one tick as
-  /// one cycle, the way Slurm resets bf_max_job_test per backfill iteration.
-  bool m_share_easy_depth_across_passes = false;
-
-  /**
-   * @brief End of the EASY candidate scan, sharing the depth across passes.
-   * @details Starts a new accounting cycle when time has advanced, charges an
-   * in-horizon blocked head once per cycle, then charges every eligible job
-   * the scan will examine against the remaining budget. A later pass at the
-   * same timestamp therefore continues from the count left by the earlier
-   * pass instead of starting from zero.
-   * @param[in] begin First candidate index (the entry after the head).
-   * @param[in] end One past the last eligible index.
-   * @param[in] head_planned Whether the head's reservation is inside the
-   * planning horizon and therefore consumes a slot.
-   * @param[in] current_time Timestamp of the pass.
-   * @return Index at which the candidate scan stops, in [begin, end].
-   */
-  size_t shared_easy_scan_end(size_t begin, size_t end, bool head_planned,
-                              sim_time_t current_time);
 
 public:
   /**
    * @brief Construct a circular-buffer conservative FCFS scheduler.
+   * @details EASY has its own FCFS implementations; this class serves the
+   * conservative and hybrid reservation policies (and no backfilling).
    * @param[in] total_nodes Cluster capacity available for allocations.
    * @param[in] initial_job_count Initially known jobs, used when capacity is 0.
    * @param[in] bf_policy Conservative or hybrid reservation policy.
+   * @throws std::invalid_argument if bf_policy is EASY.
    * @param[in] initial_capacity Initial queue capacity; zero uses job count.
    * @param[in] overflow_policy Action when the queue is full.
    * @param[in] reservation_depth Reservations retained by hybrid backfill.
@@ -103,7 +84,12 @@ public:
         m_reservation_depth(reservation_depth),
         m_backfill_queue_depth(backfill_queue_depth),
         m_backfill_depth_time(std::numeric_limits<sim_time_t>::lowest()),
-        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {}
+        m_backfill_depth_examined(0), m_backfill_depth_head_accounted(false) {
+    if (bf_policy == BackfillPolicy::EASY) {
+      throw std::invalid_argument(
+          "the conservative circular scheduler does not implement EASY");
+    }
+  }
 
   void insert_job(job_no_t job_id, sim_time_t submit_time,
                   tdiff_t run_time_estimate,
@@ -121,6 +107,21 @@ public:
 
 protected:
   size_t wait_queue_size() const override { return m_wait_queue.size(); }
+
+  /**
+   * @brief Whether a job beyond the planning horizon still uses a depth slot.
+   * @details A job whose own reservation would start beyond the planning
+   * horizon holds no reservation and no reservation-depth slot in either mode.
+   * Whether it also consumes a backfill queue-depth slot depends on the model
+   * being reproduced. Event-driven scheduling follows Fluxion, which takes a
+   * job it cannot reserve out of its count of scheduled jobs, so the default
+   * is false. The periodic subclass overrides this to follow Slurm, which
+   * counts a job it has tested toward bf_max_job_test before it finds the
+   * planned start beyond bf_window.
+   * @return true when such a job, and a blocked head beyond the horizon, use
+   * a queue-depth slot.
+   */
+  virtual bool horizon_skipped_job_uses_depth_slot() const { return false; }
 
 private:
   /** Build the chained protected reservation plan before job_index and return

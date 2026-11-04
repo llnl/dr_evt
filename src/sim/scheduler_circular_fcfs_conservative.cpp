@@ -101,33 +101,6 @@ CircularBufferFCFSConservativeScheduler::calculate_conservative_window(
   return earliest_conflict;
 }
 
-size_t CircularBufferFCFSConservativeScheduler::shared_easy_scan_end(
-    size_t begin, size_t end, bool head_planned, sim_time_t current_time) {
-  if (m_backfill_queue_depth == 0) {
-    return end;
-  }
-  if (m_backfill_depth_time != current_time) {
-    m_backfill_depth_time = current_time;
-    m_backfill_depth_examined = 0;
-    m_backfill_depth_head_accounted = false;
-  }
-  if (head_planned && !m_backfill_depth_head_accounted) {
-    ++m_backfill_depth_examined;
-    m_backfill_depth_head_accounted = true;
-  }
-  size_t remaining = m_backfill_queue_depth > m_backfill_depth_examined
-                         ? m_backfill_queue_depth - m_backfill_depth_examined
-                         : 0;
-  size_t i = begin;
-  for (; i < end && remaining > 0; ++i) {
-    if (!m_wait_queue[i].removed) {
-      --remaining;
-      ++m_backfill_depth_examined;
-    }
-  }
-  return i;
-}
-
 std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
@@ -179,53 +152,22 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
       m_wait_queue.front().nodes_requested, available_nodes,
       effective_running_jobs, current_time);
 
-  if (m_backfill_policy == BackfillPolicy::EASY) {
-    const bool head_reservation_within_horizon =
-        reservation_within_horizon(m_fcfs_reservation_time, current_time);
-    if (available_nodes == 0) {
-      return jobs_to_run;
-    }
-    const size_t scan_end =
-        m_share_easy_depth_across_passes
-            ? shared_easy_scan_end(1, m_eligible_end_idx,
-                                   head_reservation_within_horizon,
-                                   current_time)
-            : queue_depth_scan_end(m_wait_queue, 1, m_eligible_end_idx,
-                                   m_backfill_queue_depth,
-                                   head_reservation_within_horizon);
-    for (size_t i = 1; i < scan_end; ++i) {
-      const auto &job = m_wait_queue[i];
-      if (job.removed || job.nodes_requested > available_nodes) {
-        continue;
-      }
-      if (!head_reservation_within_horizon ||
-          current_time + release_estimate(current_time, job.run_time_estimate) <
-              m_fcfs_reservation_time) {
-        jobs_to_run.push_back(job.job_id);
-        available_nodes -= job.nodes_requested;
-        m_wait_queue[i].removed = true;
-        ++m_removed_count;
-        if (available_nodes == 0) {
-          break;
-        }
-      }
-    }
-    return jobs_to_run;
-  }
-
   if (available_nodes == 0) {
     return jobs_to_run;
   }
 
   // Share one depth budget across every backfill pass at this timestamp.
-  // Out-of-horizon jobs stay queued but do not consume a scan slot. They are
-  // projected again on the next pass instead of requiring blocked-list state.
+  // A job beyond the planning horizon stays queued, holds no reservation, and
+  // is projected again on the next pass instead of requiring blocked-list
+  // state. Whether it also uses a depth slot is the subclass's choice.
+  const bool horizon_job_uses_slot = horizon_skipped_job_uses_depth_slot();
   if (m_backfill_depth_time != current_time) {
     m_backfill_depth_time = current_time;
     m_backfill_depth_examined = 0;
     m_backfill_depth_head_accounted = false;
   }
-  if (reservation_within_horizon(m_fcfs_reservation_time, current_time) &&
+  if ((horizon_job_uses_slot ||
+       reservation_within_horizon(m_fcfs_reservation_time, current_time)) &&
       !m_backfill_depth_head_accounted) {
     ++m_backfill_depth_examined;
     m_backfill_depth_head_accounted = true;
@@ -238,7 +180,9 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
     const sim_time_t job_reservation =
         calculate_fcfs_reservation(job.nodes_requested, available_nodes,
                                    effective_running_jobs, current_time);
-    if (!reservation_within_horizon(job_reservation, current_time)) {
+    const bool in_horizon =
+        reservation_within_horizon(job_reservation, current_time);
+    if (!in_horizon && !horizon_job_uses_slot) {
       continue;
     }
     if (m_backfill_queue_depth != 0 &&
@@ -246,6 +190,9 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
       break;
     }
     ++m_backfill_depth_examined;
+    if (!in_horizon) {
+      continue; // Counted, but it holds no reservation and cannot backfill.
+    }
     if (job.nodes_requested > available_nodes) {
       continue;
     }
