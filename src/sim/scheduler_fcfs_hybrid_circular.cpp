@@ -200,27 +200,26 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
     const sim_time_t hybrid_window = calculate_hybrid_window(
         i, available_nodes, effective_running_jobs, current_time);
 #else
-    auto protected_plan =
-        reservation_timeline(available_nodes, effective_running_jobs, current_time);
-    const size_t depth = m_backfill_policy == BackfillPolicy::HYBRID
-                             ? m_reservation_depth
-                             : 0;
+    auto protected_plan = reservation_timeline(
+        available_nodes, effective_running_jobs, current_time);
+    const size_t depth =
+        m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
     size_t reserved = 0;
     for (size_t protected_index = 0; protected_index < i; ++protected_index) {
       const auto &protected_job = m_wait_queue[protected_index];
       if (protected_job.removed || (depth != 0 && reserved >= depth))
         continue;
-      const tdiff_t protected_duration = release_estimate(
-          current_time, protected_job.run_time_estimate);
+      const tdiff_t protected_duration =
+          release_estimate(current_time, protected_job.run_time_estimate);
       const auto reservation = protected_plan.earliest_fit(
           protected_job.nodes_requested, protected_duration, current_time);
       if (!reservation ||
           !reservation_within_horizon(*reservation, current_time))
         continue;
       ++reserved;
-      protected_plan.reserve(*reservation, protected_job.nodes_requested,
-                             release_estimate(*reservation,
-                                              protected_job.run_time_estimate));
+      protected_plan.reserve(
+          *reservation, protected_job.nodes_requested,
+          release_estimate(*reservation, protected_job.run_time_estimate));
     }
     const bool preserves_reservations = protected_plan.can_fit(
         current_time, job.nodes_requested,

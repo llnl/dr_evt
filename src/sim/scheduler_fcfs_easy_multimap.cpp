@@ -129,7 +129,8 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
   const bool head_has_projection =
       m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
-  auto reservation_plan = reservation_timeline(free_nodes, running_jobs, current_time);
+  auto reservation_plan =
+      reservation_timeline(free_nodes, running_jobs, current_time);
   if (head_within_horizon) {
     reservation_plan.reserve(m_fcfs_reservation_time, head_nodes,
                              release_estimate(m_fcfs_reservation_time,
@@ -172,12 +173,17 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
     // event to be processed first, causing a delay. Therefore, backfill jobs
     // must complete BEFORE (not at) the reservation time.
 #ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
-    const bool fits_window = head_has_projection && (!head_within_horizon ||
-        release_estimate(current_time, entry.run_time) < backfill_window);
+    const bool fits_window =
+        head_has_projection &&
+        (!head_within_horizon ||
+         release_estimate(current_time, entry.run_time) < backfill_window);
 #else
-    const bool fits_window = head_has_projection &&
-        (!head_within_horizon || reservation_plan.can_fit(
-            current_time, entry.nodes, release_estimate(current_time, entry.run_time)));
+    const bool fits_window =
+        head_has_projection &&
+        (!head_within_horizon ||
+         reservation_plan.can_fit(
+             current_time, entry.nodes,
+             release_estimate(current_time, entry.run_time)));
 #endif
 
     // EASY must fit both nodes and window. CONSERVATIVE uses the same test
@@ -190,8 +196,9 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
       const job_no_t id = entry.job_id;
       available_nodes -= entry.nodes;
       if (head_within_horizon) {
-        reservation_plan.reserve(current_time, entry.nodes,
-                                 release_estimate(current_time, entry.run_time));
+        reservation_plan.reserve(
+            current_time, entry.nodes,
+            release_estimate(current_time, entry.run_time));
       }
       m_eligible_jobs.erase(id);
       it = m_wait_queue.erase(it);

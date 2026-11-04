@@ -257,11 +257,9 @@ private:
     m_candidate_preparation_pending = false;
   }
 
-  backfill_candidates_t
-  find_backfill_candidates_from(size_t begin_idx, num_nodes_t available_nodes,
-                                sim_time_t current_time,
-                                sim_time_t reservation_time,
-                                const running_jobs_t &running_jobs) const;
+  backfill_candidates_t find_backfill_candidates_from(
+      size_t begin_idx, num_nodes_t available_nodes, sim_time_t current_time,
+      sim_time_t reservation_time, const running_jobs_t &running_jobs) const;
 
   void compact_if_needed();
 };

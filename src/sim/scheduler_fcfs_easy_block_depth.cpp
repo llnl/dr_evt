@@ -24,8 +24,8 @@ template <size_t BlockSize>
 std::vector<job_no_t>
 FCFSEasyBlockScheduler<BlockSize>::backfill_with_queue_depth(
     bool head_planned, sim_time_t planned_reservation, sim_time_t current_time,
-    Reservation_Timeline reservation_plan,
-    num_nodes_t available_nodes, std::vector<job_no_t> jobs_to_run) {
+    Reservation_Timeline reservation_plan, num_nodes_t available_nodes,
+    std::vector<job_no_t> jobs_to_run) {
   size_t head_index = 0;
   while (head_index < m_eligible_end_idx && m_job_order[head_index].removed) {
     ++head_index;
@@ -68,31 +68,45 @@ FCFSEasyBlockScheduler<BlockSize>::backfill_with_queue_depth(
 // Explicit instantiations for the supported block sizes.
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<4>::backfill_with_queue_depth(bool, sim_time_t,
-                                                     sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                     sim_time_t,
+                                                     Reservation_Timeline,
+                                                     num_nodes_t,
                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<8>::backfill_with_queue_depth(bool, sim_time_t,
-                                                     sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                     sim_time_t,
+                                                     Reservation_Timeline,
+                                                     num_nodes_t,
                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<16>::backfill_with_queue_depth(bool, sim_time_t,
-                                                      sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                      sim_time_t,
+                                                      Reservation_Timeline,
+                                                      num_nodes_t,
                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<32>::backfill_with_queue_depth(bool, sim_time_t,
-                                                      sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                      sim_time_t,
+                                                      Reservation_Timeline,
+                                                      num_nodes_t,
                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<64>::backfill_with_queue_depth(bool, sim_time_t,
-                                                      sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                      sim_time_t,
+                                                      Reservation_Timeline,
+                                                      num_nodes_t,
                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<128>::backfill_with_queue_depth(bool, sim_time_t,
-                                                       sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                       sim_time_t,
+                                                       Reservation_Timeline,
+                                                       num_nodes_t,
                                                        std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<256>::backfill_with_queue_depth(bool, sim_time_t,
-                                                       sim_time_t, Reservation_Timeline, num_nodes_t,
+                                                       sim_time_t,
+                                                       Reservation_Timeline,
+                                                       num_nodes_t,
                                                        std::vector<job_no_t>);
 
 } // namespace dr_evt

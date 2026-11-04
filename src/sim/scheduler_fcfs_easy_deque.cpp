@@ -169,8 +169,8 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
   const bool head_has_projection =
       m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
-  auto reservation_plan =
-      reservation_timeline(available_nodes, effective_running_jobs, current_time);
+  auto reservation_plan = reservation_timeline(
+      available_nodes, effective_running_jobs, current_time);
   if (head_within_horizon) {
     reservation_plan.reserve(
         m_fcfs_reservation_time, m_wait_queue.front().nodes_requested,
@@ -210,13 +210,14 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
         release_estimate(current_time, job.run_time_estimate);
 #ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
     const bool preserves_reservations =
-        head_has_projection && (!head_within_horizon ||
-                                current_time + duration < m_fcfs_reservation_time);
+        head_has_projection &&
+        (!head_within_horizon ||
+         current_time + duration < m_fcfs_reservation_time);
 #else
     const bool preserves_reservations =
         head_has_projection &&
-        (!head_within_horizon || reservation_plan.can_fit(
-                                    current_time, job.nodes_requested, duration));
+        (!head_within_horizon ||
+         reservation_plan.can_fit(current_time, job.nodes_requested, duration));
 #endif
     if (preserves_reservations) {
       jobs_to_run.push_back(job.job_id);

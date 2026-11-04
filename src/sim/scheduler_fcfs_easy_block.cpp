@@ -141,20 +141,19 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       available_nodes, effective_running_jobs, current_time);
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
   if (planned_reservation != std::numeric_limits<sim_time_t>::max()) {
-    reservation_plan.reserve(planned_reservation, head_nodes,
-                             release_estimate(planned_reservation,
-                                              head_run_time));
+    reservation_plan.reserve(
+        planned_reservation, head_nodes,
+        release_estimate(planned_reservation, head_run_time));
   }
 #endif
 
   if (m_backfill_queue_depth != 0) {
     // Values are passed and the result returned, so no local escapes and the
     // default search loop below compiles as it did before.
-    return backfill_with_queue_depth(planned_reservation !=
-                                         std::numeric_limits<sim_time_t>::max(),
-                                     planned_reservation, current_time,
-                                     std::move(reservation_plan),
-                                     available_nodes, std::move(jobs_to_run));
+    return backfill_with_queue_depth(
+        planned_reservation != std::numeric_limits<sim_time_t>::max(),
+        planned_reservation, current_time, std::move(reservation_plan),
+        available_nodes, std::move(jobs_to_run));
   }
 
   // Step 3: Backfill
@@ -167,9 +166,9 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
     if (!m_wait_queue.get_job_info(m_job_order[i].job_id, backfill_run_time,
                                    backfill_nodes) ||
         backfill_nodes > available_nodes ||
-        !reservation_plan.can_fit(current_time, backfill_nodes,
-                                  release_estimate(current_time,
-                                                   backfill_run_time)))
+        !reservation_plan.can_fit(
+            current_time, backfill_nodes,
+            release_estimate(current_time, backfill_run_time)))
       continue;
     const job_no_t bf_job = m_job_order[i].job_id;
     jobs_to_run.push_back(bf_job);

@@ -323,9 +323,10 @@ backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates_from(
     }
 #endif
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
-    if (head_within_horizon && !reservation_plan.can_fit(
-          current_time, job.nodes_requested,
-          release_estimate(current_time, job.run_time_estimate))) {
+    if (head_within_horizon &&
+        !reservation_plan.can_fit(
+            current_time, job.nodes_requested,
+            release_estimate(current_time, job.run_time_estimate))) {
       continue;
     }
 #endif
@@ -453,11 +454,15 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
   }
   const auto selected_entry = std::find_if(
       m_wait_queue.begin() + 1, m_wait_queue.begin() + m_eligible_end_idx,
-      [&](const JobEntry &job) { return !job.removed && job.job_id == *selected; });
+      [&](const JobEntry &job) {
+        return !job.removed && job.job_id == *selected;
+      });
   if (selected_entry == m_wait_queue.begin() + m_eligible_end_idx ||
-      (head_within_horizon && !reservation_plan.can_fit(
-          current_time, selected_entry->nodes_requested,
-          release_estimate(current_time, selected_entry->run_time_estimate)))) {
+      (head_within_horizon &&
+       !reservation_plan.can_fit(
+           current_time, selected_entry->nodes_requested,
+           release_estimate(current_time,
+                            selected_entry->run_time_estimate)))) {
     if (jobs_to_run.empty()) {
       finish_scheduling_cycle(available_nodes, effective_running_jobs,
                               current_time);

@@ -497,8 +497,9 @@ MultiSystemBackfillScheduler::schedule(num_nodes_t free_nodes,
       profile[time] = available;
     }
     plans.emplace_back(std::move(profile));
-    if (std::isfinite(windows[k]) && plans.back().can_fit(
-            windows[k], head.nodes_requested, head.run_time_estimate)) {
+    if (std::isfinite(windows[k]) &&
+        plans.back().can_fit(windows[k], head.nodes_requested,
+                             head.run_time_estimate)) {
       plans.back().reserve(windows[k], head.nodes_requested,
                            head.run_time_estimate);
     }
@@ -512,8 +513,9 @@ MultiSystemBackfillScheduler::schedule(num_nodes_t free_nodes,
     candidates.clear();
     for (system_id_t k = 0; k < num_systems; ++k) {
       if (m_model.fits_now(k, job.nodes_requested) &&
-          (!std::isfinite(windows[k]) || plans[k].can_fit(
-              current_time, job.nodes_requested, job.run_time_estimate))) {
+          (!std::isfinite(windows[k]) ||
+           plans[k].can_fit(current_time, job.nodes_requested,
+                            job.run_time_estimate))) {
         candidates.push_back(k);
       }
     }
@@ -522,8 +524,7 @@ MultiSystemBackfillScheduler::schedule(num_nodes_t free_nodes,
     }
     const system_id_t k = choose_system(job.nodes_requested, candidates);
     place(job, k, current_time, releases);
-    plans[k].reserve(current_time, job.nodes_requested,
-                     job.run_time_estimate);
+    plans[k].reserve(current_time, job.nodes_requested, job.run_time_estimate);
     jobs_to_run.push_back(job.job_id);
     m_wait_queue[i].removed = true;
     ++m_removed_count;

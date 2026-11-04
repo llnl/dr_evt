@@ -430,8 +430,7 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
       m_rng(m_params.m_seed), m_queue_length_sum(0), m_queue_length_samples(0),
       m_queue_length_peak(0) {
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
-  m_custom_scheduler->set_backfill_queue_depth(
-      m_params.m_backfill_queue_depth);
+  m_custom_scheduler->set_backfill_queue_depth(m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -468,8 +467,7 @@ BasicSimulation<TraceType>::BasicSimulation(
     throw std::invalid_argument("custom scheduler must not be null");
   }
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
-  m_custom_scheduler->set_backfill_queue_depth(
-      m_params.m_backfill_queue_depth);
+  m_custom_scheduler->set_backfill_queue_depth(m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);

@@ -21,8 +21,8 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace dr_evt {
 
@@ -105,8 +105,8 @@ public:
     split_at(start);
     split_at(start + duration);
     for (auto segment = m_free_nodes.find(start);
-         segment != m_free_nodes.end() &&
-         segment->first < start + duration; ++segment) {
+         segment != m_free_nodes.end() && segment->first < start + duration;
+         ++segment) {
       segment->second -= nodes;
     }
     const auto coalesce = [this](sim_time_t time) {
@@ -478,9 +478,9 @@ protected:
                                         sim_time_t current_time);
 
   /** Build the free-node profile shared by reservation searches. */
-  Reservation_Timeline reservation_timeline(
-      num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-      sim_time_t current_time) const;
+  Reservation_Timeline reservation_timeline(num_nodes_t free_nodes,
+                                            const running_jobs_t &running_jobs,
+                                            sim_time_t current_time) const;
 };
 
 /**
