@@ -76,6 +76,24 @@ def main():
         assert [row["start_time"] for row in chained] == [
             "0.0", "0.0", "100.0", "150.0", "0.0"]
 
+        # H, C, and D consume the three slots at t=0. D starts in the first
+        # pass; E must wait for the next timestamp instead of using a reset
+        # queue-depth budget in the repeated t=0 pass.
+        depth_trace = outdir / "queue_depth_per_timestamp.csv"
+        depth_trace.write_text(
+            "job_submit_time,num_nodes,time_limit\n"
+            "0,1,10\n"
+            "0,3,10\n"
+            "0,2,20\n"
+            "0,1,1\n"
+            "0,1,1\n"
+        )
+        per_timestamp = run_reference(
+            source_dir, depth_trace, outdir, "--backfill-queue-depth", "3",
+            nodes="3",
+        )
+        assert per_timestamp[4]["start_time"] == "1.0"
+
 
 if __name__ == "__main__":
     main()

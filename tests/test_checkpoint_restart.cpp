@@ -687,6 +687,34 @@ void test_rejected_checkpoints() {
     }
     assert(depth_rejected);
   }
+
+  // Both values change when backfill is evaluated or how its reservations are
+  // projected, so neither may differ across a checkpoint boundary.
+  auto interval_params = make_params();
+  interval_params.m_backfill_interval = 60.0;
+  Simulation periodic(interval_params);
+  checkpoint.clear();
+  checkpoint.seekg(0);
+  bool interval_rejected = false;
+  try {
+    periodic.load_checkpoint(checkpoint);
+  } catch (const std::runtime_error &) {
+    interval_rejected = true;
+  }
+  assert(interval_rejected);
+
+  auto resolution_params = make_params();
+  resolution_params.m_planning_time_resolution = 60.0;
+  Simulation rounded(resolution_params);
+  checkpoint.clear();
+  checkpoint.seekg(0);
+  bool resolution_rejected = false;
+  try {
+    rounded.load_checkpoint(checkpoint);
+  } catch (const std::runtime_error &) {
+    resolution_rejected = true;
+  }
+  assert(resolution_rejected);
 }
 
 /** @brief Verify Pcon records, live totals, and resource output survive

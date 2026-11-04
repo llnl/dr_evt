@@ -178,6 +178,13 @@ modeling Fluxion's external resource-status notification path.
 
 ## Remaining differences
 
+- **Backfill queue-depth accounting.** Conservative and hybrid
+  `--backfill_queue_depth` scans are shared across all backfill work at one
+  simulation timestamp and reset only when time advances. Other scheduler
+  paths reset their count for each invocation. The reservation-based policies
+  therefore model one Slurm-style backfill cycle while retaining event-driven
+  FCFS dispatch.
+
 | Aspect | DR_EVT | Difference and bias |
 |---|---|---|
 | Evaluation trigger | Event-driven by default | Slurm and LSF backfill periodically. Default DR_EVT backfill reacts sooner, so waits of backfillable jobs are optimistic. `--backfill_interval` removes this. |

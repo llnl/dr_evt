@@ -351,6 +351,20 @@ public:
     Start_Time_Kind start_time_kind;
   };
 
+  /** Completion state of one synchronous exact-lookahead request. */
+  enum class Exact_Start_Outcome {
+    STARTED,
+    REJECTED,
+    CAPACITY_UNREACHABLE,
+  };
+
+  /** Exact start returned by an output-free scheduler replay. */
+  struct Exact_Start_Result {
+    job_no_t job_idx;
+    Exact_Start_Outcome outcome;
+    std::optional<sim_time_t> start_time;
+  };
+
   /**
    * @brief Query selected appended jobs, or enumerate a waiting-queue prefix.
    * @details Pending jobs receive an on-demand reservation-aware start time.
@@ -386,6 +400,22 @@ public:
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth = 0) const;
 
+#if defined(DR_EVT_HAS_SER20)
+  /**
+   * @brief Replay an isolated copy of the scheduler to obtain exact starts.
+   * @details Unlike get_job_statuses(), this advances a private in-memory
+   * continuation through ordinary scheduler events.  It never changes this
+   * simulation, its output streams, Redis state, or checkpoint files.
+   * An empty ID list enumerates the current waiting-queue prefix; zero depth
+   * selects the complete prefix. With explicit IDs, every requested ID is
+   * returned and estimation_depth is ignored. The initial implementation runs
+   * until the requested starts are known or the clone drains.
+   */
+  std::vector<Exact_Start_Result>
+  get_exact_job_start_times(const std::vector<job_no_t> &job_idxs,
+                            size_t estimation_depth = 0) const;
+#endif
+
   /**
    * @brief Approximate pending-job starts from cumulative resource-time area.
    * @details Protected EASY, hybrid, and conservative reservation windows are
@@ -409,6 +439,12 @@ public:
                               size_t estimation_depth = 0) const;
 
 protected:
+#if defined(DR_EVT_HAS_SER20)
+  /** Estimate serialized checkpoint bytes before allocating a buffer. */
+  size_t checkpoint_reserve_bytes() const;
+  void save_checkpoint_impl(std::ostream &output, bool preserve_outputs);
+  void load_checkpoint_impl(std::istream &input, bool restore_outputs);
+#endif
   /**
    * @brief Validate an existing job and enqueue it in the scheduler.
    *

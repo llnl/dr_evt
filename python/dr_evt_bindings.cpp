@@ -88,6 +88,12 @@ PYBIND11_MODULE(dr_evt, m) {
       .value("RESERVED", Simulation::Start_Time_Kind::RESERVED)
       .value("ESTIMATED", Simulation::Start_Time_Kind::ESTIMATED);
 
+  py::enum_<Simulation::Exact_Start_Outcome>(m, "ExactStartOutcome")
+      .value("STARTED", Simulation::Exact_Start_Outcome::STARTED)
+      .value("REJECTED", Simulation::Exact_Start_Outcome::REJECTED)
+      .value("CAPACITY_UNREACHABLE",
+             Simulation::Exact_Start_Outcome::CAPACITY_UNREACHABLE);
+
   // Mutable configuration populated before constructing Simulation.
   py::class_<Sim_Params>(m, "SimParams")
       .def(py::init<>(), "Creates a configuration with DR_EVT default values.")
@@ -281,6 +287,11 @@ PYBIND11_MODULE(dr_evt, m) {
                     "StartTimeKind: NONE, RESERVED, or ESTIMATED source of a "
                     "pending start time.");
 
+  py::class_<Simulation::Exact_Start_Result>(m, "ExactStartResult")
+      .def_readonly("job_idx", &Simulation::Exact_Start_Result::job_idx)
+      .def_readonly("outcome", &Simulation::Exact_Start_Result::outcome)
+      .def_readonly("start_time", &Simulation::Exact_Start_Result::start_time);
+
   py::class_<Simulation::Queue_Drain_Start_Estimate>(m,
                                                      "QueueDrainStartEstimate")
       .def_readonly("job_idx", &Simulation::Queue_Drain_Start_Estimate::job_idx)
@@ -347,6 +358,14 @@ PYBIND11_MODULE(dr_evt, m) {
            "start-time results to a queue prefix; zero considers the "
            "complete waiting queue. "
            "Scheduled jobs have start_time and end_time.")
+
+#if defined(DR_EVT_HAS_SER20)
+      .def("get_exact_job_start_times", &Simulation::get_exact_job_start_times,
+           py::arg("job_idxs"), py::arg("estimation_depth") = 0,
+           "Replay an output-free in-memory clone to return exact scheduler "
+           "start times. This synchronous query runs until requested jobs "
+           "start or the clone drains; it does not mutate the live simulation.")
+#endif
 
       // Streaming API - Time advancement
       .def("run_until_exclusive", &Simulation::run_until_exclusive,

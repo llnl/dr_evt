@@ -218,11 +218,11 @@ void test_expected_start_is_earliest_fit() {
   Sim_Params chained_params = make_params();
   Simulation chained(chained_params);
   chained.get_trace().load_data(0);
-  const auto chained_ids = chained.append_jobs(
-      {{0.0, 100, kTestQueueInput, 100.0},
-       {0.0, 100, kTestQueueInput, 50.0},
-       {0.0, 60, kTestQueueInput, 200.0},
-       {0.0, 60, kTestQueueInput, 10.0}});
+  const auto chained_ids =
+      chained.append_jobs({{0.0, 100, kTestQueueInput, 100.0},
+                           {0.0, 100, kTestQueueInput, 50.0},
+                           {0.0, 60, kTestQueueInput, 200.0},
+                           {0.0, 60, kTestQueueInput, 10.0}});
   const auto chained_statuses = chained.get_job_statuses(chained_ids);
   assert(chained_statuses[1].expected_start_time == 100.0);
   assert(chained_statuses[2].expected_start_time == 150.0);
@@ -359,8 +359,8 @@ void test_expected_start_covers_unreserved_waiting_jobs() {
 void test_chained_conservative_reservations_allow_early_backfill() {
   std::cout << "\n=== Chained conservative reservation regression ==="
             << std::endl;
-  for (const auto policy : {BackfillPolicy::CONSERVATIVE,
-                            BackfillPolicy::HYBRID}) {
+  for (const auto policy :
+       {BackfillPolicy::CONSERVATIVE, BackfillPolicy::HYBRID}) {
     auto params = make_params();
     params.m_backfill_policy = policy;
     if (policy == BackfillPolicy::HYBRID) {
@@ -388,6 +388,71 @@ void test_chained_conservative_reservations_allow_early_backfill() {
   }
   std::cout << "  PASSED" << std::endl;
 }
+
+#if defined(DR_EVT_HAS_SER20)
+void test_exact_lookahead_replays_without_mutating_live_state() {
+  std::cout << "\n=== Exact lookahead clone ===" << std::endl;
+  auto params = make_params();
+  params.m_total_nodes = 10;
+  params.m_backfill_policy = BackfillPolicy::EASY;
+  Simulation sim(params);
+  sim.get_trace().load_data(0);
+  const auto running = sim.append_job(0.0, 6, kTestQueueInput, 10.0);
+  const auto head = sim.append_job(0.0, 10, kTestQueueInput, 100.0);
+  const auto candidate = sim.append_job(0.0, 2, kTestQueueInput, 5.0);
+  const auto impossible = sim.append_job(0.0, 11, kTestQueueInput, 1.0);
+  sim.advance_to(0.0);
+
+  const auto before_time = sim.get_current_time();
+  const auto before = sim.get_job_statuses({running, head, candidate});
+  const auto exact = sim.get_exact_job_start_times({head, candidate});
+  assert(exact.size() == 2);
+  assert(exact[0].start_time == 10.0);
+  assert(exact[1].start_time == 0.0);
+  assert(exact[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
+  assert(exact[1].outcome == Simulation::Exact_Start_Outcome::STARTED);
+  const auto explicit_depth =
+      sim.get_exact_job_start_times({head, candidate}, 1);
+  assert(explicit_depth.size() == 2);
+  const auto never = sim.get_exact_job_start_times({impossible});
+  assert(never[0].outcome == Simulation::Exact_Start_Outcome::REJECTED);
+  assert(!never[0].start_time.has_value());
+
+  // The lookahead clone drains independently; the live simulation remains at
+  // its original event boundary with the same status records.
+  assert(sim.get_current_time() == before_time);
+  const auto after = sim.get_job_statuses({running, head, candidate});
+  assert(after[0].state == before[0].state);
+  assert(after[1].state == before[1].state);
+  assert(after[2].state == before[2].state);
+
+  const auto enumerated = sim.get_exact_job_start_times({}, 1);
+  assert(enumerated.size() == 1);
+  assert(enumerated[0].job_idx == head);
+  assert(enumerated[0].start_time == 10.0);
+  assert(enumerated[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
+
+  // A request accepted by the physical machine limit can still become
+  // unreachable when its scheduled capacity falls below the request.
+  const std::string capacity_file = "/tmp/test_exact_lookahead_capacity.csv";
+  {
+    std::ofstream capacity(capacity_file);
+    capacity << "time,total_nodes\n0,4\n";
+  }
+  auto reduced_params = make_params();
+  reduced_params.m_total_nodes = 10;
+  reduced_params.m_capacity_schedule = capacity_file;
+  Simulation reduced(reduced_params);
+  reduced.get_trace().load_data(0);
+  const auto constrained = reduced.append_job(0.0, 8, kTestQueueInput, 1.0);
+  reduced.advance_to(0.0);
+  const auto unreachable = reduced.get_exact_job_start_times({constrained});
+  assert(unreachable[0].outcome ==
+         Simulation::Exact_Start_Outcome::CAPACITY_UNREACHABLE);
+  assert(!unreachable[0].start_time.has_value());
+  std::cout << "  PASSED" << std::endl;
+}
+#endif
 
 void test_append_reclaims_before_growing() {
   std::cout << "\n=== Test 2: append_job() reclaims before growing ==="
@@ -1031,6 +1096,54 @@ void test_planning_horizon_event_driven() {
       const auto final_head = sim.get_job_statuses({head}).front();
       assert(approx_equal(*final_head.start_time, bounded ? 2000.0 : 1000.0));
       assert(sim.get_statistics().jobs_completed == 3);
+    }
+  }
+
+  std::cout << "  PASSED" << std::endl;
+}
+
+// Repeated scheduler passes at one event timestamp must share the configured
+// queue-depth budget. Here D starts in the first pass after H and C consume
+// the three slots; the old per-pass accounting then reset and incorrectly
+// started E at t=0.1 in the next pass. E is reconsidered after D completes at
+// t=1.1, when the timestamp (and therefore the depth budget) changes.
+void test_backfill_queue_depth_is_shared_per_timestamp() {
+  std::cout << "\n=== Backfill queue depth: one budget per timestamp ==="
+            << std::endl;
+
+  for (const auto queue_impl :
+       {QueueImplementation::CIRCULAR, QueueImplementation::DEQUE}) {
+    for (const auto policy :
+         {BackfillPolicy::CONSERVATIVE, BackfillPolicy::HYBRID}) {
+      auto params = make_params();
+      params.m_total_nodes = 3;
+      params.m_queue_impl = queue_impl;
+      params.m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
+      params.m_backfill_policy = policy;
+      params.m_reservation_depth = 1;
+      params.m_backfill_queue_depth = 3;
+      Simulation sim(params);
+      sim.get_trace().load_data(0);
+
+      // A leaves two free nodes until t=10, blocking the three-node head H.
+      (void)sim.append_job(0.0, 1, kTestQueueInput, 10.0);
+      // Move past A's START event so it is represented in the scheduler's
+      // running-job timeline before H's reservation is projected.
+      sim.advance_to(0.1);
+      (void)sim.append_job(0.1, 3, kTestQueueInput, 10.0); // H
+      (void)sim.append_job(0.1, 2, kTestQueueInput, 20.0); // C: cannot fit
+      (void)sim.append_job(0.1, 1, kTestQueueInput, 1.0);  // D: starts now
+      const auto e = sim.append_job(0.1, 1, kTestQueueInput, 1.0);
+
+      sim.advance_to(0.1);
+      const auto at_first_timestamp = sim.get_job_statuses({e}).front();
+      assert(at_first_timestamp.state == Simulation::Job_State::PENDING);
+
+      sim.advance_to(1.1);
+      const auto at_next_timestamp = sim.get_job_statuses({e}).front();
+      assert(at_next_timestamp.state == Simulation::Job_State::RUNNING);
+      assert(at_next_timestamp.start_time.has_value());
+      assert(approx_equal(*at_next_timestamp.start_time, 1.1));
     }
   }
 
@@ -1773,6 +1886,9 @@ int main() {
     test_expected_start_is_earliest_fit();
     test_expected_start_covers_unreserved_waiting_jobs();
     test_chained_conservative_reservations_allow_early_backfill();
+#if defined(DR_EVT_HAS_SER20)
+    test_exact_lookahead_replays_without_mutating_live_state();
+#endif
     test_append_reclaims_before_growing();
     test_append_rejects_past_submit_time();
     test_append_jobs_batch();
@@ -1790,6 +1906,7 @@ int main() {
     test_capacity_schedule_across_streaming_advances();
     test_reservations_follow_capacity_schedule();
     test_planning_horizon_event_driven();
+    test_backfill_queue_depth_is_shared_per_timestamp();
     test_submit_job_records_busy_nodes();
     test_append_jobs_memory_pressure();
     test_resource_area_and_time_accounted_utilization();

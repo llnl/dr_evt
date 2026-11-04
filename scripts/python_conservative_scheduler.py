@@ -97,8 +97,11 @@ class ConservativeBackfillingScheduler:
         # Waiting jobs that hold reservations; 0 means every waiting job,
         # 1 reproduces EASY (hybrid depth as in Slurm and Fluxion).
         self.reservation_depth = reservation_depth
-        # Waiting jobs examined in one backfill pass; 0 means unlimited.
+        # Waiting jobs examined at one scheduling timestamp; 0 means unlimited.
         self.backfill_queue_depth = backfill_queue_depth
+        self.backfill_depth_time = None
+        self.backfill_depth_examined = 0
+        self.backfill_depth_head_accounted = False
         # Zero preserves event-driven backfill. A positive interval runs FCFS
         # dispatch on ordinary events and backfill only at ticks.
         self.backfill_interval = backfill_interval
@@ -361,7 +364,13 @@ class ConservativeBackfillingScheduler:
         effective_running = self.running.copy()
         effective_timeline = None
 
-        examined = 0
+        # Repeated scheduling passes at one timestamp share the same depth
+        # budget. The blocked head is charged once, when it has an in-horizon
+        # reservation; out-of-horizon jobs remain free to reconsider.
+        if self.backfill_depth_time != self.current_time:
+            self.backfill_depth_time = self.current_time
+            self.backfill_depth_examined = 0
+            self.backfill_depth_head_accounted = False
         for pos, job in enumerate(self.wait_queue):
             if effective_timeline is None:
                 effective_timeline = self.build_resource_timeline_from_running(
@@ -375,11 +384,16 @@ class ConservativeBackfillingScheduler:
             if reservation - self.current_time > self.planning_horizon:
                 remaining.append(job)
                 continue
-            if (self.backfill_queue_depth and
-                    examined >= self.backfill_queue_depth):
-                remaining.extend(self.wait_queue[pos:])
-                break
-            examined += 1
+            if pos == 0 and self.backfill_depth_head_accounted:
+                pass
+            else:
+                if (self.backfill_queue_depth and
+                        self.backfill_depth_examined >= self.backfill_queue_depth):
+                    remaining.extend(self.wait_queue[pos:])
+                    break
+                self.backfill_depth_examined += 1
+                if pos == 0:
+                    self.backfill_depth_head_accounted = True
             # Check if job fits in available resources
             if job.nodes > free_nodes:
                 remaining.append(job)

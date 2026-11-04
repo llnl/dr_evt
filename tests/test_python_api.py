@@ -760,6 +760,55 @@ def test_periodic_backfill(result):
         os.unlink(trace_file.name)
 
 
+def test_exact_lookahead(result):
+    """Exact lookahead replays an isolated in-memory scheduler clone."""
+    print("\n12. Exact Lookahead")
+    if not hasattr(dr_evt.Simulation, "get_exact_job_start_times"):
+        result.record_pass("Exact lookahead unavailable without Ser20")
+        return
+
+    trace_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+    trace_file.close()
+    try:
+        create_test_trace(trace_file.name, [])
+        params = dr_evt.SimParams()
+        params.infile = trace_file.name
+        params.total_nodes = 10
+        params.trace_format = "simple"
+        params.timestamp_format = "epoch"
+        params.run_time_mode = dr_evt.RunTimeMode.LIMIT
+        params.backfill_policy = dr_evt.BackfillPolicy.EASY
+        sim = dr_evt.Simulation(params)
+        sim.append_job(0.0, 6, QUEUE_INPUT, 10.0)
+        head = sim.append_job(0.0, 10, QUEUE_INPUT, 100.0)
+        candidate = sim.append_job(0.0, 2, QUEUE_INPUT, 5.0)
+        impossible = sim.append_job(0.0, 11, QUEUE_INPUT, 1.0)
+        sim.advance_to(0.0)
+
+        before = sim.get_current_time()
+        exact = sim.get_exact_job_start_times([head, candidate])
+        assert [status.start_time for status in exact] == [10.0, 0.0]
+        assert [status.outcome for status in exact] == [
+            dr_evt.ExactStartOutcome.STARTED,
+            dr_evt.ExactStartOutcome.STARTED,
+        ]
+        assert len(sim.get_exact_job_start_times([head, candidate], 1)) == 2
+        never = sim.get_exact_job_start_times([impossible])[0]
+        assert never.outcome == dr_evt.ExactStartOutcome.REJECTED
+        assert never.start_time is None
+        assert sim.get_current_time() == before
+        enumerated = sim.get_exact_job_start_times([], 1)
+        assert len(enumerated) == 1
+        assert enumerated[0].job_idx == head
+        assert enumerated[0].start_time == 10.0
+        assert enumerated[0].outcome == dr_evt.ExactStartOutcome.STARTED
+        result.record_pass("output-free exact scheduler replay")
+    except Exception as e:
+        result.record_fail("Exact lookahead", str(e))
+    finally:
+        os.unlink(trace_file.name)
+
+
 def test_warm_start_batch_mode(result):
     """Python run() exposes replay-based warm-start classification/accounting."""
     print("\n10. Warm-start Batch Mode")
@@ -828,6 +877,7 @@ def main():
         test_checkpoint_restart(result)
     test_warm_start_batch_mode(result)
     test_periodic_backfill(result)
+    test_exact_lookahead(result)
 
     # Print summary and exit
     return result.summary()

@@ -73,8 +73,7 @@ CircularBufferFCFSConservativeScheduler::calculate_conservative_window(
   const size_t depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t reserved = 0;
-  auto plan =
-      reservation_timeline(available_nodes, running_jobs, current_time);
+  auto plan = reservation_timeline(available_nodes, running_jobs, current_time);
   for (size_t i = 0; i < job_index; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed) {
@@ -85,8 +84,8 @@ CircularBufferFCFSConservativeScheduler::calculate_conservative_window(
     }
     const tdiff_t duration =
         release_estimate(current_time, job.run_time_estimate);
-    const auto reservation = plan.earliest_fit(job.nodes_requested, duration,
-                                               current_time);
+    const auto reservation =
+        plan.earliest_fit(job.nodes_requested, duration, current_time);
     if (!reservation) {
       continue;
     }
@@ -154,8 +153,8 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
       effective_running_jobs, current_time);
 
   if (m_backfill_policy == BackfillPolicy::EASY) {
-    const bool head_reservation_within_horizon = reservation_within_horizon(
-        m_fcfs_reservation_time, current_time);
+    const bool head_reservation_within_horizon =
+        reservation_within_horizon(m_fcfs_reservation_time, current_time);
     if (available_nodes == 0) {
       return jobs_to_run;
     }
@@ -186,27 +185,35 @@ std::vector<job_no_t> CircularBufferFCFSConservativeScheduler::schedule(
     return jobs_to_run;
   }
 
+  // Share one depth budget across every backfill pass at this timestamp.
   // Out-of-horizon jobs stay queued but do not consume a scan slot. They are
   // projected again on the next pass instead of requiring blocked-list state.
-  size_t examined = reservation_within_horizon(m_fcfs_reservation_time,
-                                                current_time)
-                        ? 1
-                        : 0;
+  if (m_backfill_depth_time != current_time) {
+    m_backfill_depth_time = current_time;
+    m_backfill_depth_examined = 0;
+    m_backfill_depth_head_accounted = false;
+  }
+  if (reservation_within_horizon(m_fcfs_reservation_time, current_time) &&
+      !m_backfill_depth_head_accounted) {
+    ++m_backfill_depth_examined;
+    m_backfill_depth_head_accounted = true;
+  }
   for (size_t i = 1; i < m_eligible_end_idx; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed) {
       continue;
     }
-    const sim_time_t job_reservation = calculate_fcfs_reservation(
-        job.nodes_requested, available_nodes, effective_running_jobs,
-        current_time);
+    const sim_time_t job_reservation =
+        calculate_fcfs_reservation(job.nodes_requested, available_nodes,
+                                   effective_running_jobs, current_time);
     if (!reservation_within_horizon(job_reservation, current_time)) {
       continue;
     }
-    if (m_backfill_queue_depth != 0 && examined >= m_backfill_queue_depth) {
+    if (m_backfill_queue_depth != 0 &&
+        m_backfill_depth_examined >= m_backfill_queue_depth) {
       break;
     }
-    ++examined;
+    ++m_backfill_depth_examined;
     if (job.nodes_requested > available_nodes) {
       continue;
     }

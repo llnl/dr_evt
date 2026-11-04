@@ -17,6 +17,8 @@
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
+#include "utils/streambuff.hpp"
+#include "utils/streamvec.hpp"
 #if defined(DR_EVT_HAS_SER20)
 #include "utils/state_io_ser20.hpp"
 #endif
@@ -32,7 +34,6 @@
 #include <iomanip>
 #include <limits>
 #include <queue>
-#include <sstream>
 #include <type_traits>
 #include <typeinfo>
 
@@ -80,6 +81,21 @@ template <typename TraceType> constexpr std::uint8_t checkpoint_trace_kind() {
 }
 constexpr std::uint64_t checkpoint_collection_limit = 100000000;
 constexpr std::uint64_t checkpoint_string_limit = 64 * 1024 * 1024;
+
+/** Sum archive scalar widths at compile time for in-memory snapshots. */
+template <typename... Ts> consteval size_t checkpoint_scalar_bytes() {
+  return (sizeof(Ts) + ... + size_t{0});
+}
+
+// This is the fixed scalar portion common to every runnable checkpoint.
+// Dynamic parameter strings and container payloads are added from their live
+// counts at the call site.
+constexpr size_t checkpoint_fixed_bytes = checkpoint_scalar_bytes<
+    decltype(checkpoint_magic), std::uint32_t, std::uint8_t, std::uint32_t,
+    bool, sim_time_t, sim_time_t, bool, num_nodes_t, size_t, num_nodes_t,
+    tdiff_t, sim_time_t, num_jobs_t, num_jobs_t, num_jobs_t, sim_time_t, size_t,
+    num_jobs_t, bool, sim_time_t, size_t, tdiff_t, sim_time_t, size_t, size_t,
+    size_t, job_no_t>();
 
 /** Output-only Redis state sampled when a checkpoint is explicitly written. */
 struct CheckpointRedisBoundary {
@@ -198,6 +214,36 @@ struct ParamsFieldWriter {
       }
     } else {
       writer.value(field);
+    }
+  }
+};
+
+/** Add the serialized extent of one parameter field to an estimate. */
+struct ParamsFieldSizeEstimator {
+  size_t &bytes;
+
+  void add(size_t amount) {
+    if (amount > std::numeric_limits<size_t>::max() - bytes) {
+      bytes = std::numeric_limits<size_t>::max();
+    } else {
+      bytes += amount;
+    }
+  }
+
+  template <typename T> void operator()(const char *, const T &field) {
+    if constexpr (std::is_enum_v<T>) {
+      add(sizeof(std::underlying_type_t<T>));
+    } else if constexpr (std::is_same_v<T, std::string>) {
+      add(sizeof(std::uint64_t));
+      add(field.size());
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+      add(sizeof(std::uint64_t));
+      for (const auto &item : field) {
+        add(sizeof(std::uint64_t));
+        add(item.size());
+      }
+    } else {
+      add(sizeof(T));
     }
   }
 };
@@ -1116,6 +1162,53 @@ void BasicSimulation<TraceType>::flush_completed_jobs() {
 #if defined(DR_EVT_HAS_SER20)
 template <typename TraceType>
 void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
+  save_checkpoint_impl(output, true);
+}
+
+template <typename TraceType>
+size_t BasicSimulation<TraceType>::checkpoint_reserve_bytes() const {
+  const auto saturating_add = [](size_t total, size_t count, size_t width) {
+    if (count > (std::numeric_limits<size_t>::max() - total) / width) {
+      return std::numeric_limits<size_t>::max();
+    }
+    return total + count * width;
+  };
+
+  // The constant term is calculated at compile time from scalar archive
+  // types. Container entries use their live population below.
+  size_t bytes = checkpoint_fixed_bytes;
+  ParamsFieldSizeEstimator parameter_bytes{bytes};
+  m_params.visit_fields(parameter_bytes);
+  bytes = saturating_add(bytes, m_capacity_changes.size(),
+                         sizeof(Capacity_Change) + 16);
+  bytes = saturating_add(bytes, m_appended_job_query_records.size(),
+                         sizeof(Appended_Job_Query_Record) + 16);
+  bytes = saturating_add(bytes, m_scheduler->pending_job_ids().size(),
+                         sizeof(job_no_t) + 16);
+  if (m_custom_scheduler != nullptr) {
+    bytes = saturating_add(bytes, m_custom_scheduler->m_wait_queue.size(), 64);
+  }
+  bytes = saturating_add(bytes, m_running_jobs.size(),
+                         sizeof(running_jobs_t::value_type) + 16);
+  bytes = saturating_add(bytes, m_pending_queue_arrivals.size(), 32);
+  bytes = saturating_add(bytes, m_event_queue.size(), 32);
+  bytes =
+      saturating_add(bytes, m_trace.m_data.size(),
+                     sizeof(typename TraceType::policy_type::record_type) + 32);
+  bytes = saturating_add(bytes, m_trace.m_ctx.m_evtq.size(), 32);
+  bytes = saturating_add(bytes, m_trace.m_ctx.m_resource_history.size(), 64);
+
+  // Binary archive collection counts and fields need modest headroom. This
+  // remains an estimate, never a claim that the serialized extent is exact.
+  if (bytes < std::numeric_limits<size_t>::max() / 4) {
+    bytes += bytes / 4;
+  }
+  return bytes;
+}
+
+template <typename TraceType>
+void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
+                                                      bool preserve_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
@@ -1131,9 +1224,11 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
     if (m_trace.dcols().get_trace_mode() != TraceMode::SIMULATION) {
       throw std::logic_error("checkpointing requires simulation-mode input");
     }
-    const bool redis_output = !m_params.m_redis_uri.empty();
-    bool simulated_output_open = m_trace.m_simulated_trace_ofs.is_open();
-    bool resource_output_open = m_trace.m_resource_trace_ofs.is_open();
+    const bool redis_output = preserve_outputs && !m_params.m_redis_uri.empty();
+    bool simulated_output_open =
+        preserve_outputs && m_trace.m_simulated_trace_ofs.is_open();
+    bool resource_output_open =
+        preserve_outputs && m_trace.m_resource_trace_ofs.is_open();
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)
     simulated_output_open =
         simulated_output_open || m_trace.m_redis_output != nullptr;
@@ -1141,8 +1236,10 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
                            (m_trace.m_redis_output != nullptr &&
                             m_trace.m_redis_output->resource_trace_active());
 #endif
-    m_trace.flush_simulated_trace_buffer(true);
-    if (resource_output_open) {
+    if (preserve_outputs) {
+      m_trace.flush_simulated_trace_buffer(true);
+    }
+    if (preserve_outputs && resource_output_open) {
       m_trace.flush_resource_history();
       m_trace.m_resource_trace_ofs.flush();
     }
@@ -1410,14 +1507,18 @@ void BasicSimulation<TraceType>::save_checkpoint(std::ostream &output) {
 
 template <typename TraceType>
 void BasicSimulation<TraceType>::save_checkpoint(const std::string &filename) {
-  std::ostringstream buffer(std::ios::out | std::ios::binary);
-  save_checkpoint(buffer);
+  std::vector<char> buffer;
+  buffer.reserve(checkpoint_reserve_bytes());
+  {
+    ostreamvec<char> stream_buffer(buffer);
+    std::ostream output(&stream_buffer);
+    save_checkpoint(output);
+  }
   std::ofstream output(filename, std::ios::binary | std::ios::trunc);
   if (!output) {
     throw std::runtime_error("cannot open checkpoint for writing: " + filename);
   }
-  const std::string state = buffer.str();
-  output.write(state.data(), static_cast<std::streamsize>(state.size()));
+  output.write(buffer.data(), static_cast<std::streamsize>(buffer.size()));
   output.close();
   if (!output) {
     throw std::runtime_error("failed to finish checkpoint: " + filename);
@@ -1426,6 +1527,12 @@ void BasicSimulation<TraceType>::save_checkpoint(const std::string &filename) {
 
 template <typename TraceType>
 void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
+  load_checkpoint_impl(input, true);
+}
+
+template <typename TraceType>
+void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
+                                                      bool restore_outputs) {
   if constexpr (std::is_same_v<TraceType, Trace> ||
                 std::is_same_v<TraceType, PconTrace> ||
                 std::is_same_v<TraceType, SwfTrace>) {
@@ -1491,6 +1598,11 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
     require_checkpoint_match(recorded.m_backfill_queue_depth,
                              m_params.m_backfill_queue_depth,
                              "backfill_queue_depth");
+    require_checkpoint_match(recorded.m_backfill_interval,
+                             m_params.m_backfill_interval, "backfill_interval");
+    require_checkpoint_match(recorded.m_planning_time_resolution,
+                             m_params.m_planning_time_resolution,
+                             "planning_time_resolution");
     require_checkpoint_match(recorded.m_node_release_delay,
                              m_params.m_node_release_delay,
                              "node_release_delay");
@@ -1876,7 +1988,7 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
     }
     m_scheduler->m_fcfs_reservation_time = reservation_time;
 
-    if (redis_output) {
+    if (restore_outputs && redis_output) {
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)
       m_trace.m_redis_output.reset();
       RedisCheckpointBoundary native_boundary;
@@ -1900,12 +2012,12 @@ void BasicSimulation<TraceType>::load_checkpoint(std::istream &input) {
 #else
       throw std::logic_error("Redis checkpoint requires Redis support");
 #endif
-    } else if (simulated_output_open) {
+    } else if (restore_outputs && simulated_output_open) {
       const auto filename = m_params.get_outfile();
       start_restart_output_segment(filename, simulated_output_bytes,
                                    m_trace.m_simulated_trace_ofs);
     }
-    if (!redis_output && resource_output_open) {
+    if (restore_outputs && !redis_output && resource_output_open) {
       const auto filename = m_params.get_resource_trace();
       start_restart_output_segment(filename, resource_output_bytes,
                                    m_trace.m_resource_trace_ofs);
@@ -2143,43 +2255,44 @@ BasicSimulation<TraceType>::get_job_statuses(
   std::vector<Job_Status> result;
   std::multimap<job_no_t, size_t> requested_pending_statuses;
   if (job_idxs.empty()) {
-    const size_t count = estimation_depth == 0
-                             ? pending_job_ids.size()
-                             : std::min(estimation_depth,
-                                        pending_job_ids.size());
+    const size_t count =
+        estimation_depth == 0
+            ? pending_job_ids.size()
+            : std::min(estimation_depth, pending_job_ids.size());
     result.reserve(count);
     for (size_t i = 0; i < count; ++i) {
       const job_no_t job_idx = pending_job_ids[i];
       requested_pending_statuses.emplace(job_idx, result.size());
-      result.push_back({job_idx, Job_State::PENDING, std::nullopt,
-                        std::nullopt, std::nullopt, Start_Time_Kind::NONE});
+      result.push_back({job_idx, Job_State::PENDING, std::nullopt, std::nullopt,
+                        std::nullopt, Start_Time_Kind::NONE});
     }
   } else {
     result.reserve(job_idxs.size());
     for (const job_no_t job_idx : job_idxs) {
-    if (job_idx < m_first_appended_job_idx ||
-        job_idx - m_first_appended_job_idx >=
-            m_appended_job_query_records.size() ||
-        !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
-             .tracked) {
-      throw std::out_of_range("No appended job with job_idx=" +
-                              std::to_string(job_idx));
-    }
-    const auto &job =
-        m_appended_job_query_records[job_idx - m_first_appended_job_idx];
-    Job_Status status{job_idx,      Job_State::PENDING, std::nullopt,
-                      std::nullopt, std::nullopt,       Start_Time_Kind::NONE};
-    if (job.rejected) {
-      status.state = Job_State::REJECTED;
-    } else if (job.scheduled) {
-      status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
-                                                    : Job_State::RUNNING;
-      status.start_time = job.start_time;
-      status.end_time = job.end_time;
-    } else {
-      requested_pending_statuses.emplace(job_idx, result.size());
-    }
-    result.push_back(status);
+      if (job_idx < m_first_appended_job_idx ||
+          job_idx - m_first_appended_job_idx >=
+              m_appended_job_query_records.size() ||
+          !m_appended_job_query_records[job_idx - m_first_appended_job_idx]
+               .tracked) {
+        throw std::out_of_range("No appended job with job_idx=" +
+                                std::to_string(job_idx));
+      }
+      const auto &job =
+          m_appended_job_query_records[job_idx - m_first_appended_job_idx];
+      Job_Status status{job_idx,      Job_State::PENDING,
+                        std::nullopt, std::nullopt,
+                        std::nullopt, Start_Time_Kind::NONE};
+      if (job.rejected) {
+        status.state = Job_State::REJECTED;
+      } else if (job.scheduled) {
+        status.state = job.end_time <= m_current_time ? Job_State::COMPLETED
+                                                      : Job_State::RUNNING;
+        status.start_time = job.start_time;
+        status.end_time = job.end_time;
+      } else {
+        requested_pending_statuses.emplace(job_idx, result.size());
+      }
+      result.push_back(status);
     }
   }
   if (requested_pending_statuses.empty()) {
@@ -2293,6 +2406,82 @@ BasicSimulation<TraceType>::get_job_statuses(
 
   return result;
 }
+
+#if defined(DR_EVT_HAS_SER20)
+template <typename TraceType>
+std::vector<typename BasicSimulation<TraceType>::Exact_Start_Result>
+BasicSimulation<TraceType>::get_exact_job_start_times(
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  // Capture enumeration IDs before replay: the clone drains its wait queue.
+  std::vector<job_no_t> requested = job_idxs;
+  if (requested.empty()) {
+    const auto pending = m_scheduler->pending_job_ids();
+    const size_t count = estimation_depth == 0
+                             ? pending.size()
+                             : std::min(estimation_depth, pending.size());
+    requested.assign(pending.begin(), pending.begin() + count);
+  }
+  if (requested.empty()) {
+    return {};
+  }
+
+  // The normal checkpoint API deliberately flushes output.  Lookahead uses
+  // the same complete state encoding in its output-free mode instead.
+  // Reuse storage on this caller thread. ostreamvec grows the vector only
+  // when the previous snapshot capacity is insufficient, unlike stringstream.
+  thread_local std::vector<char> snapshot;
+  const size_t reserve_bytes = checkpoint_reserve_bytes();
+  if (snapshot.capacity() < reserve_bytes) {
+    snapshot.reserve(reserve_bytes);
+  }
+  {
+    ostreamvec<char> snapshot_buffer(snapshot);
+    std::ostream output(&snapshot_buffer);
+    const_cast<BasicSimulation *>(this)->save_checkpoint_impl(output, false);
+  }
+  istreambuff<char> snapshot_buffer(
+      std::span<const char>{snapshot.data(), snapshot.size()});
+  std::istream input(&snapshot_buffer);
+  BasicSimulation clone(m_params);
+  clone.load_checkpoint_impl(input, false);
+  clone.m_params.set_outfile("");
+  clone.m_params.set_resource_trace("");
+  clone.m_params.m_redis_uri.clear();
+  clone.m_params.m_redis_key_prefix.clear();
+  clone.m_params.m_checkpoint_file.clear();
+  clone.m_params.m_checkpoint_interval_jobs = 0;
+  clone.m_has_automatic_checkpoint = false;
+
+  clone.advance_to(std::numeric_limits<sim_time_t>::max());
+  if (job_idxs.empty()) {
+    std::vector<Exact_Start_Result> result;
+    result.reserve(requested.size());
+    for (const job_no_t job_idx : requested) {
+      const auto &job = clone.m_trace.job_at(job_idx);
+      const bool started = job.is_scheduled();
+      result.push_back(
+          {job_idx,
+           started ? Exact_Start_Outcome::STARTED
+                   : Exact_Start_Outcome::CAPACITY_UNREACHABLE,
+           started ? std::optional<sim_time_t>(
+                         convert_epoch<sim_time_t>(job.get_begin_time()))
+                   : std::nullopt});
+    }
+    return result;
+  }
+  const auto statuses = clone.get_job_statuses(requested);
+  std::vector<Exact_Start_Result> result;
+  result.reserve(statuses.size());
+  for (const auto &status : statuses) {
+    const auto outcome = status.start_time ? Exact_Start_Outcome::STARTED
+                         : status.state == Job_State::REJECTED
+                             ? Exact_Start_Outcome::REJECTED
+                             : Exact_Start_Outcome::CAPACITY_UNREACHABLE;
+    result.push_back({status.job_idx, outcome, status.start_time});
+  }
+  return result;
+}
+#endif
 
 template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>
