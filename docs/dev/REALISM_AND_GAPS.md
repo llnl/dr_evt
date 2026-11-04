@@ -26,7 +26,8 @@ Each item describes the code on this branch.
 - **Reservations and backfill policies.** Waiting jobs are ordered by
   submission time (FCFS), or by estimated run time under SJF and LJF
   ([`--priority_policy`](../user-guide/command-line.md#-p---priority_policy-policy)).
-  The job at the front, the head, starts as soon as enough nodes are free.
+  The job at the front, the head, starts as soon as enough nodes are free;
+  this is FCFS dispatch.
   When the head does not fit, nodes would otherwise sit idle until it does.
   Backfilling lets a later job start out of order if it fits now and does not
   delay the jobs that hold reservations. A reservation is the earliest time a
@@ -52,17 +53,16 @@ Each item describes the code on this branch.
     scheduling state: a job completes, a job arrives, or scheduled capacity
     changes. All events at the same timestamp form one batch: they are applied
     together, and only then does the scheduler run. It repeats scheduling
-    passes until a pass starts no job; each pass starts jobs in queue order
-    and then backfills. These passes together are the scheduling cycle for
-    that timestamp.
+    passes until a pass starts no job; each pass does FCFS dispatch and then
+    backfills. These passes together are the backfill cycle for that
+    timestamp.
   - *Periodic backfill*, with
     [`--backfill_interval`](../user-guide/command-line.md#--backfill_interval-seconds),
-    as in Slurm. Starting jobs in queue order stays event-driven: after each
-    batch the head starts as soon as it fits, and so does each following job
-    that fits in turn. A job holding a reservation therefore starts as soon as
-    its turn comes and it fits, without waiting for a tick. Backfill, which
-    starts a job ahead of one still waiting, runs only at periodic ticks, and
-    one tick is one backfill cycle. Ticks start one interval after the first
+    as in Slurm. FCFS dispatch stays event-driven: after each batch the head
+    starts as soon as it fits, and so does each following job that fits in
+    turn. A job holding a reservation therefore starts as soon as
+    its turn comes and it fits, without waiting for a tick. Backfill runs only
+    at periodic ticks, and one tick is one backfill cycle. Ticks start one interval after the first
     event (or after the warm-start boundary) and keep their cadence; a tick
     that passes while nothing is waiting does nothing. Periodic EASY runs as
     hybrid with reservation depth 1.
@@ -72,8 +72,8 @@ Each item describes the code on this branch.
   (default unlimited), under every policy and ordering, including the custom
   EASY selector. A job counts when it is examined, whether or not it fits. In
   periodic mode the cycle is one tick: all backfill passes at the tick share
-  the count, it restarts at the next tick, and in-order starts between ticks
-  use none of it. In event-driven mode the cycle is all the passes at one
+  the count, it restarts at the next tick, and FCFS dispatch between ticks
+  uses none of it. In event-driven mode the cycle is all the passes at one
   timestamp for conservative and hybrid; the separate EASY implementations
   differ, as described under [Remaining differences](#remaining-differences).
 - **Planning horizon.**
@@ -81,7 +81,7 @@ Each item describes the code on this branch.
   stops planning reservations that would start more than the horizon after the
   current time, in both modes, as Slurm's `bf_window` does. Such a job holds no
   reservation and uses no reservation-depth slot. It keeps its queue position
-  and is reconsidered on the next pass, so released nodes or a capacity change
+  and is re-evaluated on the next pass, so released nodes or a capacity change
   can bring it back within the horizon. Whether it uses a queue-depth slot
   follows the system each mode reproduces: it does in periodic mode, as in
   Slurm, and does not in event-driven mode, as for a job Fluxion blocks (see
@@ -133,43 +133,42 @@ array task in a partition is left pending, no other jobs in that partition
 will be scheduled".
 
 The second component, the backfill plugin (`SchedulerType=sched/backfill`,
-the default), runs periodically and rebuilds its plan in every iteration
+the default), runs periodically and rebuilds its plan in every backfill cycle
 ([`slurm.conf(5)`](https://slurm.schedmd.com/slurm.conf.html),
 [Scheduling Configuration Guide](https://slurm.schedmd.com/sched_config.html)).
 The settings that matter here:
 
 | Parameter | Default | Meaning (paraphrased from `slurm.conf(5)`) |
 |---|---|---|
-| `bf_interval` | 30 s | Time between backfill iterations. |
+| `bf_interval` | 30 s | Time between backfill cycles. |
 | `bf_window` | 1440 min | How far ahead backfill plans. A job that would start later gets no reservation. |
 | `bf_resolution` | 60 s | Time grid for planned start and end times. |
-| `bf_max_job_test` | 500 (100 in older releases) | Most jobs one backfill iteration tests, that is, the queue depth. |
-| `bf_job_part_count_reserve` | 0 | How many highest-priority jobs per partition get reservations. 0 means every tested job that cannot start gets one. |
-| `bf_max_time` | `bf_interval` | Most wall time one backfill iteration may spend. |
+| `bf_max_job_test` | 500 (100 in older releases) | Most jobs one backfill cycle examines, that is, the queue depth. |
+| `bf_job_part_count_reserve` | 0 | How many highest-priority jobs per partition get reservations. 0 means every examined job that cannot start gets one. |
+| `bf_max_time` | `bf_interval` | Most wall time one backfill cycle may spend. |
 | `default_queue_depth` | 100 | Most jobs the main scheduler tries after a submission, completion, or similar event. |
 | `sched_interval` | 60 s | Time between the main scheduler's full passes. |
 
-Each backfill iteration counts tested jobs from zero, so `bf_max_job_test`
-limits one iteration, not one scheduling event. DR_EVT's periodic mode follows
-the same split: its event-driven in-order starts play the main scheduler's
-role, its backfill at ticks plays the plugin's role, and the
+Each backfill cycle counts examined jobs from zero, so `bf_max_job_test`
+limits one backfill cycle, not one scheduling event. DR_EVT's periodic mode
+follows the same split: its event-driven FCFS dispatch plays the main
+scheduler's role, its backfill at ticks plays the plugin's role, and the
 `--backfill_queue_depth` count restarts at every tick.
 
 ### Flux (Fluxion)
 
 Fluxion is event-driven like DR_EVT's default mode. An event such as a job
-submission or completion starts a scheduling loop. The loop walks the pending
-queue in priority order and, for each job, either allocates resources now or
+submission or completion starts a backfill cycle. The cycle walks the
+pending queue in priority order and, for each job, either allocates resources now or
 reserves its earliest future start
 ([`queue_policy_bf_base_impl.hpp` at 3b49d19](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp)).
-A loop examines at most `queue-depth` jobs. It yields to Flux's event loop
+A backfill cycle examines at most `queue-depth` jobs. It yields to Flux's event loop
 after every six jobs and later resumes where it stopped. Its count of examined
 jobs, `m_scheduled_cnt`, includes every job tried for allocation or
 reservation, and it is
-[reset only when a new loop starts](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp#L52-L80),
-so the depth limits one loop. In DR_EVT the closest match to one loop is the
-scheduling cycle after a batch of events: all the passes at one timestamp,
-before time advances. Fluxion plans in whole seconds and places jobs on a
+[reset only when a new backfill cycle starts](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp#L52-L80),
+so the depth limits one backfill cycle. This matches DR_EVT's event-driven
+backfill cycle: all the passes at one timestamp, before time advances. Fluxion plans in whole seconds and places jobs on a
 resource graph.
 
 When a job can be neither started now nor reserved, Fluxion moves it to a
@@ -195,23 +194,22 @@ same way.
 | Setting | Default | Meaning |
 |---|---|---|
 | `queue-policy` | `fcfs` | One of `fcfs`, `easy`, `conservative`, and `hybrid`, which reserve for 0, 1, all, or N jobs. |
-| `queue-params.queue-depth` | 32 | Most pending jobs one scheduling loop examines. |
-| `policy-params.reservation-depth` | 64 | Under `hybrid`, how many higher-priority jobs get reservations in one loop. The queue depth caps it, so the default acts as 32. |
+| `queue-params.queue-depth` | 32 | Most pending jobs one backfill cycle examines. |
+| `policy-params.reservation-depth` | 64 | Under `hybrid`, how many higher-priority jobs get reservations in one backfill cycle. The queue depth caps it, so the default acts as 32. |
 
 ### IBM Spectrum LSF
 
-LSF schedules in sessions that the `mbschd` daemon runs periodically. In LSF
-10.1 the default `JOB_SCHEDULING_INTERVAL=5 45` in `lsb.params` makes each
-session last at least five seconds: a session that finishes early waits out
-the rest. Each session is one full pass over the pending queue. Because jobs
-start during sessions, in-order starts are periodic as well as backfill,
-unlike in Slurm, and DR_EVT has no setting that reproduces this. Backfilling
-requires the candidate to have a run limit, and it works around slot
-reservations held for the highest-priority pending jobs (`SLOT_RESERVE`,
-`MAX_RESERVE_TIME`). When a finished job's slots become reusable depends on
-post-execution processing. The reservation and post-execution statements are
-summarized from the IBM documentation and should be checked against the
-installed version.
+LSF ran on Sierra and Lassen, which are retired.
+
+LSF runs FCFS dispatch and backfill together in scheduling passes. By default
+a pass starts at most every five seconds, but the interval can be set to zero,
+which runs passes back to back. A pass takes no time in DR_EVT, so zero-interval
+LSF behaves like DR_EVT's default event-driven mode. We assume LLNL configured
+its systems close to this. With a longer interval, FCFS dispatch would also be
+periodic, which DR_EVT does not reproduce.
+
+LSF can also reserve nodes for a waiting parallel job and keep them idle until
+it has enough. This is off by default.
 
 ## Reproducing a production configuration
 
@@ -236,15 +234,14 @@ nodes; Slurm applies them per partition. Where node reuse matters, also set
 In every case below, the job holds no reservation and uses no reservation
 slot.
 
-| Planner | Uses a queue-depth slot | Re-examined |
+| Planner | Uses a queue-depth slot | Re-evaluated |
 |---|---|---|
-| Slurm `bf_window` | Yes (`bf_max_job_test`) | Every backfill iteration |
+| Slurm `bf_window` | Yes (`bf_max_job_test`) | Every backfill cycle |
 | Fluxion blocked list | No (`m_scheduled_cnt` decremented) | After a completion or priority change |
 | DR_EVT, periodic | Yes, as in Slurm | Every tick |
 | DR_EVT, event-driven | No, as in Fluxion | Every pass |
 
-DR_EVT keeps such a job in the queue and recomputes its reservation on every
-pass, so nodes freed by completions or by a scheduled capacity change can bring
+DR_EVT keeps such a job in the queue and re-evaluates it on every pass, so nodes freed by completions or by a scheduled capacity change can bring
 it back. It does not model the resource-status notifications Fluxion relies
 on.
 
@@ -259,7 +256,7 @@ on.
 
 | Aspect | DR_EVT | Difference and its effect |
 |---|---|---|
-| When backfill runs | Event-driven by default | Slurm and LSF backfill periodically, so by default DR_EVT backfills sooner and backfilled jobs wait less than they would. `--backfill_interval` removes this. LSF also makes in-order starts periodic, which DR_EVT cannot reproduce. |
+| When backfill runs | Event-driven by default | Slurm backfills periodically, so by default DR_EVT backfills sooner and backfilled jobs wait less than they would. `--backfill_interval` removes this. |
 | Planning grid | Exact by default | Slurm rounds planned times to a grid and Fluxion plans in whole seconds. `--planning_time_resolution` reproduces either. |
 | Scan and reservation depth | Unlimited by default | Slurm and Fluxion limit both. Setting the same depths removes the difference. |
 | Node reuse | Immediate by default | Production nodes return after cleanup. `--node_release_delay` removes this optimism only as far as it is calibrated. |
@@ -355,9 +352,11 @@ and depths to match the target narrows those differences.
   [`dfu.cpp`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/resource/traversers/dfu.cpp#L106-L139),
   [`allocate_orelse_reserve_jobs()` EBUSY branch](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp#L120-L141),
   and [`reconsider_blocked_jobs()`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/base/queue_policy_base.hpp#L188-L194).
-- LSF: IBM Spectrum LSF 10.1 documentation, `lsb.params`
-  `JOB_SCHEDULING_INTERVAL` (read 2026-10-30); the slot-reservation and
-  post-execution statements are summarized from the `lsb.queues` reference.
+- LSF: IBM Spectrum LSF 10.1 documentation, read 2026-11-04:
+  [job life cycle](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_foundations/job_life_cycle_lsf.html),
+  [`JOB_SCHEDULING_INTERVAL`](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_config_ref/lsb.params.job_scheduling_interval.5.html),
+  [reserving processors](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/reserving_processors.html), and
+  [backfill scheduling](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/backfill.html).
 - RAPS: [ExaDigiT/RAPS at commit
   `3f21cd35`](https://github.com/ExaDigiT/RAPS/tree/3f21cd35b7bf6a8f5decc41050c8d871809608ad),
   `raps/schedulers/default.py` (`find_backfill_job`, lines 150–198,
