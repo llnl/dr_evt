@@ -91,6 +91,12 @@ public:
     }
   }
 
+  /** Whether this exact interval can be added without changing the plan. */
+  bool can_fit(sim_time_t start, num_nodes_t nodes, tdiff_t duration) const {
+    const auto fit = earliest_fit(nodes, duration, start);
+    return fit && *fit == start;
+  }
+
   /** Reserve nodes over [start, start + duration). */
   void reserve(sim_time_t start, num_nodes_t nodes, tdiff_t duration) {
     if (duration <= 0) {
@@ -201,6 +207,9 @@ public:
    */
   bool reservation_within_horizon(sim_time_t reservation_time,
                                   sim_time_t current_time) const {
+    if (reservation_time == std::numeric_limits<sim_time_t>::max()) {
+      return false;
+    }
     return static_cast<tdiff_t>(reservation_time - current_time) <=
            m_planning_horizon;
   }

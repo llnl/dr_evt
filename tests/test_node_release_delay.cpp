@@ -211,15 +211,12 @@ void test_streaming_constant_delay() {
   assert(sim.get_statistics().jobs_running == 1);
   expect_close(sim.get_fcfs_head_shadow_time(), 200.0);
   {
-    // C has ended and its nodes are observably releasing until 100; A is
-    // still running and its projected release is its limit, 200, not its
-    // limit plus the delay.
+    // C is in cleanup and contributes no future reservation release. A is
+    // still running, so its time limit is the sole projected release.
     const auto window = sim.get_backfill_window();
-    assert(window.releases.size() == 2);
-    expect_close(window.releases[0].time, 100.0);
-    assert(window.releases[0].nodes_released == 20);
-    expect_close(window.releases[1].time, 200.0);
-    assert(window.releases[1].nodes_released == 70);
+    assert(window.releases.size() == 1);
+    expect_close(window.releases.front().time, 200.0);
+    assert(window.releases.front().nodes_released == 70);
   }
 
   sim.advance_to(100.0);
@@ -230,15 +227,10 @@ void test_streaming_constant_delay() {
   assert(sim.get_nodes_in_use() == 0);
   assert(sim.get_nodes_releasing() == 70);
   assert(sim.get_statistics().jobs_running == 0);
-  // Once the job has ended, its nodes are observably in cleanup and the
-  // backfill window reports their actual release.
+  // Once the job has ended, cleanup capacity is unavailable but creates no
+  // future reservation release.
   const auto window = sim.get_backfill_window();
-  assert(window.releases.size() == 1);
-  expect_close(window.releases.front().time, 230.0);
-  assert(window.releases.front().nodes_released == 70);
-  // The cached head reservation is recomputed only by a scheduling pass, and
-  // an end that frees no nodes triggers none; the on-demand window above is
-  // the projection to consult while nodes are releasing.
+  assert(window.releases.empty());
 
   sim.advance_to(std::numeric_limits<sim_time_t>::max());
   const auto statuses = sim.get_job_statuses({0, 1, 2});
@@ -302,14 +294,35 @@ void test_exponential_delay_grows_with_size() {
   sim.advance_to(200.0);
   assert(sim.get_nodes_releasing() == 70);
   assert(sim.get_nodes_in_use() == 0);
-  // The sampled release replaces the planned one once the job has ended.
+  // Cleanup nodes do not create a future reservation release. They become
+  // schedulable only when the RELEASE event is processed.
   const auto window = sim.get_backfill_window();
-  assert(window.releases.size() == 1);
-  assert(window.releases.front().time > 200.0);
+  assert(window.releases.empty());
   sim.advance_to(std::numeric_limits<sim_time_t>::max());
   const auto statuses = sim.get_job_statuses({1});
-  expect_close(*statuses[0].start_time, window.releases.front().time, 1e-6);
+  assert(*statuses[0].start_time > 200.0);
   std::cout << "  exponential delay: ok\n";
+}
+
+void test_cleanup_release_is_not_a_reservation_prediction() {
+  // A ends at 200 then cleans up through 230. At 210 B (45 nodes) is
+  // blocked by cleanup. Its shadow must remain absent rather than projecting
+  // the sampled cleanup release at 230; RELEASE is the next schedulable
+  // decision point.
+  auto params = make_params(header_only_trace().string(), 30.0);
+  Simulation sim(params);
+  sim.append_job(0.0, 70, test_queue, 200.0);
+  sim.advance_to(200.0);
+  assert(sim.get_nodes_releasing() == 70);
+  sim.append_job(210.0, 45, test_queue, 300.0);
+  sim.advance_to(210.0);
+  const auto before_release = sim.get_job_statuses({1});
+  assert(!before_release[0].start_time.has_value());
+  assert(sim.get_fcfs_head_shadow_time() == -1.0);
+  sim.advance_to(230.0);
+  const auto after_release = sim.get_job_statuses({1});
+  expect_close(*after_release[0].start_time, 230.0);
+  std::cout << "  cleanup release is not a reservation prediction: ok\n";
 }
 
 void test_replay_is_not_delayed() {
@@ -412,8 +425,7 @@ void test_checkpoint_across_pending_release() {
   assert(restarted.get_available_nodes() == 30);
   const auto restored_window = restarted.get_backfill_window();
   assert(restored_window.releases.size() == saved_window.releases.size());
-  expect_close(restored_window.releases.front().time,
-               saved_window.releases.front().time, 0.0);
+  assert(restored_window.releases.empty());
   restarted.append_job(400.0, 10, test_queue, 100.0);
   restarted.advance_to(std::numeric_limits<sim_time_t>::max());
   const auto actual = restarted.get_job_statuses({0, 1, 2, 3});
@@ -475,6 +487,7 @@ int main() {
   test_streaming_constant_delay();
   test_backfill_admitted_up_to_the_shadow();
   test_exponential_delay_grows_with_size();
+  test_cleanup_release_is_not_a_reservation_prediction();
   test_replay_is_not_delayed();
   test_warm_start_applies_from_boundary();
 #if defined(DR_EVT_HAS_SER20)

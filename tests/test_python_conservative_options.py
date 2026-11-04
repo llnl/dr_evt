@@ -33,7 +33,7 @@ def main():
             "--backfill-interval", "5", "--planning-horizon", "10",
         )
         assert [(row["start_time"], row["end_time"]) for row in horizon] == [
-            ("0.0", "100.0"), ("104.0", "114.0"), ("5.0", "104.0")]
+            ("0.0", "100.0"), ("105.0", "115.0"), ("5.0", "105.0")]
 
         # Event-driven (no interval): the head's reservation at t=100 lies
         # beyond a 10 s horizon, so job 2 backfills at its arrival, t=1.
@@ -42,7 +42,7 @@ def main():
             "--planning-horizon", "10",
         )
         assert [(row["start_time"], row["end_time"]) for row in event_driven] == [
-            ("0.0", "100.0"), ("100.0", "110.0"), ("1.0", "100.0")]
+            ("0.0", "100.0"), ("101.0", "111.0"), ("1.0", "101.0")]
 
         resolution = run_reference(
             source_dir,
@@ -52,7 +52,9 @@ def main():
             "60",
         )
         assert resolution[2]["duration"] == "59.0"
-        assert resolution[2]["start_time"] == "130.0"
+        # It can now overlap the head's future reservation while preserving
+        # the head's ten nodes at t=120.
+        assert resolution[2]["start_time"] == "2.0"
         assert float(resolution[2]["end_time"]) - float(
             resolution[2]["start_time"]
         ) == 59.0
@@ -75,6 +77,15 @@ def main():
         # reserved at 150 and C can backfill from zero through 70.
         assert [row["start_time"] for row in chained] == [
             "0.0", "0.0", "100.0", "150.0", "0.0"]
+
+        flexible = run_reference(
+            source_dir, "tests/test_traces/feature/flexible_reservation.csv",
+            outdir, nodes="100",
+        )
+        # The 20-node candidate overlaps the 80-node head reservation at
+        # t=10 while leaving the full 80 nodes available to the head.
+        assert [row["start_time"] for row in flexible] == [
+            "0.0", "10.0", "0.0", "30.0"]
 
         # H, C, and D consume the three slots at t=0. D starts in the first
         # pass; E must wait for the next timestamp instead of using a reset

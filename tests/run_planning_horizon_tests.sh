@@ -6,7 +6,7 @@
 #    and without one, against the Python references (EASY reference for easy
 #    and sjf, conservative reference for hybrid and conservative). Hybrid and
 #    conservative use a one-job scan depth: the out-of-horizon head must not
-#    consume it, so the 99 s candidate backfills at its arrival.
+#    consume it, so the 100 s candidate backfills at its arrival.
 # 2. An explicit unlimited horizon must leave the output of the 34
 #    scheduler-correctness workloads byte-identical to the default.
 # 3. Invalid values are rejected.
@@ -85,8 +85,8 @@ for BOUND in unbounded bounded; do
 done
 
 # The fixture is only useful if the horizon changes the answer.
-EXPECTED_UNBOUNDED=$'0,0,100\n1,100,110\n2,110,209'
-EXPECTED_BOUNDED=$'0,0,100\n1,100,110\n2,1,100'
+EXPECTED_UNBOUNDED=$'0,0,100\n1,100,110\n2,110,210'
+EXPECTED_BOUNDED=$'0,0,100\n1,101,111\n2,1,101'
 if [ "$(cat "$WORK/unbounded.easy_ref")" = "$EXPECTED_UNBOUNDED" ] && \
    [ "$(cat "$WORK/bounded.easy_ref")" = "$EXPECTED_BOUNDED" ] && \
    [ "$(cat "$WORK/bounded.depth1.ref")" = "$EXPECTED_BOUNDED" ] && \

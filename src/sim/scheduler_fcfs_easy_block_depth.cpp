@@ -24,6 +24,7 @@ template <size_t BlockSize>
 std::vector<job_no_t>
 FCFSEasyBlockScheduler<BlockSize>::backfill_with_queue_depth(
     bool head_planned, sim_time_t planned_reservation, sim_time_t current_time,
+    Reservation_Timeline reservation_plan,
     num_nodes_t available_nodes, std::vector<job_no_t> jobs_to_run) {
   size_t head_index = 0;
   while (head_index < m_eligible_end_idx && m_job_order[head_index].removed) {
@@ -42,12 +43,21 @@ FCFSEasyBlockScheduler<BlockSize>::backfill_with_queue_depth(
     if (!m_wait_queue.get_job_info(job_id, run_time, nodes)) {
       throw std::logic_error("active block-queue job is missing");
     }
-    if (nodes > available_nodes ||
-        current_time + run_time >= planned_reservation) {
+    if (nodes > available_nodes) {
       continue;
     }
+#ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
+    if (current_time + run_time >= planned_reservation)
+      continue;
+#else
+    if (!reservation_plan.can_fit(current_time, nodes,
+                                  release_estimate(current_time, run_time)))
+      continue;
+#endif
     jobs_to_run.push_back(job_id);
     available_nodes -= nodes;
+    reservation_plan.reserve(current_time, nodes,
+                             release_estimate(current_time, run_time));
     m_wait_queue.remove(job_id);
     m_job_order[i].removed = true;
     ++m_removed_count;
@@ -58,31 +68,31 @@ FCFSEasyBlockScheduler<BlockSize>::backfill_with_queue_depth(
 // Explicit instantiations for the supported block sizes.
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<4>::backfill_with_queue_depth(bool, sim_time_t,
-                                                     sim_time_t, num_nodes_t,
+                                                     sim_time_t, Reservation_Timeline, num_nodes_t,
                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<8>::backfill_with_queue_depth(bool, sim_time_t,
-                                                     sim_time_t, num_nodes_t,
+                                                     sim_time_t, Reservation_Timeline, num_nodes_t,
                                                      std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<16>::backfill_with_queue_depth(bool, sim_time_t,
-                                                      sim_time_t, num_nodes_t,
+                                                      sim_time_t, Reservation_Timeline, num_nodes_t,
                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<32>::backfill_with_queue_depth(bool, sim_time_t,
-                                                      sim_time_t, num_nodes_t,
+                                                      sim_time_t, Reservation_Timeline, num_nodes_t,
                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<64>::backfill_with_queue_depth(bool, sim_time_t,
-                                                      sim_time_t, num_nodes_t,
+                                                      sim_time_t, Reservation_Timeline, num_nodes_t,
                                                       std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<128>::backfill_with_queue_depth(bool, sim_time_t,
-                                                       sim_time_t, num_nodes_t,
+                                                       sim_time_t, Reservation_Timeline, num_nodes_t,
                                                        std::vector<job_no_t>);
 template std::vector<job_no_t>
 FCFSEasyBlockScheduler<256>::backfill_with_queue_depth(bool, sim_time_t,
-                                                       sim_time_t, num_nodes_t,
+                                                       sim_time_t, Reservation_Timeline, num_nodes_t,
                                                        std::vector<job_no_t>);
 
 } // namespace dr_evt

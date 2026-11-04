@@ -298,9 +298,10 @@ and depths to match the target narrows those differences.
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).
 - **RAPS.** The [comparison helper](../../scripts/compare_with_raps.py) runs
-  one job list through RAPS and DR_EVT and lines up the start times. It is a
-  manual tool, not part of CI. RAPS cannot serve as a correctness check for
-  DR_EVT's backfill: at RAPS commit
+  one job list through RAPS and a DR_EVT binary built with
+  `DR_EVT_LEGACY_RESERVATION_BARRIER=ON`, then lines up start times. It is a
+  manual legacy-compatibility tool, not part of CI. RAPS cannot serve as a
+  correctness check for DR_EVT's default resource-aware backfill: at RAPS commit
   [3f21cd3](https://github.com/ExaDigiT/RAPS/tree/3f21cd35b7bf6a8f5decc41050c8d871809608ad),
   three differences separate the two, each verified in the RAPS source.
   1. RAPS advances in one-second steps and notices a completion one step after

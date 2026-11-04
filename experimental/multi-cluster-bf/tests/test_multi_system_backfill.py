@@ -162,9 +162,9 @@ HAND_CASES = [
      {"target_only": {0: (0, 100, "A"), 1: (0, 200, "B"),
                       2: (100, 150, "A"), 3: (1, 1001, "B")},
       "every_system": {0: (0, 100, "A"), 1: (0, 200, "B"),
-                       2: (100, 150, "A"), 3: (100, 1100, "B")},
+                       2: (100, 150, "A"), 3: (1, 1001, "B")},
       "global_shadow": {0: (0, 100, "A"), 1: (0, 200, "B"),
-                        2: (100, 150, "A"), 3: (100, 1100, "B")}}),
+                        2: (100, 150, "A"), 3: (1, 1001, "B")}}),
     ("medium_candidate_on_non_target",
      # Limit 150: ends at 151, before S_B = 200 but after T* = 100, so
      # every_system admits it and global_shadow does not.
@@ -176,7 +176,7 @@ HAND_CASES = [
       "every_system": {0: (0, 100, "A"), 1: (0, 200, "B"),
                        2: (100, 150, "A"), 3: (1, 151, "B")},
       "global_shadow": {0: (0, 100, "A"), 1: (0, 200, "B"),
-                        2: (100, 150, "A"), 3: (100, 250, "B")}}),
+                        2: (100, 150, "A"), 3: (1, 151, "B")}}),
     ("inadmissible_system_is_free",
      # B:4 can never hold the 10-node head, so S_B = inf and every rule,
      # including global_shadow, lets a long 4-node candidate use B now.
@@ -204,7 +204,7 @@ HAND_CASES = [
       "every_system": {0: (0, 100, "A"), 1: (0, 50, "B"),
                        2: (50, 70, "B"), 3: (70, 1070, "B")},
       "global_shadow": {0: (0, 100, "A"), 1: (0, 50, "B"),
-                        2: (50, 70, "B"), 3: (70, 1070, "B")}}),
+                        2: (100, 120, "A"), 3: (1, 1001, "B")}}),
 ]
 
 

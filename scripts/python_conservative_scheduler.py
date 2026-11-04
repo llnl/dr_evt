@@ -297,6 +297,24 @@ class ConservativeBackfillingScheduler:
         return (cached['earliest'] if cached['earliest'] < float('inf')
                 else None)
 
+    def can_fit_timeline(self, timeline: list, nodes: int,
+                         duration: float) -> bool:
+        """Return whether [current_time, current_time + duration) fits."""
+        start = self.current_time
+        end = self.planned_end(start, duration)
+        segment = next((i for i, (time, _) in enumerate(timeline)
+                        if time <= start and
+                        (i + 1 == len(timeline) or timeline[i + 1][0] > start)),
+                       None)
+        if segment is None:
+            return False
+        i = segment
+        while i < len(timeline) and (i == segment or timeline[i][0] < end):
+            if timeline[i][1] < nodes:
+                return False
+            i += 1
+        return True
+
     def calculate_job_reservation_time_with_running(self, job: Job, effective_running: dict) -> float:
         """
         Calculate when a job can start given effective running jobs (includes backfilled)
@@ -422,10 +440,10 @@ class ConservativeBackfillingScheduler:
                 started = True
                 continue
 
-            # Job can backfill if it completes before the earliest reservation
-            job_end = self.planned_end(self.current_time, job.duration)
-            if job_end < conservative_window:
-                self.log(f"Conservative backfill job {job.idx} (ends {job_end} < earliest reservation {conservative_window})")
+            cache_key = (id(effective_timeline), frozenset(backfilled_jobs.keys()))
+            protected_plan = self._conservative_plan_cache[cache_key]['plan']
+            if self.can_fit_timeline(protected_plan, job.nodes, job.duration):
+                self.log(f"Conservative backfill job {job.idx} preserves protected reservations")
                 self.start_job(job)
                 free_nodes -= job.nodes
                 started = True
@@ -439,7 +457,7 @@ class ConservativeBackfillingScheduler:
                 effective_timeline = None
                 continue
             else:
-                self.log(f"Blocking job {job.idx} (would end {job_end} >= earliest reservation {conservative_window})")
+                self.log(f"Blocking job {job.idx} (would overlap protected capacity)")
                 remaining.append(job)
 
         self.wait_queue = remaining

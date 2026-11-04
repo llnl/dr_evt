@@ -161,6 +161,7 @@ private:
   std::vector<job_no_t>
   backfill_with_queue_depth(bool head_planned, sim_time_t planned_reservation,
                             sim_time_t current_time,
+                            Reservation_Timeline reservation_plan,
                             num_nodes_t available_nodes,
                             std::vector<job_no_t> jobs_to_run);
 };
