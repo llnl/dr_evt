@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <map>
 #include <stdexcept>
 #include <utility>
 
@@ -21,9 +20,9 @@ PowerCappedFCFSScheduler::PowerCappedFCFSScheduler(
     job_power_function_t power_function, bool cap_backfill_power,
     bool cap_fcfs_power, size_t initial_capacity,
     CircularOverflowPolicy overflow_policy)
-    : FCFSEasyCustomScheduler(total_nodes, initial_job_count, BackfillPolicy::EASY,
-                          num_max_candidates, initial_capacity,
-                          overflow_policy),
+    : FCFSEasyCustomScheduler(total_nodes, initial_job_count,
+                              BackfillPolicy::EASY, num_max_candidates,
+                              initial_capacity, overflow_policy),
       m_maximum_power(maximum_power),
       m_power_function(std::move(power_function)),
       m_cap_backfill_power(cap_backfill_power),
@@ -116,12 +115,14 @@ sim_time_t PowerCappedFCFSScheduler::fcfs_head_reservation_time(
   num_nodes_t projected_available = available_nodes;
   double projected_power = 0.0;
   struct Release {
+    sim_time_t time = 0.0;
+    job_no_t job_id = 0;
     num_nodes_t nodes = 0;
     double power = 0.0;
   };
-  std::map<sim_time_t, Release> releases;
+  std::vector<Release> releases;
+  releases.reserve(effective_running_jobs.size());
   for (const auto &[running_id, running] : effective_running_jobs) {
-    (void)running_id;
     if (!running.predicted_power) {
       throw std::logic_error(
           "power-capped scheduler has no power estimate for a running job");
@@ -129,17 +130,30 @@ sim_time_t PowerCappedFCFSScheduler::fcfs_head_reservation_time(
     projected_power += *running.predicted_power;
     const sim_time_t end_time = running.start_time + running.run_time;
     if (end_time > current_time) {
-      releases[end_time].nodes += running.nodes;
-      releases[end_time].power += *running.predicted_power;
+      releases.push_back(
+          {end_time, running_id, running.nodes, *running.predicted_power});
     }
   }
   if (job.nodes_requested <= projected_available &&
       projected_power + job.m_cost <= m_maximum_power) {
     return current_time;
   }
-  for (const auto &[end_time, release] : releases) {
-    projected_available += release.nodes;
-    projected_power = std::max(0.0, projected_power - release.power);
+  std::sort(releases.begin(), releases.end(),
+            [](const Release &left, const Release &right) {
+              return left.time != right.time ? left.time < right.time
+                                             : left.job_id < right.job_id;
+            });
+  for (size_t begin = 0; begin < releases.size();) {
+    const sim_time_t end_time = releases[begin].time;
+    num_nodes_t released_nodes = 0;
+    double released_power = 0.0;
+    do {
+      released_nodes += releases[begin].nodes;
+      released_power += releases[begin].power;
+      ++begin;
+    } while (begin < releases.size() && releases[begin].time == end_time);
+    projected_available += released_nodes;
+    projected_power = std::max(0.0, projected_power - released_power);
     if (job.nodes_requested <= projected_available &&
         projected_power + job.m_cost <= m_maximum_power) {
       return end_time;
