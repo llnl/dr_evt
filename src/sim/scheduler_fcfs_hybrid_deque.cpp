@@ -178,17 +178,24 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
     ++m_backfill_depth_examined;
     m_backfill_depth_head_accounted = true;
   }
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  // Build the common initial state once, then keep two independent value
+  // copies as accepted starts and protected reservations diverge.
+  auto baseline_plan = reservation_timeline(available_nodes, running_jobs,
+                                            current_time, projected_starts);
+  auto availability_plan = baseline_plan;
+  auto protected_plan = std::move(baseline_plan);
+  // Keep one incrementally extended plan for the full scan. Replaying every
+  // protected prefix for each candidate made flexible reservations quadratic
+  // in the scanned prefix and repeatedly allocated timeline-map nodes.
+#else
   // Candidate horizon checks need the same availability projection as the
   // previous full map-based calculation. Extend it as jobs start instead of
   // rebuilding release maps for every candidate.
   auto availability_plan = reservation_timeline(available_nodes, running_jobs,
                                                 current_time, projected_starts);
+#endif
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
-  // Keep one incrementally extended plan for the full scan. Replaying every
-  // protected prefix for each candidate made flexible reservations quadratic
-  // in the scanned prefix and repeatedly allocated timeline-map nodes.
-  auto protected_plan = reservation_timeline(available_nodes, running_jobs,
-                                             current_time, projected_starts);
   const size_t protected_depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t protected_count = 0;

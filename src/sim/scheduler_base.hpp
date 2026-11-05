@@ -48,7 +48,9 @@ using projected_starts_t = std::vector<Running_Job>;
  * @brief Mutable free-node timeline used for reservation planning.
  * @details Each entry begins a constant-capacity segment.  A reservation
  * subtracts its nodes for its complete planned interval, so later searches
- * see the resource-time commitments made by earlier reservations.
+ * see the resource-time commitments made by earlier reservations. Timelines
+ * have value semantics: a scheduler may copy a common baseline into separate
+ * availability and protection plans before extending either plan.
  */
 class Reservation_Timeline {
   std::map<sim_time_t, num_nodes_t> m_free_nodes;
