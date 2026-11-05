@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <map>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -479,15 +480,42 @@ MultiSystemBackfillScheduler::schedule(num_nodes_t free_nodes,
     }
   }
 
+  std::vector<Reservation_Timeline> plans;
+  plans.reserve(num_systems);
+  for (system_id_t k = 0; k < num_systems; ++k) {
+    std::map<sim_time_t, num_nodes_t> profile;
+    profile[current_time] = m_model.free(k);
+    std::map<sim_time_t, num_nodes_t> releases_at;
+    for (const auto &[time, nodes] : releases[k]) {
+      if (time > current_time) {
+        releases_at[time] += nodes;
+      }
+    }
+    num_nodes_t available = m_model.free(k);
+    for (const auto &[time, nodes] : releases_at) {
+      available += nodes;
+      profile[time] = available;
+    }
+    plans.emplace_back(std::move(profile));
+    if (std::isfinite(windows[k]) &&
+        plans.back().can_fit(windows[k], head.nodes_requested,
+                             head.run_time_estimate)) {
+      plans.back().reserve(windows[k], head.nodes_requested,
+                           head.run_time_estimate);
+    }
+  }
+
   for (size_t i = 1; i < m_eligible_end_idx; ++i) {
     const JobEntry &job = m_wait_queue[i];
     if (job.removed) {
       continue;
     }
-    const sim_time_t job_end = current_time + job.run_time_estimate;
     candidates.clear();
     for (system_id_t k = 0; k < num_systems; ++k) {
-      if (m_model.fits_now(k, job.nodes_requested) && job_end < windows[k]) {
+      if (m_model.fits_now(k, job.nodes_requested) &&
+          (!std::isfinite(windows[k]) ||
+           plans[k].can_fit(current_time, job.nodes_requested,
+                            job.run_time_estimate))) {
         candidates.push_back(k);
       }
     }
@@ -496,6 +524,7 @@ MultiSystemBackfillScheduler::schedule(num_nodes_t free_nodes,
     }
     const system_id_t k = choose_system(job.nodes_requested, candidates);
     place(job, k, current_time, releases);
+    plans[k].reserve(current_time, job.nodes_requested, job.run_time_estimate);
     jobs_to_run.push_back(job.job_id);
     m_wait_queue[i].removed = true;
     ++m_removed_count;

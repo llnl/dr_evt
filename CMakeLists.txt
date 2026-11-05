@@ -235,6 +235,8 @@ option(DR_EVT_INSTALL_FETCHED_GRPC
 # Select the trace-file queue representation at configure time. Legacy mode
 # keeps existing `queue`-name traces compatible; ID mode reads `q_id` only.
 option(DR_EVT_LEGACY_QUEUE_INPUT "Read legacy queue-name trace columns instead of q_id" OFF)
+option(DR_EVT_LEGACY_RESERVATION_BARRIER
+  "Require backfill jobs to finish before protected reservations" OFF)
 
 if (DR_EVT_ENABLE_GRPC)
   if (NOT DR_EVT_ENABLE_PROTOBUF)
@@ -913,6 +915,11 @@ if(DR_EVT_WITH_UNIT_TESTING)
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_backfill_queue_depth_tests.sh
       $<TARGET_FILE:sim-bin>)
   add_test(
+    NAME test_flexible_reservation
+    COMMAND ${CMAKE_COMMAND} -E env
+      SIMULATOR=$<TARGET_FILE:sim-bin>
+      /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_flexible_reservation_tests.sh)
+  add_test(
     NAME test_max_time
     COMMAND /bin/bash
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_max_time_tests.sh
@@ -1093,6 +1100,9 @@ configure_file(
   "${CMAKE_BINARY_DIR}/dr_evt_config.hpp"
   @ONLY)
 target_compile_definitions(dr_evt PUBLIC DR_EVT_HAS_CONFIG)
+if (DR_EVT_LEGACY_RESERVATION_BARRIER)
+  target_compile_definitions(dr_evt PUBLIC DR_EVT_LEGACY_RESERVATION_BARRIER)
+endif ()
 
 if (TARGET DR_EVT_CXX_FLAGS_werror)
   target_link_libraries(dr_evt PUBLIC DR_EVT_CXX_FLAGS_werror)

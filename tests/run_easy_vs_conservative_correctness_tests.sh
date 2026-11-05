@@ -198,28 +198,28 @@ for i, (expected, actual) in enumerate(zip(cons_expected, cons_actual)):
 print("-" * 70)
 print()
 
-# Critical chained-plan check: Job 5 is safe before the first reservation.
+# Critical flexible-reservation check: Job 4 overlaps the head reservation
+# while leaving its requested 50 nodes available at t=50.
 print("Critical Behavioral Check:")
 print("-" * 70)
-job5_easy = easy_actual[5]['start']
-job5_cons = cons_actual[5]['start']
-job5_easy_exp = easy_expected[5]['start']
-job5_cons_exp = cons_expected[5]['start']
+job4_easy = easy_actual[4]['start']
+job4_cons = cons_actual[4]['start']
+job4_easy_exp = easy_expected[4]['start']
+job4_cons_exp = cons_expected[4]['start']
 
-print(f"Job 5 (backfill candidate, 10 nodes, duration 40):")
-print(f"  EASY:         starts at t={job5_easy:.1f} (expected t={job5_easy_exp:.1f})")
-print(f"  CONSERVATIVE: starts at t={job5_cons:.1f} (expected t={job5_cons_exp:.1f})")
+print(f"Job 4 (backfill candidate, 15 nodes, duration 100):")
+print(f"  EASY:         starts at t={job4_easy:.1f} (expected t={job4_easy_exp:.1f})")
+print(f"  CONSERVATIVE: starts at t={job4_cons:.1f} (expected t={job4_cons_exp:.1f})")
 print()
 
-if job5_easy == 0.0 and job5_cons == 0.0:
-    print("✅ CORRECT: EASY backfilled Job 5 at t=0")
-    print("✅ CORRECT: CONSERVATIVE backfilled Job 5 at t=0")
+if job4_easy == 0.0 and job4_cons == 100.0:
+    print("✅ CORRECT: EASY backfilled Job 4 at t=0")
+    print("✅ CORRECT: CONSERVATIVE preserved its later reservation")
     print()
     print("Explanation:")
-    print("  - EASY only checks Job 2's reservation (t=50)")
-    print("  - Job 5 ends at t=40 < 50, so EASY accepts")
-    print("  - CONSERVATIVE chains Job 2, Job 3, and Job 4 at 50, 50, and 100")
-    print("  - Job 5 ends at t=40, before the first protected reservation")
+    print("  - EASY protects the head reservation's 50 nodes at t=50")
+    print("  - Job 4 occupies only 15 of the 100 nodes, so it is safe")
+    print("  - CONSERVATIVE also protects the later queued reservations")
     behavior_pass = True
 else:
     print(f"❌ UNEXPECTED: Job 5 timing doesn't match expected behavior")

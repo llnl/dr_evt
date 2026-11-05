@@ -201,9 +201,18 @@ class HybridBackfillingScheduler:
         releases = sorted((pessimistic_end, nodes)
                           for _, _, pessimistic_end, nodes in running.values())
         timeline = [(self.current_time, current_free)]
+        # A timeline has one capacity segment per timestamp.  Keeping
+        # simultaneous releases as separate entries makes reserve() apply a
+        # protected reservation to every zero-width duplicate segment, which
+        # subtracts its nodes more than once.  The C++ Reservation_Timeline
+        # aggregates its release deltas in a map; preserve that representation
+        # here as well.
         for release_time, released_nodes in releases:
             current_free += released_nodes
-            timeline.append((release_time, current_free))
+            if timeline[-1][0] == release_time:
+                timeline[-1] = (release_time, current_free)
+            else:
+                timeline.append((release_time, current_free))
         return timeline
 
     @staticmethod
@@ -316,6 +325,20 @@ class HybridBackfillingScheduler:
             self.reserve_in_timeline(cached['plan'], self.current_time, end,
                                      job.nodes)
             cached['excluded'].add(job.idx)
+
+    def can_fit_timeline(self, timeline: list, nodes: int,
+                         duration: float) -> bool:
+        """Return whether [current_time, current_time + duration) fits."""
+        start = self.current_time
+        end = self.planned_end(start, duration)
+        segment = bisect.bisect_right(
+            timeline, (start, float('inf'))) - 1
+        i = segment
+        while i < len(timeline) and (i == segment or timeline[i][0] < end):
+            if timeline[i][1] < nodes:
+                return False
+            i += 1
+        return True
 
     def calculate_job_reservation_time_with_running(self, job: Job, effective_running: dict) -> float:
         """
@@ -436,10 +459,10 @@ class HybridBackfillingScheduler:
                 self.reserve_backfill_in_plans(job, effective_timeline)
                 continue
 
-            # Job can backfill if it completes before the earliest reservation
-            job_end = self.planned_end(self.current_time, job.duration)
-            if job_end < conservative_window:
-                self.log(f"Conservative backfill job {job.idx} (ends {job_end} < earliest reservation {conservative_window})")
+            protected_plan = self._conservative_plan_cache[
+                id(effective_timeline)]['plan']
+            if self.can_fit_timeline(protected_plan, job.nodes, job.duration):
+                self.log(f"Conservative backfill job {job.idx} preserves protected reservations")
                 self.start_job(job)
                 free_nodes -= job.nodes
                 started = True
@@ -447,7 +470,7 @@ class HybridBackfillingScheduler:
                 self.reserve_backfill_in_plans(job, effective_timeline)
                 continue
             else:
-                self.log(f"Blocking job {job.idx} (would end {job_end} >= earliest reservation {conservative_window})")
+                self.log(f"Blocking job {job.idx} (would overlap protected capacity)")
                 remaining.append(job)
 
         self.wait_queue = remaining

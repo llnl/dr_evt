@@ -151,18 +151,20 @@ private:
    * @brief Backfill under --backfill_queue_depth by scanning arrival order.
    * @param[in] head_planned Whether the head's reservation is inside the
    * planning horizon and therefore consumes a depth slot.
-   * @param[in] planned_reservation Head reservation candidates must finish
-   * before; the maximum time when the head is not planned.
+   * @param[in] planned_reservation Head reservation start, or the maximum
+   * time when the head is not planned.
    * @param[in] current_time Current simulation time.
+   * @param[in] reservation_plan Protected resource-time plan, including the
+   * head reservation when one is planned; extended for every accepted
+   * backfill job.
    * @param[in] available_nodes Free nodes before any backfill start.
    * @param[in] jobs_to_run Jobs already started in this pass.
    * @return jobs_to_run extended with the backfill starts.
    */
-  std::vector<job_no_t>
-  backfill_with_queue_depth(bool head_planned, sim_time_t planned_reservation,
-                            sim_time_t current_time,
-                            num_nodes_t available_nodes,
-                            std::vector<job_no_t> jobs_to_run);
+  std::vector<job_no_t> backfill_with_queue_depth(
+      bool head_planned, sim_time_t planned_reservation,
+      sim_time_t current_time, Reservation_Timeline reservation_plan,
+      num_nodes_t available_nodes, std::vector<job_no_t> jobs_to_run);
 };
 
 // Explicit template instantiations for common block sizes

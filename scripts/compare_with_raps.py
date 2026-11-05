@@ -5,7 +5,7 @@
 #                                                                              #
 #         SPDX-License-Identifier: MIT                                         #
 ################################################################################
-"""Compare DR_EVT's FCFS/EASY schedule with the RAPS reference scheduler.
+"""Compare legacy-barrier DR_EVT FCFS/EASY scheduling with RAPS.
 
 Runs the same job list through both simulators with the same node count,
 FCFS ordering, EASY backfilling, and recorded run times, then joins per-job
@@ -18,8 +18,13 @@ start times.
 SWF input is converted here with the same rules the simulator applies
 (tests/run_swf_tests.sh pins that the C++ loader and this mapping agree).
 
-Expected agreement: identical start order, and RAPS start times equal to
-dr_evt's plus a small non-negative lag. RAPS advances on a 1-second tick and
+RAPS treats every reservation as a strict completion-before-shadow barrier.
+Therefore this tool requires a DR_EVT simulator built with
+``-DDR_EVT_LEGACY_RESERVATION_BARRIER=ON``. It must not be used to validate
+DR_EVT's default resource-aware reservation policy.
+
+Expected agreement under that legacy mode is identical start order, and RAPS
+start times equal to dr_evt's plus a small non-negative lag. RAPS advances on a 1-second tick and
 releases a job's nodes on the tick after it completes, so every completion a
 job waited behind adds one second there; dr_evt is event-driven and reuses
 nodes at the completion instant. Beyond that lag, the
@@ -36,7 +41,7 @@ appeared from roughly the 200th job on in a manual run at RAPS commit
 RAPS backfilling against its later shadow; check the first such job by hand
 (the report lists them) before treating it as a dr_evt defect. The
 independent EASY oracle in this repository is scripts/python_reference_scheduler.py.
-Manual tool: RAPS is not part of CI.
+This is manual compatibility telemetry, not a CI correctness test.
 """
 
 import argparse

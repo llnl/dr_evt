@@ -87,9 +87,10 @@ class EasyBackfillingScheduler:
         # another job can start on them. 0 releases nodes at the job's end.
         # The scheduler does not plan with it: as in Slurm, Flux, and LSF, a
         # running job's projected release is its pessimistic end, and the
-        # cleanup time shows up when the nodes fail to come back. Once a job
-        # has ended, its nodes are observably releasing and their actual
-        # release time is used.
+        # cleanup time shows up when the nodes fail to come back. Nodes in
+        # cleanup remain unavailable, but do not become a projected future
+        # release for a reservation: only their RELEASE event makes them
+        # schedulable again.
         self.release_delay = release_delay
         # A head whose reservation starts more than this far ahead is not
         # planned: it holds no reservation, so candidates are not tested
@@ -159,15 +160,12 @@ class EasyBackfillingScheduler:
             return self.current_time
 
         # Find earliest time when enough nodes will be free
-        # Look at running jobs and their pessimistic end times (the delay is
-        # not planned for), and at ended jobs whose nodes are still releasing
-        # (their actual release time is known).
+        # Look only at live jobs and their pessimistic end times. Nodes in
+        # cleanup reduce free capacity now, but their eventual release is not
+        # a reservation-planning prediction.
         events = []
         for job_idx, (start_time, actual_end, pessimistic_end, nodes) in self.running.items():
             events.append((pessimistic_end, +nodes, job_idx))
-        for job_idx, (release_time, nodes) in self.releasing.items():
-            events.append((release_time, +nodes, job_idx))
-
         events.sort()
 
         # Simulate freeing nodes over time
@@ -179,6 +177,51 @@ class EasyBackfillingScheduler:
 
         # Should never reach here if system is not oversubscribed
         return None
+
+    def reservation_timeline(self, free_nodes: int) -> list:
+        """Projected free-node profile used for protected reservations."""
+        deltas = {}
+        for _, (_, _, pessimistic_end, nodes) in self.running.items():
+            if pessimistic_end > self.current_time:
+                deltas[pessimistic_end] = deltas.get(pessimistic_end, 0) + nodes
+        profile = [(self.current_time, free_nodes)]
+        available = free_nodes
+        for time in sorted(deltas):
+            available += deltas[time]
+            profile.append((time, available))
+        return profile
+
+    @staticmethod
+    def can_fit_timeline(profile: list, start: float, nodes: int,
+                         duration: float) -> bool:
+        end = start + duration
+        segment = next((i for i, (time, _) in enumerate(profile)
+                        if time <= start and
+                        (i + 1 == len(profile) or profile[i + 1][0] > start)),
+                       None)
+        if segment is None:
+            return False
+        for i in range(segment, len(profile)):
+            time, available = profile[i]
+            if i != segment and time >= end:
+                break
+            if available < nodes:
+                return False
+        return True
+
+    @staticmethod
+    def reserve_timeline(profile: list, start: float, nodes: int,
+                         duration: float) -> None:
+        end = start + duration
+        for boundary in (start, end):
+            if not any(time == boundary for time, _ in profile):
+                for index, (time, available) in enumerate(profile):
+                    if index + 1 == len(profile) or profile[index + 1][0] > boundary:
+                        profile.insert(index + 1, (boundary, available))
+                        break
+        for index, (time, available) in enumerate(profile):
+            if start <= time < end:
+                profile[index] = (time, available - nodes)
 
     def try_start_jobs(self):
         """
@@ -220,6 +263,11 @@ class EasyBackfillingScheduler:
         head_within_horizon = (
             reservation_time is not None and
             reservation_time - self.current_time <= self.planning_horizon)
+        reservation_plan = self.reservation_timeline(free_nodes)
+        if head_within_horizon:
+            self.reserve_timeline(reservation_plan, reservation_time,
+                                  self.wait_queue[0].nodes,
+                                  self.wait_queue[0].duration)
 
         # Position 0 is the head; the loop above just proved it's blocked
         # (that's why we're here), so it stays parked at the front.
@@ -240,20 +288,20 @@ class EasyBackfillingScheduler:
                 break
             examined += 1
             if job.nodes <= free_nodes:
-                # Tested on its projected end; the release delay is not
-                # planned for, the same as for the reservation above.
-                job_end = self.current_time + job.duration
                 if reservation_time is not None and (
-                        not head_within_horizon or job_end < reservation_time):
-                    # Backfiller - only if it completes before reservation
-                    self.log(f"Backfilling job {job.idx} (ends at {job_end} < reservation {reservation_time})")
+                        not head_within_horizon or self.can_fit_timeline(
+                            reservation_plan, self.current_time, job.nodes,
+                            job.duration)):
+                    self.log(f"Backfilling job {job.idx} preserves reservation capacity")
                     self.start_job(job)
                     free_nodes -= job.nodes
+                    if head_within_horizon:
+                        self.reserve_timeline(reservation_plan, self.current_time,
+                                              job.nodes, job.duration)
                     started = True
                     continue  # started - don't keep it in the queue
                 else:
-                    # Would interfere with FCFS head reservation
-                    self.log(f"Blocking job {job.idx} (would end at {job_end} >= reservation {reservation_time})")
+                    self.log(f"Blocking job {job.idx} (would overlap reservation capacity)")
             remaining.append(job)
 
         self.wait_queue = remaining
@@ -354,19 +402,27 @@ class EasyBackfillingScheduler:
             # refactored away from a heap.
             same_time_events.sort()
 
+            schedule_needed = False
             for evt in same_time_events:
                 if evt.type == 'SUBMIT':
                     self.handle_submit(job_map[evt.job_idx])
+                    schedule_needed = True
                 elif evt.type == 'END':
                     self.handle_end(evt.job_idx)
+                    # With cleanup enabled an END only moves nodes into the
+                    # unavailable releasing pool. A RELEASE event, not END,
+                    # is the next decision point that can use those nodes.
+                    schedule_needed = schedule_needed or self.release_delay == 0
                 elif evt.type == 'RELEASE':
                     self.handle_release(evt.job_idx)
+                    schedule_needed = True
 
             # The simulator calls schedule() again at the same time step
             # while a call starts jobs; each call is a fresh pass with its
             # own queue depth. Without a depth a repeat starts nothing.
-            while self.try_start_jobs():
-                pass
+            if schedule_needed:
+                while self.try_start_jobs():
+                    pass
 
         # Return jobs with simulation results
         return list(job_map.values())

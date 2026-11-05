@@ -69,7 +69,7 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
 
   // Step 1: consume the front of the eligible queue with pop_front()
   // (O(1) on a circular_buffer, same as on a deque) instead of
@@ -82,9 +82,9 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
     } else {
       --m_removed_count;
     }
@@ -102,14 +102,25 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
 
   // FCFS head is now genuinely at the front and blocked - calculate
   // reservation for backfilling. See FCFSEasyDequeScheduler::schedule() for
-  // why effective_running_jobs must include jobs_to_run.
-  m_fcfs_reservation_time = calculate_fcfs_reservation(
-      m_wait_queue.front().nodes_requested, available_nodes,
-      effective_running_jobs, current_time);
+  // why projected_starts must include jobs_to_run.
+  auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
+                                               current_time, projected_starts);
+  m_fcfs_reservation_time =
+      reservation_plan
+          .earliest_fit(m_wait_queue.front().nodes_requested, 0.0, current_time)
+          .value_or(std::numeric_limits<sim_time_t>::max());
   // A head whose reservation starts beyond the planning horizon is not
   // planned: candidates are not tested against it (Slurm bf_window).
   const bool head_within_horizon =
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
+  const bool head_has_projection =
+      m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
+  if (head_within_horizon) {
+    reservation_plan.reserve(
+        m_fcfs_reservation_time, m_wait_queue.front().nodes_requested,
+        release_estimate(m_fcfs_reservation_time,
+                         m_wait_queue.front().run_time_estimate));
+  }
 
   // Preserve the head-reservation snapshot, then avoid a scan that cannot
   // start a backfill job without free nodes.
@@ -135,14 +146,27 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
     // IMPORTANT: strict < (not <=) - see FCFSEasyDequeScheduler::schedule()
     // for why. Backfill jobs must complete BEFORE the reservation
     // time, not at it.
-    if (!head_within_horizon ||
-        current_time + release_estimate(current_time, job.run_time_estimate) <
-            m_fcfs_reservation_time) {
+    const tdiff_t duration =
+        release_estimate(current_time, job.run_time_estimate);
+#ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
+    const bool preserves_reservations =
+        head_has_projection &&
+        (!head_within_horizon ||
+         current_time + duration < m_fcfs_reservation_time);
+#else
+    const bool preserves_reservations =
+        head_has_projection &&
+        (!head_within_horizon ||
+         reservation_plan.can_fit(current_time, job.nodes_requested, duration));
+#endif
+    if (preserves_reservations) {
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
       m_wait_queue[i].removed = true;
       ++m_removed_count;
-
+      if (head_within_horizon) {
+        reservation_plan.reserve(current_time, job.nodes_requested, duration);
+      }
       if (available_nodes == 0)
         break;
     }

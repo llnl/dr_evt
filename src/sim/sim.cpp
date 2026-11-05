@@ -13,7 +13,6 @@
 
 #include "sim/sim.hpp"
 #include "sim/block_wait_queue.hpp"
-#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
@@ -430,8 +429,7 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
       m_rng(m_params.m_seed), m_queue_length_sum(0), m_queue_length_samples(0),
       m_queue_length_peak(0) {
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
-  m_custom_scheduler->set_backfill_queue_depth(
-      m_params.m_backfill_queue_depth);
+  m_custom_scheduler->set_backfill_queue_depth(m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -468,8 +466,7 @@ BasicSimulation<TraceType>::BasicSimulation(
     throw std::invalid_argument("custom scheduler must not be null");
   }
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
-  m_custom_scheduler->set_backfill_queue_depth(
-      m_params.m_backfill_queue_depth);
+  m_custom_scheduler->set_backfill_queue_depth(m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
   m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -824,13 +821,11 @@ void BasicSimulation<TraceType>::run_warm_start() {
     m_trace.process_single_event();
     if (is_departure && m_trace.last_departure_delayed()) {
       // A departure at the boundary itself is delayed: its nodes are busy,
-      // not free, so project their release for the first decisions.
+      // not free.  Cleanup releases are not reservation predictions; the
+      // RELEASE event is the first point at which scheduling may use them.
       const sim_time_t release_time = m_trace.last_release_time();
       if (release_time > sim_start_time) {
-        const auto &job = m_trace.job_at(event.get_job_idx());
-        m_running_jobs[event.get_job_idx()] = {
-            event_time, release_time - event_time, job.get_num_nodes()};
-        ++m_jobs_releasing;
+        (void)release_time;
       }
     } else if (event.is_release()) {
       if (m_running_jobs.erase(event.get_job_idx()) != 0) {
@@ -2913,10 +2908,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
     (void)custom_scheduler;
   }
   constexpr bool periodic_backfill = PeriodicBackfill;
-  FCFSPeriodicHybridCircularScheduler *periodic_scheduler = nullptr;
+  SchedulerBase *periodic_scheduler = nullptr;
   if constexpr (PeriodicBackfill) {
-    periodic_scheduler =
-        static_cast<FCFSPeriodicHybridCircularScheduler *>(m_scheduler.get());
+    periodic_scheduler = m_scheduler.get();
   }
 
   // Validate precondition
@@ -3103,15 +3097,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
 
         if (is_end) {
           if (m_trace.last_departure_delayed()) {
-            // No nodes were freed yet. Keep the job in the running map with
-            // its now-known release time so reservations project it, and
-            // let the release event trigger scheduling.
-            auto running = m_running_jobs.find(event_job_idx);
-            if (running != m_running_jobs.end()) {
-              running->second.run_time =
-                  m_trace.last_release_time() - running->second.start_time;
-              ++m_jobs_releasing;
-            }
+            // No nodes were freed yet. Leave the job's original limit in
+            // the running map: it remains unavailable through cleanup, but
+            // the sampled cleanup release is not projected into a protected
+            // reservation. The RELEASE event triggers the next decision.
+            ++m_jobs_releasing;
           } else {
             processed_end_event = true;
             m_running_jobs.erase(event_job_idx);

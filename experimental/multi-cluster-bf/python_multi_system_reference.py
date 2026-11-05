@@ -210,6 +210,35 @@ class MultiSystemScheduler:
                 releases[system].append((pessimistic_end, demand))
         return releases
 
+    def reservation_plan(self, k: int, releases: Sequence[Tuple[float, int]]) -> List[Tuple[float, int]]:
+        free = self.model.free(k)
+        plan = [(self.current_time, free)]
+        for time, nodes in sorted(releases):
+            free += nodes
+            if plan[-1][0] == time:
+                plan[-1] = (time, free)
+            else:
+                plan.append((time, free))
+        return plan
+
+    @staticmethod
+    def plan_fits(plan: List[Tuple[float, int]], start: float, nodes: int, duration: float) -> bool:
+        end = start + duration
+        index = max(i for i, (time, _) in enumerate(plan) if time <= start)
+        return all(available >= nodes for time, available in plan[index:]
+                   if time < end or time == plan[index][0])
+
+    @staticmethod
+    def reserve(plan: List[Tuple[float, int]], start: float, nodes: int, duration: float) -> None:
+        end = start + duration
+        for boundary in (start, end):
+            if not any(time == boundary for time, _ in plan):
+                index = max(i for i, (time, _) in enumerate(plan) if time < boundary)
+                plan.insert(index + 1, (boundary, plan[index][1]))
+        for i, (time, available) in enumerate(plan):
+            if start <= time < end:
+                plan[i] = (time, available - nodes)
+
     def try_start_jobs(self) -> None:
         model = self.model
         num_systems = model.num_systems()
@@ -251,17 +280,27 @@ class MultiSystemScheduler:
             windows = [t_star if shadows[k] < math.inf else math.inf
                        for k in range(num_systems)]
 
+        plans = [self.reservation_plan(k, releases[k])
+                 for k in range(num_systems)]
+        for k, window in enumerate(windows):
+            if window < math.inf and self.plan_fits(
+                    plans[k], window, head.nodes, head.duration):
+                self.reserve(plans[k], window, head.nodes, head.duration)
+
         remaining = [head]
         for job in self.wait_queue[1:]:
-            job_end = self.current_time + job.duration
             candidates = [k for k in range(num_systems)
-                          if model.fits_now(k, job) and job_end < windows[k]]
+                          if model.fits_now(k, job) and
+                          (windows[k] == math.inf or self.plan_fits(
+                              plans[k], self.current_time, job.nodes,
+                              job.duration))]
             if candidates:
                 k = self.choose_system(job, candidates)
                 self.log(f"Backfilling job {job.idx} on "
-                         f"{model.systems[k].name} (ends {job_end} < "
-                         f"window {windows[k]})")
+                         f"{model.systems[k].name} (preserves reservation)")
                 self.start_job(job, k)
+                self.reserve(plans[k], self.current_time, job.nodes,
+                             job.duration)
             else:
                 remaining.append(job)
         self.wait_queue = remaining

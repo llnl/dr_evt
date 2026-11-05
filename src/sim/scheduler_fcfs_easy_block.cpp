@@ -64,7 +64,7 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
 
   // Step 1: Start FCFS head(s)
   while (m_eligible_end_idx > 0) {
@@ -91,8 +91,7 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       jobs_to_run.push_back(head->job_id);
       available_nodes -= nodes_needed;
       m_wait_queue.remove(head->job_id);
-      effective_running_jobs[head->job_id] = {current_time, head_run_time,
-                                              nodes_needed};
+      projected_starts.push_back({current_time, head_run_time, nodes_needed});
 
       for (size_t i = 0; i < m_eligible_end_idx; ++i) {
         if (m_job_order[i].job_id == head->job_id && !m_job_order[i].removed) {
@@ -129,25 +128,58 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
     throw std::logic_error("active FCFS head is missing from block queue");
   }
 
-  m_fcfs_reservation_time = calculate_fcfs_reservation(
-      head_nodes, available_nodes, effective_running_jobs, current_time);
+  auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
+                                               current_time, projected_starts);
+  m_fcfs_reservation_time =
+      reservation_plan.earliest_fit(head_nodes, 0.0, current_time)
+          .value_or(std::numeric_limits<sim_time_t>::max());
   // A head reserved beyond the planning horizon is not planned: the block
   // queue's window test then sees no bound (Slurm bf_window).
   const sim_time_t planned_reservation =
       reservation_within_horizon(m_fcfs_reservation_time, current_time)
           ? m_fcfs_reservation_time
           : std::numeric_limits<sim_time_t>::max();
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  if (planned_reservation != std::numeric_limits<sim_time_t>::max()) {
+    reservation_plan.reserve(
+        planned_reservation, head_nodes,
+        release_estimate(planned_reservation, head_run_time));
+  }
+#endif
 
   if (m_backfill_queue_depth != 0) {
     // Values are passed and the result returned, so no local escapes and the
     // default search loop below compiles as it did before.
-    return backfill_with_queue_depth(planned_reservation !=
-                                         std::numeric_limits<sim_time_t>::max(),
-                                     planned_reservation, current_time,
-                                     available_nodes, std::move(jobs_to_run));
+    return backfill_with_queue_depth(
+        planned_reservation != std::numeric_limits<sim_time_t>::max(),
+        planned_reservation, current_time, std::move(reservation_plan),
+        available_nodes, std::move(jobs_to_run));
   }
 
   // Step 3: Backfill
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  for (size_t i = 0; i < m_eligible_end_idx && available_nodes > 0; ++i) {
+    if (m_job_order[i].removed || m_job_order[i].job_id == fcfs_head)
+      continue;
+    tdiff_t backfill_run_time = 0.0;
+    num_nodes_t backfill_nodes = 0;
+    if (!m_wait_queue.get_job_info(m_job_order[i].job_id, backfill_run_time,
+                                   backfill_nodes) ||
+        backfill_nodes > available_nodes ||
+        !reservation_plan.can_fit(
+            current_time, backfill_nodes,
+            release_estimate(current_time, backfill_run_time)))
+      continue;
+    const job_no_t bf_job = m_job_order[i].job_id;
+    jobs_to_run.push_back(bf_job);
+    available_nodes -= backfill_nodes;
+    reservation_plan.reserve(current_time, backfill_nodes,
+                             release_estimate(current_time, backfill_run_time));
+    m_wait_queue.remove(bf_job);
+    m_job_order[i].removed = true;
+    ++m_removed_count;
+  }
+#else
   while (available_nodes > 0) {
     tdiff_t backfill_run_time = 0.0;
     num_nodes_t backfill_nodes = 0;
@@ -164,8 +196,6 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       if (m_job_order[i].job_id == bf_job && !m_job_order[i].removed) {
         jobs_to_run.push_back(bf_job);
         available_nodes -= backfill_nodes;
-        effective_running_jobs[bf_job] = {current_time, backfill_run_time,
-                                          backfill_nodes};
         m_job_order[i].removed = true;
         if (i < m_eligible_end_idx) {
           ++m_removed_count;
@@ -174,6 +204,7 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       }
     }
   }
+#endif
 
   return jobs_to_run;
 }

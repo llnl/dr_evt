@@ -276,12 +276,13 @@ backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates(
     num_nodes_t available_nodes, sim_time_t current_time,
     sim_time_t reservation_time) const {
   return find_backfill_candidates_from(1, available_nodes, current_time,
-                                       reservation_time);
+                                       reservation_time, {});
 }
 
 backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates_from(
     size_t begin_idx, num_nodes_t available_nodes, sim_time_t current_time,
-    sim_time_t reservation_time) const {
+    sim_time_t reservation_time, const running_jobs_t &running_jobs,
+    const projected_starts_t &projected_starts) const {
   backfill_candidates_t candidates;
   candidates.reserve(std::min(m_num_max_candidates, m_eligible_end_idx > 0
                                                         ? m_eligible_end_idx - 1
@@ -295,6 +296,16 @@ backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates_from(
   // fitting job is a candidate (Slurm bf_window).
   const bool head_within_horizon =
       reservation_within_horizon(reservation_time, current_time);
+  auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
+                                               current_time, projected_starts);
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  if (head_within_horizon) {
+    const auto &head = m_wait_queue.front();
+    reservation_plan.reserve(
+        reservation_time, head.nodes_requested,
+        release_estimate(reservation_time, head.run_time_estimate));
+  }
+#endif
   // The queue depth is counted from the head, as in the built-in FCFS
   // schedulers, before any feasibility test or the candidate cap.
   const size_t scan_end =
@@ -305,11 +316,21 @@ backfill_candidates_t FCFSEasyCustomScheduler::find_backfill_candidates_from(
     if (job.removed || job.nodes_requested > available_nodes) {
       continue;
     }
+#ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
     if (head_within_horizon &&
         current_time + release_estimate(current_time, job.run_time_estimate) >=
             reservation_time) {
       continue;
     }
+#endif
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+    if (head_within_horizon &&
+        !reservation_plan.can_fit(
+            current_time, job.nodes_requested,
+            release_estimate(current_time, job.run_time_estimate))) {
+      continue;
+    }
+#endif
     candidates.emplace_back(job.job_id, job.m_cost);
     if (candidates.size() == m_num_max_candidates) {
       break;
@@ -338,7 +359,8 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
+  std::vector<job_no_t> projected_start_ids;
 
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
@@ -347,9 +369,10 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
+      projected_start_ids.push_back(job.job_id);
     } else {
       --m_removed_count;
     }
@@ -362,8 +385,7 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
 
   if (active_job_count() == 0 || m_backfill_policy == BackfillPolicy::NONE) {
     if (jobs_to_run.empty()) {
-      finish_scheduling_cycle(available_nodes, effective_running_jobs,
-                              current_time);
+      finish_scheduling_cycle(available_nodes, running_jobs, current_time);
     } else {
       complete_candidate_scan();
     }
@@ -371,8 +393,8 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
   }
 
   m_fcfs_reservation_time = calculate_fcfs_reservation(
-      m_wait_queue.front().nodes_requested, available_nodes,
-      effective_running_jobs, current_time);
+      m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
+      current_time, projected_starts);
 
   // Scanning only new arrivals is unsafe with a queue depth: a start moves
   // older, never-examined jobs into the window. The depth bounds the full
@@ -382,15 +404,22 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
           ? 1
           : m_newly_eligible_begin_idx;
   const auto candidates = find_backfill_candidates_from(
-      candidate_begin, available_nodes, current_time, m_fcfs_reservation_time);
+      candidate_begin, available_nodes, current_time, m_fcfs_reservation_time,
+      running_jobs, projected_starts);
   if (candidates.empty()) {
     if (jobs_to_run.empty()) {
-      finish_scheduling_cycle(available_nodes, effective_running_jobs,
-                              current_time);
+      finish_scheduling_cycle(available_nodes, running_jobs, current_time);
     } else {
       complete_candidate_scan();
     }
     return jobs_to_run;
+  }
+
+  // Preserve the callback API's effective-map view, but materialize it only
+  // after the reservation-only candidate scan found work for a selector.
+  running_jobs_t effective_running_jobs = running_jobs;
+  for (size_t i = 0; i < projected_starts.size(); ++i) {
+    effective_running_jobs[projected_start_ids[i]] = projected_starts[i];
   }
 
   if (m_candidate_preparation_pending) {
@@ -419,6 +448,38 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
     throw std::invalid_argument(
         "backfill selector returned a job that was not a candidate");
   }
+
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  const bool head_within_horizon =
+      reservation_within_horizon(m_fcfs_reservation_time, current_time);
+  auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
+                                               current_time, projected_starts);
+  if (head_within_horizon) {
+    const auto &head = m_wait_queue.front();
+    reservation_plan.reserve(
+        m_fcfs_reservation_time, head.nodes_requested,
+        release_estimate(m_fcfs_reservation_time, head.run_time_estimate));
+  }
+  const auto selected_entry = std::find_if(
+      m_wait_queue.begin() + 1, m_wait_queue.begin() + m_eligible_end_idx,
+      [&](const JobEntry &job) {
+        return !job.removed && job.job_id == *selected;
+      });
+  if (selected_entry == m_wait_queue.begin() + m_eligible_end_idx ||
+      (head_within_horizon &&
+       !reservation_plan.can_fit(
+           current_time, selected_entry->nodes_requested,
+           release_estimate(current_time,
+                            selected_entry->run_time_estimate)))) {
+    if (jobs_to_run.empty()) {
+      finish_scheduling_cycle(available_nodes, effective_running_jobs,
+                              current_time);
+    } else {
+      complete_candidate_scan();
+    }
+    return jobs_to_run;
+  }
+#endif
 
   for (size_t i = 1; i < m_eligible_end_idx; ++i) {
     if (!m_wait_queue[i].removed && m_wait_queue[i].job_id == *selected) {

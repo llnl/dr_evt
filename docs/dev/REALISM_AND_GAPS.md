@@ -42,12 +42,19 @@ Each item describes the code on this branch.
     waiting jobs. Depth 1 equals EASY and an unlimited depth equals
     conservative.
 
-  A backfill candidate starts only if its projected completion is strictly
-  before the earliest reservation it must protect. Reservations are recomputed
-  on every pass rather than carried over, as Slurm does, and jobs started
-  earlier in the same pass are included when later candidates are tested. SJF
-  and LJF keep their historical inclusive test, which also admits a candidate
-  that completes exactly at the reservation.
+  Each protected reservation is a resource-time commitment: it subtracts the
+  reserved nodes over the waiting job's projected run interval. A backfill
+  candidate may overlap that interval when the resulting resource-time plan
+  still has enough nodes for every protected reservation. This replaces the
+  former strict finish-before-reservation barrier; build with
+  `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` only when reproducing that legacy
+  behavior. This is the resource-preservation property modeled by Slurm's
+  [backfill window checks](https://github.com/SchedMD/slurm/blob/slurm-25-11-8-1/src/plugins/sched/backfill/backfill.c#L2910-L2915)
+  and Fluxion's per-job allocation/reservation pass
+  ([`queue_policy_bf_base_impl.hpp`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp)).
+  Reservations are recomputed on every pass rather than carried over, as
+  Slurm does, and jobs started earlier in the same pass are included when
+  later candidates are tested.
 - **When the scheduler runs.** There are two modes.
   - *Event-driven*, the default, as in Fluxion. Three kinds of events change
     scheduling state: a job completes, a job arrives, or scheduled capacity
@@ -64,8 +71,7 @@ Each item describes the code on this branch.
     its turn comes and it fits, without waiting for a tick. Backfill runs only
     at periodic ticks, and one tick is one backfill cycle. Ticks start one interval after the first
     event (or after the warm-start boundary) and keep their cadence; a tick
-    that passes while nothing is waiting does nothing. Periodic EASY runs as
-    hybrid with reservation depth 1.
+    that passes while nothing is waiting does nothing.
 - **Queue depth.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
   caps how many waiting jobs, the head included, one backfill cycle examines
@@ -99,11 +105,13 @@ Each item describes the code on this branch.
   reservations. Jobs that already started keep their start times.
 - **Node reuse.** By default a finished job's nodes are reusable at once.
   [`--node_release_delay`](../user-guide/command-line.md#--node_release_delay-seconds)
-  holds them for a sampled cleanup time
+  holds them for a sampled cleanup time after every job's actual end,
   ([constant, exponential, or uniform per node](../user-guide/command-line.md#--node_release_delay_model-model),
   a job released when its slowest node is), while planning still projects
-  releases at the time limit, as production schedulers do. Replayed history is
-  never delayed.
+  releases at the time limit, as production schedulers do. Cleanup capacity is
+  unavailable but is not a future reservation release: only its RELEASE event
+  makes it schedulable again, so a reservation can start later than its
+  prediction. Replayed history is never delayed.
 - **Resources.** One pool of identical nodes
   ([`--total_nodes`](../user-guide/command-line.md#-n---total_nodes-count)),
   optionally varied over time with
@@ -293,14 +301,14 @@ and depths to match the target narrows those differences.
   matches the Python EASY reference, as does the `fcfs_conservative` ordering,
   which uses the same schedulers. A depth of 1 equals no backfilling for FCFS,
   SJF, and LJF. Periodic EASY equals periodic hybrid with reservation depth 1
-  under the same depth, because it runs as that hybrid
-  (`tests/run_backfill_queue_depth_tests.sh`).
+  under the same depth (`tests/run_backfill_queue_depth_tests.sh`).
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).
 - **RAPS.** The [comparison helper](../../scripts/compare_with_raps.py) runs
-  one job list through RAPS and DR_EVT and lines up the start times. It is a
-  manual tool, not part of CI. RAPS cannot serve as a correctness check for
-  DR_EVT's backfill: at RAPS commit
+  one job list through RAPS and a DR_EVT binary built with
+  `DR_EVT_LEGACY_RESERVATION_BARRIER=ON`, then lines up start times. It is a
+  manual legacy-compatibility tool, not part of CI. RAPS cannot serve as a
+  correctness check for DR_EVT's default resource-aware backfill: at RAPS commit
   [3f21cd3](https://github.com/ExaDigiT/RAPS/tree/3f21cd35b7bf6a8f5decc41050c8d871809608ad),
   three differences separate the two, each verified in the RAPS source.
   1. RAPS advances in one-second steps and notices a completion one step after

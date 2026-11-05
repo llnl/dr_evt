@@ -41,7 +41,7 @@ namespace dr_evt {
  * entries over.
  */
 class FCFSEasyCircularScheduler : public SchedulerBase {
-private:
+protected:
   struct JobEntry {
     /// Stable identifier of the Trace job represented by this entry.
     job_no_t job_id;
