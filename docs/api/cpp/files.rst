@@ -42,7 +42,7 @@ Top-level ``src``
 - `scheduler_ljf_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf_easy.cpp>`_, `scheduler_ljf_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf_easy.hpp>`_
 - `scheduler_policies.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_policies.hpp>`_
 - `scheduler_sjf_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf_easy.cpp>`_, `scheduler_sjf_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf_easy.hpp>`_
-- `sim.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.cpp>`_, `sim.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.hpp>`_
+- `sim/sim.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.cpp>`_, `sim/sim.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.hpp>`_
 
 ``src/trace``
 -------------
@@ -56,13 +56,13 @@ Top-level ``src``
 - `job_stat_submit.cpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/job_stat_submit.cpp>`_, `job_stat_submit.hpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/job_stat_submit.hpp>`_
 - `job_stat_texec.hpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/job_stat_texec.hpp>`_
 - `parse_utils.cpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/parse_utils.cpp>`_, `parse_utils.hpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/parse_utils.hpp>`_
-- `trace.cpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/trace.cpp>`_, `trace.hpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/trace.hpp>`_
+- `trace/trace.cpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/trace.cpp>`_, `trace/trace.hpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/trace.hpp>`_
 - `trace_policy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/trace_policy.cpp>`_, `trace_policy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/trace/trace_policy.hpp>`_
 
 ``src/params``
 --------------
 
-- `dr_evt_params.cpp <https://github.com/LLNL/dr_evt/blob/main/src/params/dr_evt_params.cpp>`_, `dr_evt_params.hpp <https://github.com/LLNL/dr_evt/blob/main/src/params/dr_evt_params.hpp>`_
+- `params/dr_evt_params.cpp <https://github.com/LLNL/dr_evt/blob/main/src/params/dr_evt_params.cpp>`_, `params/dr_evt_params.hpp <https://github.com/LLNL/dr_evt/blob/main/src/params/dr_evt_params.hpp>`_
 - `sim_params.cpp <https://github.com/LLNL/dr_evt/blob/main/src/params/sim_params.cpp>`_, `sim_params.hpp <https://github.com/LLNL/dr_evt/blob/main/src/params/sim_params.hpp>`_
 - `trace_params.cpp <https://github.com/LLNL/dr_evt/blob/main/src/params/trace_params.cpp>`_, `trace_params.hpp <https://github.com/LLNL/dr_evt/blob/main/src/params/trace_params.hpp>`_
 
@@ -70,7 +70,7 @@ Top-level ``src``
 -------------
 
 - `dr_evt_client.cpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_client.cpp>`_
-- `dr_evt_params.cpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_params.cpp>`_, `dr_evt_params.hpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_params.hpp>`_
+- `proto/dr_evt_params.cpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_params.cpp>`_, `proto/dr_evt_params.hpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_params.hpp>`_
 - `dr_evt_server.cpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/dr_evt_server.cpp>`_
 - `utils.cpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/utils.cpp>`_, `utils.hpp <https://github.com/LLNL/dr_evt/blob/main/src/proto/utils.hpp>`_
 

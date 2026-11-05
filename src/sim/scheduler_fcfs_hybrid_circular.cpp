@@ -67,12 +67,14 @@ std::vector<job_no_t> FCFSHybridCircularScheduler::pending_job_ids() const {
 
 sim_time_t FCFSHybridCircularScheduler::calculate_hybrid_window(
     size_t job_index, num_nodes_t available_nodes,
-    const running_jobs_t &running_jobs, sim_time_t current_time) {
+    const running_jobs_t &running_jobs, sim_time_t current_time,
+    const projected_starts_t &projected_starts) {
   sim_time_t earliest_conflict = std::numeric_limits<sim_time_t>::max();
   const size_t depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t reserved = 0;
-  auto plan = reservation_timeline(available_nodes, running_jobs, current_time);
+  auto plan = reservation_timeline(available_nodes, running_jobs, current_time,
+                                   projected_starts);
   for (size_t i = 0; i < job_index; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed) {
@@ -125,7 +127,7 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
           m_wait_queue.front().nodes_requested <= available_nodes)) {
@@ -133,9 +135,9 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
     } else {
       --m_removed_count;
     }
@@ -149,8 +151,8 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
   // The blocked head's projection is kept for every policy so that
   // get_fcfs_head_shadow_time() reports it whether or not it is planned.
   m_fcfs_reservation_time = calculate_fcfs_reservation(
-      m_wait_queue.front().nodes_requested, available_nodes,
-      effective_running_jobs, current_time);
+      m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
+      current_time, projected_starts);
 
   if (available_nodes == 0) {
     return jobs_to_run;
@@ -173,12 +175,23 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
     m_backfill_depth_head_accounted = true;
   }
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  // Build the common initial state once, then keep two independent value
+  // copies as accepted starts and protected reservations diverge.
+  auto baseline_plan = reservation_timeline(available_nodes, running_jobs,
+                                            current_time, projected_starts);
+  auto availability_plan = baseline_plan;
+  auto protected_plan = std::move(baseline_plan);
   // The flexible rule protects resource-time commitments, not an earliest
   // finish-time barrier. Build that commitment plan once and extend it as the
   // scan advances; reconstructing it for every candidate repeated the same
   // map allocations and prefix reservations on this hot path.
-  auto protected_plan = reservation_timeline(
-      available_nodes, effective_running_jobs, current_time);
+#else
+  // Reuse the availability projection for all candidate horizon checks.
+  // Accepted starts extend it, avoiding a release-timeline rebuild per job.
+  auto availability_plan = reservation_timeline(available_nodes, running_jobs,
+                                                current_time, projected_starts);
+#endif
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
   const size_t protected_depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t protected_count = 0;
@@ -207,8 +220,8 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
       continue;
     }
     const sim_time_t job_reservation =
-        calculate_fcfs_reservation(job.nodes_requested, available_nodes,
-                                   effective_running_jobs, current_time);
+        availability_plan.earliest_fit(job.nodes_requested, 0.0, current_time)
+            .value_or(std::numeric_limits<sim_time_t>::max());
     const bool in_horizon =
         reservation_within_horizon(job_reservation, current_time);
     if (!in_horizon && !horizon_job_uses_slot) {
@@ -232,7 +245,7 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
     }
 #ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
     const sim_time_t hybrid_window = calculate_hybrid_window(
-        i, available_nodes, effective_running_jobs, current_time);
+        i, available_nodes, running_jobs, current_time, projected_starts);
 #else
     const bool preserves_reservations = protected_plan.can_fit(
         current_time, job.nodes_requested,
@@ -248,9 +261,12 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
       available_nodes -= job.nodes_requested;
       m_wait_queue[i].removed = true;
       ++m_removed_count;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
+      availability_plan.reserve(
+          current_time, job.nodes_requested,
+          release_estimate(current_time, job.run_time_estimate));
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
       protected_plan.reserve(
           current_time, job.nodes_requested,

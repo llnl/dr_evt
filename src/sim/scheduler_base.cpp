@@ -85,22 +85,30 @@ tdiff_t SchedulerBase::prediction_horizon(const running_jobs_t &running_jobs,
 
 sim_time_t SchedulerBase::calculate_fcfs_reservation(
     num_nodes_t nodes_needed, num_nodes_t free_nodes,
-    const running_jobs_t &running_jobs, sim_time_t current_time) {
-  const auto reservation = reservation_timeline(
-      free_nodes, running_jobs, current_time)
+    const running_jobs_t &running_jobs, sim_time_t current_time,
+    const projected_starts_t &projected_starts) {
+  const auto reservation = reservation_timeline(free_nodes, running_jobs,
+                                                current_time, projected_starts)
                                .earliest_fit(nodes_needed, 0.0, current_time);
   return reservation.value_or(std::numeric_limits<sim_time_t>::max());
 }
 
 Reservation_Timeline SchedulerBase::reservation_timeline(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-    sim_time_t current_time) const {
-  std::map<sim_time_t, std::int64_t> deltas;
+    sim_time_t current_time, const projected_starts_t &projected_starts) const {
+  std::vector<std::pair<sim_time_t, std::int64_t>> deltas;
+  deltas.reserve(running_jobs.size() + projected_starts.size());
   for (const auto &[job_idx, job] : running_jobs) {
     (void)job_idx;
     const sim_time_t end_time = job.start_time + job.run_time;
     if (end_time > current_time) {
-      deltas[end_time] += static_cast<std::int64_t>(job.nodes);
+      deltas.emplace_back(end_time, static_cast<std::int64_t>(job.nodes));
+    }
+  }
+  for (const auto &job : projected_starts) {
+    const sim_time_t end_time = job.start_time + job.run_time;
+    if (end_time > current_time) {
+      deltas.emplace_back(end_time, static_cast<std::int64_t>(job.nodes));
     }
   }
 
@@ -124,8 +132,9 @@ Reservation_Timeline SchedulerBase::reservation_timeline(
 
   while (change != m_outlook_changes_end) {
     if (change->time > current_time) {
-      deltas[change->time] += static_cast<std::int64_t>(change->total_nodes) -
-                               static_cast<std::int64_t>(reference_capacity);
+      deltas.emplace_back(change->time,
+                          static_cast<std::int64_t>(change->total_nodes) -
+                              static_cast<std::int64_t>(reference_capacity));
     }
     reference_capacity = change->total_nodes;
     ++change;
@@ -133,11 +142,19 @@ Reservation_Timeline SchedulerBase::reservation_timeline(
   const auto clamp = [](std::int64_t value) {
     return value > 0 ? static_cast<num_nodes_t>(value) : num_nodes_t{0};
   };
-  std::map<sim_time_t, num_nodes_t> profile;
-  profile[current_time] = clamp(balance);
-  for (const auto &[time, delta] : deltas) {
+  std::sort(deltas.begin(), deltas.end());
+  std::vector<std::pair<sim_time_t, num_nodes_t>> profile;
+  profile.reserve(deltas.size() + 1);
+  profile.emplace_back(current_time, clamp(balance));
+  for (size_t begin = 0; begin < deltas.size();) {
+    const sim_time_t time = deltas[begin].first;
+    std::int64_t delta = 0;
+    do {
+      delta += deltas[begin].second;
+      ++begin;
+    } while (begin < deltas.size() && deltas[begin].first == time);
     balance += delta;
-    profile[time] = clamp(balance);
+    profile.emplace_back(time, clamp(balance));
   }
   return Reservation_Timeline(std::move(profile));
 }

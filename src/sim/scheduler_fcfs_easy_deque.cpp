@@ -89,7 +89,7 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
 
   // Step 1: consume the front of the eligible queue with pop_front()
   // (O(1) on a deque) instead of scanning by index. Two cases land here:
@@ -111,9 +111,9 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
     } else {
       // Stale placeholder from an earlier backfill - it was already
       // counted in m_removed_count when marked; now that it's
@@ -151,17 +151,15 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
   // Simulation only records a job into its own running-jobs map AFTER
   // this schedule() call returns the full jobs_to_run list. If we pass
   // running_jobs through unmodified, a job like that is invisible to
-  // calculate_fcfs_reservation: its completion time can't contribute
+  // reservation projection: its completion time can't contribute
   // to "when will enough capacity free up" at all, which can push the
   // computed reservation far later than the true one - incorrectly
   // letting some other backfill candidate occupy capacity the blocked
   // head actually needs sooner than the wrong reservation implies.
-  // Building this snapshot is only ever needed here, right before the
-  // one reservation calculation per schedule() call, not for every
-  // query - it's a local, one-time correction of the caller-supplied
-  // map, not a change to how running jobs are tracked in general.
-  auto reservation_plan = reservation_timeline(
-      available_nodes, effective_running_jobs, current_time);
+  // Keep those starts in a small overlay rather than copying the full
+  // caller-supplied map on every scheduling pass.
+  auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
+                                               current_time, projected_starts);
   m_fcfs_reservation_time =
       reservation_plan
           .earliest_fit(m_wait_queue.front().nodes_requested, 0.0, current_time)
@@ -231,9 +229,6 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
       if (head_within_horizon) {
         reservation_plan.reserve(current_time, job.nodes_requested, duration);
       }
-      effective_running_jobs[job.job_id] = {current_time, duration,
-                                            job.nodes_requested};
-
       // Continue backfilling if resources available
       if (available_nodes == 0)
         break;

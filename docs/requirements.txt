@@ -1,5 +1,7 @@
 # Sphinx documentation dependencies
-sphinx>=5.0
+# Sphinx 9's C++ domain can assert while resolving Breathe-generated symbols.
+# Keep the supported 8.x line until that upstream regression is resolved.
+sphinx>=5.0,<9
 sphinx-rtd-theme>=1.2.0
 myst-parser>=1.0.0
 sphinxcontrib-mermaid>=0.9.2

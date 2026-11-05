@@ -14,6 +14,7 @@
 #include "sim/scheduler_policies.hpp"
 #include "trace/job_record.hpp"
 #include "trace/trace.hpp"
+#include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <limits>
@@ -41,34 +42,87 @@ struct Running_Job {
 };
 
 using running_jobs_t = std::map<job_no_t, Running_Job>;
+/// Jobs selected during the current scheduling pass but not yet published.
+using projected_starts_t = std::vector<Running_Job>;
 
 /**
  * @brief Mutable free-node timeline used for reservation planning.
  * @details Each entry begins a constant-capacity segment.  A reservation
  * subtracts its nodes for its complete planned interval, so later searches
- * see the resource-time commitments made by earlier reservations.
+ * see the resource-time commitments made by earlier reservations. Timelines
+ * have value semantics: a scheduler may copy a common baseline into separate
+ * availability and protection plans before extending either plan.
  */
 class Reservation_Timeline {
-  std::map<sim_time_t, num_nodes_t> m_free_nodes;
+  using segment_t = std::pair<sim_time_t, num_nodes_t>;
+  std::vector<segment_t> m_free_nodes;
 
-  void split_at(sim_time_t time) {
-    auto boundary = m_free_nodes.lower_bound(time);
+  /**
+   * @brief Return the timeline boundary at time, creating it if necessary.
+   * @param[in] time Segment boundary to locate.
+   * @return Index of the existing or newly inserted boundary.
+   */
+  size_t split_at(sim_time_t time) {
+    auto boundary =
+        std::lower_bound(m_free_nodes.begin(), m_free_nodes.end(), time,
+                         [](const segment_t &segment, sim_time_t value) {
+                           return segment.first < value;
+                         });
     if (boundary == m_free_nodes.end() || boundary->first != time) {
-      m_free_nodes.emplace_hint(boundary, time, std::prev(boundary)->second);
+      const size_t index =
+          static_cast<size_t>(std::distance(m_free_nodes.begin(), boundary));
+      m_free_nodes.insert(boundary, {time, std::prev(boundary)->second});
+      return index;
     }
+    return static_cast<size_t>(std::distance(m_free_nodes.begin(), boundary));
   }
 
 public:
-  explicit Reservation_Timeline(std::map<sim_time_t, num_nodes_t> free_nodes)
+  /**
+   * @brief Construct a timeline from ordered capacity segments.
+   * @param[in] free_nodes Ordered pairs of segment start time and free nodes.
+   */
+  explicit Reservation_Timeline(std::vector<segment_t> free_nodes)
       : m_free_nodes(std::move(free_nodes)) {}
 
-  /** Find the earliest start whose whole interval has the requested nodes. */
+  /**
+   * @brief Construct a timeline from an ordered capacity map.
+   * @param[in] free_nodes Segment start times and their free-node capacities.
+   */
+  explicit Reservation_Timeline(
+      const std::map<sim_time_t, num_nodes_t> &free_nodes)
+      : m_free_nodes(free_nodes.begin(), free_nodes.end()) {}
+
+  /**
+   * @brief Find the earliest start whose requested interval has enough nodes.
+   * @details A nonpositive duration is a point-in-time capacity query. It
+   * returns the first segment at or after @p start with enough free nodes
+   * without scanning a full interval.
+   * @param[in] nodes Number of nodes required by the interval.
+   * @param[in] duration Interval duration, or zero for a capacity query.
+   * @param[in] start Earliest time the interval may begin.
+   * @return The earliest fitting start time, or std::nullopt when no timeline
+   *         segment has sufficient capacity.
+   */
   std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
                                          sim_time_t start) const {
     if (m_free_nodes.empty()) {
       return std::nullopt;
     }
-    auto segment = std::prev(m_free_nodes.upper_bound(start));
+    auto segment = std::prev(
+        std::upper_bound(m_free_nodes.begin(), m_free_nodes.end(), start,
+                         [](sim_time_t value, const segment_t &entry) {
+                           return value < entry.first;
+                         }));
+    if (duration <= 0) {
+      while (segment != m_free_nodes.end() && segment->second < nodes) {
+        ++segment;
+      }
+      if (segment == m_free_nodes.end()) {
+        return std::nullopt;
+      }
+      return segment->first <= start ? start : segment->first;
+    }
     for (;;) {
       auto scan = segment;
       while (scan != m_free_nodes.end() &&
@@ -91,33 +145,46 @@ public:
     }
   }
 
-  /** Whether this exact interval can be added without changing the plan. */
+  /**
+   * @brief Check whether an interval fits without changing the plan.
+   * @param[in] start Interval start time.
+   * @param[in] nodes Number of nodes required by the interval.
+   * @param[in] duration Interval duration.
+   * @return true when the requested interval has sufficient free capacity;
+   *         otherwise false.
+   */
   bool can_fit(sim_time_t start, num_nodes_t nodes, tdiff_t duration) const {
     const auto fit = earliest_fit(nodes, duration, start);
     return fit && *fit == start;
   }
 
-  /** Reserve nodes over [start, start + duration). */
+  /**
+   * @brief Reserve nodes over [start, start + duration).
+   * @param[in] start Reservation start time.
+   * @param[in] nodes Nodes unavailable during the reservation.
+   * @param[in] duration Reservation duration.
+   */
   void reserve(sim_time_t start, num_nodes_t nodes, tdiff_t duration) {
     if (duration <= 0) {
       return;
     }
-    split_at(start);
-    split_at(start + duration);
-    for (auto segment = m_free_nodes.find(start);
-         segment != m_free_nodes.end() && segment->first < start + duration;
-         ++segment) {
-      segment->second -= nodes;
+    const size_t first = split_at(start);
+    size_t last = split_at(start + duration);
+    for (size_t segment = first; segment != last; ++segment) {
+      m_free_nodes[segment].second -= nodes;
     }
-    const auto coalesce = [this](sim_time_t time) {
-      auto boundary = m_free_nodes.find(time);
-      if (boundary != m_free_nodes.begin() &&
-          std::prev(boundary)->second == boundary->second) {
-        m_free_nodes.erase(boundary);
+    const auto coalesce = [this](size_t boundary) {
+      if (boundary != 0 &&
+          m_free_nodes[boundary - 1].second == m_free_nodes[boundary].second) {
+        m_free_nodes.erase(m_free_nodes.begin() + boundary);
+        return true;
       }
+      return false;
     };
-    coalesce(start);
-    coalesce(start + duration);
+    if (coalesce(first)) {
+      --last;
+    }
+    coalesce(last);
   }
 };
 
@@ -488,19 +555,41 @@ protected:
    * @param[in] running_jobs Active jobs with the metadata needed to project
    * release times.
    * @param[in] current_time Time from which to project releases.
+   * @param[in] projected_starts Jobs selected during this scheduler pass that
+   * are not yet present in running_jobs.
    * @return Earliest projected start time for the FCFS head, in sim_time_t,
    * or the maximum sim_time_t when no release or scheduled change known to
    * the outlook ever satisfies the request.
    */
-  sim_time_t calculate_fcfs_reservation(num_nodes_t nodes_needed,
-                                        num_nodes_t free_nodes,
-                                        const running_jobs_t &running_jobs,
-                                        sim_time_t current_time);
+  sim_time_t
+  calculate_fcfs_reservation(num_nodes_t nodes_needed, num_nodes_t free_nodes,
+                             const running_jobs_t &running_jobs,
+                             sim_time_t current_time,
+                             const projected_starts_t &projected_starts = {});
 
-  /** Build the free-node profile shared by reservation searches. */
-  Reservation_Timeline reservation_timeline(num_nodes_t free_nodes,
-                                            const running_jobs_t &running_jobs,
-                                            sim_time_t current_time) const;
+  /**
+   * @brief Build the free-node profile shared by reservation searches.
+   * @details Merges running-job releases and scheduled capacity changes into
+   * a resource-time timeline beginning at current_time. Callers can use the
+   * returned timeline first to find a protected reservation and then extend
+   * that same timeline while admitting backfill jobs, avoiding a duplicate
+   * reconstruction of the release profile within one scheduling pass. Release
+   * and capacity events are first collected in contiguous storage, then
+   * coalesced into the returned ordered profile; no intermediate delta map is
+   * allocated.
+   * @param[in] free_nodes Nodes available at current_time.
+   * @param[in] running_jobs Active jobs used to project release times.
+   * @param[in] current_time Time from which releases are projected.
+   * @param[in] projected_starts Jobs selected in this pass but not yet
+   * published to running_jobs. Their releases are included without copying
+   * the authoritative running-job map.
+   * @return Free-node timeline initialized at current_time.
+   */
+  Reservation_Timeline
+  reservation_timeline(num_nodes_t free_nodes,
+                       const running_jobs_t &running_jobs,
+                       sim_time_t current_time,
+                       const projected_starts_t &projected_starts = {}) const;
 };
 
 /**

@@ -11,15 +11,16 @@
 
 namespace dr_evt {
 
-std::vector<job_no_t> FCFSPeriodicEasyCircularScheduler::schedule(
-    num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-    sim_time_t current_time) {
+std::vector<job_no_t>
+FCFSPeriodicEasyCircularScheduler::schedule(num_nodes_t free_nodes,
+                                            const running_jobs_t &running_jobs,
+                                            sim_time_t current_time) {
   if (m_backfill_evaluation_time == current_time) {
     return schedule_event(free_nodes, running_jobs, current_time);
   }
   m_backfill_evaluation_time = current_time;
   return FCFSEasyCircularScheduler::schedule(free_nodes, running_jobs,
-                                              current_time);
+                                             current_time);
 }
 
 std::vector<job_no_t> FCFSPeriodicEasyCircularScheduler::schedule_event(
@@ -49,7 +50,7 @@ std::vector<job_no_t> FCFSPeriodicEasyCircularScheduler::schedule_event(
   }
 
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
           m_wait_queue.front().nodes_requested <= available_nodes)) {
@@ -57,9 +58,9 @@ std::vector<job_no_t> FCFSPeriodicEasyCircularScheduler::schedule_event(
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
     } else {
       --m_removed_count;
     }
@@ -69,8 +70,8 @@ std::vector<job_no_t> FCFSPeriodicEasyCircularScheduler::schedule_event(
 
   if (active_job_count() != 0) {
     m_fcfs_reservation_time = calculate_fcfs_reservation(
-        m_wait_queue.front().nodes_requested, available_nodes,
-        effective_running_jobs, current_time);
+        m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
+        current_time, projected_starts);
   }
   return jobs_to_run;
 }
