@@ -175,9 +175,13 @@ void test_easypower_semiclamped_candidate_cost() {
   TestableEASYPowerScheduler capped_fcfs(12.0, 10.0, 1.0, 1.0, 144.0, 1.0, 0.0,
                                          {10.0, 2.1, 1.0, 3.0}, false, true);
   const auto fcfs_starts = capped_fcfs.schedule(100, {}, 0.0);
-  if (fcfs_starts != std::vector<job_no_t>{0}) {
+  // Job 1 would raise power from 10.0 to 12.1, so the FCFS cap holds it for
+  // t=10. Job 2 uses only one unit and completes exactly at that reservation.
+  // Flexible reservations permit this non-overlapping resource-time interval;
+  // the former finish-before-reservation barrier did not.
+  if (fcfs_starts != std::vector<job_no_t>{0, 2}) {
     throw std::runtime_error(
-        "EASYPower FCFS cap did not stop the power-exceeding prefix job");
+        "EASYPower FCFS cap did not preserve its head reservation");
   }
 
   bool rejected_non_dominant_cost = false;
