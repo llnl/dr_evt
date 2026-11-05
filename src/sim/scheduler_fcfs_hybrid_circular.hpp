@@ -127,10 +127,11 @@ protected:
 private:
   /** Build the chained protected reservation plan before job_index and return
    * its earliest planned start. */
-  sim_time_t calculate_hybrid_window(size_t job_index,
-                                     num_nodes_t available_nodes,
-                                     const running_jobs_t &running_jobs,
-                                     sim_time_t current_time);
+  sim_time_t
+  calculate_hybrid_window(size_t job_index, num_nodes_t available_nodes,
+                          const running_jobs_t &running_jobs,
+                          sim_time_t current_time,
+                          const projected_starts_t &projected_starts);
 };
 
 } // namespace dr_evt

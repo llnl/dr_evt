@@ -41,6 +41,8 @@ struct Running_Job {
 };
 
 using running_jobs_t = std::map<job_no_t, Running_Job>;
+/// Jobs selected during the current scheduling pass but not yet published.
+using projected_starts_t = std::vector<Running_Job>;
 
 /**
  * @brief Mutable free-node timeline used for reservation planning.
@@ -488,14 +490,17 @@ protected:
    * @param[in] running_jobs Active jobs with the metadata needed to project
    * release times.
    * @param[in] current_time Time from which to project releases.
+   * @param[in] projected_starts Jobs selected during this scheduler pass that
+   * are not yet present in running_jobs.
    * @return Earliest projected start time for the FCFS head, in sim_time_t,
    * or the maximum sim_time_t when no release or scheduled change known to
    * the outlook ever satisfies the request.
    */
-  sim_time_t calculate_fcfs_reservation(num_nodes_t nodes_needed,
-                                        num_nodes_t free_nodes,
-                                        const running_jobs_t &running_jobs,
-                                        sim_time_t current_time);
+  sim_time_t
+  calculate_fcfs_reservation(num_nodes_t nodes_needed, num_nodes_t free_nodes,
+                             const running_jobs_t &running_jobs,
+                             sim_time_t current_time,
+                             const projected_starts_t &projected_starts = {});
 
   /**
    * @brief Build the free-node profile shared by reservation searches.
@@ -507,11 +512,16 @@ protected:
    * @param[in] free_nodes Nodes available at current_time.
    * @param[in] running_jobs Active jobs used to project release times.
    * @param[in] current_time Time from which releases are projected.
+   * @param[in] projected_starts Jobs selected in this pass but not yet
+   * published to running_jobs. Their releases are included without copying
+   * the authoritative running-job map.
    * @return Free-node timeline initialized at current_time.
    */
-  Reservation_Timeline reservation_timeline(num_nodes_t free_nodes,
-                                            const running_jobs_t &running_jobs,
-                                            sim_time_t current_time) const;
+  Reservation_Timeline
+  reservation_timeline(num_nodes_t free_nodes,
+                       const running_jobs_t &running_jobs,
+                       sim_time_t current_time,
+                       const projected_starts_t &projected_starts = {}) const;
 };
 
 /**

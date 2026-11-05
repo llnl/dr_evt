@@ -174,10 +174,11 @@ private:
    * @param[in] current_time Projection time.
    * @return Earliest start in the chained protected plan as sim_time_t.
    */
-  sim_time_t calculate_hybrid_window(size_t job_index,
-                                     num_nodes_t available_nodes,
-                                     const running_jobs_t &running_jobs,
-                                     sim_time_t current_time);
+  sim_time_t
+  calculate_hybrid_window(size_t job_index, num_nodes_t available_nodes,
+                          const running_jobs_t &running_jobs,
+                          sim_time_t current_time,
+                          const projected_starts_t &projected_starts);
 };
 
 /**@}*/

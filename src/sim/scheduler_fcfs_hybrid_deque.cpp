@@ -39,7 +39,8 @@ void FCFSHybridDequeScheduler::mark_removed(job_no_t job_id) {
 
 sim_time_t FCFSHybridDequeScheduler::calculate_hybrid_window(
     size_t backfill_index, num_nodes_t available_nodes,
-    const running_jobs_t &running_jobs, sim_time_t current_time) {
+    const running_jobs_t &running_jobs, sim_time_t current_time,
+    const projected_starts_t &projected_starts) {
   // For conservative backfilling, we need to ensure the backfill job
   // doesn't delay ANY waiting job that came before it.
   // Calculate reservation time for each job ahead of this one.
@@ -52,7 +53,8 @@ sim_time_t FCFSHybridDequeScheduler::calculate_hybrid_window(
   const size_t depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t reserved = 0;
-  auto plan = reservation_timeline(available_nodes, running_jobs, current_time);
+  auto plan = reservation_timeline(available_nodes, running_jobs, current_time,
+                                   projected_starts);
   for (size_t i = 0; i < backfill_index; ++i) {
     const auto &job = m_wait_queue[i];
     if (job.removed)
@@ -117,7 +119,7 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
 
   // Step 1: Start jobs from the front of the queue (FCFS order)
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
@@ -127,9 +129,9 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
       const auto &job = m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
     } else {
       --m_removed_count;
     }
@@ -152,8 +154,8 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
   // The blocked head's projection is kept for every policy so that
   // get_fcfs_head_shadow_time() reports it whether or not it is planned.
   m_fcfs_reservation_time = calculate_fcfs_reservation(
-      m_wait_queue.front().nodes_requested, available_nodes,
-      effective_running_jobs, current_time);
+      m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
+      current_time, projected_starts);
   if (available_nodes == 0) {
     return jobs_to_run;
   }
@@ -180,8 +182,8 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
   // Keep one incrementally extended plan for the full scan. Replaying every
   // protected prefix for each candidate made flexible reservations quadratic
   // in the scanned prefix and repeatedly allocated timeline-map nodes.
-  auto protected_plan = reservation_timeline(
-      available_nodes, effective_running_jobs, current_time);
+  auto protected_plan = reservation_timeline(available_nodes, running_jobs,
+                                             current_time, projected_starts);
   const size_t protected_depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t protected_count = 0;
@@ -208,9 +210,9 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
     const auto &job = m_wait_queue[i];
     if (job.removed)
       continue;
-    const sim_time_t job_reservation =
-        calculate_fcfs_reservation(job.nodes_requested, available_nodes,
-                                   effective_running_jobs, current_time);
+    const sim_time_t job_reservation = calculate_fcfs_reservation(
+        job.nodes_requested, available_nodes, running_jobs, current_time,
+        projected_starts);
     if (!reservation_within_horizon(job_reservation, current_time))
       continue;
     if (m_backfill_queue_depth != 0 &&
@@ -231,7 +233,7 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
     // Calculate the window: earliest in-horizon reservation ahead.
 #ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
     const sim_time_t hybrid_window = calculate_hybrid_window(
-        i, available_nodes, effective_running_jobs, current_time);
+        i, available_nodes, running_jobs, current_time, projected_starts);
 #else
     const bool preserves_reservations = protected_plan.can_fit(
         current_time, job.nodes_requested,
@@ -250,9 +252,9 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
       ++m_removed_count;
 
       // Update effective running jobs for next iteration
-      effective_running_jobs[job.job_id] = {
-          current_time, release_estimate(current_time, job.run_time_estimate),
-          job.nodes_requested};
+      projected_starts.push_back(
+          {current_time, release_estimate(current_time, job.run_time_estimate),
+           job.nodes_requested});
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
       protected_plan.reserve(
           current_time, job.nodes_requested,

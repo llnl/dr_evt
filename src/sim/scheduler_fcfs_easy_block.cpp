@@ -64,7 +64,7 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
 
   std::vector<job_no_t> jobs_to_run;
   num_nodes_t available_nodes = free_nodes;
-  running_jobs_t effective_running_jobs = running_jobs;
+  projected_starts_t projected_starts;
 
   // Step 1: Start FCFS head(s)
   while (m_eligible_end_idx > 0) {
@@ -91,8 +91,7 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       jobs_to_run.push_back(head->job_id);
       available_nodes -= nodes_needed;
       m_wait_queue.remove(head->job_id);
-      effective_running_jobs[head->job_id] = {current_time, head_run_time,
-                                              nodes_needed};
+      projected_starts.push_back({current_time, head_run_time, nodes_needed});
 
       for (size_t i = 0; i < m_eligible_end_idx; ++i) {
         if (m_job_order[i].job_id == head->job_id && !m_job_order[i].removed) {
@@ -129,8 +128,8 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
     throw std::logic_error("active FCFS head is missing from block queue");
   }
 
-  auto reservation_plan = reservation_timeline(
-      available_nodes, effective_running_jobs, current_time);
+  auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
+                                               current_time, projected_starts);
   m_fcfs_reservation_time =
       reservation_plan.earliest_fit(head_nodes, 0.0, current_time)
           .value_or(std::numeric_limits<sim_time_t>::max());
@@ -176,8 +175,6 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
     available_nodes -= backfill_nodes;
     reservation_plan.reserve(current_time, backfill_nodes,
                              release_estimate(current_time, backfill_run_time));
-    effective_running_jobs[bf_job] = {current_time, backfill_run_time,
-                                      backfill_nodes};
     m_wait_queue.remove(bf_job);
     m_job_order[i].removed = true;
     ++m_removed_count;
@@ -199,8 +196,6 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       if (m_job_order[i].job_id == bf_job && !m_job_order[i].removed) {
         jobs_to_run.push_back(bf_job);
         available_nodes -= backfill_nodes;
-        effective_running_jobs[bf_job] = {current_time, backfill_run_time,
-                                          backfill_nodes};
         m_job_order[i].removed = true;
         if (i < m_eligible_end_idx) {
           ++m_removed_count;
