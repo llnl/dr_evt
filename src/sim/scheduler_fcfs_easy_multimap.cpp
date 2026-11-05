@@ -113,8 +113,11 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
 
   // FCFS head blocked - try backfilling
   // Calculate FCFS reservation time
-  m_fcfs_reservation_time = calculate_fcfs_reservation(
-      head_nodes, free_nodes, running_jobs, current_time);
+  auto reservation_plan =
+      reservation_timeline(free_nodes, running_jobs, current_time);
+  m_fcfs_reservation_time =
+      reservation_plan.earliest_fit(head_nodes, 0.0, current_time)
+          .value_or(std::numeric_limits<sim_time_t>::max());
 
   if (m_fcfs_reservation_time <= current_time) {
     return {}; // No valid reservation window
@@ -129,8 +132,6 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
   const bool head_has_projection =
       m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
-  auto reservation_plan =
-      reservation_timeline(free_nodes, running_jobs, current_time);
   if (head_within_horizon) {
     reservation_plan.reserve(m_fcfs_reservation_time, head_nodes,
                              release_estimate(m_fcfs_reservation_time,

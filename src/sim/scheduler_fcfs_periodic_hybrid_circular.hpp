@@ -57,9 +57,9 @@ public:
    * @param[in] current_time Current simulation time.
    * @return Jobs started from the FCFS front.
    */
-  std::vector<job_no_t> schedule_event(num_nodes_t free_nodes,
-                                       const running_jobs_t &running_jobs,
-                                       sim_time_t current_time);
+  std::vector<job_no_t>
+  schedule_event(num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+                 sim_time_t current_time) override;
 
 protected:
   /**

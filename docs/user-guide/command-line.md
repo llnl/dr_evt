@@ -289,12 +289,11 @@ reservations must be protected.
 
 ### `--backfill_interval SECONDS`
 
-Uses periodic conservative or hybrid backfill while retaining event-driven
-FCFS dispatch. It is intended for Slurm-style trigger studies and uses the
-opt-in circular scheduler; it requires an enabled `--backfill_policy` and
-`--queue_impl circular`. There is no periodic EASY scheduler: `easy` runs as
-`hybrid` with `--reservation_depth 1`. `0` retains the default event-driven
-backfill behavior. Ticks start one interval after the first
+Uses periodic EASY, conservative, or hybrid backfill while retaining
+event-driven FCFS dispatch. It is intended for Slurm-style trigger studies and
+uses the opt-in circular scheduler; it requires an enabled
+`--backfill_policy` and `--queue_impl circular`. `0` retains the default
+event-driven backfill behavior. Ticks start one interval after the first
 event, or after the `--sim_start_time` boundary in a warm start, and keep that
 cadence whether or not a job is waiting; a tick that passes while nothing waits
 does nothing. Progressive loading (`--infile_list`) keeps the cadence across
