@@ -33,7 +33,7 @@ if ! select_python_interpreter 3 6; then
     exit 1
 fi
 EASY_REFERENCE="$REPO_ROOT/scripts/python_reference_scheduler.py"
-CONSERVATIVE_REFERENCE="$REPO_ROOT/scripts/python_conservative_scheduler.py"
+CONSERVATIVE_REFERENCE="$REPO_ROOT/scripts/python_hybrid_scheduler.py"
 
 FIXTURE="tests/test_traces/feature/planning_horizon.csv"
 FIXTURE_NODES=10
@@ -79,7 +79,7 @@ for BOUND in unbounded bounded; do
             --outdir "$WORK/$BOUND/depth$DEPTH" "${HOPT[@]}" \
             > "$WORK/$BOUND.depth$DEPTH.log" 2>&1 || {
             echo "✗ conservative reference failed ($BOUND, depth $DEPTH)"; sed 's/^/    /' "$WORK/$BOUND.depth$DEPTH.log"; ((FAILED++)); }
-        ref_schedule "$WORK/$BOUND/depth$DEPTH/planning_horizon_conservative_reference.csv" \
+        ref_schedule "$WORK/$BOUND/depth$DEPTH/planning_horizon_hybrid_reference.csv" \
             > "$WORK/$BOUND.depth$DEPTH.ref" 2>/dev/null
     done
 done

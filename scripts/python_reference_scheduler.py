@@ -142,7 +142,7 @@ class EasyBackfillingScheduler:
             running_jobs if running_jobs else ''
         ))
 
-    def calculate_reservation_time(self) -> Optional[float]:
+    def calculate_reservation_time(self, free_nodes: Optional[int] = None) -> Optional[float]:
         """
         Calculate when the FCFS head (first waiting job) can start
 
@@ -154,7 +154,9 @@ class EasyBackfillingScheduler:
         fcfs_head = self.wait_queue[0]
 
         # If it fits now, no need for reservation
-        if fcfs_head.nodes <= self.get_free_nodes():
+        if free_nodes is None:
+            free_nodes = self.get_free_nodes()
+        if fcfs_head.nodes <= free_nodes:
             return self.current_time
 
         # Find earliest time when enough nodes will be free
@@ -167,7 +169,7 @@ class EasyBackfillingScheduler:
         events.sort()
 
         # Simulate freeing nodes over time
-        cumulative_free = self.get_free_nodes()
+        cumulative_free = free_nodes
         for time, freed_nodes, job_idx in events:
             cumulative_free += freed_nodes
             if cumulative_free >= fcfs_head.nodes:
@@ -257,7 +259,7 @@ class EasyBackfillingScheduler:
         # Step 2/3: the head is now genuinely blocked - compute one
         # reservation and try to backfill the rest of the queue against it.
         # free_nodes still holds the correct current value from Step 1.
-        reservation_time = self.calculate_reservation_time()
+        reservation_time = self.calculate_reservation_time(free_nodes)
         head_within_horizon = (
             reservation_time is not None and
             reservation_time - self.current_time <= self.planning_horizon)

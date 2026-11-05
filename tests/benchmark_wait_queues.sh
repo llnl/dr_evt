@@ -258,7 +258,7 @@ run_periodic_backfill_benchmark() {
         if [[ "$BENCHMARK_MODE" == "hybrid" ]]; then
             python_policy_args=(--reservation-depth "$HYBRID_RESERVATION_DEPTH")
         fi
-        if "$PYTHON_BIN" scripts/python_conservative_scheduler.py "$TRACE_FILE" \
+        if "$PYTHON_BIN" scripts/python_hybrid_scheduler.py "$TRACE_FILE" \
             --nodes "$TOTAL_NODES" --outdir "$python_out_dir" \
             "${python_policy_args[@]}" \
             --backfill-queue-depth "$HYBRID_QUEUE_DEPTH" \
@@ -266,9 +266,9 @@ run_periodic_backfill_benchmark() {
             >"$outdir/python.log" 2>&1; then
             python_end=$(date +%s%N)
             python_time=$(elapsed_seconds "$python_start" "$python_end")
-            if [[ -f "$python_out_dir/${trace_name}_conservative_reference.csv" ]] && \
+            if [[ -f "$python_out_dir/${trace_name}_hybrid_reference.csv" ]] && \
                 "$PYTHON_BIN" tests/compare_scheduler_outputs.py \
-                    "$python_out_dir/${trace_name}_conservative_reference.csv" \
+                    "$python_out_dir/${trace_name}_hybrid_reference.csv" \
                     "$deque_out" --tolerance 0.001 >"$outdir/python_compare.log" 2>&1; then
                 python_status="PASS"
                 echo "done (${python_time}s)"

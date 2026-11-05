@@ -13,14 +13,14 @@ def run_reference(source_dir, trace, outdir, *options, nodes="10"):
     # A bounded run time turns a scheduler that never terminates into a
     # failure instead of a hang.
     subprocess.run(
-        [sys.executable, source_dir / "scripts" / "python_conservative_scheduler.py",
+        [sys.executable, source_dir / "scripts" / "python_hybrid_scheduler.py",
          source_dir / trace, "--nodes", nodes, "--outdir", outdir, *options],
         check=True,
         capture_output=True,
         text=True,
         timeout=60,
     )
-    output = outdir / (Path(trace).stem + "_conservative_reference.csv")
+    output = outdir / (Path(trace).stem + "_hybrid_reference.csv")
     with output.open(newline="") as stream:
         return list(csv.DictReader(stream))
 
@@ -28,13 +28,13 @@ def run_reference(source_dir, trace, outdir, *options, nodes="10"):
 def main():
     source_dir = Path(__file__).resolve().parents[1]
     scheduler_spec = importlib.util.spec_from_file_location(
-        "python_conservative_scheduler",
-        source_dir / "scripts" / "python_conservative_scheduler.py",
+        "python_hybrid_scheduler",
+        source_dir / "scripts" / "python_hybrid_scheduler.py",
     )
     scheduler_module = importlib.util.module_from_spec(scheduler_spec)
     assert scheduler_spec.loader is not None
     scheduler_spec.loader.exec_module(scheduler_module)
-    scheduler = scheduler_module.ConservativeBackfillingScheduler(100)
+    scheduler = scheduler_module.HybridBackfillingScheduler(100)
     scheduler.current_time = 0.0
     # Same-time releases must occupy one timeline boundary.  Duplicate
     # zero-width segments would receive a protected reservation twice.

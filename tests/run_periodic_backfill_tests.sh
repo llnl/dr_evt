@@ -32,7 +32,7 @@ if ! select_python_interpreter 3 6; then
     echo "No Python 3.6+ interpreter found; the reference scheduler needs one."
     exit 1
 fi
-REFERENCE="$REPO_ROOT/scripts/python_conservative_scheduler.py"
+REFERENCE="$REPO_ROOT/scripts/python_hybrid_scheduler.py"
 
 TRACE_DIR="tests/test_traces/scheduler_correctness"
 TOTAL_NODES=100
@@ -115,8 +115,8 @@ for POLICY_SPEC in "${POLICIES[@]}"; do
                 ((FAILED++))
                 continue
             fi
-            REF_JOBS="$WORK/${TEST}_conservative_reference.csv"
-            REF_RES="$WORK/${TEST}_conservative_reference_resources.csv"
+            REF_JOBS="$WORK/${TEST}_hybrid_reference.csv"
+            REF_RES="$WORK/${TEST}_hybrid_reference_resources.csv"
 
             SIM_OUT="$WORK/${CASE}.sim.csv"
             SIM_RES="$WORK/${CASE}.sim_resources.csv"

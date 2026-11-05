@@ -295,7 +295,7 @@ and depths to match the target narrows those differences.
   (`tests/run_planning_horizon_tests.sh`). How out-of-horizon jobs count
   toward the queue depth in each mode is covered by a unit test
   (`tests/test_append_job_api.cpp`) and by the Python reference test
-  (`tests/test_python_conservative_options.py`).
+  (`tests/test_python_hybrid_options.py`).
 - **Queue depth under EASY.** With a queue depth, with and without a horizon,
   every FCFS EASY implementation (deque, circular, block, and multimap)
   matches the Python EASY reference, as does the `fcfs_conservative` ordering,
