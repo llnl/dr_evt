@@ -497,7 +497,18 @@ protected:
                                         const running_jobs_t &running_jobs,
                                         sim_time_t current_time);
 
-  /** Build the free-node profile shared by reservation searches. */
+  /**
+   * @brief Build the free-node profile shared by reservation searches.
+   * @details Merges running-job releases and scheduled capacity changes into
+   * a resource-time timeline beginning at current_time. Callers can use the
+   * returned timeline first to find a protected reservation and then extend
+   * that same timeline while admitting backfill jobs, avoiding a duplicate
+   * reconstruction of the release profile within one scheduling pass.
+   * @param[in] free_nodes Nodes available at current_time.
+   * @param[in] running_jobs Active jobs used to project release times.
+   * @param[in] current_time Time from which releases are projected.
+   * @return Free-node timeline initialized at current_time.
+   */
   Reservation_Timeline reservation_timeline(num_nodes_t free_nodes,
                                             const running_jobs_t &running_jobs,
                                             sim_time_t current_time) const;
