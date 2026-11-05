@@ -13,7 +13,6 @@
 
 #include "sim/sim.hpp"
 #include "sim/block_wait_queue.hpp"
-#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
@@ -2909,10 +2908,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
     (void)custom_scheduler;
   }
   constexpr bool periodic_backfill = PeriodicBackfill;
-  FCFSPeriodicHybridCircularScheduler *periodic_scheduler = nullptr;
+  SchedulerBase *periodic_scheduler = nullptr;
   if constexpr (PeriodicBackfill) {
-    periodic_scheduler =
-        static_cast<FCFSPeriodicHybridCircularScheduler *>(m_scheduler.get());
+    periodic_scheduler = m_scheduler.get();
   }
 
   // Validate precondition

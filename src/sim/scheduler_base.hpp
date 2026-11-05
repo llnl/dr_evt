@@ -250,6 +250,23 @@ public:
                                          sim_time_t current_time) = 0;
 
   /**
+   * @brief Run an event-driven FCFS pass without a periodic backfill scan.
+   * @details Periodic scheduler variants override this so ordinary arrivals,
+   * completions, and capacity changes still dispatch FCFS work immediately;
+   * the full schedule() method is reserved for periodic backfill ticks.
+   * Non-periodic schedulers use their normal schedule() behavior.
+   * @param[in] free_nodes Nodes currently available for allocation.
+   * @param[in] running_jobs Jobs already running at this instant.
+   * @param[in] current_time Current simulation time.
+   * @return Job IDs selected from the FCFS front.
+   */
+  virtual std::vector<job_no_t>
+  schedule_event(num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+                 sim_time_t current_time) {
+    return schedule(free_nodes, running_jobs, current_time);
+  }
+
+  /**
    * @brief Advance this scheduler's internal eligibility tracking.
    * @details
    * This is an explicit command that advances eligibility tracking to
@@ -505,9 +522,10 @@ protected:
  * HYBRID backfilling; must be positive with HYBRID and is ignored otherwise.
  * @param[in] backfill_queue_depth Eligible waiting jobs, head included,
  * examined per backfill pass by every scheduler; zero is unlimited.
- * @param[in] backfill_interval Seconds between additional hybrid evaluations;
- * zero retains event-driven evaluation only. The planning horizon is not a
- * construction parameter; set it with SchedulerBase::set_planning_horizon().
+ * @param[in] backfill_interval Seconds between additional periodic backfill
+ * evaluations; zero retains event-driven evaluation only. The planning
+ * horizon is not a construction parameter; set it with
+ * SchedulerBase::set_planning_horizon().
  * @return Owning pointer to a SchedulerBase implementation.
  * @throws std::invalid_argument if HYBRID is requested with a zero depth or
  * with a non-FCFS priority policy.
