@@ -9,7 +9,7 @@ the [Test Suite README](../tests/README.md) and
 
 - `python_reference_scheduler.py` — EASY-backfilling reference used to
   generate and compare expected schedules.
-- `python_conservative_scheduler.py` — conservative-backfilling reference.
+- `python_hybrid_scheduler.py` — hybrid/conservative-backfilling reference.
 
 Their algorithmic context is documented in
 [Backfilling Algorithms](../docs/BACKFILLING_ALGORITHMS.md).

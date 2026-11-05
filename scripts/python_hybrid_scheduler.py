@@ -7,7 +7,7 @@
 ################################################################################
 
 """
-Python Reference CONSERVATIVE Backfilling Scheduler
+Python Reference HYBRID/CONSERVATIVE Backfilling Scheduler
 
 Pure implementation of CONSERVATIVE backfilling algorithm for verification.
 No dependencies, no fancy features - just correct CONSERVATIVE logic.
@@ -36,6 +36,7 @@ This is the REFERENCE implementation for verifying DR_EVT conservative backfilli
 """
 
 import csv
+import bisect
 import math
 import sys
 import os
@@ -79,9 +80,9 @@ class Event:
             return type_order[self.type] < type_order[other.type]
         return self.job_idx < other.job_idx
 
-class ConservativeBackfillingScheduler:
+class HybridBackfillingScheduler:
     """
-    Minimal CONSERVATIVE backfilling scheduler
+    Minimal HYBRID/CONSERVATIVE backfilling scheduler
 
     This is a REFERENCE implementation - kept simple and obvious
     so we can manually verify it's correct.
@@ -179,9 +180,16 @@ class ConservativeBackfillingScheduler:
 
         Returns the earliest time when enough nodes will be free for this job
         """
-        for time, available_nodes in timeline:
+        # This is a point-in-time capacity query: start at the segment which
+        # contains current_time rather than rechecking older segments.  It
+        # mirrors Reservation_Timeline::earliest_fit(..., duration=0) in the
+        # native EASY and conservative schedulers.
+        segment = bisect.bisect_right(
+            timeline, (self.current_time, float('inf'))) - 1
+        for index in range(segment, len(timeline)):
+            time, available_nodes = timeline[index]
             if available_nodes >= job.nodes:
-                return time
+                return max(self.current_time, time)
 
         # Should never reach here if system is not oversubscribed
         return self.current_time
@@ -198,16 +206,35 @@ class ConservativeBackfillingScheduler:
             timeline.append((release_time, current_free))
         return timeline
 
-    def calculate_conservative_window_with_running(self, backfill_pos: int,
-                                                     effective_running: dict,
-                                                     exclude_jobs: set,
-                                                     timeline: list) -> Optional[float]:
+    @staticmethod
+    def reserve_in_timeline(timeline: list, start: float, end: float,
+                            nodes: int) -> None:
+        """Reserve nodes over [start, end) in a free-capacity timeline."""
+        def split(time: float) -> int:
+            index = bisect.bisect_left(timeline, (time,))
+            if index < len(timeline) and timeline[index][0] == time:
+                return index
+            # All reservations begin no earlier than current_time, which is
+            # the first timeline segment.
+            timeline.insert(index, (time, timeline[index - 1][1]))
+            return index
+
+        start_index = split(start)
+        end_index = split(end)
+        for index in range(start_index, end_index):
+            time, available = timeline[index]
+            timeline[index] = (time, available - nodes)
+
+    def calculate_conservative_window(self, backfill_pos: int,
+                                      timeline: list) -> Optional[float]:
         """
         Calculate the conservative backfill window considering effective running jobs
 
         Returns the earliest reservation time among all jobs ahead of backfill_pos
-        effective_running: running jobs including already-backfilled jobs
-        exclude_jobs: set of job IDs to exclude from wait_queue (already backfilled)
+        ``timeline`` includes already-started backfill jobs.  The protected
+        plan is incrementally extended across the queue scan, just like the
+        native scheduler; rebuilding it after every accepted candidate makes
+        large conservative traces needlessly cubic.
         """
         if backfill_pos >= len(self.wait_queue):
             return None
@@ -216,16 +243,15 @@ class ConservativeBackfillingScheduler:
         # consumes its complete planned interval before the next reservation
         # is found; adding only a future release would leave its nodes free.
         # Candidates are visited in queue order, so retain and extend this
-        # prefix plan until a newly started backfill job changes the effective
-        # running set.  Rebuilding every prefix made large differential traces
-        # cubic in queue length.
-        cache_key = (id(timeline), frozenset(exclude_jobs))
+        # prefix plan for the whole scan.  Accepted backfills are inserted in
+        # place below, preserving its validity without rebuilding prefixes.
+        cache_key = id(timeline)
         cache = getattr(self, '_conservative_plan_cache', {})
         cached = cache.get(cache_key)
         if cached is None:
             cached = {
                 'plan': list(timeline), 'processed': 0, 'reserved': 0,
-                'earliest': float('inf'),
+                'earliest': float('inf'), 'excluded': set(),
             }
             cache[cache_key] = cached
             self._conservative_plan_cache = cache
@@ -234,12 +260,7 @@ class ConservativeBackfillingScheduler:
         def earliest_fit(job: Job) -> Optional[float]:
             start = self.current_time
             while True:
-                segment = next((i for i, (time, _) in enumerate(plan)
-                                if time <= start and
-                                (i + 1 == len(plan) or plan[i + 1][0] > start)),
-                               None)
-                if segment is None:
-                    return None
+                segment = bisect.bisect_right(plan, (start, float('inf'))) - 1
                 end = self.planned_end(start, job.duration)
                 i = segment
                 while i < len(plan) and (i == segment or plan[i][0] < end):
@@ -255,19 +276,8 @@ class ConservativeBackfillingScheduler:
                 start = plan[i][0]
 
         def reserve(start: float, job: Job) -> None:
-            end = self.planned_end(start, job.duration)
-            def split(time: float) -> None:
-                if any(entry_time == time for entry_time, _ in plan):
-                    return
-                for index, (entry_time, available) in enumerate(plan):
-                    if index + 1 == len(plan) or plan[index + 1][0] > time:
-                        plan.insert(index + 1, (time, available))
-                        return
-            split(start)
-            split(end)
-            for index, (time, available) in enumerate(plan):
-                if start <= time < end:
-                    plan[index] = (time, available - job.nodes)
+            self.reserve_in_timeline(
+                plan, start, self.planned_end(start, job.duration), job.nodes)
 
         # Check the reserved jobs ahead of this position: all of them, or
         # only the first reservation_depth when a depth is configured
@@ -277,7 +287,7 @@ class ConservativeBackfillingScheduler:
             job = self.wait_queue[i]
 
             # Skip jobs that were already backfilled
-            if job.idx in exclude_jobs:
+            if job.idx in cached['excluded']:
                 continue
             if (self.reservation_depth and
                     cached['reserved'] >= self.reservation_depth):
@@ -296,6 +306,16 @@ class ConservativeBackfillingScheduler:
 
         return (cached['earliest'] if cached['earliest'] < float('inf')
                 else None)
+
+    def reserve_backfill_in_plans(self, job: Job, timeline: list) -> None:
+        """Extend availability and protected plans after starting a backfill."""
+        end = self.planned_end(self.current_time, job.duration)
+        self.reserve_in_timeline(timeline, self.current_time, end, job.nodes)
+        cached = self._conservative_plan_cache.get(id(timeline))
+        if cached is not None:
+            self.reserve_in_timeline(cached['plan'], self.current_time, end,
+                                     job.nodes)
+            cached['excluded'].add(job.idx)
 
     def calculate_job_reservation_time_with_running(self, job: Job, effective_running: dict) -> float:
         """
@@ -356,13 +376,10 @@ class ConservativeBackfillingScheduler:
         # For each job in the queue (after the head), check if it can backfill
 
         remaining = []
-        backfilled_jobs = {}  # Track backfilled jobs as {job_id: (start_time, pessimistic_end)}
-        # The C++ scheduler updates its effective-running view only when it
-        # actually starts a backfill job.  Keep the same view here, and build
-        # its release timeline once per such change rather than once for every
-        # candidate/reservation pair.
-        effective_running = self.running.copy()
-        effective_timeline = None
+        # Build availability once and update it in place as backfills start.
+        # This mirrors the native scheduler's reusable reservation plans.
+        effective_timeline = self.build_resource_timeline_from_running(
+            self.running)
 
         # Repeated scheduling passes at one timestamp share the same depth
         # budget. The blocked head is charged once, when it has an in-horizon
@@ -372,9 +389,6 @@ class ConservativeBackfillingScheduler:
             self.backfill_depth_examined = 0
             self.backfill_depth_head_accounted = False
         for pos, job in enumerate(self.wait_queue):
-            if effective_timeline is None:
-                effective_timeline = self.build_resource_timeline_from_running(
-                    effective_running)
             reservation = self.calculate_job_reservation_time_from_timeline(
                 job, effective_timeline)
             # An out-of-horizon job stays queued and holds no reservation.
@@ -410,9 +424,8 @@ class ConservativeBackfillingScheduler:
             # Calculate the earliest reservation among jobs ahead.  Include
             # jobs already backfilled during this pass in the same projected
             # resource view used by the C++ implementation.
-            conservative_window = self.calculate_conservative_window_with_running(
-                pos, effective_running, set(backfilled_jobs.keys()),
-                effective_timeline)
+            conservative_window = self.calculate_conservative_window(
+                pos, effective_timeline)
 
             if conservative_window is None:
                 # No jobs ahead - shouldn't happen, but safe to backfill
@@ -420,6 +433,7 @@ class ConservativeBackfillingScheduler:
                 self.start_job(job)
                 free_nodes -= job.nodes
                 started = True
+                self.reserve_backfill_in_plans(job, effective_timeline)
                 continue
 
             # Job can backfill if it completes before the earliest reservation
@@ -430,13 +444,7 @@ class ConservativeBackfillingScheduler:
                 free_nodes -= job.nodes
                 started = True
 
-                # Track this backfilled job so next jobs see it as running
-                pessimistic_end = self.planned_end(self.current_time,
-                                                   job.duration)
-                backfilled_jobs[job.idx] = (self.current_time, pessimistic_end, job.nodes)
-                effective_running[job.idx] = (self.current_time, pessimistic_end,
-                                              pessimistic_end, job.nodes)
-                effective_timeline = None
+                self.reserve_backfill_in_plans(job, effective_timeline)
                 continue
             else:
                 self.log(f"Blocking job {job.idx} (would end {job_end} >= earliest reservation {conservative_window})")
@@ -603,9 +611,9 @@ def write_resource_trace(jobs: List[Job], filename: str, total_nodes: int):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python_conservative_scheduler.py <trace.csv> [--verbose] [--nodes N] [--outdir DIR] [--reservation-depth N] [--backfill-queue-depth N] [--backfill-interval SECONDS] [--planning-time-resolution SECONDS] [--planning-horizon SECONDS]")
+        print("Usage: python_hybrid_scheduler.py <trace.csv> [--verbose] [--nodes N] [--outdir DIR] [--reservation-depth N] [--backfill-queue-depth N] [--backfill-interval SECONDS] [--planning-time-resolution SECONDS] [--planning-horizon SECONDS]")
         print()
-        print("Python reference CONSERVATIVE backfilling scheduler for verification")
+        print("Python reference HYBRID/CONSERVATIVE backfilling scheduler for verification")
         print()
         print("Options:")
         print("  --verbose    Show detailed simulation progress")
@@ -622,7 +630,7 @@ def main():
         print("  --planning-horizon SECONDS  Limit event-driven and periodic reservations to this")
         print("               look-ahead (default: unlimited)")
         print()
-        print("Generates reference output for CONSERVATIVE backfilling verification")
+        print("Generates reference output for HYBRID/CONSERVATIVE backfilling verification")
         print("Output files are written to /tmp by default to avoid directory pollution")
         sys.exit(1)
 
@@ -673,7 +681,7 @@ def main():
         if planning_horizon < 0.0:
             raise ValueError('--planning-horizon must be nonnegative')
 
-    print(f"=== Python Reference CONSERVATIVE Backfilling Scheduler ===", file=sys.stderr)
+    print(f"=== Python Reference HYBRID/CONSERVATIVE Backfilling Scheduler ===", file=sys.stderr)
     print(f"Trace: {trace_file}", file=sys.stderr)
     print(f"Total nodes: {total_nodes}", file=sys.stderr)
     print(f"Output directory: {outdir}", file=sys.stderr)
@@ -690,7 +698,7 @@ def main():
     print(f"Loaded {len(jobs)} jobs", file=sys.stderr)
 
     # Run scheduler
-    scheduler = ConservativeBackfillingScheduler(total_nodes, verbose=verbose,
+    scheduler = HybridBackfillingScheduler(total_nodes, verbose=verbose,
                                                  reservation_depth=reservation_depth,
                                                  backfill_queue_depth=backfill_queue_depth,
                                                  backfill_interval=backfill_interval,
@@ -700,11 +708,11 @@ def main():
 
     # Write output files to specified directory
     basename = os.path.basename(trace_file).replace('.csv', '')
-    output_file = os.path.join(outdir, f'{basename}_conservative_reference.csv')
+    output_file = os.path.join(outdir, f'{basename}_hybrid_reference.csv')
     write_scheduler_output(jobs, output_file)
 
     # Write resource trace
-    resource_file = os.path.join(outdir, f'{basename}_conservative_reference_resources.csv')
+    resource_file = os.path.join(outdir, f'{basename}_hybrid_reference_resources.csv')
     write_resource_trace(jobs, resource_file, total_nodes)
 
     print(f"\nReference output written to: {output_file}", file=sys.stderr)

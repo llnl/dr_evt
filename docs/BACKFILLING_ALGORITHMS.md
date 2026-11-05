@@ -116,7 +116,7 @@ conservative. Slurm behaves this way when `bf_job_part_count_reserve` is
 set, and Fluxion's `hybrid` queue policy does the same with
 `reservation-depth`. Hybrid, with conservative as its
 unlimited-depth case, is implemented by the hybrid FCFS schedulers and accepts `fcfs` or `fcfs_conservative` ordering. The Python
-oracle `scripts/python_conservative_scheduler.py` accepts the same reservation
+oracle `scripts/python_hybrid_scheduler.py` accepts the same reservation
 and queue-depth limits via `--reservation-depth` and
 `--backfill-queue-depth`.
 Reservations beyond `--planning_horizon` consume neither a queue-depth scan

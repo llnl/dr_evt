@@ -35,7 +35,7 @@ echo ""
 source "$SCRIPT_DIR/set_simulator_path.sh"
 source "$SCRIPT_DIR/select_python.sh"
 
-if [ ! -f "./scripts/python_conservative_scheduler.py" ]; then
+if [ ! -f "./scripts/python_hybrid_scheduler.py" ]; then
     echo -e "${RED}Error: Python conservative scheduler not found${NC}"
     exit 1
 fi
@@ -88,7 +88,7 @@ BASENAME=$(basename "$TRACE" .csv)
 # Run Python reference
 echo -e "${YELLOW}Running Python CONSERVATIVE reference...${NC}"
 START_PY=$(date +%s)
-if ! "$PYTHON_BIN" scripts/python_conservative_scheduler.py "$TRACE" \
+if ! "$PYTHON_BIN" scripts/python_hybrid_scheduler.py "$TRACE" \
     --nodes "$NODES" \
     --outdir "$OUTDIR" \
     ${PY_DEPTH_ARGS[@]+"${PY_DEPTH_ARGS[@]}"} \
@@ -101,8 +101,8 @@ fi
 END_PY=$(date +%s)
 PY_TIME=$((END_PY - START_PY))
 
-PYTHON_OUT="$OUTDIR/${BASENAME}_conservative_reference.csv"
-PYTHON_RES="$OUTDIR/${BASENAME}_conservative_reference_resources.csv"
+PYTHON_OUT="$OUTDIR/${BASENAME}_hybrid_reference.csv"
+PYTHON_RES="$OUTDIR/${BASENAME}_hybrid_reference_resources.csv"
 
 if [ ! -f "$PYTHON_OUT" ]; then
     echo -e "${RED}✗ Python reference failed${NC}"

@@ -12,14 +12,14 @@ def run_reference(source_dir, trace, outdir, *options, nodes="10"):
     # A bounded run time turns a scheduler that never terminates into a
     # failure instead of a hang.
     subprocess.run(
-        [sys.executable, source_dir / "scripts" / "python_conservative_scheduler.py",
+        [sys.executable, source_dir / "scripts" / "python_hybrid_scheduler.py",
          source_dir / trace, "--nodes", nodes, "--outdir", outdir, *options],
         check=True,
         capture_output=True,
         text=True,
         timeout=60,
     )
-    output = outdir / (Path(trace).stem + "_conservative_reference.csv")
+    output = outdir / (Path(trace).stem + "_hybrid_reference.csv")
     with output.open(newline="") as stream:
         return list(csv.DictReader(stream))
 
