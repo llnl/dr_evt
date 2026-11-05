@@ -160,17 +160,18 @@ FCFSEasyDequeScheduler::schedule(num_nodes_t free_nodes,
   // one reservation calculation per schedule() call, not for every
   // query - it's a local, one-time correction of the caller-supplied
   // map, not a change to how running jobs are tracked in general.
-  m_fcfs_reservation_time = calculate_fcfs_reservation(
-      m_wait_queue.front().nodes_requested, available_nodes,
-      effective_running_jobs, current_time);
+  auto reservation_plan = reservation_timeline(
+      available_nodes, effective_running_jobs, current_time);
+  m_fcfs_reservation_time = reservation_plan
+                                .earliest_fit(m_wait_queue.front().nodes_requested,
+                                              0.0, current_time)
+                                .value_or(std::numeric_limits<sim_time_t>::max());
   // A head whose reservation starts beyond the planning horizon is not
   // planned: candidates are not tested against it (Slurm bf_window).
   const bool head_within_horizon =
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
   const bool head_has_projection =
       m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
-  auto reservation_plan = reservation_timeline(
-      available_nodes, effective_running_jobs, current_time);
   if (head_within_horizon) {
     reservation_plan.reserve(
         m_fcfs_reservation_time, m_wait_queue.front().nodes_requested,

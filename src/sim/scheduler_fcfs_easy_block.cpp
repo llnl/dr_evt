@@ -129,16 +129,17 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
     throw std::logic_error("active FCFS head is missing from block queue");
   }
 
-  m_fcfs_reservation_time = calculate_fcfs_reservation(
-      head_nodes, available_nodes, effective_running_jobs, current_time);
+  auto reservation_plan = reservation_timeline(
+      available_nodes, effective_running_jobs, current_time);
+  m_fcfs_reservation_time = reservation_plan
+                                .earliest_fit(head_nodes, 0.0, current_time)
+                                .value_or(std::numeric_limits<sim_time_t>::max());
   // A head reserved beyond the planning horizon is not planned: the block
   // queue's window test then sees no bound (Slurm bf_window).
   const sim_time_t planned_reservation =
       reservation_within_horizon(m_fcfs_reservation_time, current_time)
           ? m_fcfs_reservation_time
           : std::numeric_limits<sim_time_t>::max();
-  auto reservation_plan = reservation_timeline(
-      available_nodes, effective_running_jobs, current_time);
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
   if (planned_reservation != std::numeric_limits<sim_time_t>::max()) {
     reservation_plan.reserve(
