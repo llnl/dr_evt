@@ -195,14 +195,18 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
   const size_t protected_depth =
       m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth : 0;
   size_t protected_count = 0;
-  const auto protect_job = [&](const JobEntry &protected_job) {
+  const auto protect_job = [&](const JobEntry &protected_job,
+                               std::optional<sim_time_t> reservation =
+                                   std::nullopt) {
     if (protected_depth != 0 && protected_count >= protected_depth) {
       return;
     }
     const tdiff_t duration =
         release_estimate(current_time, protected_job.run_time_estimate);
-    const auto reservation = protected_plan.earliest_fit(
-        protected_job.nodes_requested, duration, current_time);
+    if (!reservation) {
+      reservation = protected_plan.earliest_fit(protected_job.nodes_requested,
+                                                duration, current_time);
+    }
     if (!reservation ||
         !reservation_within_horizon(*reservation, current_time)) {
       return;
@@ -247,9 +251,11 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
     const sim_time_t hybrid_window = calculate_hybrid_window(
         i, available_nodes, running_jobs, current_time, projected_starts);
 #else
-    const bool preserves_reservations = protected_plan.can_fit(
-        current_time, job.nodes_requested,
-        release_estimate(current_time, job.run_time_estimate));
+    const auto protected_start = protected_plan.earliest_fit(
+        job.nodes_requested,
+        release_estimate(current_time, job.run_time_estimate), current_time);
+    const bool preserves_reservations =
+        protected_start && *protected_start == current_time;
 #endif
 #ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
     const bool preserves_reservations =
@@ -277,7 +283,7 @@ FCFSHybridCircularScheduler::schedule(num_nodes_t free_nodes,
       }
     } else {
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
-      protect_job(job);
+      protect_job(job, protected_start);
 #endif
     }
   }
