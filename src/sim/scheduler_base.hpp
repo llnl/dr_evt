@@ -236,7 +236,10 @@ public:
    * @brief Select wait-queue jobs that may start at current_time.
    * @details
    * The returned identifiers are still existing Trace records. The caller
-   * records each selected start through Trace::insert_job().
+   * records each selected start through Trace::insert_job(). Implementations
+   * that use a resource-time reservation plan should build it once per call,
+   * use it to determine the FCFS reservation, then update that same plan as
+   * backfill candidates are admitted.
    *
    * @param[in] free_nodes Nodes currently available to allocate.
    * @param[in] running_jobs Running jobs with start time, runtime, and nodes.

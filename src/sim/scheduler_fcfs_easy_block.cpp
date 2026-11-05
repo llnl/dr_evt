@@ -131,9 +131,9 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
 
   auto reservation_plan = reservation_timeline(
       available_nodes, effective_running_jobs, current_time);
-  m_fcfs_reservation_time = reservation_plan
-                                .earliest_fit(head_nodes, 0.0, current_time)
-                                .value_or(std::numeric_limits<sim_time_t>::max());
+  m_fcfs_reservation_time =
+      reservation_plan.earliest_fit(head_nodes, 0.0, current_time)
+          .value_or(std::numeric_limits<sim_time_t>::max());
   // A head reserved beyond the planning horizon is not planned: the block
   // queue's window test then sees no bound (Slurm bf_window).
   const sim_time_t planned_reservation =

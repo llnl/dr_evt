@@ -115,9 +115,9 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
   // Calculate FCFS reservation time
   auto reservation_plan =
       reservation_timeline(free_nodes, running_jobs, current_time);
-  m_fcfs_reservation_time = reservation_plan
-                                .earliest_fit(head_nodes, 0.0, current_time)
-                                .value_or(std::numeric_limits<sim_time_t>::max());
+  m_fcfs_reservation_time =
+      reservation_plan.earliest_fit(head_nodes, 0.0, current_time)
+          .value_or(std::numeric_limits<sim_time_t>::max());
 
   if (m_fcfs_reservation_time <= current_time) {
     return {}; // No valid reservation window
