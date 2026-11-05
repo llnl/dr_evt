@@ -172,6 +172,8 @@ private:
    * @param[in] available_nodes Nodes free at current_time.
    * @param[in] running_jobs Active jobs with start time, runtime, and nodes.
    * @param[in] current_time Projection time.
+   * @param[in] projected_starts Jobs selected in this pass but not yet
+   * published to running_jobs.
    * @return Earliest start in the chained protected plan as sim_time_t.
    */
   sim_time_t

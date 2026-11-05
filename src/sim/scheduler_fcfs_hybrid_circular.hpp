@@ -125,8 +125,16 @@ protected:
   virtual bool horizon_skipped_job_uses_depth_slot() const { return false; }
 
 private:
-  /** Build the chained protected reservation plan before job_index and return
-   * its earliest planned start. */
+  /**
+   * @brief Calculate the earliest start in the chained protected plan.
+   * @param[in] job_index Candidate position in FCFS queue order.
+   * @param[in] available_nodes Nodes free at current_time.
+   * @param[in] running_jobs Active jobs used for release projection.
+   * @param[in] current_time Projection time.
+   * @param[in] projected_starts Jobs selected in this pass but not yet
+   * published to running_jobs.
+   * @return Earliest start in the chained protected plan.
+   */
   sim_time_t
   calculate_hybrid_window(size_t job_index, num_nodes_t available_nodes,
                           const running_jobs_t &running_jobs,

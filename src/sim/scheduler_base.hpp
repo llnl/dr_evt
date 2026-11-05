@@ -53,11 +53,18 @@ using projected_starts_t = std::vector<Running_Job>;
 class Reservation_Timeline {
   std::map<sim_time_t, num_nodes_t> m_free_nodes;
 
-  void split_at(sim_time_t time) {
+  /**
+   * @brief Return the timeline boundary at time, creating it if necessary.
+   * @param[in] time Segment boundary to locate.
+   * @return Iterator to the existing or newly inserted boundary.
+   */
+  std::map<sim_time_t, num_nodes_t>::iterator split_at(sim_time_t time) {
     auto boundary = m_free_nodes.lower_bound(time);
     if (boundary == m_free_nodes.end() || boundary->first != time) {
-      m_free_nodes.emplace_hint(boundary, time, std::prev(boundary)->second);
+      boundary = m_free_nodes.emplace_hint(boundary, time,
+                                           std::prev(boundary)->second);
     }
+    return boundary;
   }
 
 public:
@@ -99,27 +106,29 @@ public:
     return fit && *fit == start;
   }
 
-  /** Reserve nodes over [start, start + duration). */
+  /**
+   * @brief Reserve nodes over [start, start + duration).
+   * @param[in] start Reservation start time.
+   * @param[in] nodes Nodes unavailable during the reservation.
+   * @param[in] duration Reservation duration.
+   */
   void reserve(sim_time_t start, num_nodes_t nodes, tdiff_t duration) {
     if (duration <= 0) {
       return;
     }
-    split_at(start);
-    split_at(start + duration);
-    for (auto segment = m_free_nodes.find(start);
-         segment != m_free_nodes.end() && segment->first < start + duration;
-         ++segment) {
+    auto first = split_at(start);
+    auto last = split_at(start + duration);
+    for (auto segment = first; segment != last; ++segment) {
       segment->second -= nodes;
     }
-    const auto coalesce = [this](sim_time_t time) {
-      auto boundary = m_free_nodes.find(time);
+    const auto coalesce = [this](auto boundary) {
       if (boundary != m_free_nodes.begin() &&
           std::prev(boundary)->second == boundary->second) {
         m_free_nodes.erase(boundary);
       }
     };
-    coalesce(start);
-    coalesce(start + duration);
+    coalesce(first);
+    coalesce(last);
   }
 };
 
