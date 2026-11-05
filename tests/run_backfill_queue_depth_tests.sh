@@ -16,8 +16,7 @@
 # 2. A depth of 1 leaves only the head, so EASY must equal
 #    --backfill_policy none for FCFS, fcfs_alt, SJF, and LJF.
 # 3. Periodic EASY with a depth equals periodic hybrid with reservation
-#    depth 1 and the same depth: there is no periodic EASY scheduler, and
-#    EASY runs as hybrid with reservation depth 1.
+#    depth 1 and the same depth.
 # 4. SJF and LJF complete the workload with a depth.
 
 set -e

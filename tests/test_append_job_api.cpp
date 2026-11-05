@@ -28,6 +28,8 @@
 
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/sim.hpp"
+#include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -1822,6 +1824,24 @@ void test_periodic_backfill_run_until_exclusive() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// Periodic EASY uses its dedicated scheduler instead of translating the
+// policy to hybrid depth one. Its observable schedule remains equivalent to
+// that hybrid configuration, which the periodic tests below cover.
+void test_periodic_easy_scheduler_selection() {
+  std::cout << "\n=== Periodic EASY scheduler selection ===" << std::endl;
+
+  const auto scheduler = create_scheduler(
+      100, 0, BackfillPolicy::EASY, PriorityPolicy::FCFS,
+      QueueImplementation::CIRCULAR, 128, 0,
+      CircularOverflowPolicy::GROW, 0, 0, 10.0);
+  assert(dynamic_cast<FCFSPeriodicEasyCircularScheduler *>(scheduler.get()) !=
+         nullptr);
+  assert(dynamic_cast<FCFSPeriodicHybridCircularScheduler *>(scheduler.get()) ==
+         nullptr);
+
+  std::cout << "  PASSED" << std::endl;
+}
+
 // Periodic hybrid evaluation retains event-driven FCFS dispatch, but reserves
 // backfill scans for ticks. A candidate that arrives between ticks therefore
 // waits for the first tick even though it fits before the blocked head.
@@ -2047,6 +2067,7 @@ int main() {
     test_periodic_hybrid_backfill();
     test_periodic_backfill_idle_ticks();
     test_periodic_backfill_run_until_exclusive();
+    test_periodic_easy_scheduler_selection();
     test_append_with_known_actual_runtime();
     test_fractional_streaming_limits_validate_stored_value();
 
