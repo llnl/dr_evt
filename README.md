@@ -1,6 +1,6 @@
 # Discrete Resource Event Modeling and Multi-cluster Scheduling Simulator
 
-[![Documentation Status](https://readthedocs.org/projects/dr-evt/badge/?version=latest)](https://dr-evt.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://app.readthedocs.org/projects/dr-evt/badge/?version=latest)](https://dr-evt.readthedocs.io/en/latest/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/LLNL/dr_evt/blob/main/LICENSE)
 
 DR_EVT is a high-performance HPC job scheduler simulator supporting EASY,
