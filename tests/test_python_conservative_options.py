@@ -2,6 +2,7 @@
 """Regression coverage for the Python conservative scheduler CLI options."""
 
 import csv
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -26,6 +27,22 @@ def run_reference(source_dir, trace, outdir, *options, nodes="10"):
 
 def main():
     source_dir = Path(__file__).resolve().parents[1]
+    scheduler_spec = importlib.util.spec_from_file_location(
+        "python_conservative_scheduler",
+        source_dir / "scripts" / "python_conservative_scheduler.py",
+    )
+    scheduler_module = importlib.util.module_from_spec(scheduler_spec)
+    assert scheduler_spec.loader is not None
+    scheduler_spec.loader.exec_module(scheduler_module)
+    scheduler = scheduler_module.ConservativeBackfillingScheduler(100)
+    scheduler.current_time = 0.0
+    # Same-time releases must occupy one timeline boundary.  Duplicate
+    # zero-width segments would receive a protected reservation twice.
+    assert scheduler.build_resource_timeline_from_running({
+        1: (0.0, 10.0, 10.0, 20),
+        2: (0.0, 10.0, 10.0, 30),
+    }) == [(0.0, 50), (10.0, 100)]
+
     with tempfile.TemporaryDirectory(prefix="dr-evt-python-options-") as temp:
         outdir = Path(temp)
         horizon = run_reference(

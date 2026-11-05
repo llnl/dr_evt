@@ -193,9 +193,18 @@ class ConservativeBackfillingScheduler:
         releases = sorted((pessimistic_end, nodes)
                           for _, _, pessimistic_end, nodes in running.values())
         timeline = [(self.current_time, current_free)]
+        # A timeline has one capacity segment per timestamp.  Keeping
+        # simultaneous releases as separate entries makes reserve() apply a
+        # protected reservation to every zero-width duplicate segment, which
+        # subtracts its nodes more than once.  The C++ Reservation_Timeline
+        # aggregates its release deltas in a map; preserve that representation
+        # here as well.
         for release_time, released_nodes in releases:
             current_free += released_nodes
-            timeline.append((release_time, current_free))
+            if timeline[-1][0] == release_time:
+                timeline[-1] = (release_time, current_free)
+            else:
+                timeline.append((release_time, current_free))
         return timeline
 
     def calculate_conservative_window_with_running(self, backfill_pos: int,
