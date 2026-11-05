@@ -178,6 +178,11 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
     ++m_backfill_depth_examined;
     m_backfill_depth_head_accounted = true;
   }
+  // Candidate horizon checks need the same availability projection as the
+  // previous full map-based calculation. Extend it as jobs start instead of
+  // rebuilding release maps for every candidate.
+  auto availability_plan = reservation_timeline(available_nodes, running_jobs,
+                                                current_time, projected_starts);
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
   // Keep one incrementally extended plan for the full scan. Replaying every
   // protected prefix for each candidate made flexible reservations quadratic
@@ -210,9 +215,9 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
     const auto &job = m_wait_queue[i];
     if (job.removed)
       continue;
-    const sim_time_t job_reservation = calculate_fcfs_reservation(
-        job.nodes_requested, available_nodes, running_jobs, current_time,
-        projected_starts);
+    const sim_time_t job_reservation =
+        availability_plan.earliest_fit(job.nodes_requested, 0.0, current_time)
+            .value_or(std::numeric_limits<sim_time_t>::max());
     if (!reservation_within_horizon(job_reservation, current_time))
       continue;
     if (m_backfill_queue_depth != 0 &&
@@ -255,6 +260,9 @@ FCFSHybridDequeScheduler::schedule(num_nodes_t free_nodes,
       projected_starts.push_back(
           {current_time, release_estimate(current_time, job.run_time_estimate),
            job.nodes_requested});
+      availability_plan.reserve(
+          current_time, job.nodes_requested,
+          release_estimate(current_time, job.run_time_estimate));
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
       protected_plan.reserve(
           current_time, job.nodes_requested,

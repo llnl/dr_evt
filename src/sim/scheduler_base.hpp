@@ -508,7 +508,10 @@ protected:
    * a resource-time timeline beginning at current_time. Callers can use the
    * returned timeline first to find a protected reservation and then extend
    * that same timeline while admitting backfill jobs, avoiding a duplicate
-   * reconstruction of the release profile within one scheduling pass.
+   * reconstruction of the release profile within one scheduling pass. Release
+   * and capacity events are first collected in contiguous storage, then
+   * coalesced into the returned ordered profile; no intermediate delta map is
+   * allocated.
    * @param[in] free_nodes Nodes available at current_time.
    * @param[in] running_jobs Active jobs used to project release times.
    * @param[in] current_time Time from which releases are projected.
