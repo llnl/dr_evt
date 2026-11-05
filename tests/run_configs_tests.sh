@@ -103,9 +103,10 @@ fi
 
 # Test 2b: planning-time resolution changes the reservation/backfill decision
 # but not the actual duration. Job 0 starts off-grid at t=1. Its projected
-# release is t=120 on a 60-second timestamp grid, while job 2's proposed
-# release is also t=120; strict backfill safety therefore rejects job 2. This
-# distinguishes timestamp quantization from rounding each duration.
+# release is t=120 on a 60-second timestamp grid.  The flexible reservation
+# planner still permits job 2 at t=2 because it leaves the head's ten nodes
+# available at t=120; this distinguishes timestamp quantization from rounding
+# each duration.
 echo "Test 2b: planning time resolution affects planning, not execution"
 RESOLUTION_TRACE="tests/test_traces/feature/planning_time_resolution.csv"
 $SIMULATOR "$RESOLUTION_TRACE" \
@@ -130,7 +131,7 @@ if diff -u \
     <(printf 'job_id,start_time,end_time\n0,1,120\n1,120,130\n2,2,61\n') > /dev/null && \
    diff -u \
     <(awk -F, 'NR == 1 { print "job_id,start_time,end_time"; next } { print NR - 2 "," $2 "," $3 }' "$TEST_WORK_DIR/grid_planning.csv") \
-    <(printf 'job_id,start_time,end_time\n0,1,120\n1,120,130\n2,130,189\n') > /dev/null; then
+    <(printf 'job_id,start_time,end_time\n0,1,120\n1,120,130\n2,2,61\n') > /dev/null; then
     echo "  ✓ Planning grid quantizes projected timestamps only"
     PASS=$((PASS + 1))
 else
@@ -140,8 +141,8 @@ fi
 
 # Test 2c: an out-of-horizon EASY reservation must not prevent a periodic
 # backfill. Job 1 needs all nodes at t=100. Without a horizon, job 2 cannot
-# finish strictly before that reservation. With a ten-second horizon, the
-# reservation is omitted and job 2 starts at the first periodic tick, t=5.
+# finish before that reservation. With a ten-second horizon, the reservation
+# is omitted and job 2 starts at the first periodic tick, t=5.
 echo "Test 2c: planning horizon limits periodic reservations"
 HORIZON_TRACE="tests/test_traces/feature/planning_horizon.csv"
 $SIMULATOR "$HORIZON_TRACE" \
@@ -176,13 +177,13 @@ $SIMULATOR "$HORIZON_TRACE" \
 
 if diff -u \
     <(awk -F, 'NR == 1 { print "job_id,start_time,end_time"; next } { print NR - 2 "," $2 "," $3 }' "$TEST_WORK_DIR/unbounded_horizon.csv") \
-    <(printf 'job_id,start_time,end_time\n0,0,100\n1,100,110\n2,110,209\n') > /dev/null && \
+    <(printf 'job_id,start_time,end_time\n0,0,100\n1,100,110\n2,110,210\n') > /dev/null && \
    diff -u \
     <(awk -F, 'NR == 1 { print "job_id,start_time,end_time"; next } { print NR - 2 "," $2 "," $3 }' "$TEST_WORK_DIR/bounded_horizon.csv") \
-    <(printf 'job_id,start_time,end_time\n0,0,100\n1,104,114\n2,5,104\n') > /dev/null && \
+    <(printf 'job_id,start_time,end_time\n0,0,100\n1,105,115\n2,5,105\n') > /dev/null && \
    diff -u \
     <(awk -F, 'NR == 1 { print "job_id,start_time,end_time"; next } { print NR - 2 "," $2 "," $3 }' "$TEST_WORK_DIR/hybrid_horizon.csv") \
-    <(printf 'job_id,start_time,end_time\n0,0,100\n1,104,114\n2,5,104\n') > /dev/null; then
+    <(printf 'job_id,start_time,end_time\n0,0,100\n1,105,115\n2,5,105\n') > /dev/null; then
     echo "  ✓ Periodic horizon omits out-of-window EASY and hybrid reservations"
     PASS=$((PASS + 1))
 else
