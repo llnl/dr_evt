@@ -71,8 +71,8 @@ Each item describes the code on this branch.
     its turn comes and it fits, without waiting for a tick. Backfill runs only
     at periodic ticks, and one tick is one backfill cycle. Ticks start one interval after the first
     event (or after the warm-start boundary) and keep their cadence; a tick
-    that passes while nothing is waiting does nothing. Periodic EASY runs as
-    hybrid with reservation depth 1.
+    that passes while nothing is waiting does nothing. Periodic EASY has its
+    own scheduler and protects only the FCFS head reservation.
 - **Queue depth.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
   caps how many waiting jobs, the head included, one backfill cycle examines
@@ -302,8 +302,7 @@ and depths to match the target narrows those differences.
   matches the Python EASY reference, as does the `fcfs_conservative` ordering,
   which uses the same schedulers. A depth of 1 equals no backfilling for FCFS,
   SJF, and LJF. Periodic EASY equals periodic hybrid with reservation depth 1
-  under the same depth, because it runs as that hybrid
-  (`tests/run_backfill_queue_depth_tests.sh`).
+  under the same depth (`tests/run_backfill_queue_depth_tests.sh`).
 - **Node release delay.** The 34 workloads with a constant delay match the
   Python reference (`tests/run_node_release_delay_tests.sh`).
 - **RAPS.** The [comparison helper](../../scripts/compare_with_raps.py) runs
