@@ -142,10 +142,10 @@ Reservation_Timeline SchedulerBase::reservation_timeline(
   const auto clamp = [](std::int64_t value) {
     return value > 0 ? static_cast<num_nodes_t>(value) : num_nodes_t{0};
   };
-  std::map<sim_time_t, num_nodes_t> profile;
-  auto profile_hint =
-      profile.emplace_hint(profile.end(), current_time, clamp(balance));
   std::sort(deltas.begin(), deltas.end());
+  std::vector<std::pair<sim_time_t, num_nodes_t>> profile;
+  profile.reserve(deltas.size() + 1);
+  profile.emplace_back(current_time, clamp(balance));
   for (size_t begin = 0; begin < deltas.size();) {
     const sim_time_t time = deltas[begin].first;
     std::int64_t delta = 0;
@@ -154,8 +154,7 @@ Reservation_Timeline SchedulerBase::reservation_timeline(
       ++begin;
     } while (begin < deltas.size() && deltas[begin].first == time);
     balance += delta;
-    profile_hint =
-        profile.emplace_hint(std::next(profile_hint), time, clamp(balance));
+    profile.emplace_back(time, clamp(balance));
   }
   return Reservation_Timeline(std::move(profile));
 }
