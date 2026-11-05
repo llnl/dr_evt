@@ -952,7 +952,8 @@ void test_reservations_follow_capacity_schedule() {
   // 100 nodes; A holds 50 until t=100. Capacity drops to 55 at t=50 and
   // returns to 100 at t=150. H (60 nodes) therefore fits only at t=150:
   // t=50 balance 50-45=5, t=100 +50=55 < 60, t=150 +45=100. C (40 nodes,
-  // 120 s) fits now and ends at 120 < 150, so it is backfilled at t=0.
+  // 120 s) cannot run through the future 55-node capacity reduction, so it
+  // remains queued until A finishes at t=100.
   {
     std::ofstream capacity(CAPACITY_OUTLOOK_INCREASE_PATH);
     capacity << "time,total_nodes\n"
@@ -974,14 +975,13 @@ void test_reservations_follow_capacity_schedule() {
     assert(statuses[1].state == Simulation::Job_State::PENDING);
     assert(statuses[1].expected_start_time.has_value());
     assert(approx_equal(*statuses[1].expected_start_time, 150.0));
-    assert(statuses[2].state == Simulation::Job_State::RUNNING);
-    assert(approx_equal(*statuses[2].start_time, 0.0));
+    assert(statuses[2].state == Simulation::Job_State::PENDING);
 
-    // The system is overcommitted between the drop at 50 and A's end at
-    // 100 (90 nodes on 55); H still starts exactly at the increase.
+    // No new job crosses the capacity reduction, and H still starts exactly
+    // at the increase.
     sim.advance_to(75.0);
     assert(sim.get_current_capacity() == 55);
-    assert(sim.get_nodes_in_use() == 90);
+    assert(sim.get_nodes_in_use() == 50);
     assert(approx_equal(sim.get_fcfs_head_shadow_time(), 150.0));
     sim.advance_to(std::numeric_limits<sim_time_t>::max());
     const auto final_status = sim.get_job_statuses({head}).front();
@@ -991,10 +991,10 @@ void test_reservations_follow_capacity_schedule() {
 
   // Capacity drops to 30 at t=10 and never recovers. H (60 nodes) can never
   // start: t=10 balance 50-70=-20, t=100 +50=30 < 60. The head holds no
-  // reservation, so C (20 nodes, 5 s) is backfilled (at once, or at the
-  // first 7 s tick in periodic mode) rather than refused against a
-  // reservation at "now". Draining with a job that can never start must end
-  // in both modes instead of looping on the max() sentinel.
+  // reservation, so C (20 nodes, 5 s) is held in both modes: an unavailable
+  // head start is not an unprotected backfill window.
+  // Draining with a job that can never start must end in both modes instead
+  // of looping on the max() sentinel.
   {
     std::ofstream capacity(CAPACITY_OUTLOOK_DROP_PATH);
     capacity << "time,total_nodes\n"
@@ -1017,11 +1017,10 @@ void test_reservations_follow_capacity_schedule() {
     assert(!statuses[0].expected_start_time.has_value());
     sim.advance_to(8.0);
     const auto started = sim.get_job_statuses({candidate}).front();
-    assert(started.start_time.has_value());
-    assert(approx_equal(*started.start_time, interval == 0.0 ? 0.0 : 7.0));
+    assert(!started.start_time.has_value());
     sim.advance_to(std::numeric_limits<sim_time_t>::max());
-    assert(sim.get_statistics().jobs_completed == 2);
-    assert(sim.get_active_job_count() == 1); // H still waits
+    assert(sim.get_statistics().jobs_completed == 1);
+    assert(sim.get_active_job_count() == 2);
     assert(sim.get_nodes_in_use() == 0);
     assert(approx_equal(sim.get_current_time(), 100.0)); // last real event
   }

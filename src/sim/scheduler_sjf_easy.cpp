@@ -113,11 +113,22 @@ SJFEasyScheduler::schedule(num_nodes_t free_nodes,
     return {}; // No valid reservation window
   }
 
-  tdiff_t backfill_window = reservation_time - current_time;
+#ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
+  const tdiff_t backfill_window = reservation_time - current_time;
+#endif
   // A head reserved beyond the planning horizon is not planned, so the
   // window does not constrain candidates (Slurm bf_window).
   const bool head_within_horizon =
       reservation_within_horizon(reservation_time, current_time);
+  const bool head_has_projection =
+      reservation_time != std::numeric_limits<sim_time_t>::max();
+  auto reservation_plan =
+      reservation_timeline(free_nodes, running_jobs, current_time);
+  if (head_within_horizon) {
+    reservation_plan.reserve(
+        reservation_time, head_nodes,
+        release_estimate(reservation_time, fcfs_head_it->second.run_time));
+  }
 
   // Scan in SJF order (shortest first) for backfill candidates. Every candidate
   // that qualifies is started in this one call, as in the index-based FCFS
@@ -147,9 +158,19 @@ SJFEasyScheduler::schedule(num_nodes_t free_nodes,
 
     // Check backfill constraints
     bool fits_nodes = (entry.nodes <= available_nodes);
-    bool fits_window =
-        !head_within_horizon ||
-        (release_estimate(current_time, entry.run_time) <= backfill_window);
+#ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
+    const bool fits_window =
+        head_has_projection &&
+        (!head_within_horizon ||
+         release_estimate(current_time, entry.run_time) <= backfill_window);
+#else
+    const bool fits_window =
+        head_has_projection &&
+        (!head_within_horizon ||
+         reservation_plan.can_fit(
+             current_time, entry.nodes,
+             release_estimate(current_time, entry.run_time)));
+#endif
 
     // EASY must fit both nodes and window. CONSERVATIVE uses the same test
     // here (conservative approximation).
@@ -159,6 +180,11 @@ SJFEasyScheduler::schedule(num_nodes_t free_nodes,
       // Copy out what's needed before erasing invalidates entry.
       const job_no_t id = entry.job_id;
       available_nodes -= entry.nodes;
+      if (head_within_horizon) {
+        reservation_plan.reserve(
+            current_time, entry.nodes,
+            release_estimate(current_time, entry.run_time));
+      }
       m_eligible_jobs.erase(id);
       it = m_wait_queue.erase(it);
       started.push_back(id);

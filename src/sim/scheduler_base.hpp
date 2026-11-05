@@ -21,8 +21,8 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace dr_evt {
 
@@ -91,6 +91,12 @@ public:
     }
   }
 
+  /** Whether this exact interval can be added without changing the plan. */
+  bool can_fit(sim_time_t start, num_nodes_t nodes, tdiff_t duration) const {
+    const auto fit = earliest_fit(nodes, duration, start);
+    return fit && *fit == start;
+  }
+
   /** Reserve nodes over [start, start + duration). */
   void reserve(sim_time_t start, num_nodes_t nodes, tdiff_t duration) {
     if (duration <= 0) {
@@ -99,8 +105,8 @@ public:
     split_at(start);
     split_at(start + duration);
     for (auto segment = m_free_nodes.find(start);
-         segment != m_free_nodes.end() &&
-         segment->first < start + duration; ++segment) {
+         segment != m_free_nodes.end() && segment->first < start + duration;
+         ++segment) {
       segment->second -= nodes;
     }
     const auto coalesce = [this](sim_time_t time) {
@@ -201,6 +207,9 @@ public:
    */
   bool reservation_within_horizon(sim_time_t reservation_time,
                                   sim_time_t current_time) const {
+    if (reservation_time == std::numeric_limits<sim_time_t>::max()) {
+      return false;
+    }
     return static_cast<tdiff_t>(reservation_time - current_time) <=
            m_planning_horizon;
   }
@@ -469,9 +478,9 @@ protected:
                                         sim_time_t current_time);
 
   /** Build the free-node profile shared by reservation searches. */
-  Reservation_Timeline reservation_timeline(
-      num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-      sim_time_t current_time) const;
+  Reservation_Timeline reservation_timeline(num_nodes_t free_nodes,
+                                            const running_jobs_t &running_jobs,
+                                            sim_time_t current_time) const;
 };
 
 /**

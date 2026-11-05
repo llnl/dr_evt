@@ -137,17 +137,51 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(m_fcfs_reservation_time, current_time)
           ? m_fcfs_reservation_time
           : std::numeric_limits<sim_time_t>::max();
+  auto reservation_plan = reservation_timeline(
+      available_nodes, effective_running_jobs, current_time);
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  if (planned_reservation != std::numeric_limits<sim_time_t>::max()) {
+    reservation_plan.reserve(
+        planned_reservation, head_nodes,
+        release_estimate(planned_reservation, head_run_time));
+  }
+#endif
 
   if (m_backfill_queue_depth != 0) {
     // Values are passed and the result returned, so no local escapes and the
     // default search loop below compiles as it did before.
-    return backfill_with_queue_depth(planned_reservation !=
-                                         std::numeric_limits<sim_time_t>::max(),
-                                     planned_reservation, current_time,
-                                     available_nodes, std::move(jobs_to_run));
+    return backfill_with_queue_depth(
+        planned_reservation != std::numeric_limits<sim_time_t>::max(),
+        planned_reservation, current_time, std::move(reservation_plan),
+        available_nodes, std::move(jobs_to_run));
   }
 
   // Step 3: Backfill
+#ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
+  for (size_t i = 0; i < m_eligible_end_idx && available_nodes > 0; ++i) {
+    if (m_job_order[i].removed || m_job_order[i].job_id == fcfs_head)
+      continue;
+    tdiff_t backfill_run_time = 0.0;
+    num_nodes_t backfill_nodes = 0;
+    if (!m_wait_queue.get_job_info(m_job_order[i].job_id, backfill_run_time,
+                                   backfill_nodes) ||
+        backfill_nodes > available_nodes ||
+        !reservation_plan.can_fit(
+            current_time, backfill_nodes,
+            release_estimate(current_time, backfill_run_time)))
+      continue;
+    const job_no_t bf_job = m_job_order[i].job_id;
+    jobs_to_run.push_back(bf_job);
+    available_nodes -= backfill_nodes;
+    reservation_plan.reserve(current_time, backfill_nodes,
+                             release_estimate(current_time, backfill_run_time));
+    effective_running_jobs[bf_job] = {current_time, backfill_run_time,
+                                      backfill_nodes};
+    m_wait_queue.remove(bf_job);
+    m_job_order[i].removed = true;
+    ++m_removed_count;
+  }
+#else
   while (available_nodes > 0) {
     tdiff_t backfill_run_time = 0.0;
     num_nodes_t backfill_nodes = 0;
@@ -174,6 +208,7 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       }
     }
   }
+#endif
 
   return jobs_to_run;
 }

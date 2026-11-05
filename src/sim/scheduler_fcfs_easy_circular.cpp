@@ -110,6 +110,16 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
   // planned: candidates are not tested against it (Slurm bf_window).
   const bool head_within_horizon =
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
+  const bool head_has_projection =
+      m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
+  auto reservation_plan = reservation_timeline(
+      available_nodes, effective_running_jobs, current_time);
+  if (head_within_horizon) {
+    reservation_plan.reserve(
+        m_fcfs_reservation_time, m_wait_queue.front().nodes_requested,
+        release_estimate(m_fcfs_reservation_time,
+                         m_wait_queue.front().run_time_estimate));
+  }
 
   // Preserve the head-reservation snapshot, then avoid a scan that cannot
   // start a backfill job without free nodes.
@@ -135,13 +145,29 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
     // IMPORTANT: strict < (not <=) - see FCFSEasyDequeScheduler::schedule()
     // for why. Backfill jobs must complete BEFORE the reservation
     // time, not at it.
-    if (!head_within_horizon ||
-        current_time + release_estimate(current_time, job.run_time_estimate) <
-            m_fcfs_reservation_time) {
+    const tdiff_t duration =
+        release_estimate(current_time, job.run_time_estimate);
+#ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
+    const bool preserves_reservations =
+        head_has_projection &&
+        (!head_within_horizon ||
+         current_time + duration < m_fcfs_reservation_time);
+#else
+    const bool preserves_reservations =
+        head_has_projection &&
+        (!head_within_horizon ||
+         reservation_plan.can_fit(current_time, job.nodes_requested, duration));
+#endif
+    if (preserves_reservations) {
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
       m_wait_queue[i].removed = true;
       ++m_removed_count;
+      if (head_within_horizon) {
+        reservation_plan.reserve(current_time, job.nodes_requested, duration);
+      }
+      effective_running_jobs[job.job_id] = {current_time, duration,
+                                            job.nodes_requested};
 
       if (available_nodes == 0)
         break;
