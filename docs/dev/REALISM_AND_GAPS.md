@@ -71,8 +71,7 @@ Each item describes the code on this branch.
     its turn comes and it fits, without waiting for a tick. Backfill runs only
     at periodic ticks, and one tick is one backfill cycle. Ticks start one interval after the first
     event (or after the warm-start boundary) and keep their cadence; a tick
-    that passes while nothing is waiting does nothing. Periodic EASY has its
-    own scheduler and protects only the FCFS head reservation.
+    that passes while nothing is waiting does nothing.
 - **Queue depth.**
   [`--backfill_queue_depth`](../user-guide/command-line.md#--backfill_queue_depth-n)
   caps how many waiting jobs, the head included, one backfill cycle examines
