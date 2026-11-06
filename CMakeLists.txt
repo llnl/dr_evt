@@ -899,6 +899,13 @@ if(DR_EVT_WITH_UNIT_TESTING)
     COMMAND /bin/bash
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_node_release_delay_tests.sh
       $<TARGET_FILE:sim-bin>)
+  if(Python3_Interpreter_FOUND)
+    add_test(
+      NAME test_unified_periodic_dispatch
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_unified_dispatch_tests.py
+        $<TARGET_FILE:sim-bin>)
+  endif()
   add_test(
     NAME test_periodic_backfill_reference
     COMMAND /bin/bash

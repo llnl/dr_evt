@@ -211,6 +211,10 @@ resumed.load_checkpoint("simulation.ckpt");
 resumed.advance_to(1000.0);
 ```
 
+Checkpoints record both periodic controls and the next tick deadline. Unified
+periodic dispatch uses checkpoint format 17; checkpoints written by the prior
+format 16 must be regenerated with this build.
+
 The checkpoint includes resident job records, appended-job status history,
 scheduler queue state, running jobs, pending events, capacity and statistics
 accounting, resource history, and the random-number generator. If incremental

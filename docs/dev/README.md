@@ -11,6 +11,8 @@ maintainer-facing build guidance. It is separate from the user documentation.
   through the job store, scheduler, event loop, resource accounting, and output.
 - [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md) — FCFS and
   backfill basics, production trigger categories, and current option mappings.
+- [Fluxion Validation Plan](FLUX_VALIDATION_PLAN.md) — Small paired workloads,
+  emulator synchronization prerequisites, and comparison criteria.
 - [Realism and Known Gaps](REALISM_AND_GAPS.md) — Confirmed differences in
   triggers and backfill evaluation budgets, excluded scope, and validation limits.
 - [Performance Analysis](PERFORMANCE_ANALYSIS.md) — Linux `perf` breakdown of

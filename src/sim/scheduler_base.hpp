@@ -618,6 +618,10 @@ protected:
  * evaluations; zero retains event-driven evaluation only. The planning
  * horizon is not a construction parameter; set it with
  * SchedulerBase::set_planning_horizon().
+ * @param[in] dispatch_interval Unified FCFS/backfill tick interval; zero
+ * disables. Mutually exclusive with positive backfill_interval.
+ * @param[in] dispatch_queue_depth Entire candidate prefix per unified tick,
+ * including FCFS starts; zero is unlimited. Requires dispatch_interval > 0.
  * @return Owning pointer to a SchedulerBase implementation.
  * @throws std::invalid_argument if HYBRID is requested with a zero depth or
  * with a non-FCFS priority policy.
@@ -629,7 +633,8 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     size_t block_size = 128, size_t wait_queue_capacity = 0,
     CircularOverflowPolicy wait_queue_overflow = CircularOverflowPolicy::GROW,
     size_t reservation_depth = 0, size_t backfill_queue_depth = 0,
-    tdiff_t backfill_interval = 0.0);
+    tdiff_t backfill_interval = 0.0, tdiff_t dispatch_interval = 0.0,
+    size_t dispatch_queue_depth = 0);
 
 /**@}*/
 

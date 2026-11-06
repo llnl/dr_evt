@@ -16,23 +16,21 @@ separate limit on the number of protected waiting jobs.
 `--backfill_interval` delays backfill only. Fitting queue-head jobs still
 start after state events and do not consume `--backfill_queue_depth`.
 
-That split approximates Slurm's main-dispatch/backfill structure. It does
-not reproduce Spur's single placement pass, where immediate starts and
-future reservations share the candidate-prefix limit. For example, with
-four idle nodes and four admitted one-node jobs, Spur's placement limit of
-2 selects at most two in one real placement pass; DR_EVT's ordinary FCFS
-pass can start all four even with backfill queue depth 2.
+That split approximates Slurm's main-dispatch/backfill structure. Unified
+fixed-periodic dispatch is available separately through `--dispatch_interval`
+and `--dispatch_queue_depth`: immediate starts and waiting candidates share
+one examined prefix per tick. With four idle nodes and four admitted one-node
+jobs, depth 2 starts at most two at one tick. The next tick can start the rest
+without a new arrival or completion.
 
-LSF's minimum interval applies to scheduling sessions. DR_EVT has no option
-to delay both dispatch and backfill until the next permitted session.
-For example, after an LSF session at 0 s with a 5-second minimum interval,
-a fitting arrival at 2.3 s must wait for a permitted session; DR_EVT can
-start the head at 2.3 s. The available IBM evidence does not establish that
-LSF's job-decision limit equals DR_EVT's queue depth.
-
-These differences matter when the study depends on whole-scheduler timing
-or an evaluation limit covering immediate starts. Changing only the backfill interval
-or depth cannot remove them.
+This covers fixed periodic timing and candidate-prefix accounting. Spur's
+inspected controller also dispatches on notifications, including submissions;
+DR_EVT's unified mode waits for ticks. For LSF, this represents timing under
+the assumption that sessions occur at every aligned interval boundary while
+jobs wait, without additional delay. LSF's minimum interval alone does not
+guarantee that cadence; variable session timing and Spur notification wakes
+remain unimplemented. The available IBM evidence also does not establish
+that LSF's job-decision limit equals DR_EVT's candidate count.
 
 ### Backfill evaluation accounting
 
@@ -54,11 +52,13 @@ placement testing. Event-driven hybrid/conservative exempts them but leaves them
 than reproducing Fluxion's blocked-list lifecycle. These distinctions matter
 for finite Q when skipped jobs occur ahead of runnable candidates.
 
-The current periodic scheduling-state flag is cleared by an evaluation and
+In the separate `--backfill_interval` mode, the scheduling-state flag is cleared by an evaluation and
 is not set just because backfill started a job. Consequently, a later tick
 without an intervening state event does not necessarily examine candidates
 exposed by that start. This is a limitation for reproducing a controller
-that evaluates its new queue prefix every cycle.
+that evaluates its new queue prefix every cycle. The unified
+`--dispatch_interval` mode retries every tick and does not use this flag to
+suppress evaluations.
 
 ## Out of scope
 

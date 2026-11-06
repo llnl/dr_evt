@@ -785,7 +785,7 @@ public:
       // In periodic mode a backfill tick is an event too, but only while a
       // job is waiting for a backfill decision (advance_to() applies the same
       // rule); otherwise the tick is skipped and the cadence kept.
-      if (m_params.m_backfill_interval > 0.0 &&
+      if (m_params.scheduling_interval() > 0.0 &&
           m_scheduler->active_job_count() > 0) {
         align_backfill_tick();
         next = std::min(next, m_next_backfill_evaluation);

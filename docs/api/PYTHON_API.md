@@ -64,6 +64,8 @@ or `None`.
 | `num_max_candidates` | `int` |
 | `reservation_depth` | `int` |
 | `backfill_queue_depth` | `int`; waiting jobs examined per backfill pass (0 is unlimited) |
+| `dispatch_interval` | `float`; fixed ticks gate both FCFS and backfill (0 disables) |
+| `dispatch_queue_depth` | `int`; full candidate prefix per unified tick, including immediate starts (0 is unlimited) |
 | `backfill_interval` | `float`; seconds between periodic backfill passes (0 backfills at every event) |
 | `planning_time_resolution` | `float`; grid planned run times are rounded up to (0 is exact) |
 | `planning_horizon` | `float`; reservation look-ahead of event-driven and periodic backfill (default unlimited) |
@@ -73,9 +75,9 @@ or `None`.
 | `node_release_delay_spread` | `float`; `UNIFORM` half-width |
 | `verbose` | `bool` |
 
-The four scheduling attributes after `reservation_depth` mirror the
-`--backfill_queue_depth`, `--backfill_interval`,
-`--planning_time_resolution`, and `--planning_horizon` command-line options
+The scheduling attributes mirror the
+`--backfill_queue_depth`, `--backfill_interval`, `--dispatch_interval`,
+`--dispatch_queue_depth`, `--planning_time_resolution`, and `--planning_horizon` command-line options
 described in [Command-Line Options](../user-guide/command-line.md). A positive
 `backfill_interval` keeps FCFS dispatch event-driven and runs backfill only at
 ticks; it needs an enabled `backfill_policy` and FCFS ordering, and the

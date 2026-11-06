@@ -2023,6 +2023,130 @@ void test_fractional_streaming_limits_validate_stored_value() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// Fixed ticks gate FCFS as well as backfill; Q is shared by all starts.
+void test_unified_periodic_dispatch() {
+  std::cout << "\n=== Unified periodic dispatch ===" << std::endl;
+  for (const auto policy : {BackfillPolicy::NONE, BackfillPolicy::EASY,
+                            BackfillPolicy::HYBRID, BackfillPolicy::CONSERVATIVE}) {
+    auto params = make_params();
+    params.m_total_nodes = 4;
+    params.m_dispatch_interval = 5;
+    params.m_dispatch_queue_depth = 2;
+    params.m_backfill_policy = policy;
+    params.m_reservation_depth = 1;
+    Simulation sim(params);
+    const auto ids = sim.append_jobs({{0, 1, kTestQueueInput, 20},
+                                      {0, 1, kTestQueueInput, 20},
+                                      {0, 1, kTestQueueInput, 20},
+                                      {0, 1, kTestQueueInput, 20}});
+    sim.advance_to(4.9);
+    assert(sim.get_statistics().jobs_started == 0);
+    sim.run_until_exclusive(5);
+    assert(sim.get_statistics().jobs_started == 0);
+    sim.advance_to(5);
+    assert(sim.get_statistics().jobs_started == 2);
+#if defined(DR_EVT_HAS_SER20)
+    const auto predictions = sim.get_exact_job_start_times({ids[2], ids[3]});
+    assert(predictions[0].start_time == 10);
+    assert(predictions[1].start_time == 10);
+    assert(sim.get_statistics().jobs_started == 2);
+#endif
+    // Repeated calls at the same clock cannot consume another prefix.
+    sim.advance_to(5);
+    assert(sim.get_statistics().jobs_started == 2);
+    sim.advance_to(10);
+    assert(sim.get_statistics().jobs_started == 4);
+    const auto statuses = sim.get_job_statuses(ids);
+    assert(statuses[0].start_time == 5);
+    assert(statuses[1].start_time == 5);
+    assert(statuses[2].start_time == 10);
+    assert(statuses[3].start_time == 10);
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
+    assert(sim.get_statistics().jobs_completed == 4);
+    assert(sim.get_nodes_in_use() == 0);
+  }
+
+  // Events between ticks update state without dispatch; events on ticks are
+  // visible to the single scan. Idle time must preserve the tick phase.
+  auto params = make_params();
+  params.m_total_nodes = 1;
+  params.m_backfill_policy = BackfillPolicy::NONE;
+  params.m_dispatch_interval = 5;
+  Simulation sim(params);
+  const auto first = sim.append_job(2.3, 1, kTestQueueInput, 2);
+  sim.advance_to(5);
+  assert(sim.get_job_statuses({first})[0].start_time == 5);
+  sim.advance_to(7);
+  assert(sim.get_nodes_in_use() == 0);
+  const auto second = sim.append_job(7, 1, kTestQueueInput, 5);
+  sim.advance_to(9.9);
+  assert(sim.get_statistics().jobs_started == 1);
+  sim.advance_to(10);
+  assert(sim.get_job_statuses({second})[0].start_time == 10);
+  const auto third = sim.append_job(15, 1, kTestQueueInput, 1);
+  sim.advance_to(15);
+  assert(sim.get_job_statuses({third})[0].start_time == 15);
+  sim.advance_to(100);
+  const auto fourth = sim.append_job(100, 1, kTestQueueInput, 1);
+  sim.advance_to(100);
+  assert(sim.get_job_statuses({fourth})[0].start_time == 100);
+  std::cout << "  PASSED" << std::endl;
+}
+
+void test_unified_periodic_backfill() {
+  std::cout << "\n=== Unified periodic reservation depth ===" << std::endl;
+  for (size_t depth : {size_t{1}, size_t{2}}) {
+    auto params = make_params();
+    params.m_total_nodes = 4;
+    params.m_dispatch_interval = 5;
+    params.m_dispatch_queue_depth = 3;
+    params.m_backfill_policy = BackfillPolicy::HYBRID;
+    params.m_reservation_depth = depth;
+    Simulation sim(params);
+    const auto running = sim.append_job(0, 3, kTestQueueInput, 120);
+    sim.advance_to(5);
+    assert(sim.get_job_statuses({running})[0].start_time == 5);
+    const auto ids = sim.append_jobs({{5, 2, kTestQueueInput, 20},
+                                      {5, 4, kTestQueueInput, 100},
+                                      {5, 1, kTestQueueInput, 200}});
+    sim.advance_to(10);
+    auto statuses = sim.get_job_statuses(ids);
+    assert(!statuses[0].start_time.has_value());
+    assert(!statuses[1].start_time.has_value());
+    if (depth == 1) {
+      assert(statuses[2].start_time == 10);
+    } else {
+      assert(!statuses[2].start_time.has_value());
+    }
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
+    statuses = sim.get_job_statuses(ids);
+    assert(statuses[0].start_time == 125);
+    assert(statuses[1].start_time == (depth == 1 ? 210 : 145));
+    assert(statuses[2].start_time == (depth == 1 ? 10 : 245));
+  }
+
+  // Head beyond H consumes one of the two candidate slots. The next tick
+  // retries a fresh prefix, allowing the third candidate without a state event.
+  auto params = make_params();
+  params.m_total_nodes = 5;
+  params.m_dispatch_interval = 5;
+  params.m_dispatch_queue_depth = 2;
+  params.m_planning_horizon = 0;
+  params.m_backfill_policy = BackfillPolicy::EASY;
+  Simulation sim(params);
+  sim.append_job(0, 3, kTestQueueInput, 120);
+  sim.advance_to(5);
+  const auto ids = sim.append_jobs({{5, 3, kTestQueueInput, 20},
+                                    {5, 1, kTestQueueInput, 20},
+                                    {5, 1, kTestQueueInput, 20}});
+  sim.advance_to(10);
+  assert(sim.get_job_statuses({ids[1]})[0].start_time == 10);
+  assert(!sim.get_job_statuses({ids[2]})[0].start_time.has_value());
+  sim.advance_to(15);
+  assert(sim.get_job_statuses({ids[2]})[0].start_time == 15);
+  std::cout << "  PASSED" << std::endl;
+}
+
 int main() {
   std::cout << "====================================" << std::endl;
   std::cout << "Append-Job Test Suite" << std::endl;
@@ -2068,6 +2192,8 @@ int main() {
     test_periodic_backfill_idle_ticks();
     test_periodic_backfill_run_until_exclusive();
     test_periodic_easy_scheduler_selection();
+    test_unified_periodic_dispatch();
+    test_unified_periodic_backfill();
     test_append_with_known_actual_runtime();
     test_fractional_streaming_limits_validate_stored_value();
 

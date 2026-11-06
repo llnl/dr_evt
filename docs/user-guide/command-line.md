@@ -21,6 +21,8 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
+| Scheduling | `--dispatch_interval SECONDS` | Run FCFS and backfill only at fixed periodic ticks. |
+| Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per unified tick. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
 | Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
@@ -291,14 +293,65 @@ reservations must be protected.
 
 **Default:** `0` (unlimited)
 
+### `--dispatch_interval SECONDS` and `--dispatch_queue_depth COUNT`
+
+Use `--dispatch_interval` to run FCFS and backfill together only at fixed
+periodic ticks. Arrivals, completions, node releases, and capacity changes
+update state at their exact times; they do not launch jobs between ticks.
+At a tick, process all same-time events first, then examine the waiting queue
+once. A later tick tries again even without a new state event.
+
+Ticks are anchored to the simulation clock when the loop is initialized
+(normally 0, or the warm-start boundary), with the first tick one interval
+later. Idle periods skip unused ticks while preserving the cadence. For a
+5-second interval anchored at 0, an arrival at 2.3 starts no earlier than 5;
+a completion at 7 makes nodes available immediately, but the next dispatch
+is at 10. A fitting arrival exactly at 10 may start at 10.
+
+`--dispatch_queue_depth` limits the full eligible candidate prefix at each
+tick. Immediate FCFS starts, blocked jobs, and candidates beyond the planning
+horizon all count. Removed entries do not count. Zero means unlimited. The
+next tick starts from the current queue head, with a fresh limit. Reservation
+depth separately controls how many examined waiting jobs receive protection;
+EASY protects one, hybrid uses `--reservation_depth`, and conservative protects
+all planned earlier waiting jobs in the examined prefix.
+
+Requires a circular queue and `fcfs` or `fcfs_conservative` ordering. Supports
+`none`, `easy`, `hybrid`, and `conservative` backfill policies. A positive
+`--dispatch_interval` cannot be combined with a positive `--backfill_interval`
+or a nonzero `--backfill_queue_depth`; use `--dispatch_queue_depth` for the
+unified cycle. A nonzero dispatch queue depth requires a positive dispatch
+interval. Custom selectors are unsupported. Interval zero preserves existing
+scheduling behavior.
+
+```bash
+simulator jobs.csv --total_nodes 4 --queue_impl circular \
+    --dispatch_interval 5 --dispatch_queue_depth 2 \
+    --backfill_policy hybrid --reservation_depth 1
+```
+
+The cheap pending-job status projection does not include this cadence or
+candidate limit; exact lookahead follows the live loop. See
+[Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md).
+
+For LSF timing studies, this fixed periodic model is representative under the
+earliest-permitted-session assumption: sessions occur at every interval
+boundary while jobs wait, their phase aligns with DR_EVT's ticks, and there
+is no additional session delay. Set `--dispatch_interval` to that assumed
+session interval. LSF's minimum interval alone does not guarantee this cadence.
+Queue-depth accounting and reservation policy still need separate matching.
+
+Spur's inspected implementation also wakes on scheduler notifications,
+including submissions; this mode represents its timer path only.
+
 ### `--backfill_interval SECONDS`
 
 Uses periodic EASY, conservative, or hybrid backfill while retaining
 event-driven FCFS dispatch. It is intended for Slurm-style trigger studies and
 uses the opt-in circular scheduler; it requires an enabled
 `--backfill_policy` and `--queue_impl circular`. `0` retains the default
-event-driven backfill behavior. Ticks start one interval after the first
-event, or after the `--sim_start_time` boundary in a warm start, and keep that
+event-driven backfill behavior. Ticks start one interval after loop initialization (normally
+time 0), or after the `--sim_start_time` boundary in a warm start, and keep that
 cadence whether or not a job is waiting; a tick that passes while nothing waits
 does nothing. Progressive loading (`--infile_list`) keeps the cadence across
 file boundaries.

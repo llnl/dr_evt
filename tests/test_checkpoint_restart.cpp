@@ -340,12 +340,17 @@ void test_custom_scheduler_continuation(size_t queue_depth) {
  * arrival, so the pass at the boundary leaves the dirty flag cleared. A
  * restore that did not carry the flag would re-save a different checkpoint.
  */
-void test_periodic_backfill_continuation() {
+void test_periodic_backfill_continuation(bool unified_dispatch = false) {
   auto params = make_params();
   params.m_queue_impl = QueueImplementation::CIRCULAR;
   params.m_backfill_policy = BackfillPolicy::HYBRID;
   params.m_reservation_depth = 1;
-  params.m_backfill_interval = 4;
+  if (unified_dispatch) {
+    params.m_dispatch_interval = 4;
+    params.m_dispatch_queue_depth = 3;
+  } else {
+    params.m_backfill_interval = 4;
+  }
 
   Simulation uninterrupted(params);
   populate_checkpoint_workload(uninterrupted);
@@ -816,6 +821,7 @@ int main() {
   test_custom_scheduler_continuation(0);
   test_custom_scheduler_continuation(2);
   test_periodic_backfill_continuation();
+  test_periodic_backfill_continuation(true);
   test_output_continuation();
   test_progressive_output_continuation();
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)

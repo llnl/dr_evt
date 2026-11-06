@@ -17,6 +17,7 @@
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
 #include "sim/scheduler_fcfs_hybrid_deque.hpp"
 #include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
+#include "sim/scheduler_fcfs_unified_circular.hpp"
 #include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include "sim/scheduler_ljf_easy.hpp"
 #include "sim/scheduler_sjf_easy.hpp"
@@ -204,7 +205,35 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  size_t wait_queue_capacity,
                  CircularOverflowPolicy wait_queue_overflow,
                  size_t reservation_depth, size_t backfill_queue_depth,
-                 tdiff_t backfill_interval) {
+                 tdiff_t backfill_interval, tdiff_t dispatch_interval,
+                 size_t dispatch_queue_depth) {
+  if (!std::isfinite(dispatch_interval) || dispatch_interval < 0.0) {
+    throw std::invalid_argument("dispatch_interval must be finite and nonnegative");
+  }
+  if (dispatch_interval > 0.0) {
+    if (backfill_interval != 0.0) {
+      throw std::invalid_argument("dispatch_interval and backfill_interval are mutually exclusive");
+    }
+    if (priority_policy != PriorityPolicy::FCFS &&
+        priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) {
+      throw std::invalid_argument("unified periodic dispatch requires FCFS ordering");
+    }
+    if (queue_impl != QueueImplementation::CIRCULAR) {
+      throw std::invalid_argument("unified periodic dispatch requires queue_impl=circular");
+    }
+    if (backfill_queue_depth != 0) {
+      throw std::invalid_argument("use dispatch_queue_depth instead of backfill_queue_depth for unified dispatch");
+    }
+    if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
+      throw std::invalid_argument("hybrid backfilling requires reservation_depth > 0");
+    }
+    return std::make_unique<FCFSUnifiedCircularScheduler>(
+        total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
+        wait_queue_overflow, reservation_depth, dispatch_queue_depth);
+  }
+  if (dispatch_queue_depth != 0) {
+    throw std::invalid_argument("dispatch_queue_depth requires dispatch_interval > 0");
+  }
   if (!std::isfinite(backfill_interval) || backfill_interval < 0.0) {
     throw std::invalid_argument(
         "backfill_interval must be finite and nonnegative");
