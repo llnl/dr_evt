@@ -78,6 +78,10 @@ suppress evaluations.
 
 ### PBS timing and cycle limits
 
+OpenPBS has both a candidate cap (`max_job_check`) and a computation-time
+limit (`sched_cycle_length`). The default `max_job_check=ALL_JOBS` removes the
+count cap, but the time limit can still truncate a cycle.
+
 DR_EVT can approximate `sched_cycle_length` with queue depth Q equal to an
 assumed evaluation throughput (candidates/second) times the cycle limit,
 rounded down to at least one and capped by any explicit `max_job_check`.
@@ -86,11 +90,21 @@ planning, without modeling scheduler CPU time.
 
 The [event-driven PBS approximation](SCHEDULER_LOOPS.md#openpbs-unified-event-driven-scheduling)
 omits `scheduler_iteration` fallback cycles, assuming studied cycles are not
-truncated by Q and time alone does not change eligibility. Independently of
-failure recovery, PBS's fallback can retry candidates left by a truncated cycle;
-its deadline moves with scheduling requests. DR_EVT's event-driven Q limits
-backfill examinations, while unified dispatch counts all candidates with an
-assumed aligned cadence; neither reproduces both PBS semantics together.
+truncated by Q and time alone does not change eligibility. Modeling the fallback
+is meaningful when a count cap or timeout leaves runnable candidates unexamined,
+or when time alone changes eligibility: another cycle can change starts without
+an arrival, resource release, failure, or inconsistent state. For example, with
+four idle nodes, four runnable jobs, and Q=1, a fallback cycle can start a second
+job before the first completes. If examination is effectively unlimited and
+time alone changes nothing, the fallback repeats the same decisions.
+
+Unified fixed-periodic dispatch already retries with a fresh candidate count,
+but PBS also schedules on arrivals and resource releases and resets its relative
+fallback deadline when the server attempts scheduling requests. DR_EVT's
+event-driven Q limits backfill examinations; unified dispatch counts all
+candidates with aligned ticks and optional arrival wakes. Combining PBS's
+event triggers, relative fallback, and full-candidate cap remains future work
+for studies where these differences affect starts.
 
 ### LSF admission on reserved slots
 

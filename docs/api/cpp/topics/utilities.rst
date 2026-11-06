@@ -4,7 +4,7 @@ Utilities API
 This category includes random-number generation, seed construction,
 available-memory queries, monotonic timing, and path helpers.
 
-.. only:: doxygen
+.. if-doxygen::
 
    Random-number generation
    ------------------------

@@ -4,6 +4,7 @@ import os
 import sys
 
 _docs_dir = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(_docs_dir, '_ext'))
 _doxygen_xml = os.path.join(_docs_dir, 'doxygen', 'xml')
 _has_doxygen_xml = os.path.isfile(os.path.join(_doxygen_xml, 'index.xml'))
 
@@ -20,6 +21,7 @@ html_short_title = 'DR_EVT'
 
 # General configuration
 extensions = [
+    'optional_doxygen',
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
@@ -75,6 +77,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'dev/wip-notes/*',  # Exclude development session notes
+    'dev/FLUX_VALIDATION_PLAN.md',  # Local, untracked validation notes
 ]
 
 # Source file suffix

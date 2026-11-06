@@ -12,7 +12,8 @@ and first-run instructions.
 
 ## Build locally
 
-Create an isolated environment and install the documentation dependencies:
+Use Python 3.11 or newer with the supported Sphinx 8.x and Breathe 5.1+
+toolchain. Create an isolated environment and install the dependencies:
 
 ```bash
 python3 -m venv .venv-docs
@@ -25,6 +26,11 @@ The HTML output is written to `docs/_build/html`. If Doxygen is available,
 the build also generates the C++ Development API Reference; otherwise that optional
 portion is skipped.
 
+Environments created with an older Python cannot install the supported
+toolchain. Recreate or upgrade the documentation environment before installing
+`docs/requirements.txt`; older Sphinx/Breathe versions can emit duplicate
+declaration and namespace-target warnings.
+
 Read the Docs deployment configuration is documented in
 [ReadTheDocs Setup](dev/READTHEDOCS_SETUP.md).
 
@@ -36,3 +42,6 @@ Read the Docs deployment configuration is documented in
   other pages.
 - Keep examples runnable and update tests that validate documented commands.
 - Add new pages to the appropriate toctree in [`index.md`](index.md).
+- Wrap Breathe directives and navigation to generated source pages in
+  `if-doxygen` blocks. Unlike Sphinx's `only` directive, these skip parsing when
+  Doxygen XML is absent, so documentation-only builds remain valid.

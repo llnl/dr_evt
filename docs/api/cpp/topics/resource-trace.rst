@@ -4,7 +4,7 @@ Resource Trace API
 ``Trace`` records finalized resource-history samples and writes resource-trace
 output. Resource history is a separate circular buffer from the job store.
 
-.. only:: doxygen
+.. if-doxygen::
 
    ``Trace`` is the standard-policy alias
    ``BasicTrace<Standard_Trace_Policy>``.

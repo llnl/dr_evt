@@ -4,7 +4,7 @@ Input Options and Configuration API
 ``Sim_Params``, ``Trace_Params``, command-line parsing, and protobuf adapters
 define simulation input options and file-based configuration.
 
-.. only:: doxygen
+.. if-doxygen::
 
    .. doxygengroup:: dr_evt_params
       :project: dr_evt

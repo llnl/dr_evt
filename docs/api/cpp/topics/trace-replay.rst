@@ -4,7 +4,7 @@ Trace Parsing and Replay API
 Trace parsing, timestamp conversion, input columns, ``DR_Event``, and replay
 handling are provided by the trace subsystem.
 
-.. only:: doxygen
+.. if-doxygen::
 
    ``Trace`` is the standard-policy alias
    ``BasicTrace<Standard_Trace_Policy>``.
