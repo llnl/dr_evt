@@ -1226,7 +1226,7 @@ install(
 install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/src/sim"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN "*.tpp")
 install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/src/utils"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
@@ -1234,6 +1234,7 @@ install(
 install(
   FILES "${PROJECT_BINARY_DIR}/dr_evt_config.hpp"
         "${PROJECT_SOURCE_DIR}/src/dr_evt_types.hpp"
+        "${PROJECT_SOURCE_DIR}/src/common.hpp"
         "${PROJECT_SOURCE_DIR}/src/boost.hpp"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 

@@ -180,6 +180,22 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
                          [initial, initial + 12] + list(range(small_start, small_start + 8))
                          + [30, 30], *options)
 
+    # Large conservative prefixes exercise the search-bound planner. None of
+    # the two-node borrowers fits the lone idle node before the head starts.
+    for notified in (False, True):
+        for horizon in (None, "30"):
+            initial = 0 if notified else 1
+            options = ["--dispatch_interval", "1", "--dispatch_queue_depth", "256",
+                       "--backfill_policy", "conservative"]
+            if notified:
+                options.append("--dispatch_on_events")
+            if horizon is not None:
+                options.extend(["--planning_horizon", horizon])
+            run_case("large_conservative_{}_{}".format(notified, horizon),
+                     [(0, 3, 300), (0, 4, 1)] + [(0, 2, 1)] * 200,
+                     [initial, initial + 300] +
+                     [initial + 301 + i // 2 for i in range(200)], *options)
+
     # Explicit zero must preserve the existing event-driven schedule bytes.
     run_case("default", [(0, 4, 2), (3, 4, 2)], [0, 3], "--backfill_policy", "none")
     run_case("zero", [(0, 4, 2), (3, 4, 2)], [0, 3], "--backfill_policy", "none",

@@ -1,7 +1,7 @@
 # Performance Analysis
 
 This page records profiles of the C++ simulator: a June 2022 RIKEN/Fugaku
-trace capture and a later unified-dispatch prefix benchmark. Each section
+trace capture and later unified-dispatch optimization benchmarks. Each section
 identifies costs for its measured workload and configuration; the results
 are not general performance guarantees or comparisons among queue implementations.
 
@@ -261,3 +261,107 @@ notification settings. Streaming, checkpoint, and warm-start checks pass.
 Local raw profiles, generated inputs, benchmark scripts, and results are under
 `/tmp/dr_evt_unified_profile` and `/tmp/dr_evt_unified_optimization_benchmark.py`;
 these paths are local evidence, not files shipped with the repository.
+
+## Unified conservative reservation-search bounds (November 6, 2026)
+
+The baseline is `66dbc21`, including the candidate-prefix optimization above.
+The Release (`-O3`) build uses macOS arm64 and
+`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`. The preceding mixed-workload profile
+identified repeated capacity-segment scans in protected-job earliest-fit
+searches. This change reduces those searches; reservation updates still use
+the original vector timeline.
+
+Within one scheduling pass, adding a feasible reservation only subtracts
+capacity. Therefore an identical node-count/duration request with the same
+earliest permitted start cannot become feasible earlier than its previous
+answer. `Reservation_Search_Cache` retains that answer as a lower bound and
+starts the original earliest-fit search there. It rechecks successful answers
+against the current plan. A cached failure remains valid after feasible
+capacity subtraction. A commit not covered by the last successful query
+clears all bounds before updating the plan, including a duration enlarged by
+rounding. Different durations and query origins cannot share a bound.
+
+The cache holds at most 256 node-count/duration pairs and is destroyed at the
+end of each pass. It does not persist reservations or search state across
+wakes, alter queue ordering, or change checkpoint data. Both fixed timer
+dispatch and timer dispatch with arrival notifications can use it.
+
+Selection is confined to `FCFSUnifiedCircularScheduler`: conservative policy,
+nonzero free nodes, exact planning resolution, and at least 128 live eligible
+candidates. A stack sample of the first 128 live candidates must contain at
+most 112 distinct node-count/duration pairs. Mostly distinct requests use the
+original planner because allocating a cache was slower for that workload.
+The sample uses a 256-slot stack hash table with exact key comparisons and
+stops once more than 112 distinct shapes have been found. It does not change
+eligibility or job order. The cached traversal has a separate, non-inlined
+entry to keep its stack setup out of the fallback.
+
+Event-driven and separate periodic-backfill modes instantiate the shared
+traversal with `Reservation_Timeline`, retaining their original planner and
+adding no cache selection or cache lookups. The original virtual entry point
+contains the vector traversal directly, verified in Release disassembly.
+`DR_EVT_LEGACY_RESERVATION_BARRIER=ON` compiles out both the unified cache
+selection and the sample. FCFS, EASY, hybrid, small prefixes, and rounded
+planning retain the vector planner.
+
+Measurements use one warm-up pair and three measured alternating before/after
+pairs, without profiler overhead. They include process startup, input,
+scheduling, and CSV output. The fixed mixed workload is the seeded 20,000-job
+workload described above. The notification workload shifts those submissions
+by 0.25 seconds, exercising additional passes between ticks. A third workload
+has 8,000 jobs submitted four per second, 1–1,024 requested nodes and 1–30
+second limits, on 8,192 nodes (seed 2718). All use conservative backfill,
+one-second ticks, limit runtimes, and a candidate limit of 10,000.
+
+Median wall times for the final implementation are:
+
+| Unified conservative workload | Before | After | Speedup |
+|---|---:|---:|---:|
+| Mixed, fixed timer | 9.359 s | 4.261 s | 2.20× |
+| Mixed, timer plus between-tick arrivals | 11.742 s | 5.354 s | 2.19× |
+| Many distinct interval shapes, fixed timer | 13.561 s | 13.736 s | 0.99× |
+
+Before/after output CSVs are byte-identical. A separate comparison of the
+saturated workload above uses one warm-up pair and five measured alternating
+pairs. Fixed FCFS, fixed conservative, and notified conservative medians are
+0.073, 0.084, and 0.085 seconds, respectively, versus 0.078, 0.086, and 0.087
+seconds at the committed baseline. Those schedules are also byte-identical;
+the candidate-prefix improvement remains intact.
+
+These synthetic measurements establish workload-specific improvements, not
+production-trace speedups. The distinct-shape workload remains 1.3% slower,
+so the reuse check does not guarantee a net improvement on every workload.
+A bounded prefix sample cannot guarantee reuse
+throughout the rest of the queue. Timeline insertion/coalescing and other
+scheduler costs remain, and the cache does not optimize the legacy reservation
+barrier.
+
+Validation includes the append API (large-prefix exact lookahead without live
+mutation), checkpoint, warm-start, custom scheduler, unified dispatch,
+separate periodic-backfill, backfill queue-depth, and flexible-reservation
+CTest cases. The unified CLI script checks 88 cases. Direct cache tests compare
+the original vector planner with mixed durations, different origins, failed
+searches, more than 256 shapes, and randomized reservations; they also pass
+AddressSanitizer and UndefinedBehaviorSanitizer in a standalone build. An
+18-case before/after comparison has byte-identical schedules with fractional
+arrivals, finite/unlimited horizons, exact/rounded planning, capacity changes,
+and release delays.
+
+The full native build includes Python bindings and gRPC targets. A temporary
+installation successfully compiles a consumer of the unified scheduler header
+with the legacy barrier both disabled and enabled. The enabled object contains
+no cached-planner or reuse-sample entry. Installation now includes the shared
+`.tpp` implementation and the previously omitted `common.hpp` dependency.
+This header check is compile coverage for the enabled barrier, not a separate
+legacy-barrier runtime test run.
+
+The planning-horizon CTest script fails on this host's Bash 3.2 when expanding
+an empty array under `set -u`; the unchanged baseline fails the same way.
+A temporary copy using compatible empty-array expansion passes its 10 checks,
+including identity on all 34 scheduler-correctness workloads. The repository
+script is unchanged.
+
+Local benchmark scripts, generated inputs, and result files are under
+`/tmp/dr_evt_reservation_cache_results` and
+`/tmp/dr_evt_reservation_cache_benchmark.py`; they are local evidence rather
+than repository artifacts.

@@ -27,9 +27,10 @@
  */
 
 #define DR_EVT_HAS_CONFIG 1
-#include "sim/sim.hpp"
+#include "sim/reservation_search_cache.hpp"
 #include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
 #include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
+#include "sim/sim.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -37,6 +38,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -1830,10 +1832,10 @@ void test_periodic_backfill_run_until_exclusive() {
 void test_periodic_easy_scheduler_selection() {
   std::cout << "\n=== Periodic EASY scheduler selection ===" << std::endl;
 
-  const auto scheduler = create_scheduler(
-      100, 0, BackfillPolicy::EASY, PriorityPolicy::FCFS,
-      QueueImplementation::CIRCULAR, 128, 0,
-      CircularOverflowPolicy::GROW, 0, 0, 10.0);
+  const auto scheduler =
+      create_scheduler(100, 0, BackfillPolicy::EASY, PriorityPolicy::FCFS,
+                       QueueImplementation::CIRCULAR, 128, 0,
+                       CircularOverflowPolicy::GROW, 0, 0, 10.0);
   assert(dynamic_cast<FCFSPeriodicEasyCircularScheduler *>(scheduler.get()) !=
          nullptr);
   assert(dynamic_cast<FCFSPeriodicHybridCircularScheduler *>(scheduler.get()) ==
@@ -2026,8 +2028,9 @@ void test_fractional_streaming_limits_validate_stored_value() {
 // Fixed ticks gate FCFS as well as backfill; Q is shared by all starts.
 void test_unified_periodic_dispatch() {
   std::cout << "\n=== Unified periodic dispatch ===" << std::endl;
-  for (const auto policy : {BackfillPolicy::NONE, BackfillPolicy::EASY,
-                            BackfillPolicy::HYBRID, BackfillPolicy::CONSERVATIVE}) {
+  for (const auto policy :
+       {BackfillPolicy::NONE, BackfillPolicy::EASY, BackfillPolicy::HYBRID,
+        BackfillPolicy::CONSERVATIVE}) {
     auto params = make_params();
     params.m_total_nodes = 4;
     params.m_dispatch_interval = 5;
@@ -2150,8 +2153,9 @@ void test_unified_periodic_backfill() {
 // Timer and arrival batches share the same bounded unified pass.
 void test_unified_timer_and_events() {
   std::cout << "\n=== Unified timer and event dispatch ===" << std::endl;
-  for (const auto policy : {BackfillPolicy::NONE, BackfillPolicy::EASY,
-                            BackfillPolicy::HYBRID, BackfillPolicy::CONSERVATIVE}) {
+  for (const auto policy :
+       {BackfillPolicy::NONE, BackfillPolicy::EASY, BackfillPolicy::HYBRID,
+        BackfillPolicy::CONSERVATIVE}) {
     auto params = make_params();
     params.m_total_nodes = 4;
     params.m_dispatch_interval = 5;
@@ -2209,8 +2213,8 @@ void test_unified_timer_and_events() {
   // A distinct current-time submission batch gets a fresh prefix; an empty
   // advance at the same clock does not. The periodic phase remains at 5.
   Simulation batches(params);
-  const auto waiting = batches.append_jobs({{0, 1, kTestQueueInput, 20},
-                                           {0, 1, kTestQueueInput, 20}});
+  const auto waiting = batches.append_jobs(
+      {{0, 1, kTestQueueInput, 20}, {0, 1, kTestQueueInput, 20}});
   batches.advance_to(0);
   assert(batches.get_statistics().jobs_started == 1);
   const auto new_arrival = batches.append_job(0, 1, kTestQueueInput, 20);
@@ -2233,12 +2237,116 @@ void test_unified_timer_and_events() {
   const auto second = boundary.append_job(5, 1, kTestQueueInput, 5);
   const auto third = boundary.append_job(5, 1, kTestQueueInput, 5);
   boundary.advance_to(5);
-  assert(boundary.get_job_statuses({first})[0].state == Simulation::Job_State::COMPLETED);
+  assert(boundary.get_job_statuses({first})[0].state ==
+         Simulation::Job_State::COMPLETED);
   assert(boundary.get_job_statuses({second})[0].start_time == 5);
   assert(!boundary.get_job_statuses({third})[0].start_time.has_value());
   boundary.advance_to(10);
   assert(boundary.get_job_statuses({third})[0].start_time == 10);
   std::cout << "  PASSED" << std::endl;
+}
+
+void test_unified_cached_planner_lookahead() {
+  for (const bool notified : {false, true}) {
+    auto params = make_params();
+    params.m_total_nodes = 4;
+    params.m_dispatch_interval = 1;
+    params.m_dispatch_queue_depth = 256;
+    params.m_dispatch_on_events = notified;
+    params.m_backfill_policy = BackfillPolicy::CONSERVATIVE;
+    Simulation sim(params);
+    std::vector<Simulation::Job_Append_Request> requests{
+        {0, 3, kTestQueueInput, 300}, {0, 4, kTestQueueInput, 1}};
+    for (unsigned i = 0; i < 200; ++i) {
+      requests.push_back({0, 2, kTestQueueInput, 1});
+    }
+    const auto ids = sim.append_jobs(requests);
+    sim.advance_to(11);
+    assert(sim.get_statistics().jobs_started == 1);
+    const double initial = notified ? 0 : 1;
+#if defined(DR_EVT_HAS_SER20)
+    const auto exact = sim.get_exact_job_start_times({ids[1], ids[2]});
+    assert(exact[0].start_time == initial + 300);
+    assert(exact[1].start_time == initial + 301);
+    assert(sim.get_statistics().jobs_started == 1);
+    assert(sim.get_current_time() == 11);
+#endif
+    sim.advance_to(initial + 303);
+    assert(sim.get_job_statuses({ids[1]})[0].start_time == initial + 300);
+    assert(sim.get_job_statuses({ids[2]})[0].start_time == initial + 301);
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
+    assert(sim.get_statistics().jobs_completed == ids.size());
+  }
+}
+
+void test_reservation_search_bounds() {
+  Reservation_Timeline reference(
+      std::vector<std::pair<sim_time_t, num_nodes_t>>{
+          {0, 0}, {10, 4}, {12, 0}, {20, 4}, {25, 8}});
+  Reservation_Search_Cache cached(reference);
+  assert(cached.earliest_fit(4, 8, 0) == 20);
+  assert(cached.earliest_fit(4, 2, 0) == 10);
+  reference.reserve(20, 4, 8);
+  cached.reserve(20, 4, 8);
+  assert(cached.earliest_fit(4, 8, 0) == reference.earliest_fit(4, 8, 0));
+  assert(cached.earliest_fit(4, 2, 0) == 10);
+  reference.reserve(10, 4, 2);
+  cached.reserve(10, 4, 2);
+  assert(cached.earliest_fit(4, 2, 0) == 25);
+  assert(cached.earliest_fit(4, 1, 30) == 30);
+  assert(cached.earliest_fit(4, 1, 0) == 25);
+  assert(!cached.earliest_fit(9, 1, 0));
+
+  // More interval shapes than the bounded cache can retain must still agree
+  // with the uncached plan, before and after capacity is reserved.
+  for (unsigned shape = 1; shape <= 512; ++shape) {
+    const double duration = shape * 0.5;
+    assert(cached.earliest_fit(4, duration, 0) ==
+           reference.earliest_fit(4, duration, 0));
+  }
+  reference.reserve(28, 4, 50);
+  cached.reserve(28, 4, 50);
+  for (unsigned shape = 1; shape <= 512; ++shape) {
+    const double duration = shape * 0.5;
+    assert(cached.earliest_fit(4, duration, 0) ==
+           reference.earliest_fit(4, duration, 0));
+  }
+
+  for (unsigned seed : {7u, 29u, 101u, 4099u}) {
+    std::mt19937 rng(seed);
+    Reservation_Timeline plan(std::vector<std::pair<sim_time_t, num_nodes_t>>{
+        {0, 4}, {7, 8}, {15, 2}, {25, 10}});
+    Reservation_Search_Cache bounds(plan);
+    for (unsigned step = 0; step < 128; ++step) {
+      const num_nodes_t nodes = 1 + rng() % 10;
+      const double duration = 0.5 * (1 + rng() % 30);
+      const double origin = rng() % 30;
+      const auto fit = plan.earliest_fit(nodes, duration, origin);
+      assert(bounds.earliest_fit(nodes, duration, origin) == fit);
+      if (fit) {
+        plan.reserve(*fit, nodes, duration);
+        bounds.reserve(*fit, nodes, duration);
+      }
+      for (unsigned query = 0; query < 16; ++query) {
+        const num_nodes_t requested = 1 + rng() % 10;
+        const double limit = 0.5 * (rng() % 30);
+        const double start = rng() % 30;
+        assert(bounds.earliest_fit(requested, limit, start) ==
+               plan.earliest_fit(requested, limit, start));
+      }
+    }
+  }
+
+  // A commit longer than its verified query can wrap unsigned capacity in
+  // the original planner. Cached failures must be discarded in that case.
+  Reservation_Timeline unchecked(
+      std::vector<std::pair<sim_time_t, num_nodes_t>>{{0, 4}, {5, 0}, {10, 4}});
+  Reservation_Search_Cache guarded(unchecked);
+  assert(!guarded.earliest_fit(8, 1, 0));
+  assert(guarded.earliest_fit(4, 1, 0) == 0);
+  unchecked.reserve(0, 4, 6);
+  guarded.reserve(0, 4, 6);
+  assert(guarded.earliest_fit(8, 1, 0) == unchecked.earliest_fit(8, 1, 0));
 }
 
 int main() {
@@ -2286,6 +2394,8 @@ int main() {
     test_periodic_backfill_idle_ticks();
     test_periodic_backfill_run_until_exclusive();
     test_periodic_easy_scheduler_selection();
+    test_reservation_search_bounds();
+    test_unified_cached_planner_lookahead();
     test_unified_periodic_dispatch();
     test_unified_timer_and_events();
     test_unified_periodic_backfill();
