@@ -6,9 +6,11 @@
 DR_EVT is a high-performance HPC job scheduler simulator supporting EASY,
 hybrid, and conservative backfilling algorithms. Its trigger, queue-depth,
 reservation-depth, and planning-resolution settings can be configured to
-approximate selected production-scheduler behavior; see [Realism and Known
+approximate selected production-scheduler behavior; see [Scheduling Loops and
+DR_EVT Configurations](https://dr-evt.readthedocs.io/en/latest/dev/SCHEDULER_LOOPS.html)
+for supported mappings and [Realism and Known
 Gaps](https://dr-evt.readthedocs.io/en/latest/dev/REALISM_AND_GAPS.html) for
-the supported mappings and remaining differences. **Uniquely supports online
+remaining differences. **Uniquely supports online
 simulation via gRPC**, enabling [coordinated multi-cluster simulations](https://dr-evt.readthedocs.io/en/latest/user-guide/client-server-use-cases.html)
 where distributed schedulers interact in real-time.
 Another use case is the [Fugaku Power-Usage Simulation Experiment](https://dr-evt.readthedocs.io/en/latest/user-guide/fugaku-power-experiment.html).

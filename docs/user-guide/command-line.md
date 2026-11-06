@@ -20,7 +20,7 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | System | `--warm_start_wait_queue MODE` | Select `inherit` (default) or legacy `drop` handling for jobs waiting at a replay warm-start boundary. |
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
-| Scheduling | `--backfill_queue_depth N` | Cap jobs inspected per backfill pass by every scheduler, including the custom-EASY selector. |
+| Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
 | Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
@@ -59,8 +59,9 @@ The sections below define accepted values, defaults, and interactions.
 
 For how the scheduling controls (`--backfill_policy`, queue and reservation
 depths, interval, planning resolution, priority, and node-release delay) map
-to production-scheduler behavior, see [Realism and Known
-Gaps](../dev/REALISM_AND_GAPS.md).
+to production-scheduler behavior, see [Scheduling Loops and DR_EVT
+Configurations](../dev/SCHEDULER_LOOPS.md). Remaining differences are listed
+in [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md).
 
 ## Basic Usage
 
@@ -257,23 +258,26 @@ a scheduler examines in one scheduling pass. It applies to `easy`,
 every queue implementation, and to the experimental custom-EASY selector.
 Jobs beyond that prefix are not tested for backfill in that pass. `0` leaves
 the scan unlimited. This is a pre-feasibility queue scan limit: a job counts
-toward the depth even when it cannot fit or cannot complete before its
-reservation window. In event-driven mode under `easy` only the head holds a
+toward the depth even when it cannot fit or would delay a protected
+reservation. In event-driven mode under `easy` only the head holds a
 reservation, so only the head is exempted by `--planning_horizon`; every other
 job examined counts.
 
-The count belongs to one backfill cycle. With `--backfill_interval`, one tick
-is one cycle: all backfill passes at that tick share the count, and it resets
-at the next tick. FCFS head dispatch between ticks stays event-driven, scans no
-candidates, and uses none of it. This is how Slurm counts `bf_max_job_test` per
-backfill iteration. As in Slurm, a job whose reservation is beyond
-`--planning_horizon` still uses a slot, though it receives no reservation.
+With `--backfill_interval`, a tick's evaluation is one cycle. Periodic hybrid
+and conservative share their count across calls at the tick and count
+out-of-horizon jobs. Periodic EASY performs one scan at the tick and exempts
+an out-of-horizon head; other examined candidates count. FCFS head dispatch
+between ticks stays event-driven and uses none of this evaluation budget.
+This approximates Slurm's per-cycle placement-test limit, but Slurm can skip
+jobs before charging its counter; identical numeric limits are not a guarantee
+of identical scans.
 
 Without `--backfill_interval`, the simulator repeats scheduler passes at one
 simulation timestamp until nothing more starts. Conservative and hybrid
 backfill share their count across those passes and reset it when time
-advances; a job beyond `--planning_horizon` does not use a slot, as a blocked
-job does not in Fluxion. EASY, SJF, LJF, and the custom selector start the
+advances; a job beyond `--planning_horizon` does not use a slot. This resembles
+Fluxion's blocked-job exemption but does not reproduce its blocked list.
+EASY, SJF, LJF, and the custom selector start the
 count again in each pass, so at one timestamp they can examine more jobs than
 the depth.
 
@@ -323,9 +327,11 @@ and uses no hybrid reservation-depth slot. It keeps its queue position and is
 re-evaluated on the next scheduling pass, so newly released resources or a
 scheduled capacity change can bring its reservation into the horizon. This
 applies to both event-driven and periodic scheduling. Whether such a job uses
-a `--backfill_queue_depth` slot depends on the mode: it does in periodic mode,
-as in Slurm, and does not in event-driven mode, as for a blocked job in
-Fluxion.
+a `--backfill_queue_depth` slot depends on mode and policy. Hybrid/conservative
+count it in periodic mode and exempt it in event-driven mode. EASY exempts
+an out-of-horizon head in both modes; its other examined candidates count.
+See [Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting)
+for the remaining differences from production counters.
 
 **Default:** unlimited (the largest `tdiff_t` value)
 
@@ -858,7 +864,8 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 - [Protobuf Configuration](protobuf-config.md) - Full `.textproto` schema and worked examples
 - [Streaming API](../api/STREAMING_API.md) - Programmatic C++ API for online simulation
 - [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE algorithm details
-- [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md) - production-scheduler mappings and remaining differences
+- [Scheduling Loops and DR_EVT Configurations](../dev/SCHEDULER_LOOPS.md) - production-scheduler behavior and current option mappings
+- [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md) - confirmed differences and excluded scope
 - [Quick Start](../getting-started/quickstart.md) - Quick reference
 - [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
 - [Test Suite](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#build-and-run) - example usage in test scripts

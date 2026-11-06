@@ -9,10 +9,10 @@ maintainer-facing build guidance. It is separate from the user documentation.
   and the circular and block queue guides.
 - [Simulation Pipeline and Job Lifecycle](JOB_LIFECYCLE.md) — How input moves
   through the job store, scheduler, event loop, resource accounting, and output.
-- [Realism and Known Gaps](REALISM_AND_GAPS.md) — How the event-driven,
-  exact-time scheduling model compares with Slurm, Flux, and LSF (evaluation
-  trigger, backfill window, reservation depth), and which way each gap biases
-  results.
+- [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md) — FCFS and
+  backfill basics, production trigger categories, and current option mappings.
+- [Realism and Known Gaps](REALISM_AND_GAPS.md) — Confirmed differences in
+  triggers and backfill evaluation budgets, excluded scope, and validation limits.
 - [Performance Analysis](PERFORMANCE_ANALYSIS.md) — Linux `perf` breakdown of
   the circular FCFS scheduler on the June 2022 RIKEN trace and its primary
   optimization targets.
