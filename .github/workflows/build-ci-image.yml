@@ -1,11 +1,7 @@
 name: Build CI Image
 
 on:
-  push:
-    branches: [main, ci/image]
-    paths:
-      - '.github/docker/Dockerfile.ci'
-      - '.github/workflows/build-ci-image.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:

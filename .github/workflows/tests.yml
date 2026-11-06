@@ -15,7 +15,15 @@ env:
   CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
 
 jobs:
+  build-image:
+    name: Prepare CI Image
+    uses: ./.github/workflows/build-ci-image.yml
+    permissions:
+      contents: read
+      packages: write
+
   test:
+    needs: build-image
     name: Build and Test
     runs-on: ubuntu-latest
     permissions:
@@ -403,6 +411,7 @@ jobs:
           retention-days: 7
 
   ser20-disabled:
+    needs: build-image
     name: Build Without Ser20
     runs-on: ubuntu-latest
     permissions:
@@ -441,6 +450,7 @@ jobs:
           ./build-no-ser20/t_state 10 42 4 2
 
   redis-integration:
+    needs: build-image
     name: Redis Integration (Ser20 ${{ matrix.ser20 }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -494,6 +504,7 @@ jobs:
         run: ./tests/run_redis_grpc_client_test.sh
 
   documentation:
+    needs: build-image
     name: Build Documentation
     runs-on: ubuntu-latest
     permissions:

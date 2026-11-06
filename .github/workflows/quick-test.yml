@@ -12,7 +12,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  build-image:
+    name: Prepare CI Image
+    uses: ./.github/workflows/build-ci-image.yml
+    permissions:
+      contents: read
+      packages: write
+
   quick-test:
+    needs: build-image
     name: Quick Scheduler, Serialization, and Trace Schema Check
     runs-on: ubuntu-latest
 
