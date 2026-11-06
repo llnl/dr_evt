@@ -60,6 +60,21 @@ that evaluates its new queue prefix every cycle. The unified
 `--dispatch_interval` mode retries every tick and does not use this flag to
 suppress evaluations.
 
+### LSF admission on reserved slots
+
+The supplied IBM backfill documentation requires a job borrowing reserved
+slots to finish before the protected job's predicted start. DR_EVT's default
+resource-time rule can instead allow an overlapping execution if it preserves
+the protected resource window. The build option
+`DR_EVT_LEGACY_RESERVATION_BARRIER=ON` selects strict completion-before-start
+admission and is the chosen setting for the documented simplified LSF model.
+This provides a homogeneous-pool approximation with head protection;
+it does not reproduce LSF's queue-specific backfill eligibility and reserved
+slot ownership. EASY can mimic the example in IBM's documentation, but it does not
+establish that LSF uses only EASY or always protects exactly one waiting job.
+See the [LSF loop](SCHEDULER_LOOPS.md#lsf-scheduling-sessions-with-a-minimum-interval)
+for the confirmed policy and remaining accounting questions.
+
 ## Out of scope
 
 The built-in model uses one homogeneous node pool with FCFS, SJF, or LJF

@@ -396,13 +396,63 @@ Use `--dispatch_interval` for that cadence; do not infer a mapping from
 `LSB_MAX_JOB_DISPATCH_PER_SESSION` to `--dispatch_queue_depth` solely from it.
 
 Processor reservation is configurable and off by default in the referenced
-LSF documentation. Advance reservations and run windows add time constraints,
-but the available evidence establishes neither a general R equivalent to
-DR_EVT's reservation depth nor an H equivalent to `bf_window`. Their exact
-accounting must remain unspecified until documented; zero session interval
-alone also does not prove equivalence to DR_EVT's scheduling policy.
-The available excerpts also do not establish whether scheduling reservations
-are retained or rebuilt between sessions.
+LSF documentation. The supplied IBM *Backfill scheduling* excerpt, updated
+2026-10-26, establishes the following behavior:
+
+- Backfill is enabled at queue level. Only jobs in a backfill queue may borrow
+  reserved slots; reservation and backfill can operate within the same queue
+  when both are enabled there.
+- The protected parallel job's predicted start uses the run limits of jobs
+  occupying its reserved slots. Missing run limits can prevent that estimate
+  and backfill. The page also describes `RUNTIME` as a scheduling estimate
+  distinct from an enforced `RUNLIMIT`.
+- A job borrowing reserved slots must have a run limit that expires strictly
+  before the protected job's predicted start. This restriction concerns the
+  borrowed reserved slots; it does not establish a global ban on overlapping
+  jobs using other resources.
+
+The worked example in IBM's documentation has a one-CPU job running from 08:00 with a two-hour
+limit, and a waiting four-CPU job reserving the other three slots. A two-CPU
+job arriving at 08:30 with a one-hour limit can borrow reserved slots because
+it finishes by 09:30, before the protected start at 10:00. A two-hour limit
+would prevent that backfill.
+
+EASY head protection can mimic the example in IBM's documentation. The example does not
+establish that LSF protects exactly one waiting job in every configuration,
+or that LSF performs only EASY backfill. EASY is the selected approximation
+for this example, not a classification of the entire LSF scheduler.
+
+The chosen simplified LSF representation uses:
+
+- `-DDR_EVT_LEGACY_RESERVATION_BARRIER=ON` at build time for strict
+  completion-before-reservation admission.
+- `--dispatch_interval 5 --backfill_policy easy --dispatch_queue_depth 0`
+  for an illustrative five-second session cadence, one protected waiting job,
+  and unlimited candidate examination. Set the interval to the value assumed
+  in the study. A finite candidate limit is a model choice until its LSF
+  job-decision accounting is verified.
+- One homogeneous resource pool with FCFS ordering and known time limits.
+  Treat the idle slots available for backfill as slots reserved for the head.
+  Assume sessions occur at the aligned interval boundaries without additional
+  delay, as described above.
+
+This is a simplified LSF model with periodic sessions and strict backfill.
+The build flag applies the time barrier throughout the pool and throughout
+that build. LSF's documented barrier applies to jobs borrowing reserved slots;
+it does not establish the same restriction for jobs using unreserved slots.
+Queue-specific eligibility, slot ownership, and multiple reserving jobs are
+not reproduced by this configuration.
+
+DR_EVT's default resource-time rule (`OFF`) can permit safe overlap with a
+protected reservation. The chosen strict configuration needs dedicated
+validation; the unified-dispatch checks reported above used the default rule.
+
+The evidence still establishes neither a general R equivalent to DR_EVT's
+reservation depth nor an H equivalent to `bf_window`. It also does not specify
+whether reservations persist between sessions, whether failed tests and
+reservation attempts consume job decisions, or whether a separate examination
+limit exists. The supplied explanatory claims about those details are not
+supported by the quoted IBM passages and are not used as verified behavior.
 
 ## Sources
 
@@ -435,8 +485,13 @@ are retained or rebuilt between sessions.
   [`JOB_SCHEDULING_INTERVAL`](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_config_ref/lsb.params.job_scheduling_interval.5.html),
   [processor reservation](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/reserving_processors.html),
   and [backfill](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/backfill.html),
-  plus the supplied IBM excerpts for `LSB_MAX_JOB_DISPATCH_PER_SESSION` and
-  *Enable fast job dispatch*, last updated 2026-10-26. No LSF source was inspected.
+  plus the supplied IBM excerpts for `LSB_MAX_JOB_DISPATCH_PER_SESSION`,
+  *Manage scheduling performance*, *Enable fast job dispatch*, and
+  *Backfill scheduling*, last updated 2026-10-26. The parameter reference gives
+  default 15000, with `JOB_DISPATCH_PACK_SIZE=0` selecting the CPU-based formula;
+  the performance guide gives that formula without the same qualification.
+  These excerpts do not establish a Fix Pack 9 transition. No LSF source was
+  inspected.
 
 - **DR_EVT:** `src/sim/sim.cpp` (`advance_to_impl`),
   `src/sim/scheduler_*.cpp`, and `src/sim/scheduler_base.cpp` on this branch.
