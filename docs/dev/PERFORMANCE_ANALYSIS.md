@@ -1,9 +1,9 @@
 # Performance Analysis
 
-This page records a profiling snapshot of the C++ simulator using the June
-2022 RIKEN/Fugaku scheduling trace. It identifies optimization targets in the
-circular FCFS scheduler; it is not a general performance guarantee or a
-comparison among queue implementations.
+This page records profiles of the C++ simulator: a June 2022 RIKEN/Fugaku
+trace capture and a later unified-dispatch prefix benchmark. Each section
+identifies costs for its measured workload and configuration; the results
+are not general performance guarantees or comparisons among queue implementations.
 
 For instructions on collecting a new profile, see
 [Linux `perf` profiling](../getting-started/installation.md#linux-perf-profiling-recommended)
@@ -185,3 +185,79 @@ Several optimized inlined frames appear as `??`; a longer profile plus
 After an optimization, compare multiple alternating baseline and candidate
 runs using the same trace prefix and configuration. Report wall time as well as
 cycles, and retain sample counts and lost-sample counts with the result.
+
+
+## Unified dispatch candidate-prefix optimization (November 6, 2026)
+
+The baseline was `dae396c`, after compile-time trigger specialization.
+The optimization changes only `FCFSUnifiedCircularScheduler`; event-driven
+and separate periodic-backfill scheduler implementations are unchanged.
+The build was Release (`-O3`) on macOS arm64 with
+`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
+
+The saturated workload has four nodes, an initial four-node job with a
+200,000-second time limit, and 10,000 four-node one-second jobs, all submitted
+at zero. It uses limit runtimes, a one-second dispatch interval, and
+`--dispatch_queue_depth 10000`. Repeated ticks keep the same blocked queue
+until the initial job finishes. This deliberately exposes prefix-selection
+cost; it is not a representative production trace.
+
+A macOS `sample` capture found 881 of 902 application-thread samples in the
+candidate-counting loop for fixed conservative dispatch. The requested
+capture used a 1 ms sampling interval and 2 s duration; the process finished
+before that duration. The FCFS capture collected no useful call stacks and
+is not used to estimate hotspot percentages.
+
+Previously, every bounded unified pass walked the candidate prefix to count
+live entries, even when no entries had been removed. The optimized path:
+
+- Uses the queue index directly when there are no removed entries.
+- Avoids bounding/restoring a prefix when all eligible live jobs already fit
+  within the configured candidate limit.
+- Retains counting through removed entries when necessary, including the
+  original compaction rules and future-arrival eligibility boundary.
+
+Measurements below exclude profiler overhead. Each comparison uses one warm-up
+pair and five measured alternating before/after pairs, including process
+startup, input, scheduling, and CSV output. Median wall times are:
+
+| Unified mode | Before | After | Speedup |
+|---|---:|---:|---:|
+| Fixed FCFS | 1.107 s | 0.072 s | 15.3× |
+| Fixed conservative | 1.121 s | 0.081 s | 13.8× |
+| Timer plus arrivals, conservative | 1.120 s | 0.082 s | 13.6× |
+
+A separate seeded mixed workload has 20,000 jobs submitted four per second,
+1–8 requested nodes and 1–30 second limits, on 128 nodes (Python random seed
+2718). With the same interval, candidate limit, and conservative policy,
+fixed dispatch measured 8.903 s before and 8.855 s after. With arrival
+notifications enabled, the same workload measured 9.297 s before and
+9.273 s after. Neither comparison shows a material change in these runs.
+Their schedules were byte-identical. The integer-second arrivals coincide
+with ticks, so this workload does not measure frequent extra between-tick
+notification passes. This broader case is
+much less sensitive to prefix counting than the saturated probe.
+
+Each before/after schedule was byte-identical. The speedup applies to repeated
+large-prefix scans without removed entries; it does not imply that reservation
+planning or event processing is faster by the same factor. Small prefixes,
+queues with many removed entries, and workloads dominated by reservation
+planning need separate measurements.
+
+A second 2 s mixed-workload capture collected 1,450 application-thread
+samples after optimization. Of those, 515 were at one capacity-segment skip
+instruction in the protected-job earliest-fit search, and 230 were in
+`Reservation_Timeline::reserve` itself. Several search frames appeared as
+`???`; local symbols and disassembly map them to the `protect_job` lambda
+in `FCFSHybridCircularScheduler::schedule`, with `earliest_fit` inlined.
+The next measured opportunity is reducing repeated linear timeline searches
+and reservation updates. This optimization does not change that shared planner.
+The short capture identifies a target; it does not provide whole-run cost
+percentages for every search or reservation operation.
+
+The unified-dispatch regression script also checks removed entries, finite
+candidate limits, future arrivals, and compaction for both
+notification settings. Streaming, checkpoint, and warm-start checks pass.
+Local raw profiles, generated inputs, benchmark scripts, and results are under
+`/tmp/dr_evt_unified_profile` and `/tmp/dr_evt_unified_optimization_benchmark.py`;
+these paths are local evidence, not files shipped with the repository.

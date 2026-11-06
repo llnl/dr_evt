@@ -162,6 +162,24 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
                      event_reference(jobs, depth), *event_options,
                      "--dispatch_queue_depth", str(depth), "--backfill_policy", "none")
 
+    # Backfilled entries leave holes in a bounded prefix. Later ticks must
+    # skip them, preserve future arrivals, and retain the live candidate cap
+    # through queue compaction.
+    for notified in (False, True):
+        for depth in (2, 3):
+            for policy in ("hybrid", "conservative"):
+                initial = 0 if notified else 1
+                small_start = initial + (1 if depth == 2 else 0)
+                options = ["--dispatch_interval", "1", "--dispatch_queue_depth", str(depth),
+                           "--backfill_policy", policy, "--reservation_depth", "1",
+                           "--wait_queue_capacity", "4"]
+                if notified:
+                    options.append("--dispatch_on_events")
+                run_case("prefix_holes_{}_{}_{}".format(notified, depth, policy),
+                         [(0, 3, 12), (0, 4, 2)] + [(0, 1, 1)] * 8 + [(30, 1, 20)] * 2,
+                         [initial, initial + 12] + list(range(small_start, small_start + 8))
+                         + [30, 30], *options)
+
     # Explicit zero must preserve the existing event-driven schedule bytes.
     run_case("default", [(0, 4, 2), (3, 4, 2)], [0, 3], "--backfill_policy", "none")
     run_case("zero", [(0, 4, 2), (3, 4, 2)], [0, 3], "--backfill_policy", "none",

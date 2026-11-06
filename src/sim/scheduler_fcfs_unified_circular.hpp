@@ -38,7 +38,8 @@ public:
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override {
     sync_to(current_time);
-    if (m_dispatch_queue_depth == 0) {
+    if (m_dispatch_queue_depth == 0 ||
+        active_job_count() <= m_dispatch_queue_depth) {
       return FCFSHybridCircularScheduler::schedule(free_nodes, running_jobs,
                                                    current_time);
     }
@@ -52,17 +53,22 @@ public:
       m_wait_queue.erase(end, m_wait_queue.end());
       m_removed_count = 0;
     }
-    size_t prefix_end = 0;
-    size_t candidates = 0;
+    size_t prefix_end = std::min(m_eligible_end_idx, m_dispatch_queue_depth);
     size_t prefix_removed = 0;
-    while (prefix_end < m_eligible_end_idx &&
-           candidates < m_dispatch_queue_depth) {
-      if (m_wait_queue[prefix_end].removed) {
-        ++prefix_removed;
-      } else {
-        ++candidates;
+    // With no removed entries, queue indices already count live candidates.
+    // Only holes require walking the prefix to enforce the candidate limit.
+    if (m_removed_count != 0) {
+      prefix_end = 0;
+      size_t candidates = 0;
+      while (prefix_end < m_eligible_end_idx &&
+             candidates < m_dispatch_queue_depth) {
+        if (m_wait_queue[prefix_end].removed) {
+          ++prefix_removed;
+        } else {
+          ++candidates;
+        }
+        ++prefix_end;
       }
-      ++prefix_end;
     }
     const size_t withheld = m_eligible_end_idx - prefix_end;
     const size_t withheld_removed = m_removed_count - prefix_removed;
