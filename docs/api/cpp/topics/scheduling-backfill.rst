@@ -11,7 +11,6 @@ modes; see `Scheduling Loops <../../../dev/SCHEDULER_LOOPS.html>`_.
    .. doxygengroup:: dr_evt_sim
       :project: dr_evt
       :content-only:
-      :no-link:
       :inner:
       :members:
       :protected-members:

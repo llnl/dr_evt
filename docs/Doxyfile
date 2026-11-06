@@ -20,6 +20,7 @@ INPUT                  = src/ \
                          python/dr_evt_bindings.cpp
 FILE_PATTERNS          = *.hpp *.cpp *.tpp *.md
 EXTENSION_MAPPING      = tpp=C++
+INCLUDE_PATH           = src/
 RECURSIVE              = NO
 # INPUT is deliberately limited to project directories above.  Do not list
 # excluded dependency/build trees here: Doxygen scans every EXCLUDE directory

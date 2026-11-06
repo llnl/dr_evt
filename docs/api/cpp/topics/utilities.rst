@@ -49,12 +49,9 @@ available-memory queries, monotonic timing, and path helpers.
 
    .. doxygenfile:: system_memory.hpp
       :project: dr_evt
-      :no-link:
 
    .. doxygenfile:: timer.hpp
       :project: dr_evt
-      :no-link:
 
    .. doxygenfile:: file.hpp
       :project: dr_evt
-      :no-link:
