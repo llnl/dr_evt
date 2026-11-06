@@ -17,6 +17,7 @@ RUN apt-get update && \
         g++-14 \
         clang-18 \
         libboost-all-dev \
+        libssl-dev \
         python3 \
         python3-pip \
         python3-venv \
