@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   build:
-    if: github.repository == 'llnl/dr_evt'
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +31,7 @@ jobs:
         with:
           context: .
           file: .github/docker/Dockerfile.ci
-          push: true
+          push: ${{ github.repository == 'llnl/dr_evt' }}
           tags: ghcr.io/llnl/dr_evt-ci:ci-image
           cache-from: type=gha
           cache-to: type=gha,mode=max
