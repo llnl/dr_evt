@@ -144,6 +144,11 @@ examined candidates. It counts out-of-horizon candidates and retries on every
 tick regardless of the scheduling-state flag. EASY reuses hybrid protection
 with R=1 in this mode.
 
+Trigger modes are selected once per `advance_to` call (and at warm-start
+entry). The event loop uses compile-time specializations, so event-driven
+and separate periodic-backfill loops contain no arrival-notification checks;
+fixed unified dispatch also excludes them when the option is disabled.
+
 Periodic hybrid/conservative share Q across calls at one tick and count
 out-of-horizon jobs. Periodic EASY performs one backfill scan per tick and
 exempts an out-of-horizon head. Other examined EASY candidates still count.

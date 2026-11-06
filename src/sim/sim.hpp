@@ -827,12 +827,13 @@ public:
 
 protected:
   /**
-   * Advance using compile-time-selected accounting and warm-start paths.
+   * Advance using compile-time-selected accounting, warm-start, and trigger paths.
    * WarmStage is instantiated only while historical jobs remain; the normal
    * stage contains no pre-start-time condition.
    */
   template <bool AccountResources, bool WarmStage = false,
-            bool PeriodicBackfill = false>
+            bool PeriodicBackfill = false, bool UnifiedDispatch = false,
+            bool DispatchOnEvents = false>
   void advance_to_impl(sim_time_t target_time,
                        FCFSEasyCustomScheduler *custom_scheduler);
 
