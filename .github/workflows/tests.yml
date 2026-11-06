@@ -13,6 +13,7 @@ concurrency:
 
 env:
   CMAKE_INSTALL_PREFIX: /__w/dr_evt/dr_evt/install
+  PIP_NO_CACHE_DIR: "true"
 
 jobs:
   build-image:
@@ -53,10 +54,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
+      - name: Verify system Python
+        run: |
+          command -v python3
+          python3 --version
+          python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
 
       - name: Display versions
         run: |
@@ -64,7 +66,7 @@ jobs:
           ${{ matrix.cc }} --version
           ${{ matrix.cxx }} --version
           cmake --version
-          python --version
+          python3 --version
           echo "=== MPI version ==="
           if command -v mpirun >/dev/null 2>&1; then
             mpirun --version
@@ -78,7 +80,7 @@ jobs:
 
       - name: Create Python virtual environment
         run: |
-          python -m venv venv
+          python3 -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
           python -m pip install grpcio grpcio-tools protobuf numpy scipy
@@ -522,13 +524,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
+      - name: Verify system Python
+        run: |
+          command -v python3
+          python3 --version
+          python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
 
       - name: Install documentation dependencies
-        run: python -m pip install -r docs/requirements.txt
+        run: |
+          python3 -m venv docs-venv
+          docs-venv/bin/python -m pip install -r docs/requirements.txt
 
       - name: Build documentation with warnings as errors
-        run: make -C docs html SPHINXOPTS="-W --keep-going"
+        run: |
+          export PATH="$GITHUB_WORKSPACE/docs-venv/bin:$PATH"
+          make -C docs html SPHINXOPTS="-W --keep-going"
