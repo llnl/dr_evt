@@ -271,26 +271,24 @@ and conservative share their count across calls at the tick and count
 out-of-horizon jobs. Periodic EASY performs one scan at the tick and exempts
 an out-of-horizon head; other examined candidates count. FCFS head dispatch
 between ticks stays event-driven and uses none of this evaluation budget.
-This approximates Slurm's per-cycle placement-test limit, but Slurm can skip
-jobs before charging its counter; identical numeric limits are not a guarantee
-of identical scans.
 
 Without `--backfill_interval`, the simulator repeats scheduler passes at one
 simulation timestamp until nothing more starts. Conservative and hybrid
 backfill share their count across those passes and reset it when time
-advances; a job beyond `--planning_horizon` does not use a slot. This resembles
-Fluxion's blocked-job exemption but does not reproduce its blocked list.
-EASY, SJF, LJF, and the custom selector start the
-count again in each pass, so at one timestamp they can examine more jobs than
-the depth.
+advances; a job beyond `--planning_horizon` does not use a slot. EASY, SJF, LJF,
+and the custom selector start the count again in each pass, so at one timestamp
+they can examine more jobs than the depth.
 
-In short, `--backfill_queue_depth` controls how much of the queue a scheduler
+`--backfill_queue_depth` controls how much of the queue a scheduler
 considers; `--num_max_candidates` controls how many already-feasible jobs the
 custom-EASY callback can choose from. They are separate options acting at
 different stages: in the custom-EASY selector the depth bounds the scan first,
 then the candidate cap applies to the feasible jobs found. This is
 independent of `--reservation_depth`, which limits only the earlier jobs whose
 reservations must be protected.
+
+Production counter differences are in
+[Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
 **Default:** `0` (unlimited)
 
@@ -335,12 +333,9 @@ The cheap pending-job status projection does not include this cadence or
 candidate limit; exact lookahead follows the live loop. See
 [Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md).
 
-For LSF timing studies, this fixed periodic model is representative under the
-earliest-permitted-session assumption: sessions occur at every interval
-boundary while jobs wait, their phase aligns with DR_EVT's ticks, and there
-is no additional session delay. Set `--dispatch_interval` to that assumed
-session interval. LSF's minimum interval alone does not guarantee this cadence.
-Queue-depth accounting and reservation policy still need separate matching.
+Production timing assumptions are in
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#replicating-core-behavior-with-current-options)
+and [Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--dispatch_on_events`
 
@@ -357,21 +352,10 @@ but wait for the next tick unless an arrival occurs at the same time. Repeated
 streaming arrival batch at the current time can request a fresh pass; appending
 future jobs does not notify until their arrival time.
 
-This represents Spur's ordinary-submission notifications and periodic resource
-polling on one homogeneous pool. For its conservative reservation traversal:
-
-```bash
-simulator jobs.csv --total_nodes 4 --queue_impl circular \
-    --dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 10000 \
-    --backfill_policy conservative
-```
-
-Use the default resource-time reservation rule
-(`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) and omit a planning horizon. This
-mode does not reproduce Spur's administrative, health-check, or burst-buffer
-notifications, topology, or production eligibility rules. See
-[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#spur-unified-timer-and-event-triggers)
-for source evidence and simultaneous-wake abstractions.
+For a Spur-oriented configuration, see
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#spur-unified-timer-and-event-triggers).
+Notification and simultaneous-wake differences are in
+[Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--backfill_interval SECONDS`
 
@@ -423,11 +407,11 @@ Number of waiting jobs, in queue order, that hold reservations under
 `--backfill_policy hybrid`. A job deeper in the queue may start only if it
 fits now and delays none of those `N`; it holds no reservation of its own.
 `N` must be positive with `hybrid` and is ignored by the other policies.
-`1` reproduces `easy`; a depth of at least the queue length is
-`conservative`. This is the behaviour of Slurm's `bf_job_part_count_reserve`
-and of Fluxion's `hybrid` queue policy with `reservation-depth`. Hybrid, and
-conservative as its unlimited-depth case, use the hybrid FCFS schedulers with either `fcfs` or `fcfs_conservative`
-ordering and is rejected with `sjf` or `ljf`.
+`1` gives head protection; a depth covering all eligible waiting jobs gives
+conservative protection. EASY and hybrid can still differ in finite-Q accounting;
+see [Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
+Hybrid and conservative use the hybrid FCFS schedulers with either `fcfs` or
+`fcfs_conservative` ordering; hybrid is rejected with `sjf` or `ljf`.
 
 **Default:** `0`
 
@@ -788,10 +772,9 @@ Keep a job's nodes unavailable for a while after it ends, modeling cleanup,
 reboot, or health checks, before another job can start on them. All of a
 job's nodes return together once its slowest node is done (block release).
 
-The scheduler does not plan with the delay. As in Slurm, Flux, and LSF, a
-running job's projected release is its start time plus its time limit, and a
-backfill candidate is tested on its own projected end; none of those systems
-adds cleanup time to planned releases. A reservation made against a job's
+The scheduler does not plan with the delay. A running job's projected release
+is its start time plus its time limit, and a backfill candidate is tested on
+its own projected end. A reservation made against a job's
 limit is therefore optimistic by the cleanup time, and the head starts when
 the nodes actually return. Once a job has ended, its nodes are observably in
 cleanup and their projected release is the actual sampled release time.

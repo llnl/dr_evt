@@ -2,7 +2,7 @@
 
 This page explains the core actions of batch scheduling, groups production
 engines by trigger, and shows how to approximate those actions with DR_EVT's
-current options. The four production loops provide context for the mappings;
+current options. The production loops provide context for the mappings;
 [Realism and Known Gaps](REALISM_AND_GAPS.md) records the remaining differences,
 excluded scope, and validation limits. Detailed policy definitions are in
 [Scheduling Policies](../BACKFILLING_ALGORITHMS.md).
@@ -34,6 +34,7 @@ backfill planning and selection:
 These are conceptual actions, not necessarily two consecutive passes.
 Slurm triggers its main dispatch and backfill separately. Fluxion and Spur
 combine immediate placement and future reservation in one ordered traversal.
+OpenPBS also evaluates starts and future protection in the same cycle.
 LSF applies its configured policies within scheduling sessions.
 
 ## Shared terms
@@ -51,21 +52,29 @@ LSF applies its configured policies within scheduling sessions.
   It does not establish when scheduling runs.
 - **Planning resolution:** the granularity of the future resource-time plan,
   independent of scheduling cadence and actual execution times.
+- **Cycle execution-time limit:** elapsed scheduler computation time before a
+  traversal stops. This is separate from Q, R, H, and scheduling cadence;
+  DR_EVT does not model scheduler computation consuming simulation time. An
+  assumed evaluation throughput can translate this allowance into a derived Q.
 
 Every accepted start consumes resources in the current pass's plan. Every
 future reservation protects resources over its planned execution interval.
 Later starts must preserve earlier protected reservations; finishing before
 a reservation is one sufficient case, not a universal admission rule.
-Planning uses scheduler-visible runtime estimates, not future actual runtimes.
+Planning uses scheduler-visible time limits or runtime estimates, rather than
+future actual runtimes.
 
 ## Categories by scheduling trigger
 
 The trigger determines **when** decisions run; the policy and depth limits determine
-**which** jobs can start or receive protection.
+**which** jobs can start or receive protection. These categories describe timers
+that request scheduling, rather than daemon heartbeats or health checks. A
+health-check timer matters here only if it requests a scheduling pass or
+changes scheduling-relevant state.
 
 | Category | Trigger behavior | Production example |
 |---|---|---|
-| Unified event-driven | A relevant state event requests an allocation/reservation cycle | Fluxion |
+| Unified event-driven | A relevant state event requests an allocation/reservation cycle | Fluxion; OpenPBS |
 | Separate dispatch and backfill triggers | Events request main dispatch; a separate interval governs backfill; main dispatch also has a periodic pass | Slurm |
 | Unified timer and event triggers | An explicit notification or a periodic timer runs the same placement/reservation loop | Spur at the inspected commit |
 | Sessions with a minimum interval | Scheduling work is handled in sessions no more often than the configured minimum interval | LSF |
@@ -77,7 +86,9 @@ also wake its unified loop at 2.3 s. For LSF, if the previous session began
 at 0 s and the minimum interval is 5 s, the next session cannot begin before
 5 s; the interval does not promise a session exactly then. A hypothetical
 strict tick-gated scheduler would wait until 3 s, but that is not the inspected
-Spur submission behavior.
+Spur submission behavior. OpenPBS can request a cycle on that arrival too,
+subject to scheduler availability; its fallback timer is discussed in
+[PBS timing and cycle limits](REALISM_AND_GAPS.md#pbs-timing-and-cycle-limits).
 
 ## DR_EVT's current loop
 
@@ -182,6 +193,8 @@ controls reproduces selected decisions, not the entire production engine.
 | Fluxion-like event-driven hybrid; protect one waiting job | `--backfill_interval 0 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_time_resolution 1`; omit H |
 | Fluxion-like event-driven conservative | Same event-driven settings with `--backfill_policy conservative`; omit H |
 | Spur-like unified timer and submission notifications | `--dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 3 --backfill_policy conservative`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
+| PBS event-driven approximation; Q caps backfill examinations | `--priority_policy fcfs --backfill_policy hybrid --reservation_depth N --backfill_interval 0 --dispatch_interval 0 --backfill_queue_depth Q`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
+| PBS total-candidate Q with assumed fixed cadence | `--dispatch_interval I --dispatch_queue_depth Q --backfill_policy hybrid --reservation_depth N`; omit H; use the default resource-time rule |
 | LSF timing under the earliest-permitted-session assumption | Set `--dispatch_interval` to the assumed session interval, e.g. `5`; choose queue depth and backfill policy separately, since their LSF equivalence is unverified |
 
 For Slurm, map `bf_interval` to the backfill interval, `bf_max_job_test` to Q,
@@ -194,26 +207,20 @@ For Fluxion hybrid, map `queue-depth` and `reservation-depth` to Q and R.
 Use hybrid with R=1 for head protection when cycle-wide Q accounting matters.
 The default event-driven mode approximates Fluxion's trigger mechanism.
 
+For PBS, assume `strict_ordering=true` and global protection depth N > 0.
+The event-driven row excludes ordinary FCFS starts from Q; the fixed-cadence
+row includes them but approximates PBS timing. See
+[PBS timing and cycle limits](REALISM_AND_GAPS.md#pbs-timing-and-cycle-limits).
+
 The fixed-periodic rows implement the chat algorithm: update state on events,
 wait for the next tick, and make one bounded scheduling pass. They model
 Spur's timer path and shared candidate prefix, but Spur also dispatches on
 notifications.
 
-For LSF timing studies, assume sessions occur at every interval boundary while
-jobs are waiting, with the session phase aligned to DR_EVT's ticks and no
-additional session delay. Under this earliest-permitted-session assumption,
-unified periodic dispatch represents the session cadence. For example, with
-5-second intervals anchored at 0, an arrival at 2.3 waits until 5, and waiting
-work is reconsidered at 10, 15, and so on. This is an explicit modeling
-assumption, not a timing guarantee established by the supplied LSF evidence.
-Queue-depth accounting, reservation depth, and horizon require separate
-matching; the cadence assumption does not establish their equivalence.
-
-Set cleanup parameters from measurements when node reuse matters. Current
-options do not supply LSF sessions with variable timing beyond the assumed
-regular cadence. Production eligibility and topology, additional Spur
-notification sources, and the residual Slurm/Fluxion differences
-are detailed in [Remaining differences](REALISM_AND_GAPS.md#remaining-differences).
+For LSF, use the aligned-session assumption described in the
+[LSF mapping](#lsf-scheduling-sessions-with-a-minimum-interval).
+Set cleanup parameters from measurements when node reuse matters. Production
+modeling limits are in [Remaining differences](REALISM_AND_GAPS.md#remaining-differences).
 
 ## Example: separating Q, R, and H
 
@@ -309,10 +316,6 @@ of fixed, startup-phased evaluation ticks.
 ## Fluxion: one event-driven allocation/reservation cycle
 
 This loop describes Fluxion's policy in `flux-sched` at the pinned commit.
-The inspected `flux-core` also provides `sched-simple`, `sched-fifo`, and
-`sched-backfill` modules. Their `queue-depth` limits outstanding pending
-allocation requests, rather than Fluxion's per-cycle examination count.
-The scheduler module and version must therefore be specified when choosing Q.
 
 ```text
 on a scheduling-relevant event:
@@ -396,27 +399,37 @@ a filter absent from Spur's exposed configuration. Use the default resource-time
 reservation rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`). This extends the
 fixed periodic mode; omitting `--dispatch_on_events` retains tick-only dispatch.
 
-The inspected controller notifies on ordinary submission, administrative
-requeue (including late finalization), internal health-check submission,
-health-check recovery of a drained node, and burst-buffer stage-in readiness.
-Ordinary completion and ordinary node updates do not notify; the timer picks
-up those changes. DR_EVT models ordinary submissions as arrivals, and leaves
-its completions, cleanup releases, and capacity changes for the timer. The
-other notification sources involve APIs outside its homogeneous-pool model.
+DR_EVT models ordinary submission notifications and timer polling.
+Additional notification sources and asynchronous wake differences are in
+[Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope);
+regression coverage is in [Validation scope](REALISM_AND_GAPS.md#validation-scope).
 
-DR_EVT batches simultaneous arrivals and coalesces an arrival/timer coincidence
-into one bounded pass. Spur's asynchronous notification and timer can instead
-produce separate ready wakes. Spur also has an immediate initial Tokio tick;
-DR_EVT starts its timer one interval after initialization, with initial arrivals
-providing the notification pass. These are explicit simulation abstractions.
-A new streaming arrival batch at the current clock can request another pass;
-repeated advancement without new arrivals does not.
+## OpenPBS: unified event-driven scheduling
 
-Tests cover arrival passes between ticks without shifting phase, one prefix
-per batch, coincident arrival/timer wakes, completion and capacity polling,
-cleanup, reservation depth, randomized FCFS comparison, streaming boundaries,
-exact lookahead, warm starts, and checkpoint continuation. They validate the
-DR_EVT mode against its model, rather than a running Spur controller.
+For ordinary jobs with strict ordering, OpenPBS follows the unified
+event-driven pattern: rebuild the calendar, examine jobs in order, start
+fitting jobs, and protect eligible waiting jobs. Its fallback timer and
+cycle-limit differences are in
+[PBS timing and cycle limits](REALISM_AND_GAPS.md#pbs-timing-and-cycle-limits).
+
+| OpenPBS control | Meaning | Inspected default |
+|---|---|---|
+| `scheduler_iteration` | Fallback scheduling interval | 600 seconds |
+| `sched_cycle_length` | Main-traversal execution-time limit | 20 minutes |
+| `max_job_check` | Candidate cap Q_count, including starts and failed checks | No count cap (`ALL_JOBS`) |
+| `backfill_depth` | Protected waiting-job depth R; queue values override | Unset uses 1; server 0 disables backfill |
+| `strict_ordering` | Preserve queue order through backfill protection | False |
+
+`backfill_depth` counts protected waiting jobs, not backfill borrowers or
+`pbs_rsub` advance reservations. Reaching R does not stop later examinations.
+With strict ordering, R=1 approximates head protection and R=N hybrid backfill;
+this does not classify every PBS policy as EASY.
+
+No separate `bf_window`-like horizon was found in the inspected path; omit H
+in the mapping. Walltime limits execution duration, not future-start lookahead.
+Unstarted jobs remain pending; infeasible jobs can receive a `can_never_run`
+classification without future protection. Use DR_EVT's default resource-time
+rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) to preserve protected intervals.
 
 ## LSF: scheduling sessions with a minimum interval
 
@@ -487,31 +500,15 @@ The chosen simplified LSF representation uses:
   Assume sessions occur at the aligned interval boundaries without additional
   delay, as described above.
 
-This is a simplified LSF model with periodic sessions and strict backfill.
-The build flag applies the time barrier throughout the pool and throughout
-that build. LSF's documented barrier applies to jobs borrowing reserved slots;
-it does not establish the same restriction for jobs using unreserved slots.
-Queue-specific eligibility, slot ownership, and multiple reserving jobs are
-not reproduced by this configuration.
-
-DR_EVT's default resource-time rule (`OFF`) can permit safe overlap with a
-protected reservation. The chosen strict configuration needs dedicated
-validation; the unified-dispatch checks reported above used the default rule.
-
-The evidence still establishes neither a general R equivalent to DR_EVT's
-reservation depth nor an H equivalent to `bf_window`. It also does not specify
-whether reservations persist between sessions, whether failed tests and
-reservation attempts consume job decisions, or whether a separate examination
-limit exists. The supplied explanatory claims about those details are not
-supported by the quoted IBM passages and are not used as verified behavior.
+Reserved-slot ownership and admission differences are in
+[LSF admission on reserved slots](REALISM_AND_GAPS.md#lsf-admission-on-reserved-slots).
+Accounting and policy evidence limits are in
+[LSF evidence limits](REALISM_AND_GAPS.md#sources).
 
 ## Sources
 
 - **Slurm:** copied commit `17abb848e20054009d136a2c504a23e5462f26c8`,
-  [`backfill_agent`](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L1238),
-  [initial horizon check](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3201),
-  [test counter](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3359),
-  and [post-test horizon check](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3836).
+  [`backfill_agent`](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L1238).
   Main dispatch is described in the [Scheduling Configuration Guide](https://slurm.schedmd.com/sched_config.html)
   and the supplied SchedMD scheduling tutorial, pages 8–10 and 21–22.
 - **Fluxion:** commit `3b49d1998ed53836618e54188f45b52bc1aac811`,
@@ -521,30 +518,26 @@ supported by the quoted IBM passages and are not used as verified behavior.
   [blocked-job reconsideration](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/base/queue_policy_base.hpp#L188-L194),
   `qmanager/config/queue_system_defaults.hpp`, and the EASY, hybrid, and
   conservative policy constructors.
-- **Flux core:** copied commit `d0309fcf0e672d90e65b0797168e56a430b9fb57`,
-  [job-manager allocation requests](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/modules/job-manager/alloc.c#L457),
-  [Python scheduler request handling and queue-depth definition](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/bindings/python/flux/scheduler.py#L237),
-  and its separate [EASY backfill module](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/modules/sched-backfill.py).
-  These modules do not establish Fluxion's reservation-depth or scan-counter rules.
 - **Spur:** copied commit `693c0b32bf91a0965a63a263206e6e22a3e5a9e9`:
   `crates/spurctld/src/scheduler_loop.rs` (timer/notification selection,
-  classification, trial placement, dispatch; timer selection at lines 232–250
-  and late-requeue notification at line 3881), `crates/spurctld/src/cluster.rs`
-  (`submit_job`, `classify_pending_jobs_with`; notification call sites at lines
-  1378, 2176, 3448, 3577, and 5980),
+  classification, trial placement, dispatch; timer selection at lines 232–250),
+  `crates/spurctld/src/cluster.rs` (`submit_job`, `classify_pending_jobs_with`),
   `crates/spur-sched/src/backfill.rs` (`init_timelines`, `schedule_jobs_with`),
   and `crates/spur-core/src/config.rs` (`SchedulerConfig`).
+- **OpenPBS:** copied commit `cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a`:
+  [shared scheduler command path](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/scheduler/fifo.cpp#L502),
+  [waiting-job protection depth](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/scheduler/fifo.cpp#L1644),
+  and [future calendar search](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/scheduler/simulate.cpp#L715).
+  Control definitions also use `src/scheduler/config.h`, `parse.cpp`,
+  `server_info.cpp`, and the scheduler/server attribute manuals under `doc/man1`.
 - **LSF:** IBM Spectrum LSF 10.1
   [`JOB_SCHEDULING_INTERVAL`](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_config_ref/lsb.params.job_scheduling_interval.5.html),
   [processor reservation](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/reserving_processors.html),
   and [backfill](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/backfill.html),
-  plus the supplied IBM excerpts for `LSB_MAX_JOB_DISPATCH_PER_SESSION`,
-  *Manage scheduling performance*, *Enable fast job dispatch*, and
-  *Backfill scheduling*, last updated 2026-10-26. The parameter reference gives
-  default 15000, with `JOB_DISPATCH_PACK_SIZE=0` selecting the CPU-based formula;
-  the performance guide gives that formula without the same qualification.
-  These excerpts do not establish a Fix Pack 9 transition. No LSF source was
-  inspected.
+  plus the supplied *Backfill scheduling* excerpt, updated 2026-10-26.
 
 - **DR_EVT:** `src/sim/sim.cpp` (`advance_to_impl`),
   `src/sim/scheduler_*.cpp`, and `src/sim/scheduler_base.cpp` on this branch.
+
+References for accounting differences, fallback timing, and evidence limits
+are in [Realism and Known Gaps](REALISM_AND_GAPS.md#sources).

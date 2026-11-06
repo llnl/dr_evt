@@ -105,7 +105,7 @@ arguments use legacy names or numeric IDs.
 - `RunTimeMode.ACTUAL`, `RunTimeMode.DISTRIBUTION`,
   `RunTimeMode.LIMIT`
 - `BackfillPolicy.NONE`, `BackfillPolicy.EASY`,
-  `BackfillPolicy.CONSERVATIVE`
+  `BackfillPolicy.CONSERVATIVE`, `BackfillPolicy.HYBRID`
 - `PriorityPolicy.FCFS`, `PriorityPolicy.FCFS_CONSERVATIVE`,
   `PriorityPolicy.SJF`, `PriorityPolicy.LJF`
 - `ReleaseDelayModel.CONSTANT`, `ReleaseDelayModel.EXPONENTIAL`,

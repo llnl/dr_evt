@@ -204,9 +204,8 @@ never needs the job record, which may already have been written and
 reclaimed. Available nodes are the capacity minus allocated and releasing
 nodes. The scheduler does not plan with the delay: a not-yet-ended job's
 projected release is its start plus its time limit, and a backfill candidate
-is tested on its projected end, as production schedulers do. Once the job has
-ended, the running-job entry stays until the release with its projected
-release updated to the sampled time, so reservations account for nodes that
+is tested on its projected end. Once the job has ended, the running-job entry
+stays until the release with its projected release updated to the sampled time, so reservations account for nodes that
 are observably in cleanup. Replayed history is never delayed; in a warm start
 the delay applies to departures at or after the simulation start time.
 

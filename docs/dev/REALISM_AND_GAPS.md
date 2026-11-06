@@ -37,8 +37,11 @@ abstractions, not claims of identical asynchronous execution.
 For LSF, fixed periodic dispatch represents timing under the assumption that
 sessions occur at every aligned interval boundary while jobs wait, without
 additional delay. LSF's minimum interval alone does not guarantee that cadence;
-variable session timing remains unimplemented. The available IBM evidence also
-does not establish that LSF's job-decision limit equals DR_EVT's candidate count.
+variable session timing remains unimplemented. The available IBM evidence does
+not establish that LSF's job-decision limit equals DR_EVT's candidate count,
+what failed checks or reservation attempts charge, or whether a separate scan
+limit exists. It also does not establish a general reservation-depth or horizon
+control, or whether reservations persist between sessions.
 
 ### Backfill evaluation accounting
 
@@ -60,6 +63,11 @@ placement testing. Event-driven hybrid/conservative exempts them but leaves them
 than reproducing Fluxion's blocked-list lifecycle. These distinctions matter
 for finite Q when skipped jobs occur ahead of runnable candidates.
 
+These Fluxion comparisons apply to `flux-sched`. The inspected `flux-core`
+modules (`sched-simple`, `sched-fifo`, and `sched-backfill`) instead use
+`queue-depth` for outstanding allocation requests, so their depth cannot be
+substituted for Fluxion's examination cap.
+
 In the separate `--backfill_interval` mode, the scheduling-state flag is cleared by an evaluation and
 is not set just because backfill started a job. Consequently, a later tick
 without an intervening state event does not necessarily examine candidates
@@ -67,6 +75,22 @@ exposed by that start. This is a limitation for reproducing a controller
 that evaluates its new queue prefix every cycle. The unified
 `--dispatch_interval` mode retries every tick and does not use this flag to
 suppress evaluations.
+
+### PBS timing and cycle limits
+
+DR_EVT can approximate `sched_cycle_length` with queue depth Q equal to an
+assumed evaluation throughput (candidates/second) times the cycle limit,
+rounded down to at least one and capped by any explicit `max_job_check`.
+This approximates candidate effort, including starts, failed checks, and future
+planning, without modeling scheduler CPU time.
+
+The [event-driven PBS approximation](SCHEDULER_LOOPS.md#openpbs-unified-event-driven-scheduling)
+omits `scheduler_iteration` fallback cycles, assuming studied cycles are not
+truncated by Q and time alone does not change eligibility. Independently of
+failure recovery, PBS's fallback can retry candidates left by a truncated cycle;
+its deadline moves with scheduling requests. DR_EVT's event-driven Q limits
+backfill examinations, while unified dispatch counts all candidates with an
+assumed aligned cadence; neither reproduces both PBS semantics together.
 
 ### LSF admission on reserved slots
 
@@ -81,7 +105,8 @@ it does not reproduce LSF's queue-specific backfill eligibility and reserved
 slot ownership. EASY can mimic the example in IBM's documentation, but it does not
 establish that LSF uses only EASY or always protects exactly one waiting job.
 See the [LSF loop](SCHEDULER_LOOPS.md#lsf-scheduling-sessions-with-a-minimum-interval)
-for the confirmed policy and remaining accounting questions.
+for the selected configuration. The legacy barrier applies throughout the
+homogeneous pool and build; IBM's rule concerns borrowed reserved slots.
 
 ## Out of scope
 
@@ -89,7 +114,14 @@ The built-in model uses one homogeneous node pool with FCFS, SJF, or LJF
 ordering. It does not model multifactor priority (age, fair share, QOS),
 preemption, dependencies and arrays, per-user/account limits, partitions,
 node topology and placement, or node failures. Scheduled capacity changes
-alter the pool size; they do not model those mechanisms.
+alter the pool size; they do not model those mechanisms. Health checks, missed
+notifications, state inconsistency, and failure recovery are outside the model;
+timers used only for those purposes need no simulation equivalent.
+
+PBS's explicit advance reservations (`pbs_rsub`), per-queue protection-depth
+overrides, and prime/dedicated-time eligibility windows are also outside the
+chosen global-pool mapping. Its waiting-job reservations use the existing
+hybrid protection model.
 
 The experimental [multi-system scheduler](../user-guide/multi-cluster-backfill.md)
 shares a queue across several homogeneous systems. The external EASY selector
@@ -128,7 +160,42 @@ The [RAPS comparison helper](../../scripts/compare_with_raps.py) is a separate,
 manual check of legacy reservation-barrier behavior. It is not validation of
 DR_EVT's default resource-time feasibility rule.
 
+OpenPBS behavior was checked against pinned source and manuals, without a
+paired OpenPBS/DR_EVT runtime comparison. The unified-dispatch checks used the
+default resource-time rule; the selected strict LSF configuration needs
+separate validation.
+
 ## Sources
 
-Pinned production-source references and the current DR_EVT implementation
-files are listed in [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md#sources).
+Core loop and policy sources are listed in
+[Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md#sources).
+The following references support the differences and evidence limits above:
+
+- **Slurm accounting:** at `17abb848e20054009d136a2c504a23e5462f26c8`,
+  [initial horizon check](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3201),
+  [test counter](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3359),
+  and [post-test horizon check](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3836).
+- **Flux core:** copied commit `d0309fcf0e672d90e65b0797168e56a430b9fb57`,
+  [job-manager allocation requests](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/modules/job-manager/alloc.c#L457),
+  [Python scheduler request handling and queue-depth definition](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/bindings/python/flux/scheduler.py#L237),
+  and its separate [EASY backfill module](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/modules/sched-backfill.py).
+  These modules do not establish Fluxion's reservation-depth or scan-counter rules.
+- **Spur notification scope:** at `693c0b32bf91a0965a63a263206e6e22a3e5a9e9`,
+  `crates/spurctld/src/scheduler_loop.rs:3881` (late requeue) and
+  `crates/spurctld/src/cluster.rs` notification sites at lines 1378, 2176,
+  3448, 3577, and 5980.
+- **OpenPBS timing and cycle limits:** at `cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a`,
+  [fallback-deadline assignment](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/server/pbsd_main.c#L1366),
+  [timer-expiry request](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/server/pbsd_main.c#L1598),
+  and [main cycle and limits](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/scheduler/fifo.cpp#L820).
+  Additional inspected files: `src/server/svr_jobfunc.c` (new eligibility),
+  `req_jobobit.c` (resource-release request), `run_sched.c` (busy handling),
+  and `doc/man8/pbs_sched.8B`.
+- **LSF evidence limits:** supplied IBM excerpts for
+  `LSB_MAX_JOB_DISPATCH_PER_SESSION`, *Manage scheduling performance*, and
+  *Enable fast job dispatch*, updated 2026-10-26. The parameter reference gives
+  default 15000, with `JOB_DISPATCH_PACK_SIZE=0` selecting the CPU-based formula;
+  the performance guide gives that formula without the same qualification.
+  These excerpts do not establish a Fix Pack 9 transition. No LSF source was
+  inspected. Reserved-slot admission is documented in IBM's
+  [backfill guide](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/backfill.html).

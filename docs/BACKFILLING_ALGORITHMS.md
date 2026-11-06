@@ -16,10 +16,10 @@ maintains the reservations needed for conservative backfilling.
 
 ## Backfilling policies
 
-At each arrival or completion time, the scheduler first starts as many jobs
-from the front of the eligible queue as currently fit. If the new head is
-blocked, the configured backfilling policy determines whether a later job may
-start.
+At a permitted scheduling pass, start fitting jobs from the front of the
+eligible queue. If the new head is blocked, the backfilling policy determines
+whether a later job may start. Trigger modes and production mappings are in
+[Scheduling Loops](dev/SCHEDULER_LOOPS.md).
 
 ### None
 
@@ -33,8 +33,9 @@ EASY protects the blocked head's reservation:
    times of running jobs until enough nodes would be available for the head.
    That time is the head's reservation.
 2. Scan later eligible jobs in priority order.
-3. Start a candidate only if it fits the currently free nodes and its
-   estimated completion is strictly before the reservation.
+3. Start a candidate only if it fits now and preserves the head's protected
+   resource-time interval. With `DR_EVT_LEGACY_RESERVATION_BARRIER=ON`, require
+   its estimated completion to be strictly before the protected start.
 
 Only the queue head receives a reservation, so jobs deeper in the queue can be
 delayed by backfilling.
@@ -111,28 +112,32 @@ deque implementation.
 the first `N` waiting jobs in queue order. A candidate deeper than `N` may
 start only if it does not delay any reservation in that plan; it holds no
 reservation itself, so later candidates may pass it.
-`N = 1` reproduces EASY and a depth of at least the queue length is
-conservative. Slurm behaves this way when `bf_job_part_count_reserve` is
-set, and Fluxion's `hybrid` queue policy does the same with
-`reservation-depth`. Hybrid, with conservative as its
-unlimited-depth case, is implemented by the hybrid FCFS schedulers and accepts `fcfs` or `fcfs_conservative` ordering. The Python
-oracle `scripts/python_hybrid_scheduler.py` accepts the same reservation
-and queue-depth limits via `--reservation-depth` and
+`N = 1` provides head protection; a depth covering all eligible waiting jobs
+provides conservative protection. Hybrid and conservative accept `fcfs` or
+`fcfs_conservative` ordering. The Python oracle
+`scripts/python_hybrid_scheduler.py` accepts `--reservation-depth` and
 `--backfill-queue-depth`.
-Reservations beyond `--planning_horizon` consume neither a queue-depth scan
-slot nor a hybrid reservation-depth slot, and are reconsidered on the next
-pass.
+
+Out-of-horizon jobs receive no protection and consume no reservation-depth
+slot. Queue-depth accounting depends on the trigger mode; see
+[Command-Line Options](user-guide/command-line.md).
+Head protection alone does not guarantee identical EASY and hybrid results
+with finite scan limits; see
+[Backfill evaluation accounting](dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
 ## Runtime estimates and completion
 
 Reservations and backfill checks use each job's requested `time_limit`, which
 is the information available to the scheduler. A simulation job's observed
 run time may be shorter, depending on `--run_time_mode`. An early completion
-releases its nodes and triggers another scheduling decision; it does not
-retroactively change an earlier reservation calculation.
+releases its nodes (after any configured release delay); reconsideration follows
+the selected trigger mode and does not change an earlier reservation calculation.
 
-The completion test is strict: a candidate whose estimated completion equals
-the protected reservation is not accepted as a backfill job.
+The default admission rule preserves protected resource-time intervals and can
+allow overlapping jobs when enough resources remain. The legacy barrier requires
+completion strictly before the protected start; see
+[LSF admission on reserved slots](dev/REALISM_AND_GAPS.md#lsf-admission-on-reserved-slots)
+for its production-model scope.
 
 ## Comparison
 
@@ -155,8 +160,7 @@ result; see [Wait Queues](dev/WAIT_QUEUES.md).
   SP2 with Backfilling*.
 - Feitelson, D. G., and Weil, A. M. (1998), *Utilization and Predictability in
   Scheduling the IBM SP2 with Backfilling*.
-- Slurm, [Backfill Scheduling](https://slurm.schedmd.com/sched_config.html#backfill)
-  and [`_add_reservation()`](https://github.com/SchedMD/slurm/blob/4da7cc366ea9e109f769da83339e299f9aaff78f/src/plugins/sched/backfill/backfill.c#L4251).
-- Fluxion qmanager,
-  [conservative and hybrid policy contract](https://github.com/flux-framework/flux-sched/blob/981a1328a5a74149d459e83e96ad841c2ba153a2/doc/man5/flux-config-sched-fluxion-qmanager.rst#L82-L99)
-  and [reservation loop](https://github.com/flux-framework/flux-sched/blob/981a1328a5a74149d459e83e96ad841c2ba153a2/qmanager/policies/queue_policy_bf_base_impl.hpp#L41-L68).
+
+Production scheduler sources and option mappings are in
+[Scheduling Loops](dev/SCHEDULER_LOOPS.md#sources); accounting and modeling
+limitations are in [Realism and Known Gaps](dev/REALISM_AND_GAPS.md).
