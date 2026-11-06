@@ -47,6 +47,7 @@ static constexpr int OPT_PLANNING_HORIZON = 1017;
 static constexpr int OPT_WARM_START_WAIT_QUEUE = 1018;
 static constexpr int OPT_DISPATCH_INTERVAL = 1019;
 static constexpr int OPT_DISPATCH_QUEUE_DEPTH = 1020;
+static constexpr int OPT_DISPATCH_ON_EVENTS = 1021;
 static constexpr int OPT_NODE_RELEASE_DELAY = 1011;
 static constexpr int OPT_NODE_RELEASE_DELAY_MODEL = 1012;
 static constexpr int OPT_NODE_RELEASE_DELAY_SPREAD = 1013;
@@ -74,6 +75,7 @@ static const struct option sim_longopts[] = {
     {"backfill_interval", required_argument, 0, OPT_BACKFILL_INTERVAL},
     {"dispatch_interval", required_argument, 0, OPT_DISPATCH_INTERVAL},
     {"dispatch_queue_depth", required_argument, 0, OPT_DISPATCH_QUEUE_DEPTH},
+    {"dispatch_on_events", no_argument, 0, OPT_DISPATCH_ON_EVENTS},
     {"planning_time_resolution", required_argument, 0,
      OPT_PLANNING_TIME_RESOLUTION},
     {"planning_horizon", required_argument, 0, OPT_PLANNING_HORIZON},
@@ -120,6 +122,7 @@ Sim_Params::Sim_Params()
       m_num_max_candidates(1), m_reservation_depth(0),
       m_backfill_queue_depth(0), m_backfill_interval(0.0),
       m_dispatch_interval(0.0), m_dispatch_queue_depth(0),
+      m_dispatch_on_events(false),
       m_planning_time_resolution(0.0),
       m_planning_horizon(std::numeric_limits<tdiff_t>::max()),
       m_warm_start_wait_queue(WarmStartWaitQueuePolicy::INHERIT),
@@ -341,6 +344,9 @@ void Sim_Params::getopt(int &argc, char **&argv) {
                   << std::endl;
         print_usage(argv[0], 1);
       }
+      break;
+    case OPT_DISPATCH_ON_EVENTS:
+      m_dispatch_on_events = true;
       break;
     case OPT_DISPATCH_QUEUE_DEPTH:
       m_dispatch_queue_depth = parse_uint("--dispatch_queue_depth",
@@ -912,12 +918,17 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        enabled --backfill_policy and --queue_impl circular.\n"
          "\n"
          "    --dispatch_interval SECONDS\n"
-         "        Run FCFS and backfill only at periodic ticks; 0 disables.\n"
+         "        Run FCFS and backfill at periodic ticks; 0 disables.\n"
          "        Requires FCFS ordering and circular queue; cannot be used\n"
          "        with a positive --backfill_interval.\n"
          "\n"
+         "    --dispatch_on_events\n"
+         "        Also run one unified pass on job arrival batches,\n"
+         "        without resetting the timer cadence. Requires a positive\n"
+         "        --dispatch_interval.\n"
+         "\n"
          "    --dispatch_queue_depth N\n"
-         "        Candidate prefix examined per unified tick, including\n"
+         "        Candidate prefix examined per unified wake, including\n"
          "        immediate starts and waiting jobs; 0 means unlimited.\n"
          "\n"
          "    --planning_time_resolution SECONDS\n"
@@ -1179,6 +1190,7 @@ void Sim_Params::print() const {
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
   msg += " - dispatch_interval: " + to_string(m_dispatch_interval) + "\n";
   msg += " - dispatch_queue_depth: " + to_string(m_dispatch_queue_depth) + "\n";
+  msg += " - dispatch_on_events: " + std::string(m_dispatch_on_events ? "true" : "false") + "\n";
   msg += " - planning_time_resolution: " +
          to_string(m_planning_time_resolution) + "\n";
   msg += " - planning_horizon: ";

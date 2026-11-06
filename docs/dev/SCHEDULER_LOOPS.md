@@ -40,8 +40,9 @@ LSF applies its configured policies within scheduling sessions.
 
 - **Scheduling interval:** when a scheduling cycle may run.
 - **Queue depth Q:** the maximum number of waiting jobs examined in a cycle.
-  In DR_EVT this is the **backfill evaluation budget**, controlled by
-  `--backfill_queue_depth`; ordinary FCFS dispatch uses none of it.
+  In DR_EVT, `--backfill_queue_depth` limits backfill examinations, excluding
+  ordinary FCFS starts. In unified modes, `--dispatch_queue_depth` limits the
+  whole placement prefix, including immediate starts.
   Production engines can count different stages of candidate evaluation.
 - **Reservation depth R:** the maximum number of waiting jobs given protected
   future starts. It is not added to Q. Creating a reservation can consume one
@@ -82,7 +83,7 @@ Spur submission behavior.
 
 DR_EVT batches arrivals, completions, node releases, and scheduled capacity
 changes at their exact timestamps before making scheduling decisions.
-There are three supported trigger modes:
+There are four supported trigger modes:
 
 ```text
 event-driven (backfill_interval = 0 and dispatch_interval = 0):
@@ -97,7 +98,7 @@ periodic backfill (backfill_interval > 0):
         repeat scheduler calls until none starts a job
     on other ticks: advance the tick deadline without a backfill scan
 
-unified fixed periodic dispatch (dispatch_interval > 0):
+unified fixed periodic dispatch (dispatch_interval > 0, dispatch_on_events = false):
     on a state-event batch: apply it without scheduling
     on each tick while jobs wait:
         apply all events at that timestamp
@@ -105,6 +106,15 @@ unified fixed periodic dispatch (dispatch_interval > 0):
         perform FCFS starts and backfill with a fresh reservation plan
         do not repeat the scan at this tick
     retry from the current queue head at the next tick
+
+unified timer and arrival notifications (dispatch_interval > 0, dispatch_on_events = true):
+    apply all state events at their exact timestamps
+    on an arrival batch or a tick while jobs wait:
+        run the same unified placement/reservation/backfill pass once
+        use one fresh dispatch_queue_depth prefix and reservation plan
+    coalesce an arrival batch and timer at the same timestamp into one pass
+    ordinary completions, releases, and capacity changes wait for a tick
+    preserve the timer phase after every arrival notification
 ```
 
 Periodic ticks begin one interval after the loop is initialized (normally
@@ -117,8 +127,9 @@ and FCFS or `fcfs_conservative` ordering, and does not support custom selectors.
 
 | Control | Current behavior |
 |---|---|
-| `--dispatch_interval` | Fixed ticks gate both FCFS and backfill; 0 disables unified periodic dispatch |
-| `--dispatch_queue_depth` | Entire examined prefix per unified tick, including immediate starts and out-of-horizon jobs; 0 is unlimited |
+| `--dispatch_interval` | Aligned ticks run both FCFS and backfill; 0 disables unified periodic dispatch |
+| `--dispatch_on_events` | Also run the unified pass on job arrival batches without resetting ticks; requires positive dispatch interval |
+| `--dispatch_queue_depth` | Entire examined prefix per unified wake, including immediate starts and out-of-horizon jobs; 0 is unlimited |
 | `--priority_policy` | FCFS, SJF, or LJF orders the waiting queue |
 | `--backfill_policy` | EASY protects the head; hybrid protects up to R waiting jobs; conservative protects all planned earlier waiting jobs; none disables backfill |
 | `--reservation_depth` | R for hybrid; a job beyond the planning horizon gets no reservation slot |
@@ -165,7 +176,7 @@ controls reproduces selected decisions, not the entire production engine.
 | Slurm-like periodic backfill; protect all planned earlier jobs | Same interval, Q, H, and resolution with `--backfill_policy conservative` |
 | Fluxion-like event-driven hybrid; protect one waiting job | `--backfill_interval 0 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_time_resolution 1`; omit H |
 | Fluxion-like event-driven conservative | Same event-driven settings with `--backfill_policy conservative`; omit H |
-| Spur's reservation traversal on a homogeneous pool | `--backfill_policy conservative --backfill_queue_depth 3`; omit H; this approximates reservation selection, not Spur's unified triggers or placement budget |
+| Spur-like unified timer and submission notifications | `--dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 3 --backfill_policy conservative`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
 | LSF timing under the earliest-permitted-session assumption | Set `--dispatch_interval` to the assumed session interval, e.g. `5`; choose queue depth and backfill policy separately, since their LSF equivalence is unverified |
 
 For Slurm, map `bf_interval` to the backfill interval, `bf_max_job_test` to Q,
@@ -194,8 +205,9 @@ Queue-depth accounting, reservation depth, and horizon require separate
 matching; the cadence assumption does not establish their equivalence.
 
 Set cleanup parameters from measurements when node reuse matters. Current
-options do not supply Spur's unified event/timer placement loop or LSF sessions
-with variable timing beyond the assumed regular cadence. Those and the residual Slurm/Fluxion differences
+options do not supply LSF sessions with variable timing beyond the assumed
+regular cadence. Production eligibility and topology, additional Spur
+notification sources, and the residual Slurm/Fluxion differences
 are detailed in [Remaining differences](REALISM_AND_GAPS.md#remaining-differences).
 
 ## Example: separating Q, R, and H
@@ -370,12 +382,36 @@ For a fixed interval, notification-triggered passes do not reset the timer
 cadence. With ticks at 5, 10, and 15, a submission at 7 can trigger a pass at
 7 while the next timer wake remains at 10.
 
-DR_EVT currently implements and tests unified fixed periodic dispatch, not
-this timer-plus-notification mode. Its tests cover fixed phase across idle
-periods, events at and between ticks, candidate limits, and unchanged-state
-retries. A Spur-mode test suite must additionally check immediate notification
-passes without shifting ticks, notifications coinciding with timer wakes,
-and each notification source verified in the Spur controller.
+DR_EVT implements this core trigger pattern with `--dispatch_interval 1
+--dispatch_on_events`, using a full unified pass for each job-arrival batch
+and each aligned tick while jobs wait. Choose `--backfill_policy conservative`
+to protect feasible future starts throughout the examined prefix and
+`--dispatch_queue_depth` for its size. Omit a planning horizon to avoid adding
+a filter absent from Spur's exposed configuration. Use the default resource-time
+reservation rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`). This extends the
+fixed periodic mode; omitting `--dispatch_on_events` retains tick-only dispatch.
+
+The inspected controller notifies on ordinary submission, administrative
+requeue (including late finalization), internal health-check submission,
+health-check recovery of a drained node, and burst-buffer stage-in readiness.
+Ordinary completion and ordinary node updates do not notify; the timer picks
+up those changes. DR_EVT models ordinary submissions as arrivals, and leaves
+its completions, cleanup releases, and capacity changes for the timer. The
+other notification sources involve APIs outside its homogeneous-pool model.
+
+DR_EVT batches simultaneous arrivals and coalesces an arrival/timer coincidence
+into one bounded pass. Spur's asynchronous notification and timer can instead
+produce separate ready wakes. Spur also has an immediate initial Tokio tick;
+DR_EVT starts its timer one interval after initialization, with initial arrivals
+providing the notification pass. These are explicit simulation abstractions.
+A new streaming arrival batch at the current clock can request another pass;
+repeated advancement without new arrivals does not.
+
+Tests cover arrival passes between ticks without shifting phase, one prefix
+per batch, coincident arrival/timer wakes, completion and capacity polling,
+cleanup, reservation depth, randomized FCFS comparison, streaming boundaries,
+exact lookahead, warm starts, and checkpoint continuation. They validate the
+DR_EVT mode against its model, rather than a running Spur controller.
 
 ## LSF: scheduling sessions with a minimum interval
 
@@ -487,8 +523,10 @@ supported by the quoted IBM passages and are not used as verified behavior.
   These modules do not establish Fluxion's reservation-depth or scan-counter rules.
 - **Spur:** copied commit `693c0b32bf91a0965a63a263206e6e22a3e5a9e9`:
   `crates/spurctld/src/scheduler_loop.rs` (timer/notification selection,
-  classification, trial placement, dispatch), `crates/spurctld/src/cluster.rs`
-  (`submit_job`, `classify_pending_jobs_with`),
+  classification, trial placement, dispatch; timer selection at lines 232–250
+  and late-requeue notification at line 3881), `crates/spurctld/src/cluster.rs`
+  (`submit_job`, `classify_pending_jobs_with`; notification call sites at lines
+  1378, 2176, 3448, 3577, and 5980),
   `crates/spur-sched/src/backfill.rs` (`init_timelines`, `schedule_jobs_with`),
   and `crates/spur-core/src/config.rs` (`SchedulerConfig`).
 - **LSF:** IBM Spectrum LSF 10.1

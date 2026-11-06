@@ -106,6 +106,7 @@ private:
     visit("backfill_interval", self.m_backfill_interval);
     visit("dispatch_interval", self.m_dispatch_interval);
     visit("dispatch_queue_depth", self.m_dispatch_queue_depth);
+    visit("dispatch_on_events", self.m_dispatch_on_events);
     visit("planning_time_resolution", self.m_planning_time_resolution);
     visit("planning_horizon", self.m_planning_horizon);
     visit("priority_policy", self.m_priority_policy);
@@ -224,8 +225,10 @@ public:
   tdiff_t m_backfill_interval;
   /// Unified periodic FCFS/backfill cadence; zero keeps event dispatch.
   tdiff_t m_dispatch_interval;
-  /// Candidates examined per unified tick, including immediate starts.
+  /// Candidates examined per unified wake, including immediate starts.
   size_t m_dispatch_queue_depth;
+  /// Also run the unified pass on job arrival batches.
+  bool m_dispatch_on_events;
 
   tdiff_t scheduling_interval() const {
     return m_dispatch_interval > 0.0 ? m_dispatch_interval : m_backfill_interval;

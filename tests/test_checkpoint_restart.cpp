@@ -340,7 +340,8 @@ void test_custom_scheduler_continuation(size_t queue_depth) {
  * arrival, so the pass at the boundary leaves the dirty flag cleared. A
  * restore that did not carry the flag would re-save a different checkpoint.
  */
-void test_periodic_backfill_continuation(bool unified_dispatch = false) {
+void test_periodic_backfill_continuation(bool unified_dispatch = false,
+                                       bool dispatch_on_events = false) {
   auto params = make_params();
   params.m_queue_impl = QueueImplementation::CIRCULAR;
   params.m_backfill_policy = BackfillPolicy::HYBRID;
@@ -348,6 +349,7 @@ void test_periodic_backfill_continuation(bool unified_dispatch = false) {
   if (unified_dispatch) {
     params.m_dispatch_interval = 4;
     params.m_dispatch_queue_depth = 3;
+    params.m_dispatch_on_events = dispatch_on_events;
   } else {
     params.m_backfill_interval = 4;
   }
@@ -362,6 +364,20 @@ void test_periodic_backfill_continuation(bool unified_dispatch = false) {
   uninterrupted.advance_to(std::numeric_limits<sim_time_t>::max());
   const auto expected_stats = uninterrupted.get_statistics();
   assert(expected_stats.jobs_submitted == 2 * scheduler_workload_size);
+
+  if (unified_dispatch) {
+    auto mismatched = params;
+    mismatched.m_dispatch_on_events = !dispatch_on_events;
+    Simulation incompatible(mismatched);
+    checkpoint.seekg(0);
+    bool rejected = false;
+    try {
+      incompatible.load_checkpoint(checkpoint);
+    } catch (const std::runtime_error &) {
+      rejected = true;
+    }
+    assert(rejected);
+  }
 
   checkpoint.seekg(0);
   Simulation restarted(params);
@@ -822,6 +838,7 @@ int main() {
   test_custom_scheduler_continuation(2);
   test_periodic_backfill_continuation();
   test_periodic_backfill_continuation(true);
+  test_periodic_backfill_continuation(true, true);
   test_output_continuation();
   test_progressive_output_continuation();
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)

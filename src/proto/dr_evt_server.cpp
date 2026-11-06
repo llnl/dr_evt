@@ -306,6 +306,7 @@ public:
           sp.m_backfill_interval = r.backfill_interval();
           sp.m_dispatch_interval = r.dispatch_interval();
           sp.m_dispatch_queue_depth = r.dispatch_queue_depth();
+          sp.m_dispatch_on_events = r.dispatch_on_events();
           if (!std::isfinite(r.planning_time_resolution()) ||
               r.planning_time_resolution() < 0.0) {
             throw std::runtime_error(

@@ -21,8 +21,9 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
-| Scheduling | `--dispatch_interval SECONDS` | Run FCFS and backfill only at fixed periodic ticks. |
-| Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per unified tick. |
+| Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
+| Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per unified wake. |
+| Scheduling | `--dispatch_on_events` | Also run unified dispatch on job arrival batches, preserving timer phase. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
 | Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
@@ -296,7 +297,7 @@ reservations must be protected.
 ### `--dispatch_interval SECONDS` and `--dispatch_queue_depth COUNT`
 
 Use `--dispatch_interval` to run FCFS and backfill together only at fixed
-periodic ticks. Arrivals, completions, node releases, and capacity changes
+periodic ticks when `--dispatch_on_events` is absent. Arrivals, completions, node releases, and capacity changes
 update state at their exact times; they do not launch jobs between ticks.
 At a tick, process all same-time events first, then examine the waiting queue
 once. A later tick tries again even without a new state event.
@@ -341,8 +342,36 @@ is no additional session delay. Set `--dispatch_interval` to that assumed
 session interval. LSF's minimum interval alone does not guarantee this cadence.
 Queue-depth accounting and reservation policy still need separate matching.
 
-Spur's inspected implementation also wakes on scheduler notifications,
-including submissions; this mode represents its timer path only.
+### `--dispatch_on_events`
+
+Adds arrival notifications to unified periodic dispatch. Requires a positive
+`--dispatch_interval`; default is off. At a job-arrival batch, apply all
+same-time state events, then run one full FCFS/reservation/backfill pass with
+a fresh `--dispatch_queue_depth` prefix. An arrival coinciding with a timer
+tick shares one pass. The notification does not shift the timer: an arrival
+at 7 may start at 7 while the next 5-second tick remains at 10.
+
+Completions, cleanup releases, and capacity changes update state immediately
+but wait for the next tick unless an arrival occurs at the same time. Repeated
+`advance_to` calls without new arrivals do not request extra passes. A new
+streaming arrival batch at the current time can request a fresh pass; appending
+future jobs does not notify until their arrival time.
+
+This represents Spur's ordinary-submission notifications and periodic resource
+polling on one homogeneous pool. For its conservative reservation traversal:
+
+```bash
+simulator jobs.csv --total_nodes 4 --queue_impl circular \
+    --dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 10000 \
+    --backfill_policy conservative
+```
+
+Use the default resource-time reservation rule
+(`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) and omit a planning horizon. This
+mode does not reproduce Spur's administrative, health-check, or burst-buffer
+notifications, topology, or production eligibility rules. See
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#spur-unified-timer-and-event-triggers)
+for source evidence and simultaneous-wake abstractions.
 
 ### `--backfill_interval SECONDS`
 

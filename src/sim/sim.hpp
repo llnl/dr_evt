@@ -921,7 +921,7 @@ protected:
    * several jobs with the same timestamp, input order defines their
    * observations: if n earlier jobs are waiting, they observe n, n+1, ... .
    */
-  void record_queue_arrivals(sim_time_t current_time);
+  bool record_queue_arrivals(sim_time_t current_time);
 
   /** Reset the capacity cursor to the configured maximum. */
   void reset_capacity_schedule();

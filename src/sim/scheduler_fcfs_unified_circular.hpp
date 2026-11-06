@@ -13,7 +13,7 @@
 
 namespace dr_evt {
 
-/** FCFS and backfill over one bounded candidate prefix per periodic tick.
+/** FCFS and backfill over one bounded candidate prefix per unified wake.
  * The driver invokes schedule() once after processing all same-time events.
  * EASY uses the shared reservation implementation with one protected job.
  * Every candidate in the prefix counts, including immediate FCFS starts and

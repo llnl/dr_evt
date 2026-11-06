@@ -32,6 +32,36 @@ def fcfs_reference(jobs, depth, interval=5, capacity=4):
     return [starts[i] for i in range(len(jobs))]
 
 
+def event_reference(jobs, depth, interval=5, capacity=4):
+    pending, running, starts = [], [], {}
+    unseen = list(enumerate(jobs))
+    tick = interval
+    steps = 0
+    while unseen or pending or running:
+        time = min(unseen[0][1][0] if unseen else float("inf"),
+                   min((end for end, _ in running), default=float("inf")), tick)
+        running = [(end, nodes) for end, nodes in running if end > time]
+        notification = bool(unseen and unseen[0][1][0] == time)
+        timer_wake = time == tick
+        while unseen and unseen[0][1][0] <= time:
+            pending.append(unseen.pop(0))
+        if time == tick:
+            tick += interval
+        if not (notification or timer_wake):
+            continue
+        free = capacity - sum(nodes for _, nodes in running)
+        for index, (submit, nodes, duration) in pending[:depth or len(pending)]:
+            if nodes > free:
+                break
+            starts[index] = time
+            free -= nodes
+            running.append((time + duration, nodes))
+        pending = [(index, job) for index, job in pending if index not in starts]
+        steps += 1
+        assert steps < 10000, "event reference failed to drain"
+    return [starts[i] for i in range(len(jobs))]
+
+
 with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
     work = pathlib.Path(directory)
 
@@ -98,6 +128,40 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
                      "--dispatch_interval", "5", "--dispatch_queue_depth", str(depth),
                      "--backfill_policy", "none")
 
+    event_options = ("--dispatch_interval", "5", "--dispatch_on_events")
+    for policy in ("none", "easy", "hybrid", "conservative"):
+        run_case("event_prefix_" + policy, [(0, 1, 20)] * 4, [0, 0, 5, 5],
+                 *event_options, "--dispatch_queue_depth", "2",
+                 "--backfill_policy", policy, "--reservation_depth", "1")
+    run_case("arrival_preserves_phase", [(0, 1, 20)] * 4 + [(7, 1, 20)],
+             [0, 5, 7, 10, 20], *event_options,
+             "--dispatch_queue_depth", "1", "--backfill_policy", "none")
+    run_case("arrival_on_tick", [(0, 1, 20)] * 4 + [(5, 1, 20)],
+             [0, 5, 10, 15, 20], *event_options,
+             "--dispatch_queue_depth", "1", "--backfill_policy", "none")
+    run_case("completion_arrival", [(0, 4, 2), (0, 4, 5), (7, 4, 1)],
+             [0, 5, 10], *event_options, "--backfill_policy", "none")
+    run_case("event_fractional", [(2.3, 4, 2)], [2.3],
+             *event_options, "--backfill_policy", "none")
+    run_case("event_empty", [], [], *event_options, "--backfill_policy", "none")
+    run_case("event_capacity", [(0, 4, 1)], [10], *event_options,
+             "--backfill_policy", "none", "--capacity_schedule", str(capacity))
+    run_case("event_cleanup", [(0, 4, 1), (0, 4, 1)], [0, 5],
+             *event_options, "--backfill_policy", "none", "--node_release_delay", "2")
+    for depth, starts in ((1, [0, 120, 210, 6]), (2, [0, 120, 140, 240])):
+        run_case("event_reservations_" + str(depth),
+                 [(0, 3, 120), (6, 2, 20), (6, 4, 100), (6, 1, 200)], starts,
+                 *event_options, "--dispatch_queue_depth", "3",
+                 "--backfill_policy", "hybrid", "--reservation_depth", str(depth))
+    for seed in range(4):
+        rng = random.Random(seed)
+        jobs = sorted((rng.randrange(0, 100), rng.randrange(1, 5), rng.randrange(1, 15))
+                      for _ in range(40))
+        for depth in (0, 1, 2, 5):
+            run_case("event_fcfs_{}_{}".format(seed, depth), jobs,
+                     event_reference(jobs, depth), *event_options,
+                     "--dispatch_queue_depth", str(depth), "--backfill_policy", "none")
+
     # Explicit zero must preserve the existing event-driven schedule bytes.
     run_case("default", [(0, 4, 2), (3, 4, 2)], [0, 3], "--backfill_policy", "none")
     run_case("zero", [(0, 4, 2), (3, 4, 2)], [0, 3], "--backfill_policy", "none",
@@ -106,6 +170,9 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
     checks += 1
 
     for options in (
+        ["--dispatch_on_events"],
+        ["--dispatch_on_events", "--dispatch_interval", "0"],
+        ["--dispatch_on_events", "--backfill_interval", "5"],
         ["--dispatch_interval", "-1"], ["--dispatch_interval", "nan"],
         ["--dispatch_interval", "inf"], ["--dispatch_interval", "nope"],
         ["--dispatch_interval", "5junk"], ["--dispatch_queue_depth", "2"],
@@ -121,4 +188,4 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
         assert result.returncode != 0, "accepted invalid options: " + repr(options)
         checks += 1
 
-print("Unified periodic dispatch: {} checks passed".format(checks))
+print("Unified dispatch (fixed ticks and timer/event wakes): {} checks passed".format(checks))

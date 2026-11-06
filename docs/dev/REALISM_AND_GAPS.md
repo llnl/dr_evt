@@ -6,7 +6,8 @@ scheduling differences that affect those mappings, plus the built-in model's
 excluded scope. Different defaults are configuration choices, not gaps.
 
 Here, **backfill evaluation budget** means the number of waiting jobs a cycle
-may examine, controlled by `--backfill_queue_depth`. Reservation depth is a
+may examine: `--backfill_queue_depth` for separate backfill, or
+`--dispatch_queue_depth` for the whole unified placement prefix. Reservation depth is a
 separate limit on the number of protected waiting jobs.
 
 ## Remaining differences
@@ -23,14 +24,21 @@ one examined prefix per tick. With four idle nodes and four admitted one-node
 jobs, depth 2 starts at most two at one tick. The next tick can start the rest
 without a new arrival or completion.
 
-This covers fixed periodic timing and candidate-prefix accounting. Spur's
-inspected controller also dispatches on notifications, including submissions;
-DR_EVT's unified mode waits for ticks. For LSF, this represents timing under
-the assumption that sessions occur at every aligned interval boundary while
-jobs wait, without additional delay. LSF's minimum interval alone does not
-guarantee that cadence; variable session timing and Spur notification wakes
-remain unimplemented. The available IBM evidence also does not establish
-that LSF's job-decision limit equals DR_EVT's candidate count.
+`--dispatch_on_events` adds immediate arrival-batch notifications to that
+unified loop without changing the aligned timer phase. This represents Spur's
+ordinary-submission and periodic-polling paths: completions, releases, and
+capacity changes update state but do not request a pass between ticks.
+Administrative requeue, health-check recovery/submission, and burst-buffer
+readiness notifications are outside the model. DR_EVT coalesces simultaneous
+arrival/timer wakes into one pass, whereas Spur can consume them separately;
+its timer also has an immediate initial tick. These wake details are simulation
+abstractions, not claims of identical asynchronous execution.
+
+For LSF, fixed periodic dispatch represents timing under the assumption that
+sessions occur at every aligned interval boundary while jobs wait, without
+additional delay. LSF's minimum interval alone does not guarantee that cadence;
+variable session timing remains unimplemented. The available IBM evidence also
+does not establish that LSF's job-decision limit equals DR_EVT's candidate count.
 
 ### Backfill evaluation accounting
 
@@ -98,6 +106,7 @@ recorded validation includes:
 | Model behavior | Recorded evidence |
 |---|---|
 | Event-driven policies | 34 scheduler-correctness workloads match the independent Python reference |
+| Unified dispatch | Fixed ticks and timer/arrival wakes checked against hand-computed cases and independent randomized FCFS references; streaming, warm-start, and checkpoint continuation checks |
 | Periodic backfill | 136 runs across those workloads, two reservation policies, and 7 s / 30 s intervals match the reference |
 | Planning horizon | Horizon workloads and explicit-unlimited runs agree with the references; accounting is also covered by C++ and Python tests |
 | Queue depth | EASY implementations agree with their reference; periodic EASY equals hybrid with depth 1 in the tested cases without a finite horizon |

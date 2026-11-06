@@ -2147,6 +2147,100 @@ void test_unified_periodic_backfill() {
   std::cout << "  PASSED" << std::endl;
 }
 
+// Timer and arrival batches share the same bounded unified pass.
+void test_unified_timer_and_events() {
+  std::cout << "\n=== Unified timer and event dispatch ===" << std::endl;
+  for (const auto policy : {BackfillPolicy::NONE, BackfillPolicy::EASY,
+                            BackfillPolicy::HYBRID, BackfillPolicy::CONSERVATIVE}) {
+    auto params = make_params();
+    params.m_total_nodes = 4;
+    params.m_dispatch_interval = 5;
+    params.m_dispatch_queue_depth = 2;
+    params.m_dispatch_on_events = true;
+    params.m_backfill_policy = policy;
+    params.m_reservation_depth = 1;
+    Simulation sim(params);
+    const auto ids = sim.append_jobs({{0, 1, kTestQueueInput, 20},
+                                      {0, 1, kTestQueueInput, 20},
+                                      {0, 1, kTestQueueInput, 20},
+                                      {0, 1, kTestQueueInput, 20}});
+    sim.advance_to(0);
+    assert(sim.get_statistics().jobs_started == 2);
+    sim.advance_to(0);
+    assert(sim.get_statistics().jobs_started == 2);
+#if defined(DR_EVT_HAS_SER20)
+    const auto exact = sim.get_exact_job_start_times({ids[2], ids[3]});
+    assert(exact[0].start_time == 5);
+    assert(exact[1].start_time == 5);
+    assert(sim.get_statistics().jobs_started == 2);
+#endif
+    sim.run_until_exclusive(5);
+    assert(sim.get_statistics().jobs_started == 2);
+    sim.advance_to(5);
+    assert(sim.get_statistics().jobs_started == 4);
+    sim.advance_to(std::numeric_limits<sim_time_t>::max());
+    assert(sim.get_statistics().jobs_completed == 4);
+  }
+
+  auto params = make_params();
+  params.m_total_nodes = 4;
+  params.m_dispatch_interval = 5;
+  params.m_dispatch_queue_depth = 1;
+  params.m_dispatch_on_events = true;
+  params.m_backfill_policy = BackfillPolicy::NONE;
+  Simulation sim(params);
+  const auto ids = sim.append_jobs({{0, 1, kTestQueueInput, 20},
+                                    {0, 1, kTestQueueInput, 20},
+                                    {0, 1, kTestQueueInput, 20},
+                                    {0, 1, kTestQueueInput, 20}});
+  sim.advance_to(5);
+  assert(sim.get_statistics().jobs_started == 2);
+  // Merely admitting a future submission must not notify at the current time.
+  const auto later = sim.append_job(7, 1, kTestQueueInput, 20);
+  sim.advance_to(5);
+  assert(sim.get_statistics().jobs_started == 2);
+  sim.advance_to(7);
+  assert(sim.get_job_statuses({ids[2]})[0].start_time == 7);
+  sim.advance_to(10);
+  assert(sim.get_job_statuses({ids[3]})[0].start_time == 10);
+  sim.advance_to(20);
+  assert(sim.get_job_statuses({later})[0].start_time == 20);
+
+  // A distinct current-time submission batch gets a fresh prefix; an empty
+  // advance at the same clock does not. The periodic phase remains at 5.
+  Simulation batches(params);
+  const auto waiting = batches.append_jobs({{0, 1, kTestQueueInput, 20},
+                                           {0, 1, kTestQueueInput, 20}});
+  batches.advance_to(0);
+  assert(batches.get_statistics().jobs_started == 1);
+  const auto new_arrival = batches.append_job(0, 1, kTestQueueInput, 20);
+  batches.advance_to(0);
+  assert(batches.get_job_statuses({waiting[1]})[0].start_time == 0);
+  assert(!batches.get_job_statuses({new_arrival})[0].start_time.has_value());
+  batches.advance_to(0);
+  assert(batches.get_statistics().jobs_started == 2);
+  batches.advance_to(5);
+  assert(batches.get_job_statuses({new_arrival})[0].start_time == 5);
+
+  // A completion and newly submitted job at the same API boundary must be
+  // processed before one unified pass, even when the queue was synced first.
+  auto boundary_params = params;
+  boundary_params.m_total_nodes = 1;
+  Simulation boundary(boundary_params);
+  const auto first = boundary.append_job(0, 1, kTestQueueInput, 5);
+  boundary.advance_to(0);
+  boundary.run_until_exclusive(5);
+  const auto second = boundary.append_job(5, 1, kTestQueueInput, 5);
+  const auto third = boundary.append_job(5, 1, kTestQueueInput, 5);
+  boundary.advance_to(5);
+  assert(boundary.get_job_statuses({first})[0].state == Simulation::Job_State::COMPLETED);
+  assert(boundary.get_job_statuses({second})[0].start_time == 5);
+  assert(!boundary.get_job_statuses({third})[0].start_time.has_value());
+  boundary.advance_to(10);
+  assert(boundary.get_job_statuses({third})[0].start_time == 10);
+  std::cout << "  PASSED" << std::endl;
+}
+
 int main() {
   std::cout << "====================================" << std::endl;
   std::cout << "Append-Job Test Suite" << std::endl;
@@ -2193,6 +2287,7 @@ int main() {
     test_periodic_backfill_run_until_exclusive();
     test_periodic_easy_scheduler_selection();
     test_unified_periodic_dispatch();
+    test_unified_timer_and_events();
     test_unified_periodic_backfill();
     test_append_with_known_actual_runtime();
     test_fractional_streaming_limits_validate_stored_value();

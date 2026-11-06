@@ -128,7 +128,8 @@ run_trace(const std::string &trace, double sim_start_time, unsigned total_nodes,
           WarmStartWaitQueuePolicy warm_start_wait_queue =
               WarmStartWaitQueuePolicy::DROP,
           size_t reservation_depth = 0, size_t backfill_queue_depth = 0,
-          double dispatch_interval = 0.0, size_t dispatch_queue_depth = 0) {
+          double dispatch_interval = 0.0, size_t dispatch_queue_depth = 0,
+          bool dispatch_on_events = false) {
   const std::string stem = "run_" + std::to_string(run_number++);
   const auto trace_path = work_dir / (stem + ".csv");
   const auto job_path = work_dir / (stem + ".jobs.csv");
@@ -158,6 +159,7 @@ run_trace(const std::string &trace, double sim_start_time, unsigned total_nodes,
   params.m_backfill_queue_depth = backfill_queue_depth;
   params.m_dispatch_interval = dispatch_interval;
   params.m_dispatch_queue_depth = dispatch_queue_depth;
+  params.m_dispatch_on_events = dispatch_on_events;
   params.m_block_size = 4;
   params.m_job_flush_interval = 100000;
   params.m_resource_history_capacity = 100000;
@@ -706,6 +708,32 @@ void test_unified_periodic_warm_start() {
   }
 }
 
+void test_unified_timer_event_warm_start() {
+  const std::string trace =
+      "job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit\n"
+      "0,0,16,3,0,20\n"
+      "10,30,50,2,0,20\n";
+  const auto result = run_trace(
+      trace, 10, 4, PriorityPolicy::FCFS, BackfillPolicy::HYBRID,
+      QueueImplementation::CIRCULAR, {}, RunTimeMode::ACTUAL,
+      DistributionType::NORMAL, 1, 0, -1, 0,
+      WarmStartWaitQueuePolicy::DROP, 1, 0, 5, 2, true);
+  assert(result.jobs.size() == 1);
+  // Ordinary seed completion at 16 waits for the next aligned tick.
+  expect_job(result.jobs[0], 10, 20, 40, 2);
+
+  const auto notified = run_trace(
+      "job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit\n"
+      "0,0,16,3,0,20\n"
+      "17,30,50,2,0,20\n",
+      10, 4, PriorityPolicy::FCFS, BackfillPolicy::HYBRID,
+      QueueImplementation::CIRCULAR, {}, RunTimeMode::ACTUAL,
+      DistributionType::NORMAL, 1, 0, -1, 0,
+      WarmStartWaitQueuePolicy::DROP, 1, 0, 5, 2, true);
+  assert(notified.jobs.size() == 1);
+  expect_job(notified.jobs[0], 17, 17, 37, 2);
+}
+
 void test_seeded_random_differential() {
   constexpr double t = 20.5;
   for (unsigned seed : {7u, 29u, 101u, 4099u}) {
@@ -883,6 +911,7 @@ int main() {
     test_periodic_backfill();
     test_seeded_random_differential();
     test_unified_periodic_warm_start();
+    test_unified_timer_event_warm_start();
     test_self_consistent_replay_warm_start();
     test_rejected_modes();
   } catch (...) {

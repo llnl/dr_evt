@@ -206,7 +206,10 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  CircularOverflowPolicy wait_queue_overflow,
                  size_t reservation_depth, size_t backfill_queue_depth,
                  tdiff_t backfill_interval, tdiff_t dispatch_interval,
-                 size_t dispatch_queue_depth) {
+                 size_t dispatch_queue_depth, bool dispatch_on_events) {
+  if (dispatch_on_events && dispatch_interval <= 0.0) {
+    throw std::invalid_argument("dispatch_on_events requires dispatch_interval > 0");
+  }
   if (!std::isfinite(dispatch_interval) || dispatch_interval < 0.0) {
     throw std::invalid_argument("dispatch_interval must be finite and nonnegative");
   }
