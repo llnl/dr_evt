@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   build:
+    if: github.repository == 'llnl/dr_evt'
     runs-on: ubuntu-latest
 
     steps:
