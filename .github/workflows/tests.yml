@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+  CMAKE_INSTALL_PREFIX: /__w/dr_evt/dr_evt/install
 
 jobs:
   build-image:
@@ -480,7 +480,7 @@ jobs:
         run: |
           cmake -S . -B build-redis \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" \
+            -DCMAKE_INSTALL_PREFIX="/__w/dr_evt/dr_evt/install" \
             -DDR_EVT_WITH_REDIS=ON \
             -DDR_EVT_WITH_SER20=${{ matrix.ser20 }} \
             -DDR_EVT_WITH_UNIT_TESTING=OFF \
@@ -494,13 +494,13 @@ jobs:
 
       - name: Run Redis integration test
         env:
-          CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+          CMAKE_INSTALL_PREFIX: /__w/dr_evt/dr_evt/install
           REQUIRE_CHECKPOINT_RESTART: ${{ matrix.ser20 == 'ON' && '1' || '0' }}
         run: ./tests/run_redis_tests.sh
 
       - name: Run Redis gRPC client example test
         env:
-          CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+          CMAKE_INSTALL_PREFIX: /__w/dr_evt/dr_evt/install
         run: ./tests/run_redis_grpc_client_test.sh
 
   documentation:
