@@ -14,12 +14,15 @@ jobs:
 
     steps:
       - name: Checkout repository
+        if: github.repository == 'llnl/dr_evt'
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
+        if: github.repository == 'llnl/dr_evt'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to GitHub Container Registry
+        if: github.repository == 'llnl/dr_evt'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -27,6 +30,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push CI image
+        if: github.repository == 'llnl/dr_evt'
         uses: docker/build-push-action@v7
         with:
           context: .
