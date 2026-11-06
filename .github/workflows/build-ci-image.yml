@@ -2,7 +2,7 @@ name: Build CI Image
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/image]
     paths:
       - '.github/docker/Dockerfile.ci'
       - '.github/workflows/build-ci-image.yml'
@@ -36,6 +36,6 @@ jobs:
           context: .
           file: .github/docker/Dockerfile.ci
           push: true
-          tags: ghcr.io/llnl/dr_evt-ci:latest
+          tags: ghcr.io/llnl/dr_evt-ci:ci-image
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -15,24 +15,27 @@ jobs:
   quick-test:
     name: Quick Scheduler, Serialization, and Trace Schema Check
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/llnl/dr_evt-ci:ci-image
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    defaults:
+      run:
+        shell: bash
+
     env:
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            libboost-all-dev \
-            python3 \
-            libopenmpi-dev \
-            openmpi-bin \
-            gcc-14 \
-            g++-14
 
       - name: Configure and Build
         env:
@@ -103,6 +106,8 @@ jobs:
           echo "Quick Test Complete"
           echo "Scheduler correctness (34 fixtures): ${{ steps.scheduler-correctness.outcome }}"
           echo "Node release delay (34 differential + 3 checks): ${{ steps.node-release-delay.outcome }}"
+          echo "Periodic backfill: ${{ steps.periodic-backfill.outcome }}"
+          echo "Planning horizon: ${{ steps.planning-horizon.outcome }}"
           echo "Streaming append API (23 checks): ${{ steps.append-job.outcome }}"
           echo "Ser20 memory serialization: ${{ steps.serialization.outcome }}"
           echo "Trace schema / progressive-loading API: ${{ steps.trace-schema.outcome }}"

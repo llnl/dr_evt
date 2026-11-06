@@ -5,7 +5,7 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,7 +18,17 @@ jobs:
   test:
     name: Build and Test
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/llnl/dr_evt-ci:ci-image
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       matrix:
         compiler: [gcc, clang]
@@ -29,29 +39,11 @@ jobs:
           - compiler: clang
             cc: clang-18
             cxx: clang++-18
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            libboost-all-dev \
-            python3 \
-            python3-pip \
-            libopenmpi-dev \
-            openmpi-bin \
-            libprotobuf-dev \
-            protobuf-compiler \
-            libgrpc++-dev \
-            protobuf-compiler-grpc \
-            ${{ matrix.cc }} \
-            ${{ matrix.cxx }}
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -413,15 +405,20 @@ jobs:
   ser20-disabled:
     name: Build Without Ser20
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/llnl/dr_evt-ci:ci-image
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake libboost-all-dev gcc-14 g++-14
 
       - name: Configure without Ser20
         env:
@@ -447,29 +444,24 @@ jobs:
     name: Redis Integration (Ser20 ${{ matrix.ser20 }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/llnl/dr_evt-ci:ci-image
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
         ser20: ['OFF', 'ON']
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            libboost-all-dev \
-            libgrpc++-dev \
-            libhiredis-dev \
-            libprotobuf-dev \
-            protobuf-compiler \
-            protobuf-compiler-grpc \
-            redis-server \
-            gcc-14 \
-            g++-14
 
       - name: Configure Redis-enabled build
         env:
@@ -504,15 +496,20 @@ jobs:
   documentation:
     name: Build Documentation
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      packages: read
+    container:
+      image: ghcr.io/llnl/dr_evt-ci:ci-image
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
 
       - name: Set up Python
         uses: actions/setup-python@v6
