@@ -366,6 +366,16 @@ Submission can wake this loop before the next timer tick. The timer is created
 when the scheduling loop starts, and its first Tokio tick is immediate;
 `interval_secs` is not a universal launch gate. Periodic wakes continue even
 without new submissions. There is no persistent scan cursor across passes.
+For a fixed interval, notification-triggered passes do not reset the timer
+cadence. With ticks at 5, 10, and 15, a submission at 7 can trigger a pass at
+7 while the next timer wake remains at 10.
+
+DR_EVT currently implements and tests unified fixed periodic dispatch, not
+this timer-plus-notification mode. Its tests cover fixed phase across idle
+periods, events at and between ticks, candidate limits, and unchanged-state
+retries. A Spur-mode test suite must additionally check immediate notification
+passes without shifting ticks, notifications coinciding with timer wakes,
+and each notification source verified in the Spur controller.
 
 ## LSF: scheduling sessions with a minimum interval
 
