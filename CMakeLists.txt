@@ -901,6 +901,10 @@ if(DR_EVT_WITH_UNIT_TESTING)
       $<TARGET_FILE:sim-bin>)
   if(Python3_Interpreter_FOUND)
     add_test(
+      NAME test_python_periodic_reference
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python_periodic_reference.py)
+    add_test(
       NAME test_read_build_config
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_read_build_config.py)

@@ -13,50 +13,13 @@ import math
 import pathlib
 import random
 import subprocess
+import sys
 import tempfile
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+from python_periodic_scheduler import legacy_easy_reference as reference
+
 from read_build_config import reservation_barrier
-
-
-def reference(jobs, interval, depth, capacity=4):
-    """Use tuples (submit, nodes, limit, actual), observing releases at ticks."""
-    pending, running, starts = [], [], {}
-    arrivals = list(enumerate(jobs))
-    tick = interval
-    while arrivals or pending or running:
-        running = [job for job in running if job[0] > tick]
-        while arrivals and arrivals[0][1][0] <= tick:
-            pending.append(arrivals.pop(0))
-        free = capacity - sum(nodes for _, _, nodes in running)
-        prefix = pending[:depth or len(pending)]
-        blocked = None
-        for position, (index, (_, nodes, limit, actual)) in enumerate(prefix):
-            if nodes > free:
-                blocked = position
-                break
-            starts[index] = tick
-            running.append((tick + actual, tick + limit, nodes))
-            free -= nodes
-        if blocked is not None:
-            head_nodes = prefix[blocked][1][1]
-            future_free = free
-            protected_start = None
-            for release, nodes in sorted((estimate, nodes)
-                                         for _, estimate, nodes in running):
-                future_free += nodes
-                if future_free >= head_nodes:
-                    protected_start = release
-                    break
-            assert protected_start is not None
-            for index, (_, nodes, limit, actual) in prefix[blocked + 1:]:
-                if nodes <= free and tick + limit < protected_start:
-                    starts[index] = tick
-                    running.append((tick + actual, tick + limit, nodes))
-                    free -= nodes
-        pending = [(index, job) for index, job in pending if index not in starts]
-        tick += interval
-        assert tick < 100000, "reference did not drain"
-    return [starts[index] for index in range(len(jobs))]
 
 
 def main():

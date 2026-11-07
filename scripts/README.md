@@ -10,6 +10,20 @@ the [Test Suite README](../tests/README.md) and
 - `python_reference_scheduler.py` — EASY-backfilling reference used to
   generate and compare expected schedules.
 - `python_hybrid_scheduler.py` — hybrid/conservative-backfilling reference.
+- `python_periodic_scheduler.py` — fixed periodic FCFS reference with optional
+  arrival passes, plus tick-only EASY with strict reservation admission.
+  Regression runners import its scheduling functions; its standalone CLI reads
+  simple epoch CSV and writes a schedule CSV to stdout or `--outfile`.
+
+```bash
+python3 scripts/python_periodic_scheduler.py jobs.csv --nodes 4 \
+  --dispatch-interval 5 --dispatch-queue-depth 2 --outfile reference.csv
+```
+
+Use `--dispatch-on-events` for FCFS arrival passes. `--backfill-policy easy`
+uses strict completion-before-start admission and currently requires timer-only
+dispatch. The reference has constant capacity and no cleanup delay, warm start,
+planning horizon/resolution, or general hybrid/conservative protection.
 
 Their algorithmic context is documented in
 [Backfilling Algorithms](../docs/BACKFILLING_ALGORITHMS.md).

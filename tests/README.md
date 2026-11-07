@@ -161,6 +161,13 @@ proof of the algorithm.
 
 ### Fixed periodic EASY with strict reservation admission
 
+The periodic-dispatch and strict-reservation runners import shared scheduling
+functions from [`python_periodic_scheduler.py`](../scripts/python_periodic_scheduler.py).
+The script is also a standalone reference; see the
+[reference script guide](../scripts/README.md#reference-schedulers). Hand-computed
+fixtures remain in the runners, and `test_python_periodic_reference` checks
+the CLI's input ordering, actual runtimes, epoch times, and policy limits.
+
 [`run_legacy_reservation_validation.py`](run_legacy_reservation_validation.py) checks fixed-session
 FCFS/EASY with strict completion-before-reservation admission. It covers a
 4-node head-protection example, rejected long and equal-boundary jobs, time-limit
