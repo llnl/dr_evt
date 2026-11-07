@@ -199,8 +199,8 @@ the simulation itself must resume later.
 
 ### `save_checkpoint()` / `load_checkpoint()`
 
-Save all logical state at a settled API boundary and restore it into a newly
-constructed simulation with matching `Sim_Params`:
+Save all logical state after `advance_to()` returns, outside scheduler callbacks,
+and restore it into a newly constructed simulation with matching `Sim_Params`:
 
 ```cpp
 sim.advance_to(500.0);
@@ -315,9 +315,9 @@ effective scheduled capacity. During a non-preemptive reduction below live
 occupancy, the running allocation is treated as effective capacity until it
 drains, keeping utilization bounded by one. For a simulation created with the Custom-FCFS callback
 constructor, `get_resource_area()` is the area under the allocated-node curve:
-the time integral of allocated nodes, accumulated once per settled scheduling
-timestamp and reported in node-seconds. Standard schedulers do not perform
-this live bookkeeping, and calling `get_resource_area()` for one throws
+the time integral of allocated nodes, updated after all events and scheduling
+decisions at each timestamp have been applied, and reported in node-seconds.
+Standard schedulers do not perform this live bookkeeping, and calling `get_resource_area()` for one throws
 `std::logic_error`.
 
 For Custom FCFS, `Statistics::utilization` divides this area by the integrated

@@ -214,7 +214,8 @@ contains `time` and `nodes_released`.
 `max(1, turnaround / max(run_time, 10 seconds))` over completed jobs.
 
 For simulations constructed with Custom-FCFS callbacks, `resource_area` is
-accumulated as `nodes_in_use * interval` between settled scheduling times.
+accumulated as `nodes_in_use * interval` between scheduling timestamps, using
+occupancy after all events and scheduling decisions at each timestamp.
 `utilization` divides that area by integrated effective capacity over the
 accounting horizon (the snapshot time while work is running, or the last
 resource event after it becomes idle). During non-preemptive draining,

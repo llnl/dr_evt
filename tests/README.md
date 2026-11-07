@@ -173,9 +173,8 @@ FCFS/EASY with strict completion-before-reservation admission. It covers a
 4-node head-protection example, rejected long and equal-boundary jobs, time-limit
 planning, early releases, cadence, candidate limits, and 96 randomized
 comparisons with an independent reference. The head-protection fixture uses
-a 30-minute protected job. These tests validate the specified policy set;
-their evidence scope is described in
-[Realism and Known Gaps](../docs/user-guide/REALISM_AND_GAPS.md#validation-scope).
+a 30-minute protected job. These tests validate the specified policy set.
+See the [Testing Guide](../docs/TESTING_GUIDE.md) for test coverage and invocation.
 
 ```bash
 cmake -S . -B build-legacy -DCMAKE_BUILD_TYPE=Release \

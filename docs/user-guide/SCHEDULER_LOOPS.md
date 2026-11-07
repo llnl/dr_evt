@@ -6,8 +6,8 @@ depths, planning horizon and resolution, and reservation admission. This page
 explains those choices and their supported combinations. Publicly documented
 production schedulers provide examples of related approaches, not identities
 for DR_EVT configurations or claims of equivalent implementations.
-[Realism and Known Gaps](REALISM_AND_GAPS.md) records the remaining differences,
-excluded scope, and validation limits. Detailed policy definitions are in
+[Realism and Known Gaps](REALISM_AND_GAPS.md) records the remaining differences
+and excluded scope. Detailed policy definitions are in
 [Scheduling Policies](../BACKFILLING_ALGORITHMS.md).
 
 ## FCFS dispatch and backfill
@@ -29,7 +29,7 @@ strict dispatch:
 
 backfill planning and selection:
     build the resource-time plan from running jobs and known capacity changes
-    examine waiting jobs in order within the backfill evaluation budget
+    examine waiting jobs in order within the backfill examination limit
     start a job now if it fits without delaying protected reservations
     otherwise, reserve a feasible future interval when policy permits
 ```
@@ -123,7 +123,7 @@ event-driven (backfill_interval = 0 and dispatch_interval = 0):
 periodic backfill (backfill_interval > 0):
     on a state-event batch: apply it, then run FCFS dispatch
     on a backfill tick with the scheduling-state flag set:
-        clear the flag; run backfill with a fresh evaluation budget
+        clear the flag; run backfill with a fresh examination count
         repeat scheduler calls until none starts a job
     on other ticks: advance the tick deadline without a backfill scan
 
@@ -176,7 +176,7 @@ with R=1 in this mode.
 Trigger modes are selected once per `advance_to` call (and at warm-start
 entry). The event loop uses compile-time specializations, so event-driven
 and separate periodic-backfill loops contain no arrival-notification checks;
-fixed fixed periodic dispatch also excludes them when the option is disabled.
+fixed periodic dispatch also excludes them when the option is disabled.
 
 Periodic hybrid/conservative share Q across calls at one tick and count
 out-of-horizon jobs. Periodic EASY performs one backfill scan per tick and
@@ -493,7 +493,7 @@ This policy set models ordinary submission notifications and timer polling;
 it does not implement the production controller's asynchronous execution.
 Additional notification sources and asynchronous wake differences are in
 [Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope);
-regression coverage is in [Validation scope](REALISM_AND_GAPS.md#validation-scope).
+regression coverage is described in [Testing Guide](../TESTING_GUIDE.md).
 
 ## OpenPBS: event-driven dispatch and backfill
 

@@ -20,7 +20,7 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | System | `--warm_start_wait_queue MODE` | Select `inherit` (default) or legacy `drop` handling for jobs waiting at a replay warm-start boundary. |
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
-| Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
+| Scheduling | `--backfill_queue_depth N` | Limit counted waiting-job examinations during backfill; accounting depends on trigger mode and policy. |
 | Scheduling | `--per_pass_accounting` | Use event-driven FCFS placement passes with per-pass Q/R counters and guarded reservation-only restarts. |
 | Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
 | Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
@@ -279,7 +279,7 @@ With `--backfill_interval`, a tick's evaluation is one cycle. Periodic hybrid
 and conservative share their count across calls at the tick and count
 out-of-horizon jobs. Periodic EASY performs one scan at the tick and exempts
 an out-of-horizon head; other examined candidates count. FCFS head dispatch
-between ticks stays event-driven and uses none of this evaluation budget.
+between ticks stays event-driven and does not consume this examination count.
 
 Without `--backfill_interval`, the simulator repeats scheduler passes at one
 simulation timestamp until nothing more starts. Conservative and hybrid
