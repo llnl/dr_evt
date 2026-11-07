@@ -2,8 +2,13 @@
 """Check build-header discovery and fail-closed reservation mode detection."""
 
 from pathlib import Path
+import contextlib
+import importlib.util
+import io
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from read_build_config import reservation_barrier, require_reservation_barrier
 
@@ -54,6 +59,54 @@ class BuildConfigTests(unittest.TestCase):
         header.parent.mkdir()
         header.write_text("/* #undef DR_EVT_LEGACY_RESERVATION_BARRIER */\n")
         self.assertEqual(reservation_barrier(self.binary, header), (False, header))
+
+
+class RapsBuildConfigTests(unittest.TestCase):
+    setUp = BuildConfigTests.setUp
+
+    @classmethod
+    def setUpClass(cls):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "compare_with_raps.py"
+        spec = importlib.util.spec_from_file_location("raps_comparison", script)
+        cls.comparison = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.comparison)
+
+    def invoke(self, *extra):
+        args = ["compare_with_raps.py", "--input", "unused.csv", "--total_nodes", "4",
+                "--simulator", str(self.binary), "--workdir", str(self.root / "output")]
+        with patch.object(sys, "argv", args + list(extra)):
+            return self.comparison.main()
+
+    def test_raps_rejects_disabled_before_running(self):
+        self.header.write_text("/* #undef DR_EVT_LEGACY_RESERVATION_BARRIER */\n")
+        errors = io.StringIO()
+        with patch.object(self.comparison, "run_dr_evt") as native, \
+                patch.object(self.comparison, "run_raps") as reference, \
+                contextlib.redirect_stderr(errors), self.assertRaises(SystemExit):
+            self.invoke("--dr-evt-output", "unused-output.csv")
+        native.assert_not_called()
+        reference.assert_not_called()
+        self.assertIn("expected ON", errors.getvalue())
+        self.assertFalse((self.root / "output").exists())
+
+    def test_raps_accepts_enabled_build(self):
+        self.header.write_text("#define DR_EVT_LEGACY_RESERVATION_BARRIER 1\n")
+        with patch.object(self.comparison, "clamp_actual", return_value=1), \
+                patch.object(self.comparison, "run_dr_evt", return_value=[(0, 0, 1, 5)]) as native, \
+                patch.object(self.comparison, "run_raps", return_value={0: (0, 0)}) as reference, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.invoke()
+        native.assert_called_once()
+        reference.assert_called_once()
+
+    def test_preparation_requires_no_simulator_build(self):
+        with patch.object(self.comparison, "clamp_actual", return_value=1), \
+                patch.object(self.comparison, "run_dr_evt") as native, \
+                patch.object(self.comparison, "run_raps") as reference, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.invoke("--prepare-only"), 0)
+        native.assert_not_called()
+        reference.assert_not_called()
 
 
 if __name__ == "__main__":

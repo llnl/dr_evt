@@ -22,6 +22,8 @@ RAPS treats every reservation as a strict completion-before-shadow barrier.
 Therefore this tool requires a DR_EVT simulator built with
 ``-DDR_EVT_LEGACY_RESERVATION_BARRIER=ON``. It must not be used to validate
 DR_EVT's default resource-aware reservation policy.
+The comparison checks the generated config header before running either
+simulator. Use --config-header for a nonstandard header location.
 
 Expected agreement under that legacy mode is identical start order, and RAPS
 start times equal to dr_evt's plus a small non-negative lag. RAPS advances on a 1-second tick and
@@ -55,6 +57,8 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from read_build_config import require_reservation_barrier
 
 
 def swf_to_csv(swf_path, csv_path, cores_per_node):
@@ -198,6 +202,8 @@ def main():
     ap.add_argument("--cores_per_node", type=int, default=0, help="SWF only; 0 = header")
     ap.add_argument("--max_jobs", type=int, default=0, help="use only the first N jobs")
     ap.add_argument("--simulator", default=os.environ.get("DR_EVT_SIMULATOR", str(ROOT / "install" / "bin" / "simulator")))
+    ap.add_argument("--config-header", type=Path,
+                    help="generated dr_evt_config.hpp for a nonstandard installation")
     ap.add_argument("--raps-root", default=str(ROOT / "external" / "RAPS"))
     ap.add_argument("--workdir", default=None, help="keep intermediate files here")
     ap.add_argument("--tolerance", type=float, default=1.0, help="seconds counted as agreement")
@@ -208,6 +214,17 @@ def main():
     ap.add_argument("--dr-evt-output", default=None,
                     help="existing simulator --outfile for <workdir>/jobs.csv; skips running it")
     args = ap.parse_args()
+
+    # The comparison requires the compiled legacy admission rule. The
+    # header verifies the build; no runtime option changes that rule.
+    if not args.prepare_only:
+        try:
+            header = require_reservation_barrier(
+                shutil.which(args.simulator) or args.simulator, True,
+                args.config_header)
+        except ValueError as error:
+            ap.error(str(error))
+        print(f"DR_EVT_LEGACY_RESERVATION_BARRIER=ON ({header})")
 
     work = Path(args.workdir) if args.workdir else Path(tempfile.mkdtemp(prefix="dr_evt_raps_"))
     work.mkdir(parents=True, exist_ok=True)
