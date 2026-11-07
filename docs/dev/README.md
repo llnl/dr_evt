@@ -10,7 +10,7 @@ maintainer-facing build guidance. It is separate from the user documentation.
 - [Simulation Pipeline and Job Lifecycle](JOB_LIFECYCLE.md) — How input moves
   through the job store, scheduler, event loop, resource accounting, and output.
 - [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md) — FCFS and
-  backfill basics, production trigger categories, and current option mappings.
+  backfill basics, trigger categories, and supported policy combinations.
 - [Realism and Known Gaps](REALISM_AND_GAPS.md) — Confirmed differences in
   triggers and backfill evaluation budgets, excluded scope, and validation limits.
 - [Performance Analysis](PERFORMANCE_ANALYSIS.md) — Linux `perf` breakdown of

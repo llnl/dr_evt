@@ -22,8 +22,8 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
 | Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
-| Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per unified wake. |
-| Scheduling | `--dispatch_on_events` | Also run unified dispatch on job arrival batches, preserving timer phase. |
+| Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
+| Scheduling | `--dispatch_on_events` | Also run fixed periodic dispatch on job arrival batches, preserving timer phase. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
 | Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
@@ -315,7 +315,7 @@ depth separately controls how many examined waiting jobs receive protection;
 EASY protects one, hybrid uses `--reservation_depth`, and conservative protects
 all planned earlier waiting jobs in the examined prefix.
 
-With unified dispatch, `--backfill_policy easy` uses the hybrid implementation
+With fixed periodic dispatch, `--backfill_policy easy` uses the hybrid implementation
 with reservation depth fixed at 1, equivalent to `--backfill_policy hybrid
 --reservation_depth 1`. No explicit reservation-depth option is needed for
 `easy`; another supplied depth does not change its one-job protection.
@@ -326,7 +326,7 @@ Requires a circular queue and `fcfs` or `fcfs_conservative` ordering. Supports
 `none`, `easy`, `hybrid`, and `conservative` backfill policies. A positive
 `--dispatch_interval` cannot be combined with a positive `--backfill_interval`
 or a nonzero `--backfill_queue_depth`; use `--dispatch_queue_depth` for the
-unified cycle. A nonzero dispatch queue depth requires a positive dispatch
+combined FCFS/backfill cycle. A nonzero dispatch queue depth requires a positive dispatch
 interval. Custom selectors are unsupported. Interval zero preserves existing
 scheduling behavior.
 
@@ -340,13 +340,13 @@ The cheap pending-job status projection does not include this cadence or
 candidate limit; exact lookahead follows the live loop. See
 [Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md).
 
-Production timing assumptions are in
-[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#replicating-core-behavior-with-current-options)
+Policy combinations and timing assumptions are in
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#supported-policy-combinations)
 and [Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--dispatch_on_events`
 
-Adds arrival notifications to unified periodic dispatch. Requires a positive
+Adds arrival notifications to fixed periodic dispatch. Requires a positive
 `--dispatch_interval`; default is off. At a job-arrival batch, apply all
 same-time state events, then run one full FCFS/reservation/backfill pass with
 a fresh `--dispatch_queue_depth` prefix. An arrival coinciding with a timer
@@ -359,16 +359,16 @@ but wait for the next tick unless an arrival occurs at the same time. Repeated
 streaming arrival batch at the current time can request a fresh pass; appending
 future jobs does not notify until their arrival time.
 
-For a Spur-oriented configuration, see
-[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#spur-unified-timer-and-event-triggers).
+For combinations with conservative backfill and a candidate limit, see
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#supported-policy-combinations).
 Notification and simultaneous-wake differences are in
 [Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--backfill_interval SECONDS`
 
 Uses periodic EASY, conservative, or hybrid backfill while retaining
-event-driven FCFS dispatch. It is intended for Slurm-style trigger studies and
-uses the opt-in circular scheduler; it requires an enabled
+event-driven FCFS dispatch. This separates the dispatch and backfill triggers
+and uses the opt-in circular scheduler; it requires an enabled
 `--backfill_policy` and `--queue_impl circular`. `0` retains the default
 event-driven backfill behavior. Ticks start one interval after loop initialization (normally
 time 0), or after the `--sim_start_time` boundary in a warm start, and keep that
@@ -385,8 +385,8 @@ start time is known. It affects projected releases, reservations, and backfill
 feasibility checks. The
 simulation clock and the job's actual execution duration are unchanged. The
 estimate is supplied to every scheduler, but pure FCFS dispatch does not use
-it to decide whether a job can start immediately. For example, `60` models
-Slurm's typical `bf_resolution` grid for planned begin/end timestamps. Leave
+it to decide whether a job can start immediately. For example, `60` uses
+a one-minute grid for projected releases and reservation planning. Leave
 it at `0` for exact floating-point planning.
 
 **Default:** `0` (exact planning)

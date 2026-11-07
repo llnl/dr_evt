@@ -65,7 +65,7 @@ or `None`.
 | `reservation_depth` | `int` |
 | `backfill_queue_depth` | `int`; waiting jobs examined per backfill pass (0 is unlimited) |
 | `dispatch_interval` | `float`; aligned ticks run both FCFS and backfill (0 disables) |
-| `dispatch_queue_depth` | `int`; full candidate prefix per unified wake, including immediate starts (0 is unlimited) |
+| `dispatch_queue_depth` | `int`; full candidate prefix per dispatch wake, including immediate starts (0 is unlimited) |
 | `dispatch_on_events` | `bool`; also dispatch on job arrival batches without resetting ticks; requires positive `dispatch_interval` (default `False`) |
 | `backfill_interval` | `float`; seconds between periodic backfill passes (0 backfills at every event) |
 | `planning_time_resolution` | `float`; grid planned run times are rounded up to (0 is exact) |

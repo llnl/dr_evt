@@ -159,21 +159,22 @@ resource trace with outputs from `scripts/python_reference_scheduler.py`.
 These comparisons test consistency between implementations, not independent
 proof of the algorithm.
 
-### Simplified LSF model
+### Fixed periodic EASY with strict reservation admission
 
-[`run_lsf_model_validation.py`](run_lsf_model_validation.py) checks fixed-session
-FCFS/EASY with strict completion-before-reservation admission. It covers IBM's
-4-CPU backfill example, rejected long and equal-boundary jobs, time-limit
+[`run_legacy_reservation_validation.py`](run_legacy_reservation_validation.py) checks fixed-session
+FCFS/EASY with strict completion-before-reservation admission. It covers a
+4-node head-protection example, rejected long and equal-boundary jobs, time-limit
 planning, early releases, cadence, candidate limits, and 96 randomized
-comparisons with an independent reference. IBM does not specify the protected
-job's duration; the fixture assumes 30 minutes. This validates DR_EVT's
-documented approximation, not an LSF daemon or its decision accounting.
+comparisons with an independent reference. The head-protection fixture uses
+a 30-minute protected job. These tests validate the specified policy set;
+their evidence scope is described in
+[Realism and Known Gaps](../docs/dev/REALISM_AND_GAPS.md#validation-scope).
 
 ```bash
-cmake -S . -B build-lsf -DCMAKE_BUILD_TYPE=Release \
+cmake -S . -B build-legacy -DCMAKE_BUILD_TYPE=Release \
   -DDR_EVT_LEGACY_RESERVATION_BARRIER=ON -DDR_EVT_WITH_UNIT_TESTING=ON
-cmake --build build-lsf --target sim-bin -j2
-ctest --test-dir build-lsf -R '^test_lsf_model_validation$' --output-on-failure
+cmake --build build-legacy --target sim-bin -j2
+ctest --test-dir build-legacy -R '^test_legacy_reservation_validation$' --output-on-failure
 ```
 
 The CTest is registered only in legacy-barrier builds. Passing
@@ -235,16 +236,16 @@ differential runner uses the
 
 [`benchmark_wait_queues.sh`](benchmark_wait_queues.sh) accepts fixed dispatch
 options alongside the existing `easy`, `hybrid`, and `conservative` policy
-choices; `none` is also supported for fixed dispatch. For example, the
-documented Spur representation uses conservative backfill, one-second ticks
-plus arrival passes, and queue depth 10,000. Use a Release build with the
+choices; `none` is also supported for fixed dispatch. The first example uses
+conservative backfill, one-second ticks plus arrival passes, and queue depth
+10,000. Use a Release build with the
 default `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`:
 
 ```bash
 ./tests/benchmark_wait_queues.sh --backfill-policy conservative \
   --dispatch-interval 1 --dispatch-on-events --dispatch-queue-depth 10000
-# Simplified LSF: use a separately built barrier-ON binary.
-SIMULATOR="$PWD/build-lsf/simulator" ./tests/benchmark_wait_queues.sh \
+# EASY with strict reservation admission: use a barrier-ON binary.
+SIMULATOR="$PWD/build-legacy/simulator" ./tests/benchmark_wait_queues.sh \
   --backfill-policy easy --dispatch-interval 5
 ```
 

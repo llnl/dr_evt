@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the documented homogeneous LSF approximation, not an LSF daemon.
+"""Validate fixed periodic FCFS/EASY with strict reservation admission.
 
 Requires DR_EVT_LEGACY_RESERVATION_BARRIER=ON. The independent reference uses
 fixed sessions, FCFS, one protected head, and strict completion-before-start
-backfill. Finite candidate limits exercise DR_EVT's model, not LSF accounting.
+backfill. Finite candidate limits exercise DR_EVT's examination-count model.
 """
 
 import argparse
@@ -73,7 +73,7 @@ def main():
     try:
         barrier, config_header = reservation_barrier(simulator, args.config_header)
         if not barrier:
-            print("SKIP: simplified LSF checks require a barrier-ON build; "
+            print("SKIP: legacy reservation checks require a barrier-ON build; "
                   "{} records OFF.".format(config_header))
             return
         if args.flexible_simulator:
@@ -88,7 +88,7 @@ def main():
     except ValueError as error:
         parser.error(str(error))
     results = []
-    with tempfile.TemporaryDirectory(prefix="dr_evt_lsf_model_") as directory:
+    with tempfile.TemporaryDirectory(prefix="dr_evt_legacy_reservation_") as directory:
         work = pathlib.Path(directory)
 
         def run_case(name, jobs, interval=5, depth=0, expected=None,
@@ -172,13 +172,13 @@ def main():
                     run_case("random_{}_{}_{}".format(seed, interval, depth), jobs,
                              interval=interval, depth=depth, actual_mode=True)
 
-    report = {"scope": "DR_EVT simplified LSF model; no LSF daemon comparison",
+    report = {"scope": "DR_EVT fixed periodic FCFS/EASY with strict reservation admission",
               "config_header": str(config_header),
               "reservation_rule": "legacy completion strictly before protected start",
               "checks": len(results), "results": results}
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + "\n")
-    print("Simplified LSF model: {} checks passed (96 randomized).".format(len(results)))
+    print("Fixed periodic FCFS/EASY, legacy reservation barrier: {} checks passed (96 randomized).".format(len(results)))
 
 
 if __name__ == "__main__":

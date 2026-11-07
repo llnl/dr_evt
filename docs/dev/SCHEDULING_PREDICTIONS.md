@@ -39,10 +39,10 @@ scheduler state or policy; exact effects from later admissible backfill remain
 the responsibility of the separate full-lookahead design.
 
 The cheap pending projection does not apply `--dispatch_interval`,
-`--dispatch_on_events`, or `--dispatch_queue_depth`. In unified periodic mode it can therefore forecast
+`--dispatch_on_events`, or `--dispatch_queue_depth`. In fixed periodic mode it can therefore forecast
 resource availability before a permitted launch tick, or beyond the candidate
 prefix for that tick. Lifecycle states and recorded actual starts remain
-accurate. Use exact lookahead when estimates must follow the unified loop.
+accurate. Use exact lookahead when estimates must follow the fixed periodic dispatch loop.
 
 The projection is deliberately not a scheduler replay. It walks the queue in
 order and carves every projected placement from its temporary profile before

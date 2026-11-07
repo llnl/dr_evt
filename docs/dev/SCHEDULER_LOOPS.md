@@ -1,8 +1,11 @@
 # Scheduling loops and DR_EVT configurations
 
-This page explains the core actions of batch scheduling, groups production
-engines by trigger, and shows how to approximate those actions with DR_EVT's
-current options. The production loops provide context for the mappings;
+DR_EVT represents scheduling approaches through configurable policy sets:
+queue ordering, backfill protection, triggers, examination and reservation
+depths, planning horizon and resolution, and reservation admission. This page
+explains those choices and their supported combinations. Publicly documented
+production schedulers provide examples of related approaches, not identities
+for DR_EVT configurations or claims of equivalent implementations.
 [Realism and Known Gaps](REALISM_AND_GAPS.md) records the remaining differences,
 excluded scope, and validation limits. Detailed policy definitions are in
 [Scheduling Policies](../BACKFILLING_ALGORITHMS.md).
@@ -42,7 +45,7 @@ LSF applies its configured policies within scheduling sessions.
 - **Scheduling interval:** when a scheduling cycle may run.
 - **Queue depth Q:** the maximum number of waiting jobs examined in a cycle.
   In DR_EVT, `--backfill_queue_depth` limits backfill examinations, excluding
-  ordinary FCFS starts. In unified modes, `--dispatch_queue_depth` limits the
+  ordinary FCFS starts. In fixed periodic modes, `--dispatch_queue_depth` limits the
   whole placement prefix, including immediate starts.
   Production engines can count different stages of candidate evaluation.
 - **Reservation depth R:** the maximum number of waiting jobs given protected
@@ -72,17 +75,24 @@ that request scheduling, rather than daemon heartbeats or health checks. A
 health-check timer matters here only if it requests a scheduling pass or
 changes scheduling-relevant state.
 
-| Category | Trigger behavior | Production example |
+The examples classify selected public behaviors. They do not imply that
+DR_EVT implements every trigger category or every configuration of an engine.
+DR_EVT's supported trigger modes are defined below.
+Vendor option names in the production examples are evidence of related
+policies or controls. They are not DR_EVT options, and their semantics are
+not automatically reproduced by choosing similar simulator settings.
+
+| Category | Trigger behavior | Publicly documented example |
 |---|---|---|
-| Unified event-driven | A relevant state event requests an allocation/reservation cycle | Fluxion; OpenPBS |
+| Event-driven dispatch and backfill | A relevant state event requests an allocation/reservation cycle | Fluxion; OpenPBS |
 | Separate dispatch and backfill triggers | Events request main dispatch; a separate interval governs backfill; main dispatch also has a periodic pass | Slurm |
-| Unified timer and event triggers | An explicit notification or a periodic timer runs the same placement/reservation loop | Spur at the inspected commit |
+| Timer and notification triggers | An explicit notification or a periodic timer runs the same placement/reservation loop | Spur at the inspected commit |
 | Sessions with a minimum interval | Scheduling work is handled in sessions no more often than the configured minimum interval | LSF |
 
 For timing alone, suppose a fitting job arrives at 2.3 s and a periodic timer's
 next wake is 3 s. Fluxion can evaluate at 2.3 s. Slurm's main scheduler can
 dispatch then, subject to its throttling. Spur's submission notification can
-also wake its unified loop at 2.3 s. For LSF, if the previous session began
+also wake its placement/reservation loop at 2.3 s. For LSF, if the previous session began
 at 0 s and the minimum interval is 5 s, the next session cannot begin before
 5 s; the interval does not promise a session exactly then. A hypothetical
 strict tick-gated scheduler would wait until 3 s, but that is not the inspected
@@ -109,7 +119,7 @@ periodic backfill (backfill_interval > 0):
         repeat scheduler calls until none starts a job
     on other ticks: advance the tick deadline without a backfill scan
 
-unified fixed periodic dispatch (dispatch_interval > 0, dispatch_on_events = false):
+fixed periodic dispatch (dispatch_interval > 0, dispatch_on_events = false):
     on a state-event batch: apply it without scheduling
     on each tick while jobs wait:
         apply all events at that timestamp
@@ -118,10 +128,10 @@ unified fixed periodic dispatch (dispatch_interval > 0, dispatch_on_events = fal
         do not repeat the scan at this tick
     retry from the current queue head at the next tick
 
-unified timer and arrival notifications (dispatch_interval > 0, dispatch_on_events = true):
+fixed periodic dispatch with arrival notifications (dispatch_interval > 0, dispatch_on_events = true):
     apply all state events at their exact timestamps
     on an arrival batch or a tick while jobs wait:
-        run the same unified placement/reservation/backfill pass once
+        run the same FCFS/reservation/backfill pass once
         use one fresh dispatch_queue_depth prefix and reservation plan
     coalesce an arrival batch and timer at the same timestamp into one pass
     ordinary completions, releases, and capacity changes wait for a tick
@@ -138,9 +148,9 @@ and FCFS or `fcfs_conservative` ordering, and does not support custom selectors.
 
 | Control | Current behavior |
 |---|---|
-| `--dispatch_interval` | Aligned ticks run both FCFS and backfill; 0 disables unified periodic dispatch |
-| `--dispatch_on_events` | Also run the unified pass on job arrival batches without resetting ticks; requires positive dispatch interval |
-| `--dispatch_queue_depth` | Entire examined prefix per unified wake, including immediate starts and out-of-horizon jobs; 0 is unlimited |
+| `--dispatch_interval` | Aligned ticks run both FCFS and backfill; 0 disables fixed periodic dispatch |
+| `--dispatch_on_events` | Also run the combined FCFS/backfill pass on job arrival batches without resetting ticks; requires positive dispatch interval |
+| `--dispatch_queue_depth` | Entire examined prefix per dispatch wake, including immediate starts and out-of-horizon jobs; 0 is unlimited |
 | `--priority_policy` | FCFS, SJF, or LJF orders the waiting queue |
 | `--backfill_policy` | EASY protects the head; hybrid protects up to R waiting jobs; conservative protects all planned earlier waiting jobs; none disables backfill |
 | `--reservation_depth` | R for hybrid; a job beyond the planning horizon gets no reservation slot |
@@ -150,7 +160,7 @@ and FCFS or `fcfs_conservative` ordering, and does not support custom selectors.
 | `--total_nodes`, `--capacity_schedule` | One homogeneous node pool, optionally changing capacity over time |
 | `--node_release_delay` | Hold nodes after actual completion for constant, exponential, or uniform cleanup; replayed history is not delayed |
 
-Unified periodic dispatch uses its own Q, `--dispatch_queue_depth`, for all
+Fixed periodic dispatch uses its own Q, `--dispatch_queue_depth`, for all
 examined candidates. It counts out-of-horizon candidates and retries on every
 tick regardless of the scheduling-state flag. EASY reuses hybrid protection
 with R=1 in this mode.
@@ -158,7 +168,7 @@ with R=1 in this mode.
 Trigger modes are selected once per `advance_to` call (and at warm-start
 entry). The event loop uses compile-time specializations, so event-driven
 and separate periodic-backfill loops contain no arrival-notification checks;
-fixed unified dispatch also excludes them when the option is disabled.
+fixed fixed periodic dispatch also excludes them when the option is disabled.
 
 Periodic hybrid/conservative share Q across calls at one tick and count
 out-of-horizon jobs. Periodic EASY performs one backfill scan per tick and
@@ -177,48 +187,56 @@ actual release. A job's nodes become reusable when its slowest node finishes
 cleanup. Runtime and cleanup options are defined in the
 [command-line reference](../user-guide/command-line.md).
 
-## Replicating core behavior with current options
+## Supported policy combinations
 
-These mappings apply to one homogeneous pool and a fixed queue-order policy.
-The values are illustrative choices, not production defaults. Matching the
-controls reproduces selected decisions, not the entire production engine.
+These policy sets apply to one homogeneous pool and a fixed queue-order policy.
+The values are illustrative study choices. Similar controls can appear in
+production schedulers, but matching option values does not establish matching
+decisions or implementation semantics.
 
-| Target behavior | DR_EVT option choices |
+| Policy set | DR_EVT option choices |
 |---|---|
 | Fixed periodic FCFS with a total candidate limit | `--dispatch_interval 5 --dispatch_queue_depth 3 --backfill_policy none` |
 | Fixed periodic FCFS and backfill with head protection | `--dispatch_interval 5 --dispatch_queue_depth 3 --backfill_policy hybrid --reservation_depth 1`; optionally set H and resolution |
-| Slurm-like periodic backfill; protect one waiting job | `--queue_impl circular --backfill_interval 5 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_horizon 300 --planning_time_resolution 1` |
-| Slurm-like periodic backfill; protect N waiting jobs | Same settings with `--reservation_depth N` |
-| Slurm-like periodic backfill; protect all planned earlier jobs | Same interval, Q, H, and resolution with `--backfill_policy conservative` |
-| Fluxion-like event-driven hybrid; protect one waiting job | `--backfill_interval 0 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_time_resolution 1`; omit H |
-| Fluxion-like event-driven conservative | Same event-driven settings with `--backfill_policy conservative`; omit H |
-| Spur-like unified timer and submission notifications | `--dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 3 --backfill_policy conservative`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
-| PBS event-driven approximation; Q caps backfill examinations | `--priority_policy fcfs --backfill_policy hybrid --reservation_depth N --backfill_interval 0 --dispatch_interval 0 --backfill_queue_depth Q`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
-| PBS total-candidate Q with assumed fixed cadence | `--dispatch_interval I --dispatch_queue_depth Q --backfill_policy hybrid --reservation_depth N`; omit H; use the default resource-time rule |
-| LSF timing under the earliest-permitted-session assumption | Set `--dispatch_interval` to the assumed session interval, e.g. `5`; choose queue depth and backfill policy separately, since their LSF equivalence is unverified |
+| Event-driven FCFS with separate periodic backfill; protect one waiting job | `--queue_impl circular --backfill_interval 5 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_horizon 300 --planning_time_resolution 1` |
+| Event-driven FCFS with separate periodic backfill; protect N waiting jobs | Same settings with `--reservation_depth N` |
+| Event-driven FCFS with separate periodic conservative backfill | Same interval, Q, H, and resolution with `--backfill_policy conservative` |
+| Event-driven head protection with cycle-wide backfill Q | `--backfill_interval 0 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_time_resolution 1`; omit H |
+| Event-driven conservative backfill | Same event-driven settings with `--backfill_policy conservative`; omit H |
+| Fixed periodic conservative backfill with arrival notifications | `--dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 3 --backfill_policy conservative`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
+| Event-driven hybrid with backfill examination cap Q | `--priority_policy fcfs --backfill_policy hybrid --reservation_depth N --backfill_interval 0 --dispatch_interval 0 --backfill_queue_depth Q`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
+| Fixed periodic hybrid with total-candidate cap Q | `--dispatch_interval I --dispatch_queue_depth Q --backfill_policy hybrid --reservation_depth N`; omit H; use the default resource-time rule |
+| Fixed periodic EASY with strict completion-before-start admission | `--dispatch_interval 5 --backfill_policy easy --dispatch_queue_depth 0`; omit H; build with `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` |
 
-For Slurm, map `bf_interval` to the backfill interval, `bf_max_job_test` to Q,
-`bf_job_part_count_reserve=N` to hybrid R, and `bf_resolution` to planning
-resolution. Convert `bf_window` from minutes to seconds: a 5-minute window
+Related controls in Slurm include `bf_interval` for backfill cadence,
+`bf_max_job_test` for Q, `bf_job_part_count_reserve=N` for protection depth,
+and `bf_resolution` for planning resolution. These are conceptual counterparts;
+their accounting and rounding need not agree with DR_EVT. Convert `bf_window`
+from minutes to seconds when choosing H: a 5-minute window
 becomes `--planning_horizon 300`. Its zero reservation-count setting removes
 that limit, so use conservative rather than interpreting it as R=0.
 
-For Fluxion hybrid, map `queue-depth` and `reservation-depth` to Q and R.
+Fluxion hybrid also exposes `queue-depth` and `reservation-depth`, related
+to Q and R.
 Use hybrid with R=1 for head protection when cycle-wide Q accounting matters.
-The default event-driven mode approximates Fluxion's trigger mechanism.
+Its event-driven allocation/reservation cycle belongs to the event-driven
+category; candidate accounting and blocked-job handling differ.
 
-For PBS, assume `strict_ordering=true` and global protection depth N > 0.
+OpenPBS with `strict_ordering=true` and global protection depth N > 0
+provides another example of event-driven hybrid protection.
 The event-driven row excludes ordinary FCFS starts from Q; the fixed-cadence
-row includes them but approximates PBS timing. See
+row includes them but uses aligned ticks rather than its event and fallback
+timing. See
 [PBS timing and cycle limits](REALISM_AND_GAPS.md#pbs-timing-and-cycle-limits).
 
-The fixed-periodic rows implement the chat algorithm: update state on events,
-wait for the next tick, and make one bounded scheduling pass. They model
-Spur's timer path and shared candidate prefix, but Spur also dispatches on
-notifications.
+The fixed-periodic rows update state on events, wait for the next tick, and
+make one bounded scheduling pass. Spur provides an example of a shared
+placement/reservation prefix with timer and notification triggers; the
+arrival-enabled policy set studies that combination under DR_EVT's wake rules.
 
-For LSF, use the aligned-session assumption described in the
-[LSF mapping](#lsf-scheduling-sessions-with-a-minimum-interval).
+LSF's minimum-interval sessions relate to fixed cadence only under the
+aligned-session assumption described in the
+[LSF timing example](#lsf-scheduling-sessions-with-a-minimum-interval).
 Set cleanup parameters from measurements when node reuse matters. Production
 modeling limits are in [Remaining differences](REALISM_AND_GAPS.md#remaining-differences).
 
@@ -350,7 +368,7 @@ allocated or reserved, not simply one beyond a chosen lookahead window.
 Blocked jobs are reconsidered on applicable state changes, including
 completion and priority changes. Fluxion plans in whole seconds.
 
-## Spur: unified timer and event triggers
+## Spur: timer and submission notification triggers
 
 ```text
 wait for either a periodic timer wake or an explicit scheduler notification
@@ -390,23 +408,25 @@ For a fixed interval, notification-triggered passes do not reset the timer
 cadence. With ticks at 5, 10, and 15, a submission at 7 can trigger a pass at
 7 while the next timer wake remains at 10.
 
-DR_EVT implements this core trigger pattern with `--dispatch_interval 1
---dispatch_on_events`, using a full unified pass for each job-arrival batch
+The supported fixed periodic dispatch policy with `--dispatch_interval 1
+--dispatch_on_events` shares the timer-plus-submission trigger category,
+using one FCFS/backfill pass for each job-arrival batch
 and each aligned tick while jobs wait. Choose `--backfill_policy conservative`
 to protect feasible future starts throughout the examined prefix and
 `--dispatch_queue_depth` for its size. Omit a planning horizon to avoid adding
-a filter absent from Spur's exposed configuration. Use the default resource-time
+a lookahead filter when studying this policy set. Use the default resource-time
 reservation rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`). This extends the
 fixed periodic mode; omitting `--dispatch_on_events` retains tick-only dispatch.
 
-DR_EVT models ordinary submission notifications and timer polling.
+This policy set models ordinary submission notifications and timer polling;
+it does not implement the production controller's asynchronous execution.
 Additional notification sources and asynchronous wake differences are in
 [Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope);
 regression coverage is in [Validation scope](REALISM_AND_GAPS.md#validation-scope).
 
-## OpenPBS: unified event-driven scheduling
+## OpenPBS: event-driven dispatch and backfill
 
-For ordinary jobs with strict ordering, OpenPBS follows the unified
+For ordinary jobs with strict ordering, OpenPBS follows the fixed periodic
 event-driven pattern: rebuild the calendar, examine jobs in order, start
 fitting jobs, and protect eligible waiting jobs. Its fallback timer and
 cycle-limit differences are in
@@ -453,10 +473,11 @@ definition does not establish whether unsuccessful tests or future
 reservations consume decisions, so the pseudocode deliberately does not use
 `tested += 1` for every candidate.
 
-DR_EVT's unified periodic dispatch is representative of LSF session timing
-under the earliest-permitted-session assumption above: sessions follow the
-aligned interval boundaries whenever work waits, without additional delay.
-Use `--dispatch_interval` for that cadence; do not infer a mapping from
+DR_EVT supports fixed periodic dispatch. Relating that policy to LSF's
+minimum-interval sessions requires an additional study assumption: sessions
+follow aligned interval boundaries whenever work waits, without additional
+delay. The interval setting alone does not establish this behavior in LSF.
+Use `--dispatch_interval` for the assumed cadence; do not infer a mapping from
 `LSB_MAX_JOB_DISPATCH_PER_SESSION` to `--dispatch_queue_depth` solely from it.
 
 Processor reservation is configurable and off by default in the referenced
@@ -481,12 +502,13 @@ job arriving at 08:30 with a one-hour limit can borrow reserved slots because
 it finishes by 09:30, before the protected start at 10:00. A two-hour limit
 would prevent that backfill.
 
-EASY head protection can mimic the example in IBM's documentation. The example does not
+EASY head protection can produce the decisions in IBM's worked example.
+This agreement does not
 establish that LSF protects exactly one waiting job in every configuration,
-or that LSF performs only EASY backfill. EASY is the selected approximation
-for this example, not a classification of the entire LSF scheduler.
+or that LSF performs only EASY backfill. The example illustrates an approach
+with head protection; it does not identify a complete production policy set.
 
-The chosen simplified LSF representation uses:
+One supported policy set for studying head protection and strict admission uses:
 
 - `-DDR_EVT_LEGACY_RESERVATION_BARRIER=ON` at build time for strict
   completion-before-reservation admission.

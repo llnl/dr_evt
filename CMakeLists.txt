@@ -906,9 +906,9 @@ if(DR_EVT_WITH_UNIT_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_read_build_config.py)
     if(DR_EVT_LEGACY_RESERVATION_BARRIER)
       add_test(
-        NAME test_lsf_model_validation
+        NAME test_legacy_reservation_validation
         COMMAND ${Python3_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_lsf_model_validation.py
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_legacy_reservation_validation.py
           $<TARGET_FILE:sim-bin>
           --config-header ${CMAKE_CURRENT_BINARY_DIR}/dr_evt_config.hpp)
     endif()
