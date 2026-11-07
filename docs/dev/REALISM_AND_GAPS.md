@@ -153,6 +153,7 @@ recorded validation includes:
 |---|---|
 | Event-driven policies | 34 scheduler-correctness workloads match the independent Python reference |
 | Unified dispatch | Fixed ticks and timer/arrival wakes checked against hand-computed cases and independent randomized FCFS references; streaming, warm-start, and checkpoint continuation checks |
+| Simplified LSF configuration | Legacy-barrier EASY matches IBM's example, boundary and runtime cases, and 96 randomized comparisons with an independent fixed-session reference; the default-rule overlap control differs as expected |
 | Periodic backfill | 136 runs across those workloads, two reservation policies, and 7 s / 30 s intervals match the reference |
 | Planning horizon | Horizon workloads and explicit-unlimited runs agree with the references; accounting is also covered by C++ and Python tests |
 | Queue depth | EASY implementations agree with their reference; periodic EASY equals hybrid with depth 1 in the tested cases without a finite horizon |
@@ -175,9 +176,12 @@ manual check of legacy reservation-barrier behavior. It is not validation of
 DR_EVT's default resource-time feasibility rule.
 
 OpenPBS behavior was checked against pinned source and manuals, without a
-paired OpenPBS/DR_EVT runtime comparison. The unified-dispatch checks used the
-default resource-time rule; the selected strict LSF configuration needs
-separate validation.
+paired OpenPBS/DR_EVT runtime comparison. The strict LSF approximation was
+validated in Docker with
+[`run_lsf_model_validation.py`](../../tests/run_lsf_model_validation.py):
+106 legacy-rule checks and one default-rule control passed. These establish
+the selected homogeneous-pool model, not LSF's internal accounting or session
+timing. No LSF daemon was run.
 
 ## Sources
 

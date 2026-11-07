@@ -900,6 +900,13 @@ if(DR_EVT_WITH_UNIT_TESTING)
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_node_release_delay_tests.sh
       $<TARGET_FILE:sim-bin>)
   if(Python3_Interpreter_FOUND)
+    if(DR_EVT_LEGACY_RESERVATION_BARRIER)
+      add_test(
+        NAME test_lsf_model_validation
+        COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_lsf_model_validation.py
+          $<TARGET_FILE:sim-bin>)
+    endif()
     add_test(
       NAME test_unified_periodic_dispatch
       COMMAND ${Python3_EXECUTABLE}

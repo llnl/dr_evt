@@ -159,6 +159,27 @@ resource trace with outputs from `scripts/python_reference_scheduler.py`.
 These comparisons test consistency between implementations, not independent
 proof of the algorithm.
 
+### Simplified LSF model
+
+[`run_lsf_model_validation.py`](run_lsf_model_validation.py) checks fixed-session
+FCFS/EASY with strict completion-before-reservation admission. It covers IBM's
+4-CPU backfill example, rejected long and equal-boundary jobs, time-limit
+planning, early releases, cadence, candidate limits, and 96 randomized
+comparisons with an independent reference. IBM does not specify the protected
+job's duration; the fixture assumes 30 minutes. This validates DR_EVT's
+documented approximation, not an LSF daemon or its decision accounting.
+
+```bash
+cmake -S . -B build-lsf -DCMAKE_BUILD_TYPE=Release \
+  -DDR_EVT_LEGACY_RESERVATION_BARRIER=ON -DDR_EVT_WITH_UNIT_TESTING=ON
+cmake --build build-lsf --target sim-bin -j2
+ctest --test-dir build-lsf -R '^test_lsf_model_validation$' --output-on-failure
+```
+
+The CTest is registered only in legacy-barrier builds. Passing
+`--flexible-simulator PATH` directly to the script adds a control against a
+default-rule build, verifying that only the strict build rejects a safe overlap.
+
 ### Replay tests
 
 Replay tests contain four simulation/replay CLI comparisons and the
