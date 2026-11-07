@@ -29,6 +29,8 @@ getting-started/tutorial
 
 user-guide/overview
 user-guide/command-line
+user-guide/SCHEDULER_LOOPS
+user-guide/REALISM_AND_GAPS
 user-guide/protobuf-config
 user-guide/trace-formats
 user-guide/output-traces
@@ -66,8 +68,6 @@ CLIENT_SERVER_GUIDE
 dev/README
 dev/WAIT_QUEUES
 dev/JOB_LIFECYCLE
-dev/SCHEDULER_LOOPS
-dev/REALISM_AND_GAPS
 dev/PERFORMANCE_ANALYSIS
 dev/SCHEDULING_PREDICTIONS
 dev/design-decisions/README

@@ -175,7 +175,7 @@ planning, early releases, cadence, candidate limits, and 96 randomized
 comparisons with an independent reference. The head-protection fixture uses
 a 30-minute protected job. These tests validate the specified policy set;
 their evidence scope is described in
-[Realism and Known Gaps](../docs/dev/REALISM_AND_GAPS.md#validation-scope).
+[Realism and Known Gaps](../docs/user-guide/REALISM_AND_GAPS.md#validation-scope).
 
 ```bash
 cmake -S . -B build-legacy -DCMAKE_BUILD_TYPE=Release \

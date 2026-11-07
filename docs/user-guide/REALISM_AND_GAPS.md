@@ -144,7 +144,7 @@ overrides, and prime/dedicated-time eligibility windows are also outside the
 chosen global-pool mapping. Its waiting-job reservations use the existing
 hybrid protection model.
 
-The experimental [multi-system scheduler](../user-guide/multi-cluster-backfill.md)
+The experimental [multi-system scheduler](multi-cluster-backfill.md)
 shares a queue across several homogeneous systems. The external EASY selector
 ranks feasible backfill candidates; it does not control preceding FCFS
 dispatch or the whole queue. Studies requiring those excluded mechanisms

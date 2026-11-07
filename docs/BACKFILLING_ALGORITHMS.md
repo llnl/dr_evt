@@ -9,8 +9,8 @@ backfill protection, scheduling triggers, examination and reservation depths,
 planning horizon and resolution, and reservation admission. These describe
 the scheduling approach studied by the simulator. Their relationships to
 publicly documented production behavior and the limits of those comparisons
-are discussed in [Scheduling Loops](dev/SCHEDULER_LOOPS.md) and
-[Realism and Known Gaps](dev/REALISM_AND_GAPS.md).
+are discussed in [Scheduling Loops](user-guide/SCHEDULER_LOOPS.md) and
+[Realism and Known Gaps](user-guide/REALISM_AND_GAPS.md).
 
 ## Priority policies
 
@@ -27,7 +27,7 @@ maintains the reservations needed for conservative backfilling.
 At a permitted scheduling pass, start fitting jobs from the front of the
 eligible queue. If the new head is blocked, the backfilling policy determines
 whether a later job may start. Trigger modes and option combinations are in
-[Scheduling Loops](dev/SCHEDULER_LOOPS.md).
+[Scheduling Loops](user-guide/SCHEDULER_LOOPS.md).
 
 ### None
 
@@ -131,7 +131,7 @@ slot. Queue-depth accounting depends on the trigger mode; see
 [Command-Line Options](user-guide/command-line.md).
 Head protection alone does not guarantee identical EASY and hybrid results
 with finite scan limits; see
-[Backfill evaluation accounting](dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
+[Backfill evaluation accounting](user-guide/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
 ## Runtime estimates and completion
 
@@ -144,7 +144,7 @@ the selected trigger mode and does not change an earlier reservation calculation
 The default admission rule preserves protected resource-time intervals and can
 allow overlapping jobs when enough resources remain. The legacy barrier requires
 completion strictly before the protected start; see
-[Reservation admission scope](dev/REALISM_AND_GAPS.md)
+[Reservation admission scope](user-guide/REALISM_AND_GAPS.md)
 for the limits of this homogeneous-pool rule.
 
 ## Comparison
@@ -170,5 +170,5 @@ result; see [Wait Queues](dev/WAIT_QUEUES.md).
   Scheduling the IBM SP2 with Backfilling*.
 
 Production scheduler sources and option mappings are in
-[Scheduling Loops](dev/SCHEDULER_LOOPS.md#sources); accounting and modeling
-limitations are in [Realism and Known Gaps](dev/REALISM_AND_GAPS.md).
+[Scheduling Loops](user-guide/SCHEDULER_LOOPS.md#sources); accounting and modeling
+limitations are in [Realism and Known Gaps](user-guide/REALISM_AND_GAPS.md).

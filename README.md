@@ -8,9 +8,9 @@ hybrid, and conservative backfilling algorithms. It models scheduling approaches
 through a set of policies: queue ordering, dispatch and backfill triggers,
 examination and reservation depths, planning horizon and resolution, and
 reservation admission. See [Scheduling Loops and
-DR_EVT Configurations](https://dr-evt.readthedocs.io/en/latest/dev/SCHEDULER_LOOPS.html)
+DR_EVT Configurations](https://dr-evt.readthedocs.io/en/latest/user-guide/SCHEDULER_LOOPS.html)
 for supported combinations and [Realism and Known
-Gaps](https://dr-evt.readthedocs.io/en/latest/dev/REALISM_AND_GAPS.html) for
+Gaps](https://dr-evt.readthedocs.io/en/latest/user-guide/REALISM_AND_GAPS.html) for
 model scope and evidence limits. **Uniquely supports online
 simulation via gRPC**, enabling [coordinated multi-cluster simulations](https://dr-evt.readthedocs.io/en/latest/user-guide/client-server-use-cases.html)
 where distributed schedulers interact in real-time.

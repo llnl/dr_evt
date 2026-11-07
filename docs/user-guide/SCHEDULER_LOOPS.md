@@ -185,7 +185,7 @@ sampled distribution and are capped by time limits. Cleanup nodes remain
 unavailable until their release event; planning does not reveal their future
 actual release. A job's nodes become reusable when its slowest node finishes
 cleanup. Runtime and cleanup options are defined in the
-[command-line reference](../user-guide/command-line.md).
+[command-line reference](command-line.md).
 
 ## Supported policy combinations
 
