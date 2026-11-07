@@ -17,12 +17,16 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * FCFS (First-Come-First-Served) scheduler with iterator tracking.
- *
+ * @brief Event-driven FCFS dispatch and EASY backfill using a deque queue.
+ * @details
  * Key optimization: Maintains iterator marking boundary between
  * "eligible" (submit_time <= current_time) and "not yet eligible" jobs.
  *
  * No rescanning or submit_time comparison in schedule().
+ * @note Selected by --priority_policy fcfs --queue_impl deque
+ * --backfill_policy easy, with --dispatch_interval 0 and --backfill_interval 0.
+ * --priority_policy fcfs_conservative with EASY also selects this queue.
+ * --backfill_policy none disables backfill.
  */
 class FCFSEasyDequeScheduler : public SchedulerBase {
 private:

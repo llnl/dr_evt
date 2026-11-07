@@ -7,6 +7,13 @@
 
 /** @file scheduler_fcfs_hybrid_circular.tpp
  * @brief Shared FCFS traversal with a compile-time protection planner.
+ * @details Used by event-driven hybrid/conservative scheduling, separate
+ * periodic backfill, and unified periodic dispatch (including arrival wakes).
+ * Existing modes use Reservation_Timeline; only unified conservative dispatch
+ * can select Reservation_Search_Cache. Unified EASY uses hybrid protection
+ * with reservation depth 1; existing EASY modes use separate implementations.
+ * @note This template is not selected directly by an option. The concrete
+ * scheduler headers document the options that activate each caller.
  */
 
 template <typename ProtectionTimeline>

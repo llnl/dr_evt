@@ -5,12 +5,12 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_unified_circular.hpp
- * @brief Bounded FCFS and backfill scans for unified dispatch wakes.
+/** @file scheduler_periodic_fcfs_hybrid_circular.hpp
+ * @brief Periodic FCFS dispatch and hybrid backfill using a circular queue.
  */
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_UNIFIED_CIRCULAR_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_UNIFIED_CIRCULAR_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_CIRCULAR_HPP
+#define DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_CIRCULAR_HPP
 
 #include "sim/reservation_search_cache.hpp"
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
@@ -20,19 +20,29 @@
 
 namespace dr_evt {
 
-/** @brief FCFS and backfill over one bounded candidate prefix per unified wake.
- * @details The driver invokes schedule() once after processing all same-time
+/** @brief Periodic FCFS dispatch and hybrid backfill using a circular queue.
+ * @details Selected by create_scheduler() only when dispatch_interval > 0.
+ * Used for fixed periodic dispatch and, with dispatch_on_events enabled,
+ * arrival-triggered unified passes. Ordinary event-driven scheduling and
+ * separate periodic backfill use their existing scheduler implementations.
+ * The driver invokes schedule() once after processing all same-time
  * events. EASY uses the shared reservation implementation with one protected
  * job. Every candidate in the prefix counts, including immediate FCFS starts
  * and jobs whose projected starts fall outside the planning horizon.
+ * @note Selected by --dispatch_interval I (I > 0), --backfill_interval 0,
+ * --queue_impl circular, and FCFS ordering. Supports --backfill_policy none,
+ * easy, hybrid, or conservative. EASY maps to hybrid with depth 1; hybrid
+ * requires --reservation_depth N (N > 0). --dispatch_queue_depth Q bounds the
+ * full pass; --dispatch_on_events also requests passes on job arrivals.
  */
-class FCFSUnifiedCircularScheduler : public FCFSHybridCircularScheduler {
+class PeriodicFCFSHybridCircularScheduler : public FCFSHybridCircularScheduler {
   /// Maximum live candidates per wake; zero leaves the prefix unlimited.
   size_t m_dispatch_queue_depth;
 
 public:
   /**
-   * @brief Construct a unified-dispatch circular scheduler.
+   * @brief Construct a periodic FCFS dispatch and hybrid backfill scheduler
+   * using a circular queue.
    * @param[in] total_nodes Cluster capacity available for allocations.
    * @param[in] initial_job_count Initially known jobs, used when capacity is
    * zero.
@@ -43,12 +53,10 @@ public:
    * @param[in] dispatch_queue_depth Live candidates examined per wake; zero
    * leaves the prefix unlimited.
    */
-  FCFSUnifiedCircularScheduler(num_nodes_t total_nodes,
-                               size_t initial_job_count, BackfillPolicy policy,
-                               size_t initial_capacity,
-                               CircularOverflowPolicy overflow_policy,
-                               size_t reservation_depth,
-                               size_t dispatch_queue_depth)
+  PeriodicFCFSHybridCircularScheduler(
+      num_nodes_t total_nodes, size_t initial_job_count, BackfillPolicy policy,
+      size_t initial_capacity, CircularOverflowPolicy overflow_policy,
+      size_t reservation_depth, size_t dispatch_queue_depth)
       : FCFSHybridCircularScheduler(
             total_nodes, initial_job_count,
             policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID : policy,

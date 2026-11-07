@@ -19,8 +19,10 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * FCFS scheduler with hybrid-reservation backfilling support. Conservative is
- * the unlimited-depth case.
+ * @brief Event-driven FCFS dispatch and hybrid/conservative backfill using a
+ * deque queue.
+ * @details Conservative is the unlimited-reservation-depth case within the
+ * examined prefix.
  *
  * Supports three backfill modes via BackfillPolicy. EASY is not one of them;
  * it has its own FCFS schedulers, and constructing this class with EASY throws.
@@ -35,6 +37,10 @@ namespace dr_evt {
  * This is the deque-backed implementation. The default hybrid scheduler
  * uses FCFSHybridCircularScheduler; select
  * QueueImplementation::DEQUE to retain this unbounded queue.
+ * @note With --dispatch_interval 0 and --backfill_interval 0, selected by
+ * --queue_impl deque and --backfill_policy hybrid --reservation_depth N
+ * (N > 0) with FCFS ordering, or --priority_policy fcfs_conservative with
+ * conservative/none backfill and --queue_impl deque.
  */
 class FCFSHybridDequeScheduler : public SchedulerBase {
 private:

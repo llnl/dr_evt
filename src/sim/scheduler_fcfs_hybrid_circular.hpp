@@ -6,7 +6,8 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_hybrid_circular.hpp
- * @brief Circular-buffer wait queue for hybrid-reservation FCFS backfilling.
+ * @brief Event-driven FCFS dispatch and hybrid/conservative backfill using a
+ * circular queue; also the base implementation for periodic variants.
  */
 
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_HYBRID_CIRCULAR_HPP
@@ -20,13 +21,20 @@
 namespace dr_evt {
 
 /**
- * @brief Hybrid-reservation FCFS scheduler backed by a contiguous circular
- * buffer.
- * @details This preserves FCFSHybridDequeScheduler's reservation and lazy
+ * @brief Event-driven FCFS dispatch and hybrid/conservative backfill using a
+ * circular queue.
+ * @details Selected directly for event-driven runs; periodic subclasses reuse
+ * its queue and reservation logic with different triggers. This preserves
+ * FCFSHybridDequeScheduler's reservation and lazy
  * removal rules while making its repeated indexed scans contiguous in memory.
  * The queue is fixed-capacity unless its configured overflow policy permits
  * growth; the deque-backed scheduler remains available through
  * QueueImplementation::DEQUE.
+ * @note With --dispatch_interval 0 and --backfill_interval 0, selected by
+ * --backfill_policy hybrid --reservation_depth N (N > 0) with FCFS ordering,
+ * or --priority_policy fcfs_conservative with conservative/none backfill.
+ * --queue_impl circular selects this queue; unsupported hybrid queue kinds
+ * also fall back to it. --queue_impl deque selects FCFSHybridDequeScheduler.
  */
 class FCFSHybridCircularScheduler : public SchedulerBase {
 protected:

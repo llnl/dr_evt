@@ -190,7 +190,7 @@ cycles, and retain sample counts and lost-sample counts with the result.
 ## Unified dispatch candidate-prefix optimization (November 6, 2026)
 
 The baseline was `dae396c`, after compile-time trigger specialization.
-The optimization changes only `FCFSUnifiedCircularScheduler`; event-driven
+The optimization changes only `PeriodicFCFSHybridCircularScheduler`; event-driven
 and separate periodic-backfill scheduler implementations are unchanged.
 The build was Release (`-O3`) on macOS arm64 with
 `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
@@ -286,7 +286,7 @@ end of each pass. It does not persist reservations or search state across
 wakes, alter queue ordering, or change checkpoint data. Both fixed timer
 dispatch and timer dispatch with arrival notifications can use it.
 
-Selection is confined to `FCFSUnifiedCircularScheduler`: conservative policy,
+Selection is confined to `PeriodicFCFSHybridCircularScheduler`: conservative policy,
 nonzero free nodes, exact planning resolution, and at least 128 live eligible
 candidates. A stack sample of the first 128 live candidates must contain at
 most 112 distinct node-count/duration pairs. Mostly distinct requests use the

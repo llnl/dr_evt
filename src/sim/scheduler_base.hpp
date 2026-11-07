@@ -195,6 +195,11 @@ public:
  * backfilling. The simulation submits validated job metadata, synchronizes
  * arrival eligibility, and repeatedly asks the scheduler which jobs can start
  * with the currently available nodes.
+ * Scheduling triggers belong to the simulation driver; this interface owns
+ * no event loop or timer and specifies no queue container.
+ * @note No option selects SchedulerBase directly. create_scheduler() chooses
+ * a concrete implementation from --priority_policy, --backfill_policy,
+ * --queue_impl, --dispatch_interval, and --backfill_interval.
  */
 class SchedulerBase {
   template <typename TraceType> friend class BasicSimulation;

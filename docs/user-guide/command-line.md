@@ -315,6 +315,13 @@ depth separately controls how many examined waiting jobs receive protection;
 EASY protects one, hybrid uses `--reservation_depth`, and conservative protects
 all planned earlier waiting jobs in the examined prefix.
 
+With unified dispatch, `--backfill_policy easy` uses the hybrid implementation
+with reservation depth fixed at 1, equivalent to `--backfill_policy hybrid
+--reservation_depth 1`. No explicit reservation-depth option is needed for
+`easy`; another supplied depth does not change its one-job protection.
+Event-driven and separate periodic-backfill modes retain their dedicated EASY
+implementations.
+
 Requires a circular queue and `fcfs` or `fcfs_conservative` ordering. Supports
 `none`, `easy`, `hybrid`, and `conservative` backfill policies. A positive
 `--dispatch_interval` cannot be combined with a positive `--backfill_interval`
