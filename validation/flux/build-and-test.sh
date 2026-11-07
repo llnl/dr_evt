@@ -34,3 +34,4 @@ timeout 120 flux start python3 /validation/test_quiescent.py
 export FLUX_FICTION_JOBTAP_SO=/workspace/fiction-build/src/emu-jobtap.so
 python3 /validation/test_fiction.py
 python3 /validation/build_dr_evt.py
+python3 /validation/test_paired.py "$(cat /workspace/dr_evt-simulator)"
