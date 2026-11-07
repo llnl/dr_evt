@@ -535,6 +535,12 @@ jobs:
           python3 -m venv docs-venv
           docs-venv/bin/python -m pip install -r docs/requirements.txt
 
+      - name: Build documentation without Doxygen XML
+        run: |
+          export PATH="$GITHUB_WORKSPACE/docs-venv/bin:$PATH"
+          sphinx-build -b html -E -a -W --keep-going \
+            docs docs/_build/no-doxygen/html
+
       - name: Build documentation with warnings as errors
         run: |
           export PATH="$GITHUB_WORKSPACE/docs-venv/bin:$PATH"

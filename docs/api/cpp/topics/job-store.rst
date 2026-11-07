@@ -5,7 +5,7 @@ The job store is owned by ``Trace``. It holds ``Job_Record`` instances,
 supports batch and streaming insertion, reclaims completed front records, and
 writes simulated-job output.
 
-.. only:: doxygen
+.. if-doxygen::
 
    ``Trace`` is the standard-policy alias
    ``BasicTrace<Standard_Trace_Policy>``.

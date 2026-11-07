@@ -20,7 +20,10 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | System | `--warm_start_wait_queue MODE` | Select `inherit` (default) or legacy `drop` handling for jobs waiting at a replay warm-start boundary. |
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
-| Scheduling | `--backfill_queue_depth N` | Cap jobs inspected per backfill pass by every scheduler, including the custom-EASY selector. |
+| Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
+| Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
+| Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per unified wake. |
+| Scheduling | `--dispatch_on_events` | Also run unified dispatch on job arrival batches, preserving timer phase. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
 | Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
@@ -59,8 +62,9 @@ The sections below define accepted values, defaults, and interactions.
 
 For how the scheduling controls (`--backfill_policy`, queue and reservation
 depths, interval, planning resolution, priority, and node-release delay) map
-to production-scheduler behavior, see [Realism and Known
-Gaps](../dev/REALISM_AND_GAPS.md).
+to production-scheduler behavior, see [Scheduling Loops and DR_EVT
+Configurations](../dev/SCHEDULER_LOOPS.md). Remaining differences are listed
+in [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md).
 
 ## Basic Usage
 
@@ -257,27 +261,25 @@ a scheduler examines in one scheduling pass. It applies to `easy`,
 every queue implementation, and to the experimental custom-EASY selector.
 Jobs beyond that prefix are not tested for backfill in that pass. `0` leaves
 the scan unlimited. This is a pre-feasibility queue scan limit: a job counts
-toward the depth even when it cannot fit or cannot complete before its
-reservation window. In event-driven mode under `easy` only the head holds a
+toward the depth even when it cannot fit or would delay a protected
+reservation. In event-driven mode under `easy` only the head holds a
 reservation, so only the head is exempted by `--planning_horizon`; every other
 job examined counts.
 
-The count belongs to one backfill cycle. With `--backfill_interval`, one tick
-is one cycle: all backfill passes at that tick share the count, and it resets
-at the next tick. FCFS head dispatch between ticks stays event-driven, scans no
-candidates, and uses none of it. This is how Slurm counts `bf_max_job_test` per
-backfill iteration. As in Slurm, a job whose reservation is beyond
-`--planning_horizon` still uses a slot, though it receives no reservation.
+With `--backfill_interval`, a tick's evaluation is one cycle. Periodic hybrid
+and conservative share their count across calls at the tick and count
+out-of-horizon jobs. Periodic EASY performs one scan at the tick and exempts
+an out-of-horizon head; other examined candidates count. FCFS head dispatch
+between ticks stays event-driven and uses none of this evaluation budget.
 
 Without `--backfill_interval`, the simulator repeats scheduler passes at one
 simulation timestamp until nothing more starts. Conservative and hybrid
 backfill share their count across those passes and reset it when time
-advances; a job beyond `--planning_horizon` does not use a slot, as a blocked
-job does not in Fluxion. EASY, SJF, LJF, and the custom selector start the
-count again in each pass, so at one timestamp they can examine more jobs than
-the depth.
+advances; a job beyond `--planning_horizon` does not use a slot. EASY, SJF, LJF,
+and the custom selector start the count again in each pass, so at one timestamp
+they can examine more jobs than the depth.
 
-In short, `--backfill_queue_depth` controls how much of the queue a scheduler
+`--backfill_queue_depth` controls how much of the queue a scheduler
 considers; `--num_max_candidates` controls how many already-feasible jobs the
 custom-EASY callback can choose from. They are separate options acting at
 different stages: in the custom-EASY selector the depth bounds the scan first,
@@ -285,7 +287,75 @@ then the candidate cap applies to the feasible jobs found. This is
 independent of `--reservation_depth`, which limits only the earlier jobs whose
 reservations must be protected.
 
+Production counter differences are in
+[Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
+
 **Default:** `0` (unlimited)
+
+### `--dispatch_interval SECONDS` and `--dispatch_queue_depth COUNT`
+
+Use `--dispatch_interval` to run FCFS and backfill together only at fixed
+periodic ticks when `--dispatch_on_events` is absent. Arrivals, completions, node releases, and capacity changes
+update state at their exact times; they do not launch jobs between ticks.
+At a tick, process all same-time events first, then examine the waiting queue
+once. A later tick tries again even without a new state event.
+
+Ticks are anchored to the simulation clock when the loop is initialized
+(normally 0, or the warm-start boundary), with the first tick one interval
+later. Idle periods skip unused ticks while preserving the cadence. For a
+5-second interval anchored at 0, an arrival at 2.3 starts no earlier than 5;
+a completion at 7 makes nodes available immediately, but the next dispatch
+is at 10. A fitting arrival exactly at 10 may start at 10.
+
+`--dispatch_queue_depth` limits the full eligible candidate prefix at each
+tick. Immediate FCFS starts, blocked jobs, and candidates beyond the planning
+horizon all count. Removed entries do not count. Zero means unlimited. The
+next tick starts from the current queue head, with a fresh limit. Reservation
+depth separately controls how many examined waiting jobs receive protection;
+EASY protects one, hybrid uses `--reservation_depth`, and conservative protects
+all planned earlier waiting jobs in the examined prefix.
+
+Requires a circular queue and `fcfs` or `fcfs_conservative` ordering. Supports
+`none`, `easy`, `hybrid`, and `conservative` backfill policies. A positive
+`--dispatch_interval` cannot be combined with a positive `--backfill_interval`
+or a nonzero `--backfill_queue_depth`; use `--dispatch_queue_depth` for the
+unified cycle. A nonzero dispatch queue depth requires a positive dispatch
+interval. Custom selectors are unsupported. Interval zero preserves existing
+scheduling behavior.
+
+```bash
+simulator jobs.csv --total_nodes 4 --queue_impl circular \
+    --dispatch_interval 5 --dispatch_queue_depth 2 \
+    --backfill_policy hybrid --reservation_depth 1
+```
+
+The cheap pending-job status projection does not include this cadence or
+candidate limit; exact lookahead follows the live loop. See
+[Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md).
+
+Production timing assumptions are in
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#replicating-core-behavior-with-current-options)
+and [Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
+
+### `--dispatch_on_events`
+
+Adds arrival notifications to unified periodic dispatch. Requires a positive
+`--dispatch_interval`; default is off. At a job-arrival batch, apply all
+same-time state events, then run one full FCFS/reservation/backfill pass with
+a fresh `--dispatch_queue_depth` prefix. An arrival coinciding with a timer
+tick shares one pass. The notification does not shift the timer: an arrival
+at 7 may start at 7 while the next 5-second tick remains at 10.
+
+Completions, cleanup releases, and capacity changes update state immediately
+but wait for the next tick unless an arrival occurs at the same time. Repeated
+`advance_to` calls without new arrivals do not request extra passes. A new
+streaming arrival batch at the current time can request a fresh pass; appending
+future jobs does not notify until their arrival time.
+
+For a Spur-oriented configuration, see
+[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#spur-unified-timer-and-event-triggers).
+Notification and simultaneous-wake differences are in
+[Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--backfill_interval SECONDS`
 
@@ -293,8 +363,8 @@ Uses periodic EASY, conservative, or hybrid backfill while retaining
 event-driven FCFS dispatch. It is intended for Slurm-style trigger studies and
 uses the opt-in circular scheduler; it requires an enabled
 `--backfill_policy` and `--queue_impl circular`. `0` retains the default
-event-driven backfill behavior. Ticks start one interval after the first
-event, or after the `--sim_start_time` boundary in a warm start, and keep that
+event-driven backfill behavior. Ticks start one interval after loop initialization (normally
+time 0), or after the `--sim_start_time` boundary in a warm start, and keep that
 cadence whether or not a job is waiting; a tick that passes while nothing waits
 does nothing. Progressive loading (`--infile_list`) keeps the cadence across
 file boundaries.
@@ -323,9 +393,11 @@ and uses no hybrid reservation-depth slot. It keeps its queue position and is
 re-evaluated on the next scheduling pass, so newly released resources or a
 scheduled capacity change can bring its reservation into the horizon. This
 applies to both event-driven and periodic scheduling. Whether such a job uses
-a `--backfill_queue_depth` slot depends on the mode: it does in periodic mode,
-as in Slurm, and does not in event-driven mode, as for a blocked job in
-Fluxion.
+a `--backfill_queue_depth` slot depends on mode and policy. Hybrid/conservative
+count it in periodic mode and exempt it in event-driven mode. EASY exempts
+an out-of-horizon head in both modes; its other examined candidates count.
+See [Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting)
+for the remaining differences from production counters.
 
 **Default:** unlimited (the largest `tdiff_t` value)
 
@@ -335,11 +407,11 @@ Number of waiting jobs, in queue order, that hold reservations under
 `--backfill_policy hybrid`. A job deeper in the queue may start only if it
 fits now and delays none of those `N`; it holds no reservation of its own.
 `N` must be positive with `hybrid` and is ignored by the other policies.
-`1` reproduces `easy`; a depth of at least the queue length is
-`conservative`. This is the behaviour of Slurm's `bf_job_part_count_reserve`
-and of Fluxion's `hybrid` queue policy with `reservation-depth`. Hybrid, and
-conservative as its unlimited-depth case, use the hybrid FCFS schedulers with either `fcfs` or `fcfs_conservative`
-ordering and is rejected with `sjf` or `ljf`.
+`1` gives head protection; a depth covering all eligible waiting jobs gives
+conservative protection. EASY and hybrid can still differ in finite-Q accounting;
+see [Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
+Hybrid and conservative use the hybrid FCFS schedulers with either `fcfs` or
+`fcfs_conservative` ordering; hybrid is rejected with `sjf` or `ljf`.
 
 **Default:** `0`
 
@@ -700,10 +772,9 @@ Keep a job's nodes unavailable for a while after it ends, modeling cleanup,
 reboot, or health checks, before another job can start on them. All of a
 job's nodes return together once its slowest node is done (block release).
 
-The scheduler does not plan with the delay. As in Slurm, Flux, and LSF, a
-running job's projected release is its start time plus its time limit, and a
-backfill candidate is tested on its own projected end; none of those systems
-adds cleanup time to planned releases. A reservation made against a job's
+The scheduler does not plan with the delay. A running job's projected release
+is its start time plus its time limit, and a backfill candidate is tested on
+its own projected end. A reservation made against a job's
 limit is therefore optimistic by the cleanup time, and the head starts when
 the nodes actually return. Once a job has ended, its nodes are observably in
 cleanup and their projected release is the actual sampled release time.
@@ -858,7 +929,8 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 - [Protobuf Configuration](protobuf-config.md) - Full `.textproto` schema and worked examples
 - [Streaming API](../api/STREAMING_API.md) - Programmatic C++ API for online simulation
 - [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE algorithm details
-- [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md) - production-scheduler mappings and remaining differences
+- [Scheduling Loops and DR_EVT Configurations](../dev/SCHEDULER_LOOPS.md) - production-scheduler behavior and current option mappings
+- [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md) - confirmed differences and excluded scope
 - [Quick Start](../getting-started/quickstart.md) - Quick reference
 - [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
 - [Test Suite](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#build-and-run) - example usage in test scripts

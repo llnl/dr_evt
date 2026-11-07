@@ -128,6 +128,9 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
   sp.m_reservation_depth = cfg.reservation_depth();
   sp.m_backfill_queue_depth = cfg.backfill_queue_depth();
   sp.m_backfill_interval = cfg.backfill_interval();
+  sp.m_dispatch_interval = cfg.dispatch_interval();
+  sp.m_dispatch_queue_depth = cfg.dispatch_queue_depth();
+  sp.m_dispatch_on_events = cfg.dispatch_on_events();
   if (!std::isfinite(cfg.planning_time_resolution()) ||
       cfg.planning_time_resolution() < 0.0) {
     throw std::runtime_error(

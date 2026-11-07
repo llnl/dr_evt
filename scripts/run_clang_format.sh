@@ -35,7 +35,7 @@ repo_root=$(cd "$script_dir/.." && pwd -P)
 
 mapfile -d '' source_files < <(
     find "$repo_root/src" "$repo_root/tests" -type f \
-        \( -name '*.hpp' -o -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
+        \( -name '*.hpp' -o -name '*.cpp' -o -name '*.tpp' -o -name '*.h' -o -name '*.c' \) \
         -print0 | sort -z
 )
 

@@ -108,10 +108,15 @@ message InitRequest {
     // every scheduler. Zero leaves the scan unlimited.
     uint64 backfill_queue_depth = 23;
 
-    // Seconds between periodic conservative or hybrid backfill evaluations
-    // (EASY runs as hybrid with reservation depth 1). Zero retains
-    // event-driven backfill behavior.
+    // Seconds between periodic backfill evaluations; FCFS dispatch remains
+    // event driven. Zero retains event-driven backfill behavior.
     double backfill_interval = 24;
+    // Aligned FCFS/backfill cadence; zero disables unified dispatch.
+    double dispatch_interval = 28;
+    // Entire examined candidate prefix per unified wake; zero is unlimited.
+    uint64 dispatch_queue_depth = 29;
+    // Also wake unified dispatch on job arrival batches, keeping the tick phase.
+    bool dispatch_on_events = 30;
 
     // Planning time-limit grid for scheduler projections; zero is exact.
     double planning_time_resolution = 25;

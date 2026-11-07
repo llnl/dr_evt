@@ -82,7 +82,7 @@ Use your MPI launcher's host or hostfile options to distribute ranks across
 nodes. Ranks must resolve one another's hostnames, selected TCP ports must be
 reachable, and the server binary must be available on every server node.
 
-Test and Slurm validation commands are in the
+Distributed launch and streaming test commands are in the
 [distributed client/server tests section](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests).
 
 ## Synchronized independent systems

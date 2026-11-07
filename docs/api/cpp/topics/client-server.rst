@@ -4,7 +4,7 @@ Client, Server, and Orchestration API
 The gRPC service and client implementations expose streaming simulation over
 the network; the MPI feeder supports multi-server orchestration.
 
-.. only:: doxygen
+.. if-doxygen::
 
    .. doxygengroup:: dr_evt_proto
       :project: dr_evt

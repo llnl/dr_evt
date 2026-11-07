@@ -899,6 +899,20 @@ if(DR_EVT_WITH_UNIT_TESTING)
     COMMAND /bin/bash
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_node_release_delay_tests.sh
       $<TARGET_FILE:sim-bin>)
+  if(Python3_Interpreter_FOUND)
+    if(DR_EVT_LEGACY_RESERVATION_BARRIER)
+      add_test(
+        NAME test_lsf_model_validation
+        COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_lsf_model_validation.py
+          $<TARGET_FILE:sim-bin>)
+    endif()
+    add_test(
+      NAME test_unified_periodic_dispatch
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_unified_dispatch_tests.py
+        $<TARGET_FILE:sim-bin>)
+  endif()
   add_test(
     NAME test_periodic_backfill_reference
     COMMAND /bin/bash
@@ -1219,7 +1233,7 @@ install(
 install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/src/sim"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN "*.tpp")
 install(
   DIRECTORY "${PROJECT_SOURCE_DIR}/src/utils"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
@@ -1227,6 +1241,7 @@ install(
 install(
   FILES "${PROJECT_BINARY_DIR}/dr_evt_config.hpp"
         "${PROJECT_SOURCE_DIR}/src/dr_evt_types.hpp"
+        "${PROJECT_SOURCE_DIR}/src/common.hpp"
         "${PROJECT_SOURCE_DIR}/src/boost.hpp"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 

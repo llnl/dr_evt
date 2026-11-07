@@ -141,8 +141,8 @@ tests/benchmark_wait_queues.sh --backfill-policy hybrid \
   --with-python-reference \
   tests/test_traces/scale/huge_2000jobs.csv
 
-# Slurm-default-style periodic backfill: 30 s, reserve all tested jobs,
-# and examine Slurm's default 500-job backfill prefix
+# Periodic conservative benchmark: 30 s, protect planned waiting jobs,
+# and examine a 500-job prefix
 tests/benchmark_wait_queues.sh --backfill-policy conservative \
   --backfill-interval 30 \
   --backfill-queue-depth 500
@@ -185,9 +185,10 @@ tests/benchmark_wait_queues.sh --backfill-policy hybrid
 
 Pass `--reservation-depth N` or `--backfill-queue-depth N` to model a
 deployment-specific setting. Keep the reservation depth no larger than queue
-depth: jobs outside the examined prefix cannot be protected. Slurm's analogous
-`bf_job_part_count_reserve` has no portable default; a depth of `1` matches
-EASY and a depth near the queue length approaches conservative backfilling.
+depth: jobs outside the examined prefix cannot be protected. A depth of `1`
+protects the head; a depth covering the eligible queue gives conservative
+protection. Production parameter mappings are in
+[Scheduling Loops](SCHEDULER_LOOPS.md#replicating-core-behavior-with-current-options).
 
 The command byte-compares the C++ deque and circular schedules, then compares
 the Python hybrid schedule with deque using a `0.001` time tolerance. It does

@@ -107,6 +107,22 @@ public:
   std::vector<job_no_t> pending_job_ids() const override;
 
 protected:
+  /**
+   * @brief Run the shared traversal with a compile-time protection planner.
+   * @details Inlined to preserve the original vector-plan virtual entry point
+   * for event-driven and separate periodic-backfill scheduling.
+   * @tparam ProtectionTimeline Reservation_Timeline-compatible planner.
+   * @param[in] free_nodes Nodes available for immediate starts.
+   * @param[in] running_jobs Active jobs used for release projection.
+   * @param[in] current_time Scheduling timestamp.
+   * @return Job identifiers selected for immediate starts in queue order.
+   */
+  template <typename ProtectionTimeline>
+  [[gnu::always_inline]] inline std::vector<job_no_t>
+  schedule_with_protection(num_nodes_t free_nodes,
+                           const running_jobs_t &running_jobs,
+                           sim_time_t current_time);
+
   size_t wait_queue_size() const override { return m_wait_queue.size(); }
 
   /**
@@ -141,6 +157,8 @@ private:
                           sim_time_t current_time,
                           const projected_starts_t &projected_starts);
 };
+
+#include "sim/scheduler_fcfs_hybrid_circular.tpp"
 
 } // namespace dr_evt
 

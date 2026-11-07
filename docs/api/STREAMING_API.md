@@ -211,6 +211,11 @@ resumed.load_checkpoint("simulation.ckpt");
 resumed.advance_to(1000.0);
 ```
 
+Checkpoints record both periodic controls, `dispatch_on_events`, and the next
+tick deadline. This build uses checkpoint format 18; checkpoints written by
+formats 16 or 17 must be regenerated. Restart preserves arrival notification
+behavior and timer phase.
+
 The checkpoint includes resident job records, appended-job status history,
 scheduler queue state, running jobs, pending events, capacity and statistics
 accounting, resource history, and the random-number generator. If incremental

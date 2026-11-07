@@ -16,7 +16,6 @@ function, enum, or file name.
 .. doxygengroup:: dr_evt_trace
    :project: dr_evt
    :content-only:
-   :no-link:
    :inner:
    :members:
    :protected-members:

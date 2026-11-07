@@ -785,7 +785,7 @@ public:
       // In periodic mode a backfill tick is an event too, but only while a
       // job is waiting for a backfill decision (advance_to() applies the same
       // rule); otherwise the tick is skipped and the cadence kept.
-      if (m_params.m_backfill_interval > 0.0 &&
+      if (m_params.scheduling_interval() > 0.0 &&
           m_scheduler->active_job_count() > 0) {
         align_backfill_tick();
         next = std::min(next, m_next_backfill_evaluation);
@@ -827,12 +827,13 @@ public:
 
 protected:
   /**
-   * Advance using compile-time-selected accounting and warm-start paths.
+   * Advance using compile-time-selected accounting, warm-start, and trigger paths.
    * WarmStage is instantiated only while historical jobs remain; the normal
    * stage contains no pre-start-time condition.
    */
   template <bool AccountResources, bool WarmStage = false,
-            bool PeriodicBackfill = false>
+            bool PeriodicBackfill = false, bool UnifiedDispatch = false,
+            bool DispatchOnEvents = false>
   void advance_to_impl(sim_time_t target_time,
                        FCFSEasyCustomScheduler *custom_scheduler);
 
@@ -921,7 +922,7 @@ protected:
    * several jobs with the same timestamp, input order defines their
    * observations: if n earlier jobs are waiting, they observe n, n+1, ... .
    */
-  void record_queue_arrivals(sim_time_t current_time);
+  bool record_queue_arrivals(sim_time_t current_time);
 
   /** Reset the capacity cursor to the configured maximum. */
   void reset_capacity_schedule();

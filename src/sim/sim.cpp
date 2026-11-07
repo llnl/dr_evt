@@ -63,9 +63,9 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    16; // 11: reservation_depth; 12: node release delay; 13: scalar event
-        // and resource-sample times; 14: backfill_queue_depth; 15: periodic
-        // backfill deadline; 16: periodic backfill dirty flag
+    18; // 18: unified event wakes; 17: dispatch controls; 16: periodic dirty
+        // flag; 15: periodic deadline; 14: backfill_queue_depth; 13: scalar
+        // event/sample times; 12: release delay; 11: reservation_depth
 
 /// Trace policy identifier stored in a checkpoint so a file written by one
 /// trace type is not restored into another.
@@ -373,7 +373,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
           m_params.m_queue_impl, m_params.m_block_size,
           m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
-          m_params.m_backfill_interval)),
+          m_params.m_backfill_interval, m_params.m_dispatch_interval,
+          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events)),
       m_custom_scheduler(nullptr), m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -872,6 +873,12 @@ void BasicSimulation<TraceType>::run_warm_start() {
   if (m_pre_start_jobs != 0) {
     if (m_custom_scheduler != nullptr) {
       advance_to_impl<true, true>(run_limit, m_custom_scheduler);
+    } else if (m_params.m_dispatch_interval > 0.0) {
+      if (m_params.m_dispatch_on_events) {
+        advance_to_impl<false, true, true, true, true>(run_limit, nullptr);
+      } else {
+        advance_to_impl<false, true, true, true>(run_limit, nullptr);
+      }
     } else if (m_params.m_backfill_interval > 0.0) {
       advance_to_impl<false, true, true>(run_limit, nullptr);
     } else {
@@ -1595,6 +1602,12 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(recorded.m_backfill_queue_depth,
                              m_params.m_backfill_queue_depth,
                              "backfill_queue_depth");
+    require_checkpoint_match(recorded.m_dispatch_on_events,
+                             m_params.m_dispatch_on_events, "dispatch_on_events");
+    require_checkpoint_match(recorded.m_dispatch_interval,
+                             m_params.m_dispatch_interval, "dispatch_interval");
+    require_checkpoint_match(recorded.m_dispatch_queue_depth,
+                             m_params.m_dispatch_queue_depth, "dispatch_queue_depth");
     require_checkpoint_match(recorded.m_backfill_interval,
                              m_params.m_backfill_interval, "backfill_interval");
     require_checkpoint_match(recorded.m_planning_time_resolution,
@@ -1971,7 +1984,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
           m_params.m_queue_impl, m_params.m_block_size,
           m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
-          m_params.m_backfill_interval);
+          m_params.m_backfill_interval, m_params.m_dispatch_interval,
+          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events);
       m_scheduler->set_planning_time_resolution(
           m_params.m_planning_time_resolution);
       m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -2760,7 +2774,7 @@ void BasicSimulation<TraceType>::submit_job(job_no_t job_idx,
 #endif
 
   m_scheduler->insert_job(job_idx, submit_time, run_time_estimate, nodes);
-  if (m_params.m_backfill_interval > 0.0) {
+  if (m_params.scheduling_interval() > 0.0) {
     m_periodic_backfill_dirty = true;
   }
   ++m_pending_queue_arrivals[arrival_time];
@@ -2771,11 +2785,11 @@ void BasicSimulation<TraceType>::submit_job(job_no_t job_idx,
 }
 
 template <typename TraceType>
-void BasicSimulation<TraceType>::record_queue_arrivals(
+bool BasicSimulation<TraceType>::record_queue_arrivals(
     sim_time_t current_time) {
   auto arrivals = m_pending_queue_arrivals.find(current_time);
   if (arrivals == m_pending_queue_arrivals.end()) {
-    return;
+    return false;
   }
 
   const size_t count = arrivals->second;
@@ -2791,15 +2805,16 @@ void BasicSimulation<TraceType>::record_queue_arrivals(
     ++m_queue_length_samples;
   }
   m_pending_queue_arrivals.erase(arrivals);
+  return true;
 }
 
 template <typename TraceType>
 void BasicSimulation<TraceType>::align_backfill_tick() {
-  if (m_params.m_backfill_interval <= 0.0) {
+  if (m_params.scheduling_interval() <= 0.0) {
     return;
   }
   if (m_next_backfill_evaluation == std::numeric_limits<sim_time_t>::max()) {
-    m_next_backfill_evaluation = m_current_time + m_params.m_backfill_interval;
+    m_next_backfill_evaluation = m_current_time + m_params.scheduling_interval();
   } else if (m_next_backfill_evaluation < m_current_time) {
     // Ticks are not consumed while nothing waits, and the clock may have
     // moved past one at the end of the previous call. Keep the cadence but
@@ -2807,8 +2822,8 @@ void BasicSimulation<TraceType>::align_backfill_tick() {
     // backward.
     const auto missed_ticks =
         std::ceil((m_current_time - m_next_backfill_evaluation) /
-                  m_params.m_backfill_interval);
-    m_next_backfill_evaluation += missed_ticks * m_params.m_backfill_interval;
+                  m_params.scheduling_interval());
+    m_next_backfill_evaluation += missed_ticks * m_params.scheduling_interval();
   }
 }
 
@@ -2888,11 +2903,17 @@ bool BasicSimulation<TraceType>::apply_capacity_changes(
 template <typename TraceType>
 void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
   if (m_custom_scheduler != nullptr) {
-    if (m_params.m_backfill_interval > 0.0) {
+    if (m_params.scheduling_interval() > 0.0) {
       throw std::invalid_argument(
           "periodic backfilling is unsupported by custom schedulers");
     }
     advance_to_impl<true, false>(target_time, m_custom_scheduler);
+  } else if (m_params.m_dispatch_interval > 0.0) {
+    if (m_params.m_dispatch_on_events) {
+      advance_to_impl<false, false, true, true, true>(target_time, nullptr);
+    } else {
+      advance_to_impl<false, false, true, true>(target_time, nullptr);
+    }
   } else if (m_params.m_backfill_interval > 0.0) {
     advance_to_impl<false, false, true>(target_time, nullptr);
   } else {
@@ -2901,13 +2922,17 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
 }
 
 template <typename TraceType>
-template <bool AccountResources, bool WarmStage, bool PeriodicBackfill>
+template <bool AccountResources, bool WarmStage, bool PeriodicBackfill,
+          bool UnifiedDispatch, bool DispatchOnEvents>
 void BasicSimulation<TraceType>::advance_to_impl(
     sim_time_t target_time, FCFSEasyCustomScheduler *custom_scheduler) {
   if constexpr (!AccountResources) {
     (void)custom_scheduler;
   }
   constexpr bool periodic_backfill = PeriodicBackfill;
+  static_assert(!UnifiedDispatch || PeriodicBackfill);
+  static_assert(!DispatchOnEvents || UnifiedDispatch);
+  constexpr bool unified_dispatch = UnifiedDispatch;
   SchedulerBase *periodic_scheduler = nullptr;
   if constexpr (PeriodicBackfill) {
     periodic_scheduler = m_scheduler.get();
@@ -2929,24 +2954,46 @@ void BasicSimulation<TraceType>::advance_to_impl(
   // Before entering the main loop, account for jobs submitted at the current
   // time and check whether any are eligible. This handles t=0 initially and
   // jobs appended at the current time by a streaming caller.
+  if constexpr (DispatchOnEvents) {
+    // Initialize the timer before a notification pass so its phase never
+    // depends on the time of that pass.
+    align_backfill_tick();
+  }
   m_scheduler->sync_to(m_current_time);
-  record_queue_arrivals(m_current_time);
+  [[maybe_unused]] const bool initial_arrivals = record_queue_arrivals(m_current_time);
   const bool initial_capacity_changed = apply_capacity_changes(m_current_time);
   if constexpr (AccountResources) {
     if (initial_capacity_changed) {
       custom_scheduler->notify_resource_change();
     }
   }
-  if (m_scheduler->has_eligible_jobs()) {
+  [[maybe_unused]] bool initial_notification = false;
+  [[maybe_unused]] const sim_time_t initial_time = m_current_time;
+  bool schedule_initial = !UnifiedDispatch;
+  if constexpr (DispatchOnEvents) {
+    initial_notification = initial_arrivals;
+    const bool initial_replay_batch =
+        !m_trace.pending_events().empty() &&
+        m_trace.pending_events().begin()->get_time() == m_current_time;
+    schedule_initial = initial_notification && !initial_replay_batch;
+    if (schedule_initial && m_next_backfill_evaluation == m_current_time) {
+      // Coalesce an initial notification batch with a coincident timer wake.
+      m_next_backfill_evaluation += m_params.m_dispatch_interval;
+    }
+  }
+  if (schedule_initial && m_scheduler->has_eligible_jobs()) {
     // Call scheduler to evaluate newly arriving jobs
     while (true) {
       num_nodes_t free_nodes = get_available_nodes();
       publish_capacity_outlook();
-      auto jobs_to_run = periodic_backfill
-                             ? periodic_scheduler->schedule_event(
-                                   free_nodes, m_running_jobs, m_current_time)
-                             : m_scheduler->schedule(free_nodes, m_running_jobs,
-                                                     m_current_time);
+      auto jobs_to_run = [&] {
+        if constexpr (PeriodicBackfill && !UnifiedDispatch) {
+          return periodic_scheduler->schedule_event(
+              free_nodes, m_running_jobs, m_current_time);
+        } else {
+          return m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+        }
+      }();
 
       if (jobs_to_run.empty()) {
         break;
@@ -2968,6 +3015,10 @@ void BasicSimulation<TraceType>::advance_to_impl(
         // Records a resource-history sample internally (Trace's own
         // Context, via process_events_until()) - no separate call needed.
         m_trace.run_until_inclusive(m_current_time);
+      }
+      if constexpr (UnifiedDispatch) {
+        initial_notification = false;
+        break; // One examined prefix for this notification batch.
       }
     }
   }
@@ -3024,6 +3075,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
 
     // Decide which event to process
     bool should_schedule = false;
+    [[maybe_unused]] bool arrival_notification = false;
     bool periodic_evaluation = false;
     // A periodic tick orders events only while a job is waiting for a
     // backfill decision; otherwise it must not hold back completions,
@@ -3050,7 +3102,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
       // stale relative to m_current_time, since nothing else
       // would sync it before the queries below.
       m_scheduler->sync_to(m_current_time);
-      record_queue_arrivals(m_current_time);
+      if constexpr (DispatchOnEvents) {
+        arrival_notification = record_queue_arrivals(m_current_time);
+      } else {
+        record_queue_arrivals(m_current_time);
+      }
 
       // Process ALL events at current_time before calling scheduler
       // This ensures END events are processed before START events created by
@@ -3100,7 +3156,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
             // No nodes were freed yet. Leave the job's original limit in
             // the running map: it remains unavailable through cleanup, but
             // the sampled cleanup release is not projected into a protected
-            // reservation. The RELEASE event triggers the next decision.
+            // reservation. RELEASE updates state for the next permitted decision.
             ++m_jobs_releasing;
           } else {
             processed_end_event = true;
@@ -3147,7 +3203,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
       // sync_to() call would already cover this in practice, but
       // this doesn't rely on that.
       m_scheduler->sync_to(m_current_time);
-      record_queue_arrivals(m_current_time);
+      if constexpr (DispatchOnEvents) {
+        arrival_notification = record_queue_arrivals(m_current_time);
+      } else {
+        record_queue_arrivals(m_current_time);
+      }
       const bool capacity_changed = apply_capacity_changes(m_current_time);
       if constexpr (AccountResources) {
         if (capacity_changed) {
@@ -3170,7 +3230,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
         custom_scheduler->advance_resource_accounting_to(m_current_time);
       }
       m_scheduler->sync_to(m_current_time);
-      record_queue_arrivals(m_current_time);
+      if constexpr (DispatchOnEvents) {
+        arrival_notification = record_queue_arrivals(m_current_time);
+      } else {
+        record_queue_arrivals(m_current_time);
+      }
       apply_capacity_changes(m_current_time);
       if constexpr (AccountResources) {
         custom_scheduler->notify_resource_change();
@@ -3181,7 +3245,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
       }
     } else if (next_tick < std::numeric_limits<sim_time_t>::max() &&
                next_tick <= target_time &&
-               (!m_trace.pending_events().empty() ||
+               (unified_dispatch || !m_trace.pending_events().empty() ||
                 next_arrival < std::numeric_limits<sim_time_t>::max() ||
                 (next_capacity < std::numeric_limits<sim_time_t>::max() &&
                  next_capacity <= target_time))) {
@@ -3195,10 +3259,14 @@ void BasicSimulation<TraceType>::advance_to_impl(
         custom_scheduler->advance_resource_accounting_to(m_current_time);
       }
       m_scheduler->sync_to(m_current_time);
-      record_queue_arrivals(m_current_time);
-      periodic_evaluation = m_periodic_backfill_dirty;
+      if constexpr (DispatchOnEvents) {
+        arrival_notification = record_queue_arrivals(m_current_time);
+      } else {
+        record_queue_arrivals(m_current_time);
+      }
+      periodic_evaluation = unified_dispatch || m_periodic_backfill_dirty;
       should_schedule = periodic_evaluation;
-      m_next_backfill_evaluation += m_params.m_backfill_interval;
+      m_next_backfill_evaluation += m_params.scheduling_interval();
     } else {
       // No arrivals and no replay events before target_time
       if (m_params.m_verbose) {
@@ -3218,10 +3286,23 @@ void BasicSimulation<TraceType>::advance_to_impl(
     // not turn the next ordinary event into a backfill pass; the catch-up at
     // the end of the iteration moves it to the next tick instead.
     if constexpr (PeriodicBackfill) {
+      // An idle jump can cross unused ticks. For unified dispatch, restore
+      // the phase before deciding whether this event is exactly on a tick.
+      if constexpr (UnifiedDispatch) {
+        align_backfill_tick();
+      }
       if (!periodic_evaluation &&
           m_next_backfill_evaluation == m_current_time) {
         periodic_evaluation = true;
-        m_next_backfill_evaluation += m_params.m_backfill_interval;
+        m_next_backfill_evaluation += m_params.scheduling_interval();
+      }
+      if constexpr (UnifiedDispatch) {
+        should_schedule = periodic_evaluation;
+        if constexpr (DispatchOnEvents) {
+          should_schedule = should_schedule || arrival_notification ||
+                            (initial_notification && m_current_time == initial_time);
+          initial_notification = false;
+        }
       }
       if (periodic_evaluation) {
         m_periodic_backfill_dirty = false;
@@ -3230,23 +3311,30 @@ void BasicSimulation<TraceType>::advance_to_impl(
 
     // Scheduling loop - let scheduler make decisions after processing END
     // events
+    bool started_at_tick = false;
     if (should_schedule) {
       // Keep calling scheduler until it can't start any more jobs
       while (true) {
         num_nodes_t free_nodes = get_available_nodes();
         publish_capacity_outlook();
 
-        auto jobs_to_run =
-            periodic_backfill && !periodic_evaluation
-                ? periodic_scheduler->schedule_event(free_nodes, m_running_jobs,
-                                                     m_current_time)
-                : m_scheduler->schedule(free_nodes, m_running_jobs,
-                                        m_current_time);
+        auto jobs_to_run = [&] {
+          if constexpr (PeriodicBackfill && !UnifiedDispatch) {
+            return periodic_evaluation
+                       ? m_scheduler->schedule(free_nodes, m_running_jobs,
+                                               m_current_time)
+                       : periodic_scheduler->schedule_event(
+                             free_nodes, m_running_jobs, m_current_time);
+          } else {
+            return m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+          }
+        }();
 
         if (jobs_to_run.empty()) {
           break; // Scheduler can't start anything else
         }
 
+        started_at_tick = true;
         // Process ALL jobs returned by scheduler (backfilling can return
         // multiple)
         for (job_no_t job : jobs_to_run) {
@@ -3276,6 +3364,10 @@ void BasicSimulation<TraceType>::advance_to_impl(
             break; // Process only one START event per job
           }
         }
+        // A unified cycle examines its prefix once, including FCFS starts.
+        if constexpr (UnifiedDispatch) {
+          break;
+        }
       }
     }
     if constexpr (AccountResources) {
@@ -3294,10 +3386,19 @@ void BasicSimulation<TraceType>::advance_to_impl(
         const auto missed_ticks =
             static_cast<size_t>(
                 std::floor((m_current_time - m_next_backfill_evaluation) /
-                           m_params.m_backfill_interval)) +
+                           m_params.scheduling_interval())) +
             1;
         m_next_backfill_evaluation +=
-            missed_ticks * m_params.m_backfill_interval;
+            missed_ticks * m_params.scheduling_interval();
+      }
+    }
+
+    if constexpr (UnifiedDispatch) {
+      if (periodic_evaluation && !started_at_tick &&
+          m_trace.pending_events().empty() &&
+          next_arrival == std::numeric_limits<sim_time_t>::max() &&
+          next_capacity == std::numeric_limits<sim_time_t>::max()) {
+        break;
       }
     }
 

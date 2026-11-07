@@ -104,6 +104,9 @@ private:
     visit("reservation_depth", self.m_reservation_depth);
     visit("backfill_queue_depth", self.m_backfill_queue_depth);
     visit("backfill_interval", self.m_backfill_interval);
+    visit("dispatch_interval", self.m_dispatch_interval);
+    visit("dispatch_queue_depth", self.m_dispatch_queue_depth);
+    visit("dispatch_on_events", self.m_dispatch_on_events);
     visit("planning_time_resolution", self.m_planning_time_resolution);
     visit("planning_horizon", self.m_planning_horizon);
     visit("priority_policy", self.m_priority_policy);
@@ -220,6 +223,16 @@ public:
   /// Seconds between additional hybrid backfill evaluations; zero disables
   /// periodic evaluation and preserves event-driven scheduling only.
   tdiff_t m_backfill_interval;
+  /// Unified periodic FCFS/backfill cadence; zero keeps event dispatch.
+  tdiff_t m_dispatch_interval;
+  /// Candidates examined per unified wake, including immediate starts.
+  size_t m_dispatch_queue_depth;
+  /// Also run the unified pass on job arrival batches.
+  bool m_dispatch_on_events;
+
+  tdiff_t scheduling_interval() const {
+    return m_dispatch_interval > 0.0 ? m_dispatch_interval : m_backfill_interval;
+  }
   /// Planning time-limit grid for scheduler projections; zero is exact.
   tdiff_t m_planning_time_resolution;
   /// Reservation look-ahead for backfill planning (Slurm bf_window); the

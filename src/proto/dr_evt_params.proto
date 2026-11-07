@@ -132,10 +132,18 @@ message DR_EVT_Params {
         // by every scheduler. Zero leaves the scan unlimited.
         uint64 backfill_queue_depth = 41;
 
-        // Seconds between periodic conservative or hybrid backfill
-        // evaluations (EASY runs as hybrid with reservation depth 1). Zero
-        // keeps event-driven backfill behavior.
+        // Seconds between periodic backfill evaluations; FCFS dispatch
+        // remains event driven. Zero keeps event-driven backfill behavior.
         double backfill_interval = 42;
+
+        // Unified dispatch: aligned FCFS/backfill ticks; optional arrival wakes.
+        // Zero disables; mutually exclusive with positive backfill_interval.
+        double dispatch_interval = 46;
+        // Entire candidate prefix per unified wake, including immediate starts.
+        // Zero means unlimited; requires dispatch_interval > 0.
+        uint64 dispatch_queue_depth = 47;
+        // Also wake unified dispatch on job arrival batches, keeping the tick phase.
+        bool dispatch_on_events = 48;
 
         // Planning time-limit grid for scheduler projections; zero is exact.
         double planning_time_resolution = 43;

@@ -43,6 +43,8 @@ cpp/topics/configuration.rst
 cpp/topics/utilities.rst
 ```
 
+:::{if-doxygen}
+
 ## Browse by source directory
 
 ```{toctree}
@@ -56,6 +58,8 @@ cpp/source/proto
 cpp/source/mpi
 cpp/source/utils
 ```
+
+:::
 
 ## Browse by code file
 
