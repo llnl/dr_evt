@@ -10,10 +10,10 @@ For instructions on collecting a new profile, see
 or [GNU `gprof` profiling](../getting-started/installation.md#gnu-gprof-profiling).
 For end-to-end results comparing the available queue implementations, see the
 [wait queue performance comparison](WAIT_QUEUES.md#benchmark-record).
-For repeatable unified-dispatch timings, use
+For repeatable fixed-periodic-dispatch timings, use
 [`tests/benchmark_wait_queues.sh`](../../tests/benchmark_wait_queues.sh) with
 `--dispatch-interval` and a backfill policy, described in the
-[test guide](../../tests/README.md#unified-periodic-dispatch-benchmark).
+[test guide](../../tests/README.md#fixed-periodic-dispatch-benchmark).
 
 ## Workload and measurement
 

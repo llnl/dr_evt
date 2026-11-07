@@ -41,6 +41,7 @@ DISPATCH_QUEUE_DEPTH=0
 DISPATCH_ON_EVENTS=0
 DISPATCH_RUNS=3
 DISPATCH_OPTIONS_SET=0
+CONFIG_HEADER=""
 
 print_usage() {
     echo "Usage: $0 [OPTIONS] [TRACE_FILE]"
@@ -61,15 +62,17 @@ print_usage() {
     echo "  --backfill-interval SECONDS"
     echo "                Periodic backfill cadence; 0 keeps event-driven backfill."
     echo "  --dispatch-interval SECONDS"
-    echo "                Unified periodic dispatch; choose easy, hybrid, conservative, or none."
+    echo "                Fixed periodic dispatch; choose easy, hybrid, conservative, or none."
     echo "  --dispatch-on-events"
     echo "                Also schedule arrivals between ticks (requires dispatch interval)."
     echo "  --dispatch-queue-depth N"
-    echo "                Unified candidates per pass; 0 is unlimited (default: 0)."
-    echo "  --runs N     Measured unified-dispatch runs after one warmup (default: 3)."
+    echo "                Dispatch candidates per pass; 0 is unlimited (default: 0)."
+    echo "  --runs N     Measured fixed-dispatch runs after one warmup (default: 3)."
+    echo "  --config-header PATH"
+    echo "                Generated header for a nonstandard installation layout."
     echo "  --with-python-reference"
     echo "                Include the slow Python oracle in a periodic run."
-    echo "  TRACE_FILE    Default: huge_10000jobs.csv; unified dispatch uses huge_2000jobs.csv."
+    echo "  TRACE_FILE    Default: huge_10000jobs.csv; fixed dispatch uses huge_2000jobs.csv."
     echo ""
     echo "EXAMPLES:"
     echo "  $0 --backfill-policy conservative --dispatch-interval 1 --dispatch-on-events --dispatch-queue-depth 10000"
@@ -83,6 +86,15 @@ print_usage() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --config-header)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --config-header requires a path" >&2
+                exit 1
+            fi
+            CONFIG_HEADER="$2"
+            DISPATCH_OPTIONS_SET=1
+            shift 2
+            ;;
         --dispatch-on-events)
             DISPATCH_ON_EVENTS=1
             DISPATCH_OPTIONS_SET=1
@@ -179,11 +191,11 @@ if [[ "$BENCHMARK_MODE" != "all" && "$BENCHMARK_MODE" != "easy" && "$BENCHMARK_M
 fi
 
 if [[ "$DISPATCH_OPTIONS_SET" == "1" && "$DISPATCH_MODE" == "0" ]]; then
-    echo "Error: --dispatch-on-events, --dispatch-queue-depth, and --runs require --dispatch-interval" >&2
+    echo "Error: fixed-dispatch options require --dispatch-interval" >&2
     exit 1
 fi
 if [[ "$DISPATCH_MODE" == "1" && ( "$BENCHMARK_MODE" == "all" || "$HYBRID_BACKFILL_INTERVAL" != "0" || "$WITH_PYTHON_REFERENCE" != "0" ) ]]; then
-    echo "Error: unified dispatch requires one --backfill-policy (easy, hybrid, conservative, or none), no --backfill-interval, and no Python oracle" >&2
+    echo "Error: fixed periodic dispatch requires one --backfill-policy (easy, hybrid, conservative, or none), no --backfill-interval, and no Python oracle" >&2
     exit 1
 fi
 
@@ -205,16 +217,17 @@ TIMESTAMP_FORMAT="epoch"
 # Use run_time_mode=limit (jobs run for full time_limit) for consistent benchmarking.
 RUN_TIME_MODE="limit"
 
-# Unified dispatch has only a circular implementation. Measure complete runs
+# Fixed periodic dispatch has only a circular implementation. Measure complete runs
 # rather than compare queue variants or invoke the separate-backfill oracle.
-run_unified_dispatch_benchmark() {
+run_fixed_dispatch_benchmark() {
     if ! select_python_interpreter 3 7; then
         echo "Error: Python 3.7+ is required for portable timing and reporting" >&2
         return 1
     fi
     "$PYTHON_BIN" - "$SIMULATOR" "$TRACE_FILE" "$BENCHMARK_MODE" \
         "$DISPATCH_INTERVAL" "$DISPATCH_QUEUE_DEPTH" "$DISPATCH_ON_EVENTS" \
-        "$DISPATCH_RUNS" "$HYBRID_RESERVATION_DEPTH" "$TOTAL_NODES" "$MAX_JOBS" <<'PY'
+        "$DISPATCH_RUNS" "$HYBRID_RESERVATION_DEPTH" "$TOTAL_NODES" "$MAX_JOBS" \
+        "$SCRIPT_DIR" "$CONFIG_HEADER" <<'PY'
 import hashlib
 import json
 import math
@@ -225,10 +238,17 @@ import sys
 import tempfile
 import time
 
-simulator, trace, policy, interval, depth, on_events, runs, reservations, nodes, max_jobs = sys.argv[1:]
+simulator, trace, policy, interval, depth, on_events, runs, reservations, nodes, max_jobs, script_dir, header_override = sys.argv[1:]
+sys.path.insert(0, script_dir)
+from read_build_config import reservation_barrier
+
 if not math.isfinite(float(interval)) or float(interval) <= 0:
     sys.exit("Error: --dispatch-interval must be finite and positive")
-outdir = Path(tempfile.mkdtemp(prefix="dr-evt-unified-benchmark-"))
+try:
+    barrier, config_header = reservation_barrier(simulator, header_override or None)
+except ValueError as error:
+    sys.exit("Error: {}".format(error))
+outdir = Path(tempfile.mkdtemp(prefix="dr-evt-fixed-dispatch-benchmark-"))
 common = [simulator, str(Path(trace).resolve()),
           "--priority_policy", "fcfs", "--queue_impl", "circular",
           "--backfill_policy", policy,
@@ -240,11 +260,14 @@ if on_events == "1":
     common.append("--dispatch_on_events")
 if policy == "hybrid":
     common.extend(["--reservation_depth", reservations])
-print("Unified dispatch: {}; interval: {} s; queue depth: {}; arrival passes: {}".format(
+print("Fixed periodic dispatch: {}; interval: {} s; queue depth: {}; arrival passes: {}".format(
     policy, interval, depth, on_events == "1"))
+print("Priority policy: fcfs; backfill policy: {}; queue: circular".format(policy))
 if policy == "hybrid":
     print("Reservation depth: {}".format(reservations))
 print("Trace: {}; nodes: {}; planning horizon: unlimited".format(trace, nodes))
+print("DR_EVT_LEGACY_RESERVATION_BARRIER={} ({})".format(
+    "ON" if barrier else "OFF", config_header))
 print("Timing includes parsing, scheduling, event handling, and trace output.")
 print("Artifacts: {}".format(outdir), flush=True)
 elapsed_runs = []
@@ -271,17 +294,23 @@ for run in range(int(runs) + 1):
     if run:
         elapsed_runs.append(elapsed)
 report = {"command": common, "seconds": elapsed_runs,
+          "priority_policy": "fcfs", "backfill_policy": policy,
+          "queue_impl": "circular", "dispatch_interval": float(interval),
+          "dispatch_queue_depth": int(depth), "dispatch_on_events": on_events == "1",
+          "config_header": str(config_header), "legacy_reservation_barrier": barrier,
           "median_seconds": statistics.median(elapsed_runs),
           "warmup_runs": 1, "identical_outputs": True,
           "schedule_sha256": reference_hashes[0],
           "resource_trace_sha256": reference_hashes[1]}
+if policy in ("easy", "hybrid"):
+    report["reservation_depth"] = 1 if policy == "easy" else int(reservations)
 (outdir / "results.json").write_text(json.dumps(report, indent=2) + "\n")
 print("Median: {:.6f} s; repeated outputs identical".format(report["median_seconds"]))
 PY
 }
 
 if [[ "$DISPATCH_MODE" == "1" ]]; then
-    run_unified_dispatch_benchmark
+    run_fixed_dispatch_benchmark
     exit $?
 fi
 

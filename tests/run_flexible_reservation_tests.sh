@@ -7,6 +7,11 @@ ROOT_DIR="$SCRIPT_DIR/.."
 source "$SCRIPT_DIR/set_simulator_path.sh"
 source "$SCRIPT_DIR/select_python.sh"
 select_python_interpreter 3 7
+BARRIER_MODE=$("$PYTHON_BIN" "$SCRIPT_DIR/read_build_config.py" "$SIMULATOR" --value)
+if [[ "$BARRIER_MODE" == "on" ]]; then
+    echo "SKIP: flexible reservation checks require a barrier-OFF build."
+    exit 0
+fi
 
 TRACE="$SCRIPT_DIR/test_traces/feature/flexible_reservation.csv"
 EXPECTED="$SCRIPT_DIR/test_traces/feature/flexible_reservation.expected.csv"
@@ -35,11 +40,16 @@ run_case conservative --priority_policy fcfs_conservative --backfill_policy cons
 # Point this at a separately configured -DDR_EVT_LEGACY_RESERVATION_BARRIER=ON
 # binary to verify compatibility without making the normal test suite build twice.
 if [ -n "${DR_EVT_LEGACY_SIMULATOR:-}" ]; then
-    "$DR_EVT_LEGACY_SIMULATOR" "$TRACE" --total_nodes 100 --trace_format simple \
-        --run_time_mode limit --priority_policy fcfs --backfill_policy easy \
-        --outfile "$WORK/legacy.csv"
-    check_schedule legacy "$WORK/legacy.csv" \
-        "$SCRIPT_DIR/test_traces/feature/flexible_reservation.legacy.expected.csv"
+    LEGACY_MODE=$("$PYTHON_BIN" "$SCRIPT_DIR/read_build_config.py" "$DR_EVT_LEGACY_SIMULATOR" --value)
+    if [[ "$LEGACY_MODE" == "on" ]]; then
+        "$DR_EVT_LEGACY_SIMULATOR" "$TRACE" --total_nodes 100 --trace_format simple \
+            --run_time_mode limit --priority_policy fcfs --backfill_policy easy \
+            --outfile "$WORK/legacy.csv"
+        check_schedule legacy "$WORK/legacy.csv" \
+            "$SCRIPT_DIR/test_traces/feature/flexible_reservation.legacy.expected.csv"
+    else
+        echo "SKIP: legacy control records barrier OFF."
+    fi
 fi
 
 echo "Flexible reservation tests passed."

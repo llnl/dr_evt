@@ -179,6 +179,11 @@ ctest --test-dir build-lsf -R '^test_lsf_model_validation$' --output-on-failure
 The CTest is registered only in legacy-barrier builds. Passing
 `--flexible-simulator PATH` directly to the script adds a control against a
 default-rule build, verifying that only the strict build rejects a safe overlap.
+The script checks the generated `dr_evt_config.hpp` before running cases:
+legacy checks run when the main binary records ON, and the flexible control
+runs when its binary records OFF. Inapplicable checks are skipped.
+Headers are found beside build binaries or in the installation's `include`
+directory; use `--config-header` and `--flexible-config-header` for other layouts.
 
 ### Replay tests
 
@@ -226,11 +231,11 @@ using a `0.001` time tolerance. The
 differential runner uses the
 [`scheduler_correctness`](test_traces/scheduler_correctness/) fixtures.
 
-### Unified periodic dispatch benchmark
+### Fixed periodic dispatch benchmark
 
-[`benchmark_wait_queues.sh`](benchmark_wait_queues.sh) accepts unified dispatch
+[`benchmark_wait_queues.sh`](benchmark_wait_queues.sh) accepts fixed dispatch
 options alongside the existing `easy`, `hybrid`, and `conservative` policy
-choices; `none` is also supported for unified dispatch. For example, the
+choices; `none` is also supported for fixed dispatch. For example, the
 documented Spur representation uses conservative backfill, one-second ticks
 plus arrival passes, and queue depth 10,000. Use a Release build with the
 default `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`:
@@ -238,8 +243,9 @@ default `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`:
 ```bash
 ./tests/benchmark_wait_queues.sh --backfill-policy conservative \
   --dispatch-interval 1 --dispatch-on-events --dispatch-queue-depth 10000
-# EASY on five-second ticks, with unlimited examination:
-./tests/benchmark_wait_queues.sh --backfill-policy easy --dispatch-interval 5
+# Simplified LSF: use a separately built barrier-ON binary.
+SIMULATOR="$PWD/build-lsf/simulator" ./tests/benchmark_wait_queues.sh \
+  --backfill-policy easy --dispatch-interval 5
 ```
 
 The default trace has 2,000 jobs on a 500-node pool. One warmup precedes three
@@ -247,9 +253,15 @@ measured runs; the script reports their median, checks repeated schedule and
 resource outputs are identical, and retains logs, traces, and `results.json`
 in a temporary directory. Use fractional submission times to exercise arrival
 passes between one-second ticks. These are simulator timings, not measurements
-of production schedulers. Unified runs use a circular queue and unlimited
+of production schedulers. Fixed-dispatch runs use a circular queue and unlimited
 horizon. `--reservation-depth` controls hybrid protection, and `--runs` controls
 the number of measured runs. Omit `--dispatch-on-events` for timer-only dispatch.
+The runner automatically reads and records the barrier mode from
+`dr_evt_config.hpp`; the binary determines which reservation rule is benchmarked.
+Reports identify the applied priority and backfill policies, queue, and dispatch
+settings, without vendor scheduler labels.
+Use `--config-header PATH` for a nonstandard installation layout. Older headers
+that do not record the setting require rebuilding.
 
 ### Streaming API tests
 

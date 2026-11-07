@@ -15,6 +15,8 @@ import random
 import subprocess
 import tempfile
 
+from read_build_config import reservation_barrier
+
 
 def reference(jobs, interval, depth, capacity=4):
     """Use tuples (submit, nodes, limit, actual), observing releases at ticks."""
@@ -60,11 +62,31 @@ def reference(jobs, interval, depth, capacity=4):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("simulator", type=pathlib.Path)
+    parser.add_argument("--config-header", type=pathlib.Path,
+                        help="Generated header for a nonstandard install layout")
     parser.add_argument("--flexible-simulator", type=pathlib.Path,
                         help="Optional default-barrier build for a negative control")
+    parser.add_argument("--flexible-config-header", type=pathlib.Path)
     parser.add_argument("--report", type=pathlib.Path)
     args = parser.parse_args()
     simulator = args.simulator.resolve()
+    try:
+        barrier, config_header = reservation_barrier(simulator, args.config_header)
+        if not barrier:
+            print("SKIP: simplified LSF checks require a barrier-ON build; "
+                  "{} records OFF.".format(config_header))
+            return
+        if args.flexible_simulator:
+            control_barrier, _ = reservation_barrier(args.flexible_simulator,
+                                                      args.flexible_config_header)
+            if control_barrier:
+                print("SKIP: flexible control records barrier ON; "
+                      "running the legacy checks only.")
+                args.flexible_simulator = None
+        elif args.flexible_config_header:
+            parser.error("--flexible-config-header requires --flexible-simulator")
+    except ValueError as error:
+        parser.error(str(error))
     results = []
     with tempfile.TemporaryDirectory(prefix="dr_evt_lsf_model_") as directory:
         work = pathlib.Path(directory)
@@ -151,6 +173,7 @@ def main():
                              interval=interval, depth=depth, actual_mode=True)
 
     report = {"scope": "DR_EVT simplified LSF model; no LSF daemon comparison",
+              "config_header": str(config_header),
               "reservation_rule": "legacy completion strictly before protected start",
               "checks": len(results), "results": results}
     if args.report:
