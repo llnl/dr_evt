@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf automake libtool build-essential cmake meson ninja-build \
-    pkg-config git ca-certificates jq patch file \
+    pkg-config git ca-certificates jq patch file bc \
     libzmq3-dev uuid-dev libjansson-dev liblz4-dev libarchive-dev \
     libhwloc-dev libsqlite3-dev libncurses-dev libssl-dev \
     libboost-graph-dev libedit-dev libyaml-cpp-dev \

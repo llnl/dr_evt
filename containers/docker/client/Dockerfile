@@ -7,6 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+        bc \
         build-essential \
         ca-certificates \
         cmake \
@@ -17,6 +18,7 @@ RUN apt-get update \
         libgrpc++-dev \
         libhiredis-dev \
         libprotobuf-dev \
+        libssl-dev \
         protobuf-compiler \
         protobuf-compiler-grpc \
     && rm -rf /var/lib/apt/lists/*
@@ -40,9 +42,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+        bc \
         libgrpc++-dev \
         libhiredis1.1 \
         libprotobuf-dev \
+        libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /opt/dr-evt /opt/dr-evt
