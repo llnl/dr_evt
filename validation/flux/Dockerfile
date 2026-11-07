@@ -6,7 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config git ca-certificates jq patch file bc \
     libzmq3-dev uuid-dev libjansson-dev liblz4-dev libarchive-dev \
     libhwloc-dev libsqlite3-dev libncurses-dev libssl-dev \
-    libboost-graph-dev libedit-dev libyaml-cpp-dev \
+    libboost-graph-dev libboost-program-options-dev libboost-serialization-dev \
+    libedit-dev libyaml-cpp-dev \
     lua5.1 liblua5.1-dev lua-posix libfaketime \
     python3 python3-dev python3-pip python3-venv python3-cffi python3-ply \
     python3-setuptools python3-yaml python3-wheel python3-jsonschema \

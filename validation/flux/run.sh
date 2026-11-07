@@ -18,6 +18,7 @@ mkdir -p "$results"
 docker build -t "$image" "$validation_dir"
 docker run --rm \
     --mount "type=bind,src=$sources,dst=/sources,readonly" \
+    --mount "type=bind,src=$repo_dir,dst=/dr_evt_source,readonly" \
     --mount "type=bind,src=$results,dst=/results" \
     --mount "type=volume,src=$build_volume,dst=/workspace" \
     -e "BUILD_JOBS=${BUILD_JOBS:-4}" "$image"

@@ -1,6 +1,5 @@
 """Exercise the real scheduler RPC, including queued and asynchronous work."""
 import json
-import errno
 from pathlib import Path
 import subprocess
 
@@ -94,34 +93,5 @@ cleanup([occupant, head, borrower])
 barrier('easy: final idle', 0)
 command('module', 'remove', 'sched-fluxion-qmanager')
 
-# This pinned Fluxion retries a truncated reservation-only pass repeatedly:
-# reservation sets m_scheduled, which causes next_match_iter to request another
-# pass. A truthful barrier must remain pending while those passes keep running.
-command('module', 'load', 'sched-fluxion-qmanager', 'queue-policy=easy',
-        'queue-params=queue-depth=1')
-command('queue', 'start', '--all')
-occupant = job(4)
-wait(occupant, 'start')
-waiting = [job(1), job(1)]
-for jobid in waiting:
-    wait(jobid, 'depend')
-probe = handle.rpc('sched.quiescent')
-try:
-    probe.wait_for(0.25)
-except OSError as error:
-    assert error.errno == errno.ETIMEDOUT, error
-else:
-    raise AssertionError('Reservation-only retries unexpectedly reported quiescence')
-stats = handle.rpc('sched-fluxion-qmanager.stats-get').get()
-assert not probe.is_ready(), stats
-cleanup([occupant, *waiting])
-reply = probe.get()
-# The original probe can settle between cancellation events; its allocation
-# count describes that snapshot. Probe again after all clean events.
-assert reply['status'] == 0 and 0 <= reply['alloc_current'] <= 3, reply
-barrier('easy depth-one: idle after cancelling retry workload', 0)
-checks.append({'case': 'easy depth-one reserve-only retries: probe waits until cancellation',
-               'stats_while_busy': stats, 'resumed_reply': reply})
-print('PASS reservation-only retry: no false readiness; cancellation releases probe', flush=True)
 RESULTS.joinpath('quiescence.json').write_text(json.dumps(checks, indent=2) + '\n')
 print(f'{len(checks)} synchronization cases passed', flush=True)

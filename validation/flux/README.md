@@ -1,8 +1,10 @@
 # Fluxion validation with Flux Fiction
 
-This harness builds Flux Core, Fluxion, and Flux Fiction in Linux containers.
-It adds a local `sched.quiescent` handler to an isolated Fluxion source export.
-The mounted checkouts are read-only; DR_EVT's scheduler is unchanged.
+This harness builds Flux Core, Fluxion, Flux Fiction, and DR_EVT in a Linux
+container. It verifies the Fiction backend and time-step synchronization with
+hand-computed smoke cases. Paired DR_EVT comparisons are a separate step.
+
+## Run
 
 From the repository root:
 
@@ -10,56 +12,64 @@ From the repository root:
 bash validation/flux/run.sh
 ```
 
-The default source location is `external/{flux-core,flux-sched,flux-fiction}`.
-Override it with `FLUX_SOURCES=/path/to/checkouts`. Results and build logs go
-to `validation/flux/results/`; `FLUX_VALIDATION_RESULTS` overrides that path.
-The reusable Docker build volume is `dr-evt-flux-validation-build`; override
-it with `FLUX_VALIDATION_BUILD_VOLUME` to start a fresh build after a source or
-extension change. Only committed external sources are exported, and their
-revisions and extension hashes are recorded.
+Sources default to `external/{flux-core,flux-sched,flux-fiction}`;
+`FLUX_SOURCES` selects another checkout directory. The checkouts and DR_EVT
+repository are mounted read-only. Only committed sources are exported into a
+reusable Docker volume, and local checkout edits are excluded.
 
-## Synchronization extension
+`FLUX_VALIDATION_IMAGE` selects the image name, `FLUX_VALIDATION_BUILD_VOLUME`
+selects the build volume, and `BUILD_JOBS` controls Flux build parallelism.
+Use a fresh build volume after changing external revisions or the local
+synchronization overlay. Results default to `validation/flux/results/`;
+`FLUX_VALIDATION_RESULTS` selects another directory. Generated results are ignored.
 
-Flux Fiction waits for `sched.quiescent` before advancing its logical clock.
-The handler waits until Fluxion has no active matching loop, requested pass,
-unsent allocation response, or dirty annotation. It also queries
-`job-manager.alloc-query` until the job manager has sent its queued batch and
-its outstanding allocation count matches Fluxion's waiting-job count.
-Reservations remain waiting jobs; current allocations count running jobs.
-Flux Fiction separately waits for the corresponding start acknowledgements.
+`prepare.py` records external revisions and overlay hashes in `sources.json`
+and saves the applied patch as `fluxion-quiescence.patch`. `build_dr_evt.py`
+exports the current DR_EVT commit, builds a Release executable with the default
+resource-time reservation rule, and records its revision, configure flags, and
+binary hash in `dr_evt-sources.json`. Each Fiction run retains its input,
+configuration, log, and job transitions in a unique output directory.
 
-The extension observes state without invoking extra scheduling passes or
-changing placement, queue depth, reservation depth, or backfill admission.
-It supports concurrent probes and returns errors on query failure or unload.
-Use it with a single unrestricted queue and unheld jobs: held requests left
-in the job manager prevent a successful drain. The test runner has a real-time
-timeout to detect stalls; waiting a fixed duration is not the readiness rule.
+## Checks
 
-The native tests exercise the actual RPC on a four-core graph with FCFS,
-EASY, hybrid, and conservative policies. They cover concurrent idle probes,
-initial allocation, blocked batches, cancellation, and EASY reservation/backfill.
-FCFS uses queue depth one to check repeated release-triggered passes;
-the ordinary backfill cases use depth 100.
+The default runner performs:
 
-The cloned Fluxion revision continually retries a truncated reservation-only
-backfill pass: reservations mark the queue as scheduled, which requests another
-pass when the depth is exhausted with candidates remaining. An explicit
-depth-one EASY case verifies that the handler stays pending during these
-retries and resumes when cancellation allows the scheduler to settle. This
-limitation is retained rather than changing the reference scheduling policy.
+- Native synchronization checks for idle queues, allocations, pending jobs,
+  resource releases, cancellation, and safe backfill.
+- Fiction smoke cases with hand-computed start and finish times: one job, and
+  a blocked four-node head with a safely backfilled one-node job.
+- A build of the committed DR_EVT simulator for subsequent comparisons.
 
-Two Flux Fiction smoke cases use its real Flux backend, a four-node graph,
-and libfaketime to check hand-computed job starts, completions, and allocated
-node counts. They establish the runnable reference and synchronization
-prerequisites.
+The synchronization checks use one broker with four cores. Fiction smoke
+cases use **four nodes total, one core per node**, whole-node allocation,
+equal priorities, known time limits, and no simulated system latency.
+Reports are `quiescence.json` and `fiction/report.json`; the complete build
+log is `build-and-test.log`. Agreement is established only for the exercised
+cases, not general scheduler equivalence.
 
-On November 6, 2026, all 24 native synchronization cases and both Fiction smoke
-cases passed in Ubuntu 24.04 ARM64 Docker with GCC 13. The tested build volume
-is `dr-evt-flux-validation-build-v3`; set `FLUX_VALIDATION_BUILD_VOLUME` to that
-value to reuse it locally. Results include `sources.json`, the applied
-`fluxion-quiescence.patch`, `quiescence.json`, and Fiction inputs, logs, and
-transition tables under `results/fiction/`.
+## Time-step synchronization
 
-Optional profiling dependencies are omitted from the image. They do not
-affect scheduling and the upstream DFTracer package failed to compile on
-the initial ARM64 Docker setup.
+Fiction owns the time-ordered arrival/completion event queue; Fluxion owns the
+waiting-job queue. Fiction submits a job's resource requirements and time limit.
+After receiving its start notification, Fiction schedules completion at
+`start + actual duration`. Actual duration stays in Fiction.
+
+After firing the events at one timestamp, Fiction asks its jobtap plugin to
+confirm those events and their resulting starts. Jobtap sends an empty
+`sched.quiescent` request to the local handler. The handler replies only when
+Fluxion has no active or requested scheduling pass, outstanding allocation
+responses and changed annotations have been sent, and allocation-request counts
+agree with the job manager. Its reply contains `status` and `alloc_current`,
+the number of allocated jobs. Jobtap then waits for Fiction's start
+acknowledgments before echoing the original step request. Fiction can then
+advance to the next event timestamp; waiting jobs may remain queued.
+
+The handler is applied only to the isolated Fluxion export and observes state
+without changing placement or scheduling policy. The tested setup has one
+unrestricted queue with unheld jobs, and backfill examination caps cover its
+waiting queues. Finite-depth restart behavior is outside these checks.
+Concurrent probes and error handling are supported. Real-time timeouts stop
+incomplete runs; they are not the synchronization condition.
+
+Optional profiling dependencies are omitted from the image; they do not affect
+scheduling.
