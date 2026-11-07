@@ -92,6 +92,19 @@ and both 2,000-job FCFS comparisons agree on starts, finishes, node counts,
 and occupancy. Generated reports remain ignored. These results apply to the
 listed workloads and policy settings.
 
+## Node-reservation placement discrepancy
+
+The [four-job reproducer](reproduce_divergence.py) checks two cases using the
+same high-ID-first matcher and DR_EVT `--per_pass_accounting`. With A submitted
+before B, Fiction starts D at 80 while DR_EVT starts it at 70. Swapping A and B's
+equal-time input order makes every start and finish time agree, with D at 70.
+The [explanation](DIVERGENCE.md) lists the node assignments and protected window.
+
+Both cases are checked under EASY, hybrid R=32, and conservative on four nodes
+with Q=2048. Twelve single-job deletion controls also match. The default runner
+includes all 18 checks. An expected-divergence check passes only when the documented
+difference is reproduced; a matching case requires complete schedule agreement.
+
 ## Time-step synchronization
 
 Fiction owns the time-ordered arrival/completion event queue; Fluxion owns the
