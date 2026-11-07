@@ -18,10 +18,15 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * Shortest Job First (SJF) scheduler with iterator tracking
- *
+ * @brief Event-driven SJF dispatch and EASY backfill using an ordered
+ * multimap queue.
+ * @details
  * Uses std::multimap ordered by run_time for priority,
  * plus tracking of eligibility boundary to avoid rescanning.
+ * @note Selected by --priority_policy sjf --backfill_policy easy, with
+ * --dispatch_interval 0 and --backfill_interval 0. The queue implementation
+ * is fixed; --queue_impl does not change it. --backfill_policy none disables
+ * backfill.
  */
 class SJFEasyScheduler : public SchedulerBase {
 public:

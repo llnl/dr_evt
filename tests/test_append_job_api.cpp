@@ -2026,8 +2026,8 @@ void test_fractional_streaming_limits_validate_stored_value() {
 }
 
 // Fixed ticks gate FCFS as well as backfill; Q is shared by all starts.
-void test_unified_periodic_dispatch() {
-  std::cout << "\n=== Unified periodic dispatch ===" << std::endl;
+void test_fixed_periodic_dispatch() {
+  std::cout << "\n=== Fixed periodic dispatch ===" << std::endl;
   for (const auto policy :
        {BackfillPolicy::NONE, BackfillPolicy::EASY, BackfillPolicy::HYBRID,
         BackfillPolicy::CONSERVATIVE}) {
@@ -2096,8 +2096,8 @@ void test_unified_periodic_dispatch() {
   std::cout << "  PASSED" << std::endl;
 }
 
-void test_unified_periodic_backfill() {
-  std::cout << "\n=== Unified periodic reservation depth ===" << std::endl;
+void test_fixed_periodic_backfill() {
+  std::cout << "\n=== Fixed periodic reservation depth ===" << std::endl;
   for (size_t depth : {size_t{1}, size_t{2}}) {
     auto params = make_params();
     params.m_total_nodes = 4;
@@ -2150,9 +2150,9 @@ void test_unified_periodic_backfill() {
   std::cout << "  PASSED" << std::endl;
 }
 
-// Timer and arrival batches share the same bounded unified pass.
-void test_unified_timer_and_events() {
-  std::cout << "\n=== Unified timer and event dispatch ===" << std::endl;
+// Timer and arrival batches share the same bounded FCFS/backfill pass.
+void test_fixed_periodic_dispatch_on_arrivals() {
+  std::cout << "\n=== Fixed periodic dispatch with arrival wakes ===" << std::endl;
   for (const auto policy :
        {BackfillPolicy::NONE, BackfillPolicy::EASY, BackfillPolicy::HYBRID,
         BackfillPolicy::CONSERVATIVE}) {
@@ -2227,7 +2227,7 @@ void test_unified_timer_and_events() {
   assert(batches.get_job_statuses({new_arrival})[0].start_time == 5);
 
   // A completion and newly submitted job at the same API boundary must be
-  // processed before one unified pass, even when the queue was synced first.
+  // processed before one FCFS/backfill pass, even when the queue was synced first.
   auto boundary_params = params;
   boundary_params.m_total_nodes = 1;
   Simulation boundary(boundary_params);
@@ -2246,7 +2246,7 @@ void test_unified_timer_and_events() {
   std::cout << "  PASSED" << std::endl;
 }
 
-void test_unified_cached_planner_lookahead() {
+void test_fixed_periodic_cached_planner_lookahead() {
   for (const bool notified : {false, true}) {
     auto params = make_params();
     params.m_total_nodes = 4;
@@ -2395,10 +2395,10 @@ int main() {
     test_periodic_backfill_run_until_exclusive();
     test_periodic_easy_scheduler_selection();
     test_reservation_search_bounds();
-    test_unified_cached_planner_lookahead();
-    test_unified_periodic_dispatch();
-    test_unified_timer_and_events();
-    test_unified_periodic_backfill();
+    test_fixed_periodic_cached_planner_lookahead();
+    test_fixed_periodic_dispatch();
+    test_fixed_periodic_dispatch_on_arrivals();
+    test_fixed_periodic_backfill();
     test_append_with_known_actual_runtime();
     test_fractional_streaming_limits_validate_stored_value();
 

@@ -900,17 +900,26 @@ if(DR_EVT_WITH_UNIT_TESTING)
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_node_release_delay_tests.sh
       $<TARGET_FILE:sim-bin>)
   if(Python3_Interpreter_FOUND)
+    add_test(
+      NAME test_python_periodic_reference
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python_periodic_reference.py)
+    add_test(
+      NAME test_read_build_config
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_read_build_config.py)
     if(DR_EVT_LEGACY_RESERVATION_BARRIER)
       add_test(
-        NAME test_lsf_model_validation
+        NAME test_legacy_reservation_validation
         COMMAND ${Python3_EXECUTABLE}
-          ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_lsf_model_validation.py
-          $<TARGET_FILE:sim-bin>)
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_legacy_reservation_validation.py
+          $<TARGET_FILE:sim-bin>
+          --config-header ${CMAKE_CURRENT_BINARY_DIR}/dr_evt_config.hpp)
     endif()
     add_test(
-      NAME test_unified_periodic_dispatch
+      NAME test_fixed_periodic_dispatch
       COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_unified_dispatch_tests.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_fixed_periodic_dispatch_tests.py
         $<TARGET_FILE:sim-bin>)
   endif()
   add_test(
@@ -1324,6 +1333,7 @@ append_str_tf(_str
   DR_EVT_HAS_NUMA
   DR_EVT_HAS_PROTOBUF
   DR_EVT_INSTALL_FETCHED_GRPC
+  DR_EVT_LEGACY_RESERVATION_BARRIER
   DR_EVT_GPROF)
 string(APPEND _str
   "\n== End DR_EVT Configuration Summary ==\n")

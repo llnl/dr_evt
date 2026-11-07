@@ -63,7 +63,7 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    18; // 18: unified event wakes; 17: dispatch controls; 16: periodic dirty
+    18; // 18: arrival dispatch wakes; 17: dispatch controls; 16: periodic dirty
         // flag; 15: periodic deadline; 14: backfill_queue_depth; 13: scalar
         // event/sample times; 12: release delay; 11: reservation_depth
 
@@ -2923,16 +2923,16 @@ void BasicSimulation<TraceType>::advance_to(sim_time_t target_time) {
 
 template <typename TraceType>
 template <bool AccountResources, bool WarmStage, bool PeriodicBackfill,
-          bool UnifiedDispatch, bool DispatchOnEvents>
+          bool FixedPeriodicDispatch, bool DispatchOnEvents>
 void BasicSimulation<TraceType>::advance_to_impl(
     sim_time_t target_time, FCFSEasyCustomScheduler *custom_scheduler) {
   if constexpr (!AccountResources) {
     (void)custom_scheduler;
   }
   constexpr bool periodic_backfill = PeriodicBackfill;
-  static_assert(!UnifiedDispatch || PeriodicBackfill);
-  static_assert(!DispatchOnEvents || UnifiedDispatch);
-  constexpr bool unified_dispatch = UnifiedDispatch;
+  static_assert(!FixedPeriodicDispatch || PeriodicBackfill);
+  static_assert(!DispatchOnEvents || FixedPeriodicDispatch);
+  constexpr bool fixed_periodic_dispatch = FixedPeriodicDispatch;
   SchedulerBase *periodic_scheduler = nullptr;
   if constexpr (PeriodicBackfill) {
     periodic_scheduler = m_scheduler.get();
@@ -2969,7 +2969,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
   }
   [[maybe_unused]] bool initial_notification = false;
   [[maybe_unused]] const sim_time_t initial_time = m_current_time;
-  bool schedule_initial = !UnifiedDispatch;
+  bool schedule_initial = !FixedPeriodicDispatch;
   if constexpr (DispatchOnEvents) {
     initial_notification = initial_arrivals;
     const bool initial_replay_batch =
@@ -2987,7 +2987,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
       num_nodes_t free_nodes = get_available_nodes();
       publish_capacity_outlook();
       auto jobs_to_run = [&] {
-        if constexpr (PeriodicBackfill && !UnifiedDispatch) {
+        if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
           return periodic_scheduler->schedule_event(
               free_nodes, m_running_jobs, m_current_time);
         } else {
@@ -3016,7 +3016,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
         // Context, via process_events_until()) - no separate call needed.
         m_trace.run_until_inclusive(m_current_time);
       }
-      if constexpr (UnifiedDispatch) {
+      if constexpr (FixedPeriodicDispatch) {
         initial_notification = false;
         break; // One examined prefix for this notification batch.
       }
@@ -3245,7 +3245,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
       }
     } else if (next_tick < std::numeric_limits<sim_time_t>::max() &&
                next_tick <= target_time &&
-               (unified_dispatch || !m_trace.pending_events().empty() ||
+               (fixed_periodic_dispatch || !m_trace.pending_events().empty() ||
                 next_arrival < std::numeric_limits<sim_time_t>::max() ||
                 (next_capacity < std::numeric_limits<sim_time_t>::max() &&
                  next_capacity <= target_time))) {
@@ -3264,7 +3264,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
       } else {
         record_queue_arrivals(m_current_time);
       }
-      periodic_evaluation = unified_dispatch || m_periodic_backfill_dirty;
+      periodic_evaluation = fixed_periodic_dispatch || m_periodic_backfill_dirty;
       should_schedule = periodic_evaluation;
       m_next_backfill_evaluation += m_params.scheduling_interval();
     } else {
@@ -3286,9 +3286,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
     // not turn the next ordinary event into a backfill pass; the catch-up at
     // the end of the iteration moves it to the next tick instead.
     if constexpr (PeriodicBackfill) {
-      // An idle jump can cross unused ticks. For unified dispatch, restore
+      // An idle jump can cross unused ticks. For fixed periodic dispatch, restore
       // the phase before deciding whether this event is exactly on a tick.
-      if constexpr (UnifiedDispatch) {
+      if constexpr (FixedPeriodicDispatch) {
         align_backfill_tick();
       }
       if (!periodic_evaluation &&
@@ -3296,7 +3296,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
         periodic_evaluation = true;
         m_next_backfill_evaluation += m_params.scheduling_interval();
       }
-      if constexpr (UnifiedDispatch) {
+      if constexpr (FixedPeriodicDispatch) {
         should_schedule = periodic_evaluation;
         if constexpr (DispatchOnEvents) {
           should_schedule = should_schedule || arrival_notification ||
@@ -3319,7 +3319,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
         publish_capacity_outlook();
 
         auto jobs_to_run = [&] {
-          if constexpr (PeriodicBackfill && !UnifiedDispatch) {
+          if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
             return periodic_evaluation
                        ? m_scheduler->schedule(free_nodes, m_running_jobs,
                                                m_current_time)
@@ -3364,8 +3364,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
             break; // Process only one START event per job
           }
         }
-        // A unified cycle examines its prefix once, including FCFS starts.
-        if constexpr (UnifiedDispatch) {
+        // A fixed periodic dispatch cycle examines its prefix once, including FCFS starts.
+        if constexpr (FixedPeriodicDispatch) {
           break;
         }
       }
@@ -3393,7 +3393,7 @@ void BasicSimulation<TraceType>::advance_to_impl(
       }
     }
 
-    if constexpr (UnifiedDispatch) {
+    if constexpr (FixedPeriodicDispatch) {
       if (periodic_evaluation && !started_at_tick &&
           m_trace.pending_events().empty() &&
           next_arrival == std::numeric_limits<sim_time_t>::max() &&

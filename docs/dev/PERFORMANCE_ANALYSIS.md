@@ -1,7 +1,7 @@
 # Performance Analysis
 
 This page records profiles of the C++ simulator: a June 2022 RIKEN/Fugaku
-trace capture and later unified-dispatch optimization benchmarks. Each section
+trace capture and later fixed periodic dispatch optimization benchmarks. Each section
 identifies costs for its measured workload and configuration; the results
 are not general performance guarantees or comparisons among queue implementations.
 
@@ -10,6 +10,10 @@ For instructions on collecting a new profile, see
 or [GNU `gprof` profiling](../getting-started/installation.md#gnu-gprof-profiling).
 For end-to-end results comparing the available queue implementations, see the
 [wait queue performance comparison](WAIT_QUEUES.md#benchmark-record).
+For repeatable fixed periodic dispatch timings, use
+[`tests/benchmark_wait_queues.sh`](../../tests/benchmark_wait_queues.sh) with
+`--dispatch-interval` and a backfill policy, described in the
+[test guide](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#fixed-periodic-dispatch-benchmark).
 
 ## Workload and measurement
 
@@ -187,10 +191,10 @@ runs using the same trace prefix and configuration. Report wall time as well as
 cycles, and retain sample counts and lost-sample counts with the result.
 
 
-## Unified dispatch candidate-prefix optimization (November 6, 2026)
+## Fixed periodic dispatch candidate-prefix optimization (November 6, 2026)
 
 The baseline was `dae396c`, after compile-time trigger specialization.
-The optimization changes only `FCFSUnifiedCircularScheduler`; event-driven
+The optimization changes only `PeriodicFCFSHybridCircularScheduler`; event-driven
 and separate periodic-backfill scheduler implementations are unchanged.
 The build was Release (`-O3`) on macOS arm64 with
 `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
@@ -208,7 +212,7 @@ capture used a 1 ms sampling interval and 2 s duration; the process finished
 before that duration. The FCFS capture collected no useful call stacks and
 is not used to estimate hotspot percentages.
 
-Previously, every bounded unified pass walked the candidate prefix to count
+Previously, every bounded combined FCFS/backfill pass walked the candidate prefix to count
 live entries, even when no entries had been removed. The optimized path:
 
 - Uses the queue index directly when there are no removed entries.
@@ -221,7 +225,7 @@ Measurements below exclude profiler overhead. Each comparison uses one warm-up
 pair and five measured alternating before/after pairs, including process
 startup, input, scheduling, and CSV output. Median wall times are:
 
-| Unified mode | Before | After | Speedup |
+| Fixed periodic mode | Before | After | Speedup |
 |---|---:|---:|---:|
 | Fixed FCFS | 1.107 s | 0.072 s | 15.3× |
 | Fixed conservative | 1.121 s | 0.081 s | 13.8× |
@@ -255,14 +259,14 @@ and reservation updates. This optimization does not change that shared planner.
 The short capture identifies a target; it does not provide whole-run cost
 percentages for every search or reservation operation.
 
-The unified-dispatch regression script also checks removed entries, finite
+The fixed-periodic-dispatch regression script also checks removed entries, finite
 candidate limits, future arrivals, and compaction for both
 notification settings. Streaming, checkpoint, and warm-start checks pass.
 Local raw profiles, generated inputs, benchmark scripts, and results are under
 `/tmp/dr_evt_unified_profile` and `/tmp/dr_evt_unified_optimization_benchmark.py`;
 these paths are local evidence, not files shipped with the repository.
 
-## Unified conservative reservation-search bounds (November 6, 2026)
+## Fixed periodic conservative reservation-search bounds (November 6, 2026)
 
 The baseline is `66dbc21`, including the candidate-prefix optimization above.
 The Release (`-O3`) build uses macOS arm64 and
@@ -286,7 +290,7 @@ end of each pass. It does not persist reservations or search state across
 wakes, alter queue ordering, or change checkpoint data. Both fixed timer
 dispatch and timer dispatch with arrival notifications can use it.
 
-Selection is confined to `FCFSUnifiedCircularScheduler`: conservative policy,
+Selection is confined to `PeriodicFCFSHybridCircularScheduler`: conservative policy,
 nonzero free nodes, exact planning resolution, and at least 128 live eligible
 candidates. A stack sample of the first 128 live candidates must contain at
 most 112 distinct node-count/duration pairs. Mostly distinct requests use the
@@ -300,7 +304,7 @@ Event-driven and separate periodic-backfill modes instantiate the shared
 traversal with `Reservation_Timeline`, retaining their original planner and
 adding no cache selection or cache lookups. The original virtual entry point
 contains the vector traversal directly, verified in Release disassembly.
-`DR_EVT_LEGACY_RESERVATION_BARRIER=ON` compiles out both the unified cache
+`DR_EVT_LEGACY_RESERVATION_BARRIER=ON` compiles out both the fixed periodic dispatch cache
 selection and the sample. FCFS, EASY, hybrid, small prefixes, and rounded
 planning retain the vector planner.
 
@@ -315,7 +319,7 @@ one-second ticks, limit runtimes, and a candidate limit of 10,000.
 
 Median wall times for the final implementation are:
 
-| Unified conservative workload | Before | After | Speedup |
+| Fixed periodic conservative workload | Before | After | Speedup |
 |---|---:|---:|---:|
 | Mixed, fixed timer | 9.359 s | 4.261 s | 2.20× |
 | Mixed, timer plus between-tick arrivals | 11.742 s | 5.354 s | 2.19× |
@@ -337,9 +341,9 @@ scheduler costs remain, and the cache does not optimize the legacy reservation
 barrier.
 
 Validation includes the append API (large-prefix exact lookahead without live
-mutation), checkpoint, warm-start, custom scheduler, unified dispatch,
+mutation), checkpoint, warm-start, custom scheduler, fixed periodic dispatch,
 separate periodic-backfill, backfill queue-depth, and flexible-reservation
-CTest cases. The unified CLI script checks 88 cases. Direct cache tests compare
+CTest cases. The fixed periodic dispatch CLI script checks 88 cases. Direct cache tests compare
 the original vector planner with mixed durations, different origins, failed
 searches, more than 256 shapes, and randomized reservations; they also pass
 AddressSanitizer and UndefinedBehaviorSanitizer in a standalone build. An
@@ -348,7 +352,7 @@ arrivals, finite/unlimited horizons, exact/rounded planning, capacity changes,
 and release delays.
 
 The full native build includes Python bindings and gRPC targets. A temporary
-installation successfully compiles a consumer of the unified scheduler header
+installation successfully compiles a consumer of the periodic scheduler header
 with the legacy barrier both disabled and enabled. The enabled object contains
 no cached-planner or reuse-sample entry. Installation now includes the shared
 `.tpp` implementation and the previously omitted `common.hpp` dependency.

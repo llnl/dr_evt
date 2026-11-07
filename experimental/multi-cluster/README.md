@@ -369,8 +369,8 @@ mpirun -np 6 build/mpi_performance_dispatch \
   --output dispatch-decisions.csv
 ```
 
-Use `srun -n 6` instead of `mpirun -np 6` inside an appropriate Slurm
-allocation. MPI and Ser20 are required; gRPC and Python are not.
+Use the site's MPI launcher inside an appropriate allocation. MPI and Ser20
+are required; gRPC and Python are not.
 
 ### Prediction-study matrix
 

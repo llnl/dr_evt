@@ -18,8 +18,8 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * FCFS (First-Come-First-Served) scheduler using BlockWaitQueue.
- *
+ * @brief Event-driven FCFS dispatch and EASY backfill using a block queue.
+ * @details
  * Uses BlockWaitQueue for O(1) insert/remove and O(blocks) backfill search.
  * Maintains separate eligibility tracking (identical to
  * FCFSEasyDequeScheduler).
@@ -27,6 +27,11 @@ namespace dr_evt {
  * Key optimization over FCFSEasyDequeScheduler: BlockWaitQueue's
  * find_backfill_candidate() uses block-level metadata pre-filtering for faster
  * backfill search.
+ * @note Selected by --priority_policy fcfs --queue_impl block
+ * --backfill_policy easy, with --dispatch_interval 0 and --backfill_interval 0.
+ * --block_size selects 4, 8, 16, 32, 64, 128, or 256 entries per block.
+ * --priority_policy fcfs_conservative with EASY also selects this queue.
+ * --backfill_policy none disables backfill.
  *
  * @tparam BlockSize Block size (must be power of 2)
  */

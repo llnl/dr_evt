@@ -195,6 +195,11 @@ public:
  * backfilling. The simulation submits validated job metadata, synchronizes
  * arrival eligibility, and repeatedly asks the scheduler which jobs can start
  * with the currently available nodes.
+ * Scheduling triggers belong to the simulation driver; this interface owns
+ * no event loop or timer and specifies no queue container.
+ * @note No option selects SchedulerBase directly. create_scheduler() chooses
+ * a concrete implementation from --priority_policy, --backfill_policy,
+ * --queue_impl, --dispatch_interval, and --backfill_interval.
  */
 class SchedulerBase {
   template <typename TraceType> friend class BasicSimulation;
@@ -618,11 +623,11 @@ protected:
  * evaluations; zero retains event-driven evaluation only. The planning
  * horizon is not a construction parameter; set it with
  * SchedulerBase::set_planning_horizon().
- * @param[in] dispatch_interval Unified FCFS/backfill tick interval; zero
+ * @param[in] dispatch_interval Fixed periodic FCFS/backfill tick interval; zero
  * disables. Mutually exclusive with positive backfill_interval.
- * @param[in] dispatch_queue_depth Entire candidate prefix per unified wake,
+ * @param[in] dispatch_queue_depth Entire candidate prefix per dispatch wake,
  * including FCFS starts; zero is unlimited. Requires dispatch_interval > 0.
- * @param[in] dispatch_on_events Also request the unified pass on job arrival
+ * @param[in] dispatch_on_events Also request the FCFS/backfill pass on job arrival
  * batches without changing the timer cadence; requires dispatch_interval > 0.
  * @return Owning pointer to a SchedulerBase implementation.
  * @throws std::invalid_argument if HYBRID is requested with a zero depth or

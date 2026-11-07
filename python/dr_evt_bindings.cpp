@@ -148,12 +148,12 @@ PYBIND11_MODULE(dr_evt, m) {
                      "FCFS ordering.")
       .def_readwrite("dispatch_interval", &Sim_Params::m_dispatch_interval,
                      "float: Aligned interval for both FCFS and backfill; "
-                     "0 disables unified periodic dispatch.")
+                     "0 disables fixed periodic dispatch.")
       .def_readwrite("dispatch_on_events", &Sim_Params::m_dispatch_on_events,
-                     "bool: Also run unified dispatch on arrival batches without "
+                     "bool: Also run fixed periodic dispatch on arrival batches without "
                      "resetting periodic ticks; requires dispatch_interval > 0.")
       .def_readwrite("dispatch_queue_depth", &Sim_Params::m_dispatch_queue_depth,
-                     "int: Entire candidate prefix per unified wake, including "
+                     "int: Entire candidate prefix per dispatch wake, including "
                      "immediate FCFS starts; 0 is unlimited.")
       .def_readwrite("planning_time_resolution",
                      &Sim_Params::m_planning_time_resolution,

@@ -690,7 +690,7 @@ void test_periodic_backfill() {
   }
 }
 
-void test_unified_periodic_warm_start() {
+void test_fixed_periodic_warm_start() {
   for (const double departure : {16.0, 20.0}) {
     std::ostringstream trace;
     trace << "job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit\n"
@@ -708,7 +708,7 @@ void test_unified_periodic_warm_start() {
   }
 }
 
-void test_unified_timer_event_warm_start() {
+void test_fixed_periodic_arrival_warm_start() {
   const std::string trace =
       "job_submit_time,begin_time,end_time,num_nodes,exit_status,time_limit\n"
       "0,0,16,3,0,20\n"
@@ -910,8 +910,8 @@ int main() {
   test_queue_depth_after_warm_start();
     test_periodic_backfill();
     test_seeded_random_differential();
-    test_unified_periodic_warm_start();
-    test_unified_timer_event_warm_start();
+    test_fixed_periodic_warm_start();
+    test_fixed_periodic_arrival_warm_start();
     test_self_consistent_replay_warm_start();
     test_rejected_modes();
   } catch (...) {

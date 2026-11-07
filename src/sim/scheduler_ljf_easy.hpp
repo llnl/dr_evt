@@ -18,10 +18,15 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * Longest Job First (LJF) scheduler with iterator tracking
- *
+ * @brief Event-driven LJF dispatch and EASY backfill using an ordered map
+ * queue.
+ * @details
  * Uses std::map with descending order (longest run_time first),
  * plus tracking of eligibility boundary to avoid rescanning.
+ * @note Selected by --priority_policy ljf --backfill_policy easy, with
+ * --dispatch_interval 0 and --backfill_interval 0. The queue implementation
+ * is fixed; --queue_impl does not change it. --backfill_policy none disables
+ * backfill.
  */
 class LJFEasyScheduler : public SchedulerBase {
 public:

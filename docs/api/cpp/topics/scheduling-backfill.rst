@@ -3,7 +3,7 @@ Scheduling and Backfill API
 
 ``SchedulerBase``, the FCFS/SJF/LJF schedulers, wait queues, and schedule
 windows implement priority ordering with EASY, hybrid, or conservative
-backfilling. Event-driven and unified periodic dispatch are separate trigger
+backfilling. Event-driven and fixed periodic dispatch are separate trigger
 modes; see `Scheduling Loops <../../../dev/SCHEDULER_LOOPS.html>`_.
 
 .. if-doxygen::

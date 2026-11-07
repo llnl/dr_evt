@@ -159,26 +159,39 @@ resource trace with outputs from `scripts/python_reference_scheduler.py`.
 These comparisons test consistency between implementations, not independent
 proof of the algorithm.
 
-### Simplified LSF model
+### Fixed periodic EASY with strict reservation admission
 
-[`run_lsf_model_validation.py`](run_lsf_model_validation.py) checks fixed-session
-FCFS/EASY with strict completion-before-reservation admission. It covers IBM's
-4-CPU backfill example, rejected long and equal-boundary jobs, time-limit
+The periodic-dispatch and strict-reservation runners import shared scheduling
+functions from [`python_periodic_scheduler.py`](../scripts/python_periodic_scheduler.py).
+The script is also a standalone reference; see the
+[reference script guide](../scripts/README.md#reference-schedulers). Hand-computed
+fixtures remain in the runners, and `test_python_periodic_reference` checks
+the CLI's input ordering, actual runtimes, epoch times, and policy limits.
+
+[`run_legacy_reservation_validation.py`](run_legacy_reservation_validation.py) checks fixed-session
+FCFS/EASY with strict completion-before-reservation admission. It covers a
+4-node head-protection example, rejected long and equal-boundary jobs, time-limit
 planning, early releases, cadence, candidate limits, and 96 randomized
-comparisons with an independent reference. IBM does not specify the protected
-job's duration; the fixture assumes 30 minutes. This validates DR_EVT's
-documented approximation, not an LSF daemon or its decision accounting.
+comparisons with an independent reference. The head-protection fixture uses
+a 30-minute protected job. These tests validate the specified policy set;
+their evidence scope is described in
+[Realism and Known Gaps](../docs/dev/REALISM_AND_GAPS.md#validation-scope).
 
 ```bash
-cmake -S . -B build-lsf -DCMAKE_BUILD_TYPE=Release \
+cmake -S . -B build-legacy -DCMAKE_BUILD_TYPE=Release \
   -DDR_EVT_LEGACY_RESERVATION_BARRIER=ON -DDR_EVT_WITH_UNIT_TESTING=ON
-cmake --build build-lsf --target sim-bin -j2
-ctest --test-dir build-lsf -R '^test_lsf_model_validation$' --output-on-failure
+cmake --build build-legacy --target sim-bin -j2
+ctest --test-dir build-legacy -R '^test_legacy_reservation_validation$' --output-on-failure
 ```
 
 The CTest is registered only in legacy-barrier builds. Passing
 `--flexible-simulator PATH` directly to the script adds a control against a
 default-rule build, verifying that only the strict build rejects a safe overlap.
+The script checks the generated `dr_evt_config.hpp` before running cases:
+legacy checks run when the main binary records ON, and the flexible control
+runs when its binary records OFF. Inapplicable checks are skipped.
+Headers are found beside build binaries or in the installation's `include`
+directory; use `--config-header` and `--flexible-config-header` for other layouts.
 
 ### Replay tests
 
@@ -225,6 +238,38 @@ Python EASY and hybrid schedules with their respective C++ `deque` baselines
 using a `0.001` time tolerance. The
 differential runner uses the
 [`scheduler_correctness`](test_traces/scheduler_correctness/) fixtures.
+
+### Fixed periodic dispatch benchmark
+
+[`benchmark_wait_queues.sh`](benchmark_wait_queues.sh) accepts fixed dispatch
+options alongside the existing `easy`, `hybrid`, and `conservative` policy
+choices; `none` is also supported for fixed dispatch. The first example uses
+conservative backfill, one-second ticks plus arrival passes, and queue depth
+10,000. Use a Release build with the
+default `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`:
+
+```bash
+./tests/benchmark_wait_queues.sh --backfill-policy conservative \
+  --dispatch-interval 1 --dispatch-on-events --dispatch-queue-depth 10000
+# EASY with strict reservation admission: use a barrier-ON binary.
+SIMULATOR="$PWD/build-legacy/simulator" ./tests/benchmark_wait_queues.sh \
+  --backfill-policy easy --dispatch-interval 5
+```
+
+The default trace has 2,000 jobs on a 500-node pool. One warmup precedes three
+measured runs; the script reports their median, checks repeated schedule and
+resource outputs are identical, and retains logs, traces, and `results.json`
+in a temporary directory. Use fractional submission times to exercise arrival
+passes between one-second ticks. These are simulator timings, not measurements
+of production schedulers. Fixed-dispatch runs use a circular queue and unlimited
+horizon. `--reservation-depth` controls hybrid protection, and `--runs` controls
+the number of measured runs. Omit `--dispatch-on-events` for timer-only dispatch.
+The runner automatically reads and records the barrier mode from
+`dr_evt_config.hpp`; the binary determines which reservation rule is benchmarked.
+Reports identify the applied priority and backfill policies, queue, and dispatch
+settings, without vendor scheduler labels.
+Use `--config-header PATH` for a nonstandard installation layout. Older headers
+that do not record the setting require rebuilding.
 
 ### Streaming API tests
 

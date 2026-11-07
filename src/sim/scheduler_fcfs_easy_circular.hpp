@@ -19,8 +19,9 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * FCFS scheduler using boost::circular_buffer instead of std::deque.
- *
+ * @brief Event-driven FCFS dispatch and EASY backfill using a circular queue.
+ * @details Selected directly for event-driven runs; the periodic EASY
+ * subclass reuses this queue and backfill logic with separate timer triggers.
  * Identical in every other respect to FCFSEasyDequeScheduler (same JobEntry
  * layout, same lazy-mark-and-compact removal, same pop_front() head
  * consumption, same indexed backfill scan) - only the underlying
@@ -39,6 +40,10 @@ namespace dr_evt {
  * exceeded: ABORT throws, ending the simulation; GROW reallocates to a
  * larger capacity via set_capacity(), which copies all existing
  * entries over.
+ * @note Selected by --priority_policy fcfs --queue_impl circular
+ * --backfill_policy easy (the defaults), with --dispatch_interval 0 and
+ * --backfill_interval 0. --priority_policy fcfs_conservative with EASY also
+ * selects this implementation. --backfill_policy none disables backfill.
  */
 class FCFSEasyCircularScheduler : public SchedulerBase {
 protected:

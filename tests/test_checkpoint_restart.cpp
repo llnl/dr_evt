@@ -340,13 +340,13 @@ void test_custom_scheduler_continuation(size_t queue_depth) {
  * arrival, so the pass at the boundary leaves the dirty flag cleared. A
  * restore that did not carry the flag would re-save a different checkpoint.
  */
-void test_periodic_backfill_continuation(bool unified_dispatch = false,
+void test_periodic_backfill_continuation(bool fixed_periodic_dispatch = false,
                                        bool dispatch_on_events = false) {
   auto params = make_params();
   params.m_queue_impl = QueueImplementation::CIRCULAR;
   params.m_backfill_policy = BackfillPolicy::HYBRID;
   params.m_reservation_depth = 1;
-  if (unified_dispatch) {
+  if (fixed_periodic_dispatch) {
     params.m_dispatch_interval = 4;
     params.m_dispatch_queue_depth = 3;
     params.m_dispatch_on_events = dispatch_on_events;
@@ -365,7 +365,7 @@ void test_periodic_backfill_continuation(bool unified_dispatch = false,
   const auto expected_stats = uninterrupted.get_statistics();
   assert(expected_stats.jobs_submitted == 2 * scheduler_workload_size);
 
-  if (unified_dispatch) {
+  if (fixed_periodic_dispatch) {
     auto mismatched = params;
     mismatched.m_dispatch_on_events = !dispatch_on_events;
     Simulation incompatible(mismatched);

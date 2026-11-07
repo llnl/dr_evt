@@ -18,8 +18,8 @@ namespace dr_evt {
  *  @{ */
 
 /**
- * Alternative FCFS scheduler implementation for differential testing
- *
+ * @brief Event-driven FCFS dispatch and EASY backfill using a multimap queue.
+ * @details Alternative implementation for differential testing.
  * Based on SJF scheduler framework but uses submit_time ordering instead of
  * run_time. This provides an independent implementation to verify
  * scheduler_fcfs_easy_deque correctness.
@@ -31,6 +31,11 @@ namespace dr_evt {
  *
  * Purpose: Differential testing - if both implementations produce same results,
  * high confidence in correctness of both.
+ * @note Selected by --priority_policy fcfs --queue_impl multimap
+ * --backfill_policy easy, with --dispatch_interval 0 and --backfill_interval 0.
+ * --priority_policy fcfs_alt also selects this implementation regardless of
+ * --queue_impl. --priority_policy fcfs_conservative with EASY selects it when
+ * --queue_impl multimap. --backfill_policy none disables backfill.
  */
 class FCFSEasyMultimapScheduler : public SchedulerBase {
 public:

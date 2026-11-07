@@ -29,14 +29,20 @@ using backfill_selector_t =
     std::function<std::optional<job_no_t>(const backfill_candidates_t &)>;
 
 /**
- * @brief Customizable FCFS scheduler with externally selected backfilling.
- *
+ * @brief Event-driven FCFS dispatch and externally selected EASY backfill
+ * using a circular queue.
+ * @details
  * FCFS-head handling, circular-buffer growth, and EASY feasibility checks
  * match FCFSEasyCircularScheduler. When a job is inserted, a caller-provided
  * cost function computes the m_cost stored in its wait-queue entry. When the
  * head is blocked, up to num_max_candidates feasible (job_id, cost) pairs are
  * reported to a caller-provided selector. Only the candidate returned by that
  * selector is backfilled during the call.
+ * @note Activated through the C++/Python Simulation constructor accepting
+ * candidate limits, a cost callback, and a selection callback, with both
+ * dispatch and backfill intervals zero. --num_max_candidates controls the
+ * candidate limit after this API path is selected; no CLI flag activates
+ * the custom scheduler by itself.
  */
 class FCFSEasyCustomScheduler : public SchedulerBase {
 private:

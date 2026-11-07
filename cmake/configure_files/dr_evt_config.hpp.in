@@ -32,6 +32,9 @@
 #cmakedefine DR_EVT_HAS_ABSL_LOG_SINK 1
 #cmakedefine01 DR_EVT_LEGACY_QUEUE_INPUT
 
+/* Defined only when backfill must finish before protected reservations. */
+#cmakedefine DR_EVT_LEGACY_RESERVATION_BARRIER 1
+
 
 #ifdef DR_EVT_HAS_OPENMP
 #include <omp.h>

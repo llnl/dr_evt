@@ -1,13 +1,18 @@
 # Realism and Known Gaps
 
 [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md) explains the
-core behavior and current option mappings. This page lists only the confirmed
-scheduling differences that affect those mappings, plus the built-in model's
-excluded scope. Different defaults are configuration choices, not gaps.
+supported policy combinations. This page records the model's scope and the
+limits of relating those combinations to publicly documented production
+approaches. A production scheduler may use a related method while differing
+in triggers, accounting, admission, and placement. These comparisons do not
+establish equivalent decisions or reproduce a production implementation.
+Different defaults are configuration choices, not gaps.
+Vendor options cited here establish the presence of a related control;
+their detailed behavior must be distinguished from DR_EVT's policy semantics.
 
 Here, **backfill evaluation budget** means the number of waiting jobs a cycle
 may examine: `--backfill_queue_depth` for separate backfill, or
-`--dispatch_queue_depth` for the whole unified placement prefix. Reservation depth is a
+`--dispatch_queue_depth` for the whole dispatch placement prefix. Reservation depth is a
 separate limit on the number of protected waiting jobs.
 
 ## Remaining differences
@@ -17,16 +22,18 @@ separate limit on the number of protected waiting jobs.
 `--backfill_interval` delays backfill only. Fitting queue-head jobs still
 start after state events and do not consume `--backfill_queue_depth`.
 
-That split approximates Slurm's main-dispatch/backfill structure. Unified
-fixed-periodic dispatch is available separately through `--dispatch_interval`
+That split belongs to the trigger category illustrated by Slurm's
+main-dispatch/backfill structure. Fixed periodic dispatch is available
+separately through `--dispatch_interval`
 and `--dispatch_queue_depth`: immediate starts and waiting candidates share
 one examined prefix per tick. With four idle nodes and four admitted one-node
 jobs, depth 2 starts at most two at one tick. The next tick can start the rest
 without a new arrival or completion.
 
 `--dispatch_on_events` adds immediate arrival-batch notifications to that
-unified loop without changing the aligned timer phase. This represents Spur's
-ordinary-submission and periodic-polling paths: completions, releases, and
+FCFS/backfill loop without changing the aligned timer phase. This policy set
+shares the timer-plus-submission category illustrated by Spur, with these
+DR_EVT rules: completions, releases, and
 capacity changes update state but do not request a pass between ticks.
 Administrative requeue, health-check recovery/submission, and burst-buffer
 readiness notifications are outside the model. DR_EVT coalesces simultaneous
@@ -34,7 +41,7 @@ arrival/timer wakes into one pass, whereas Spur can consume them separately;
 its timer also has an immediate initial tick. These wake details are simulation
 abstractions, not claims of identical asynchronous execution.
 
-For LSF, fixed periodic dispatch represents timing under the assumption that
+Relating fixed periodic dispatch to LSF requires the assumption that
 sessions occur at every aligned interval boundary while jobs wait, without
 additional delay. LSF's minimum interval alone does not guarantee that cadence;
 variable session timing remains unimplemented. The available IBM evidence does
@@ -72,7 +79,7 @@ In the separate `--backfill_interval` mode, the scheduling-state flag is cleared
 is not set just because backfill started a job. Consequently, a later tick
 without an intervening state event does not necessarily examine candidates
 exposed by that start. This is a limitation for reproducing a controller
-that evaluates its new queue prefix every cycle. The unified
+that evaluates its new queue prefix every cycle. The fixed periodic
 `--dispatch_interval` mode retries every tick and does not use this flag to
 suppress evaluations.
 
@@ -88,7 +95,7 @@ rounded down to at least one and capped by any explicit `max_job_check`.
 This approximates candidate effort, including starts, failed checks, and future
 planning, without modeling scheduler CPU time.
 
-The [event-driven PBS approximation](SCHEDULER_LOOPS.md#openpbs-unified-event-driven-scheduling)
+The [event-driven policy set related to OpenPBS](SCHEDULER_LOOPS.md#openpbs-event-driven-dispatch-and-backfill)
 omits `scheduler_iteration` fallback cycles, assuming studied cycles are not
 truncated by Q and time alone does not change eligibility. Modeling the fallback
 is meaningful when a count cap or timeout leaves runnable candidates unexamined,
@@ -98,10 +105,10 @@ four idle nodes, four runnable jobs, and Q=1, a fallback cycle can start a secon
 job before the first completes. If examination is effectively unlimited and
 time alone changes nothing, the fallback repeats the same decisions.
 
-Unified fixed-periodic dispatch already retries with a fresh candidate count,
+Fixed periodic dispatch already retries with a fresh candidate count,
 but PBS also schedules on arrivals and resource releases and resets its relative
 fallback deadline when the server attempts scheduling requests. DR_EVT's
-event-driven Q limits backfill examinations; unified dispatch counts all
+event-driven Q limits backfill examinations; fixed periodic dispatch counts all
 candidates with aligned ticks and optional arrival wakes. Combining PBS's
 event triggers, relative fallback, and full-candidate cap remains future work
 for studies where these differences affect starts.
@@ -113,10 +120,10 @@ slots to finish before the protected job's predicted start. DR_EVT's default
 resource-time rule can instead allow an overlapping execution if it preserves
 the protected resource window. The build option
 `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` selects strict completion-before-start
-admission and is the chosen setting for the documented simplified LSF model.
-This provides a homogeneous-pool approximation with head protection;
+admission and can be combined with EASY head protection in a homogeneous pool.
+This policy set agrees with the decisions in IBM's worked example;
 it does not reproduce LSF's queue-specific backfill eligibility and reserved
-slot ownership. EASY can mimic the example in IBM's documentation, but it does not
+slot ownership. Agreement with that example does not
 establish that LSF uses only EASY or always protects exactly one waiting job.
 See the [LSF loop](SCHEDULER_LOOPS.md#lsf-scheduling-sessions-with-a-minimum-interval)
 for the selected configuration. The legacy barrier applies throughout the
@@ -145,15 +152,16 @@ need an extension or another tool.
 
 ## Validation scope
 
-The existing tests establish agreement with independent implementations of
-DR_EVT's model, not complete fidelity to a production scheduler. Previously
+The existing tests establish agreement with independent references and
+fixtures for DR_EVT's policy sets. They do not establish production scheduler
+equivalence. Previously
 recorded validation includes:
 
 | Model behavior | Recorded evidence |
 |---|---|
 | Event-driven policies | 34 scheduler-correctness workloads match the independent Python reference |
-| Unified dispatch | Fixed ticks and timer/arrival wakes checked against hand-computed cases and independent randomized FCFS references; streaming, warm-start, and checkpoint continuation checks |
-| Simplified LSF configuration | Legacy-barrier EASY matches IBM's example, boundary and runtime cases, and 96 randomized comparisons with an independent fixed-session reference; the default-rule overlap control differs as expected |
+| Fixed periodic dispatch | Fixed ticks and timer/arrival wakes checked against hand-computed cases and independent randomized FCFS references; streaming, warm-start, and checkpoint continuation checks |
+| Fixed periodic FCFS/EASY with strict reservation admission | Head-protection, boundary and runtime cases, and 96 randomized comparisons agree with an independent fixed-session reference; the default-rule overlap control differs as expected |
 | Periodic backfill | 136 runs across those workloads, two reservation policies, and 7 s / 30 s intervals match the reference |
 | Planning horizon | Horizon workloads and explicit-unlimited runs agree with the references; accounting is also covered by C++ and Python tests |
 | Queue depth | EASY implementations agree with their reference; periodic EASY equals hybrid with depth 1 in the tested cases without a finite horizon |
@@ -176,9 +184,10 @@ manual check of legacy reservation-barrier behavior. It is not validation of
 DR_EVT's default resource-time feasibility rule.
 
 OpenPBS behavior was checked against pinned source and manuals, without a
-paired OpenPBS/DR_EVT runtime comparison. The strict LSF approximation was
+paired OpenPBS/DR_EVT runtime comparison. Fixed periodic FCFS/EASY with
+strict reservation admission was
 validated in Docker with
-[`run_lsf_model_validation.py`](../../tests/run_lsf_model_validation.py):
+[`run_legacy_reservation_validation.py`](../../tests/run_legacy_reservation_validation.py):
 106 legacy-rule checks and one default-rule control passed. These establish
 the selected homogeneous-pool model, not LSF's internal accounting or session
 timing. No LSF daemon was run.

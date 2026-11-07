@@ -111,11 +111,11 @@ message InitRequest {
     // Seconds between periodic backfill evaluations; FCFS dispatch remains
     // event driven. Zero retains event-driven backfill behavior.
     double backfill_interval = 24;
-    // Aligned FCFS/backfill cadence; zero disables unified dispatch.
+    // Aligned FCFS/backfill cadence; zero disables fixed periodic dispatch.
     double dispatch_interval = 28;
-    // Entire examined candidate prefix per unified wake; zero is unlimited.
+    // Entire examined candidate prefix per dispatch wake; zero is unlimited.
     uint64 dispatch_queue_depth = 29;
-    // Also wake unified dispatch on job arrival batches, keeping the tick phase.
+    // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
     bool dispatch_on_events = 30;
 
     // Planning time-limit grid for scheduler projections; zero is exact.

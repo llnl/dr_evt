@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the documented homogeneous LSF approximation, not an LSF daemon.
+"""Validate fixed periodic FCFS/EASY with strict reservation admission.
 
 Requires DR_EVT_LEGACY_RESERVATION_BARRIER=ON. The independent reference uses
 fixed sessions, FCFS, one protected head, and strict completion-before-start
-backfill. Finite candidate limits exercise DR_EVT's model, not LSF accounting.
+backfill. Finite candidate limits exercise DR_EVT's examination-count model.
 """
 
 import argparse
@@ -13,60 +13,45 @@ import math
 import pathlib
 import random
 import subprocess
+import sys
 import tempfile
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+from python_periodic_scheduler import legacy_easy_reference as reference
 
-def reference(jobs, interval, depth, capacity=4):
-    """Use tuples (submit, nodes, limit, actual), observing releases at ticks."""
-    pending, running, starts = [], [], {}
-    arrivals = list(enumerate(jobs))
-    tick = interval
-    while arrivals or pending or running:
-        running = [job for job in running if job[0] > tick]
-        while arrivals and arrivals[0][1][0] <= tick:
-            pending.append(arrivals.pop(0))
-        free = capacity - sum(nodes for _, _, nodes in running)
-        prefix = pending[:depth or len(pending)]
-        blocked = None
-        for position, (index, (_, nodes, limit, actual)) in enumerate(prefix):
-            if nodes > free:
-                blocked = position
-                break
-            starts[index] = tick
-            running.append((tick + actual, tick + limit, nodes))
-            free -= nodes
-        if blocked is not None:
-            head_nodes = prefix[blocked][1][1]
-            future_free = free
-            protected_start = None
-            for release, nodes in sorted((estimate, nodes)
-                                         for _, estimate, nodes in running):
-                future_free += nodes
-                if future_free >= head_nodes:
-                    protected_start = release
-                    break
-            assert protected_start is not None
-            for index, (_, nodes, limit, actual) in prefix[blocked + 1:]:
-                if nodes <= free and tick + limit < protected_start:
-                    starts[index] = tick
-                    running.append((tick + actual, tick + limit, nodes))
-                    free -= nodes
-        pending = [(index, job) for index, job in pending if index not in starts]
-        tick += interval
-        assert tick < 100000, "reference did not drain"
-    return [starts[index] for index in range(len(jobs))]
+from read_build_config import reservation_barrier
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("simulator", type=pathlib.Path)
+    parser.add_argument("--config-header", type=pathlib.Path,
+                        help="Generated header for a nonstandard install layout")
     parser.add_argument("--flexible-simulator", type=pathlib.Path,
                         help="Optional default-barrier build for a negative control")
+    parser.add_argument("--flexible-config-header", type=pathlib.Path)
     parser.add_argument("--report", type=pathlib.Path)
     args = parser.parse_args()
     simulator = args.simulator.resolve()
+    try:
+        barrier, config_header = reservation_barrier(simulator, args.config_header)
+        if not barrier:
+            print("SKIP: legacy reservation checks require a barrier-ON build; "
+                  "{} records OFF.".format(config_header))
+            return
+        if args.flexible_simulator:
+            control_barrier, _ = reservation_barrier(args.flexible_simulator,
+                                                      args.flexible_config_header)
+            if control_barrier:
+                print("SKIP: flexible control records barrier ON; "
+                      "running the legacy checks only.")
+                args.flexible_simulator = None
+        elif args.flexible_config_header:
+            parser.error("--flexible-config-header requires --flexible-simulator")
+    except ValueError as error:
+        parser.error(str(error))
     results = []
-    with tempfile.TemporaryDirectory(prefix="dr_evt_lsf_model_") as directory:
+    with tempfile.TemporaryDirectory(prefix="dr_evt_legacy_reservation_") as directory:
         work = pathlib.Path(directory)
 
         def run_case(name, jobs, interval=5, depth=0, expected=None,
@@ -150,12 +135,13 @@ def main():
                     run_case("random_{}_{}_{}".format(seed, interval, depth), jobs,
                              interval=interval, depth=depth, actual_mode=True)
 
-    report = {"scope": "DR_EVT simplified LSF model; no LSF daemon comparison",
+    report = {"scope": "DR_EVT fixed periodic FCFS/EASY with strict reservation admission",
+              "config_header": str(config_header),
               "reservation_rule": "legacy completion strictly before protected start",
               "checks": len(results), "results": results}
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + "\n")
-    print("Simplified LSF model: {} checks passed (96 randomized).".format(len(results)))
+    print("Fixed periodic FCFS/EASY, legacy reservation barrier: {} checks passed (96 randomized).".format(len(results)))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,14 @@ DR_EVT separates queue ordering from the rule that permits a lower-priority
 job to start ahead of the queue head. Command-line names and defaults are in
 [Command-Line Options](user-guide/command-line.md#scheduling-policies).
 
+A scheduling configuration is a set of policies and limits: queue ordering,
+backfill protection, scheduling triggers, examination and reservation depths,
+planning horizon and resolution, and reservation admission. These describe
+the scheduling approach studied by the simulator. Their relationships to
+publicly documented production behavior and the limits of those comparisons
+are discussed in [Scheduling Loops](dev/SCHEDULER_LOOPS.md) and
+[Realism and Known Gaps](dev/REALISM_AND_GAPS.md).
+
 ## Priority policies
 
 - **FCFS** orders jobs by submission time and preserves input order for ties.
@@ -18,7 +26,7 @@ maintains the reservations needed for conservative backfilling.
 
 At a permitted scheduling pass, start fitting jobs from the front of the
 eligible queue. If the new head is blocked, the backfilling policy determines
-whether a later job may start. Trigger modes and production mappings are in
+whether a later job may start. Trigger modes and option combinations are in
 [Scheduling Loops](dev/SCHEDULER_LOOPS.md).
 
 ### None
@@ -136,8 +144,8 @@ the selected trigger mode and does not change an earlier reservation calculation
 The default admission rule preserves protected resource-time intervals and can
 allow overlapping jobs when enough resources remain. The legacy barrier requires
 completion strictly before the protected start; see
-[LSF admission on reserved slots](dev/REALISM_AND_GAPS.md#lsf-admission-on-reserved-slots)
-for its production-model scope.
+[Reservation admission scope](dev/REALISM_AND_GAPS.md)
+for the limits of this homogeneous-pool rule.
 
 ## Comparison
 

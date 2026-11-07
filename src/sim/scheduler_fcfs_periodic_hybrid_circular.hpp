@@ -6,7 +6,8 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_periodic_hybrid_circular.hpp
- * @brief Opt-in circular hybrid scheduler for periodic backfill evaluation.
+ * @brief Event-driven FCFS dispatch and periodic hybrid/conservative backfill
+ * using a circular queue.
  */
 
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_CIRCULAR_HPP
@@ -19,10 +20,13 @@
 namespace dr_evt {
 
 /**
- * @brief Circular scheduler selected for periodic backfill runs.
- * @details The simulation driver supplies periodic evaluation times. This
- * class inherits the existing hybrid queue and reservation logic, leaving
- * ordinary scheduler hot paths unchanged.
+ * @brief Event-driven FCFS dispatch and periodic hybrid/conservative backfill
+ * using a circular queue.
+ * @details State events run FCFS through schedule_event(); timer ticks run
+ * backfill through schedule(). The simulation driver controls these wakes.
+ * @note Selected by --backfill_interval I (I > 0), --dispatch_interval 0,
+ * --queue_impl circular, and FCFS ordering, with --backfill_policy hybrid
+ * --reservation_depth N (N > 0), or --backfill_policy conservative.
  */
 class FCFSPeriodicHybridCircularScheduler final
     : public FCFSHybridCircularScheduler {

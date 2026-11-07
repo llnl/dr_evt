@@ -7,62 +7,14 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+from python_periodic_scheduler import fcfs_reference, event_reference
+
 simulator = str(pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "build/simulator").resolve())
 checks = 0
 
 
-def fcfs_reference(jobs, depth, interval=5, capacity=4):
-    pending, running, starts = [], [], {}
-    unseen = list(enumerate(jobs))
-    tick = interval
-    while unseen or pending or running:
-        running = [(end, nodes) for end, nodes in running if end > tick]
-        while unseen and unseen[0][1][0] <= tick:
-            pending.append(unseen.pop(0))
-        free = capacity - sum(nodes for _, nodes in running)
-        for index, (submit, nodes, duration) in pending[:depth or len(pending)]:
-            if nodes > free:
-                break
-            starts[index] = tick
-            free -= nodes
-            running.append((tick + duration, nodes))
-        pending = [(index, job) for index, job in pending if index not in starts]
-        tick += interval
-        assert tick < 10000, "reference failed to drain"
-    return [starts[i] for i in range(len(jobs))]
-
-
-def event_reference(jobs, depth, interval=5, capacity=4):
-    pending, running, starts = [], [], {}
-    unseen = list(enumerate(jobs))
-    tick = interval
-    steps = 0
-    while unseen or pending or running:
-        time = min(unseen[0][1][0] if unseen else float("inf"),
-                   min((end for end, _ in running), default=float("inf")), tick)
-        running = [(end, nodes) for end, nodes in running if end > time]
-        notification = bool(unseen and unseen[0][1][0] == time)
-        timer_wake = time == tick
-        while unseen and unseen[0][1][0] <= time:
-            pending.append(unseen.pop(0))
-        if time == tick:
-            tick += interval
-        if not (notification or timer_wake):
-            continue
-        free = capacity - sum(nodes for _, nodes in running)
-        for index, (submit, nodes, duration) in pending[:depth or len(pending)]:
-            if nodes > free:
-                break
-            starts[index] = time
-            free -= nodes
-            running.append((time + duration, nodes))
-        pending = [(index, job) for index, job in pending if index not in starts]
-        steps += 1
-        assert steps < 10000, "event reference failed to drain"
-    return [starts[i] for i in range(len(jobs))]
-
-
-with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
+with tempfile.TemporaryDirectory(prefix="dr_evt_fixed_periodic_dispatch_") as directory:
     work = pathlib.Path(directory)
 
     def run_case(name, jobs, expected, *options):
@@ -222,4 +174,4 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
         assert result.returncode != 0, "accepted invalid options: " + repr(options)
         checks += 1
 
-print("Unified dispatch (fixed ticks and timer/event wakes): {} checks passed".format(checks))
+print("Fixed periodic dispatch (ticks and optional arrival wakes): {} checks passed".format(checks))

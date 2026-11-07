@@ -6,7 +6,8 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_periodic_easy_circular.hpp
- * @brief Opt-in circular EASY scheduler for periodic backfill evaluation.
+ * @brief Event-driven FCFS dispatch and periodic EASY backfill using a
+ * circular queue.
  */
 
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_EASY_CIRCULAR_HPP
@@ -19,11 +20,13 @@
 namespace dr_evt {
 
 /**
- * @brief Circular EASY scheduler whose backfill scans run only at periodic
- * ticks.
+ * @brief Event-driven FCFS dispatch and periodic EASY backfill using a
+ * circular queue.
  * @details Normal simulation events retain immediate FCFS dispatch through
  * schedule_event(); schedule() performs the usual EASY backfill scan when the
  * simulation reaches a configured tick.
+ * @note Selected by --backfill_interval I (I > 0), --dispatch_interval 0,
+ * --queue_impl circular, --backfill_policy easy, and FCFS ordering.
  */
 class FCFSPeriodicEasyCircularScheduler final
     : public FCFSEasyCircularScheduler {
