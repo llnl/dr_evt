@@ -12,6 +12,7 @@ set_full_path(THIS_DIR_HEADERS
     scheduler_fcfs_easy_multimap.hpp
     scheduler_fcfs_hybrid_deque.hpp
     scheduler_fcfs_hybrid_circular.hpp
+    scheduler_fcfs_pass_hybrid_circular.hpp
     scheduler_periodic_fcfs_hybrid_circular.hpp
     scheduler_fcfs_periodic_easy_circular.hpp
     scheduler_fcfs_periodic_hybrid_circular.hpp
@@ -32,6 +33,7 @@ set_full_path(THIS_DIR_SOURCES
     scheduler_fcfs_easy_multimap.cpp
     scheduler_fcfs_hybrid_deque.cpp
     scheduler_fcfs_hybrid_circular.cpp
+    scheduler_fcfs_pass_hybrid_circular.cpp
     scheduler_fcfs_periodic_easy_circular.cpp
     scheduler_fcfs_periodic_hybrid_circular.cpp
     scheduler_fcfs_easy_block.cpp

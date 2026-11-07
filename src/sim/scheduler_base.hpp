@@ -629,6 +629,8 @@ protected:
  * including FCFS starts; zero is unlimited. Requires dispatch_interval > 0.
  * @param[in] dispatch_on_events Also request the FCFS/backfill pass on job arrival
  * batches without changing the timer cadence; requires dispatch_interval > 0.
+ * @param[in] per_pass_accounting Use event-driven placement passes with
+ * per-pass Q/R counters and guarded reservation-only restarts.
  * @return Owning pointer to a SchedulerBase implementation.
  * @throws std::invalid_argument if HYBRID is requested with a zero depth or
  * with a non-FCFS priority policy.
@@ -641,7 +643,8 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     CircularOverflowPolicy wait_queue_overflow = CircularOverflowPolicy::GROW,
     size_t reservation_depth = 0, size_t backfill_queue_depth = 0,
     tdiff_t backfill_interval = 0.0, tdiff_t dispatch_interval = 0.0,
-    size_t dispatch_queue_depth = 0, bool dispatch_on_events = false);
+    size_t dispatch_queue_depth = 0, bool dispatch_on_events = false,
+    bool per_pass_accounting = false);
 
 /**@}*/
 

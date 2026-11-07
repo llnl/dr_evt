@@ -21,6 +21,7 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
+| Scheduling | `--per_pass_accounting` | Use event-driven FCFS placement passes with per-pass Q/R counters and guarded reservation-only restarts. |
 | Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
 | Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
 | Scheduling | `--dispatch_on_events` | Also run fixed periodic dispatch on job arrival batches, preserving timer phase. |
@@ -254,6 +255,14 @@ This setting has no effect on the built-in `easy`, `hybrid`, or
 **Default:** `1`
 
 ### `--backfill_queue_depth N`
+
+With `--per_pass_accounting`, Q instead counts the entire placement
+pass: immediate starts, future reservations, and failed allocation-only
+tests. Q/R reset per pass, and reservation-only passes can repeat with a
+tentative termination guard. See
+[per-pass placement accounting](SCHEDULER_LOOPS.md#per-pass-placement-accounting)
+for the rules and supported option combinations. The following describes
+the default accounting when that option is absent.
 
 Maximum number of eligible waiting jobs, including the blocked FCFS head, that
 a scheduler examines in one scheduling pass. It applies to `easy`,

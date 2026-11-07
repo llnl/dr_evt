@@ -144,6 +144,8 @@ message DR_EVT_Params {
         uint64 dispatch_queue_depth = 47;
         // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
         bool dispatch_on_events = 48;
+        // Event-driven placement passes with per-pass Q/R and guarded retries.
+        bool per_pass_accounting = 49;
 
         // Planning time-limit grid for scheduler projections; zero is exact.
         double planning_time_resolution = 43;

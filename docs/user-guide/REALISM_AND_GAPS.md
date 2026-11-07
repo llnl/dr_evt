@@ -61,20 +61,6 @@ Periodic EASY runs one scan per tick; periodic hybrid shares its count across
 calls. They also differ with a finite horizon: EASY exempts an out-of-horizon
 head, while periodic hybrid counts it.
 
-Equal numeric depths also need not mean equal candidates across engines:
-Slurm charges Q after preliminary checks; Spur caps an admitted candidate
-prefix; Fluxion refunds allocation-or-reservation `EBUSY` failures. DR_EVT
-counts its backfill examinations. In particular, periodic hybrid/conservative
-charges out-of-horizon jobs, while Slurm charges them only if they reached
-placement testing. Event-driven hybrid/conservative exempts them but leaves them in the queue, rather
-than reproducing Fluxion's blocked-list lifecycle. These distinctions matter
-for finite Q when skipped jobs occur ahead of runnable candidates.
-
-These Fluxion comparisons apply to `flux-sched`. The inspected `flux-core`
-modules (`sched-simple`, `sched-fifo`, and `sched-backfill`) instead use
-`queue-depth` for outstanding allocation requests, so their depth cannot be
-substituted for Fluxion's examination cap.
-
 In the separate `--backfill_interval` mode, the scheduling-state flag is cleared by an evaluation and
 is not set just because backfill started a job. Consequently, a later tick
 without an intervening state event does not necessarily examine candidates

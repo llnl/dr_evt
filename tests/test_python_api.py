@@ -164,6 +164,10 @@ def test_sim_params(result):
         params = dr_evt.SimParams()
 
         # Test all exposed parameters
+        assert params.per_pass_accounting is False
+        params.per_pass_accounting = True
+        assert params.per_pass_accounting is True
+        params.per_pass_accounting = False
         params.infile = "test.csv"
         params.total_nodes = 100
         params.trace_format = "simple"

@@ -146,6 +146,10 @@ PYBIND11_MODULE(dr_evt, m) {
                      "dispatch stays event-driven. 0 (default) backfills at "
                      "every event. Requires an enabled backfill policy and "
                      "FCFS ordering.")
+      .def_readwrite("per_pass_accounting",
+                     &Sim_Params::m_per_pass_accounting,
+                     "bool: Event-driven placement passes with per-pass Q/R "
+                     "accounting and guarded reservation-only retries.")
       .def_readwrite("dispatch_interval", &Sim_Params::m_dispatch_interval,
                      "float: Aligned interval for both FCFS and backfill; "
                      "0 disables fixed periodic dispatch.")

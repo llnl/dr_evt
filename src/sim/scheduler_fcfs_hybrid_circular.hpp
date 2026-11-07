@@ -138,11 +138,9 @@ protected:
    * @details A job whose own reservation would start beyond the planning
    * horizon holds no reservation and no reservation-depth slot in either mode.
    * Whether it also consumes a backfill queue-depth slot depends on the model
-   * being reproduced. Event-driven scheduling follows Fluxion, which takes a
-   * job it cannot reserve out of its count of scheduled jobs, so the default
-   * is false. The periodic subclass overrides this to follow Slurm, which
-   * counts a job it has tested toward bf_max_job_test before it finds the
-   * planned start beyond bf_window.
+   * selected. The default event-driven traversal exempts horizon skips.
+   * The periodic subclass counts candidates in its bounded prefix even
+   * when their projected starts fall outside the planning horizon.
    * @return true when such a job, and a blocked head beyond the horizon, use
    * a queue-depth slot.
    */
