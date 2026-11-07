@@ -432,8 +432,9 @@ allocated or reserved, not simply one beyond a chosen lookahead window.
 Blocked jobs are reconsidered on applicable state changes, including
 completion and priority changes. Fluxion plans in whole seconds.
 
-DR_EVT supports this style of counting and restarting through
-[per-pass placement accounting](#per-pass-placement-accounting). Its tentative
+DR_EVT's `--per_pass_accounting` selects
+[per-pass placement accounting](#per-pass-placement-accounting), which models
+these counting and restart rules with synchronous passes. Its tentative
 termination guard does not claim to reproduce the asynchronous flag-clearing
 mechanism. The default hybrid/conservative scheduler retains its separate
 backfill examination count shared across calls at one timestamp.

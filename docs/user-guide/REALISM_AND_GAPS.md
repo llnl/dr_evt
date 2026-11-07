@@ -10,10 +10,22 @@ Different defaults are configuration choices, not gaps.
 Vendor options cited here establish the presence of a related control;
 their detailed behavior must be distinguished from DR_EVT's policy semantics.
 
-Here, **backfill evaluation budget** means the number of waiting jobs a cycle
-may examine: `--backfill_queue_depth` for separate backfill, or
-`--dispatch_queue_depth` for the whole dispatch placement prefix. Reservation depth is a
-separate limit on the number of protected waiting jobs.
+**Examination depth** limits counted waiting-job evaluations:
+`--backfill_queue_depth` for backfill, or `--dispatch_queue_depth` for the
+whole fixed-periodic placement prefix. **Reservation depth** separately
+limits protected waiting jobs. A reservation can consume both counts;
+per-pass versus per-timestamp counter resets are described below.
+
+## Supported accounting policies
+
+Default event-driven hybrid/conservative scheduling counts backfill
+examinations and shares Q across calls at one simulation timestamp.
+`--per_pass_accounting` selects whole-placement accounting: immediate starts
+and successful reservations count toward Q, and each pass resets Q/R.
+Reservation-only passes can repeat, with a tentative guard against unchanged
+retries. These are supported policy choices; the
+[per-pass loop](SCHEDULER_LOOPS.md#per-pass-placement-accounting) specifies
+the failure-counting rules and the guard's assumptions.
 
 ## Remaining differences
 
@@ -52,10 +64,10 @@ control, or whether reservations persist between sessions.
 
 ### Backfill evaluation accounting
 
-In event-driven mode, hybrid and conservative share Q across all scheduling
-passes at one timestamp. The separate EASY, SJF, LJF, and custom-selector
+With default event-driven accounting, hybrid and conservative share Q across
+all scheduling passes at one timestamp. The separate EASY, SJF, LJF, and custom-selector
 paths reset Q each pass. If one pass starts a job, another pass at the same
-time can therefore receive another full backfill evaluation budget. Use hybrid with reservation
+time can therefore receive a fresh backfill examination count. Use hybrid with reservation
 depth 1 when head protection and cycle-wide accounting are both required.
 Periodic EASY runs one scan per tick; periodic hybrid shares its count across
 calls. They also differ with a finite horizon: EASY exempts an out-of-horizon
