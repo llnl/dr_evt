@@ -223,11 +223,11 @@ public:
   /// Seconds between additional hybrid backfill evaluations; zero disables
   /// periodic evaluation and preserves event-driven scheduling only.
   tdiff_t m_backfill_interval;
-  /// Unified periodic FCFS/backfill cadence; zero keeps event dispatch.
+  /// Fixed periodic FCFS/backfill cadence; zero keeps event dispatch.
   tdiff_t m_dispatch_interval;
-  /// Candidates examined per unified wake, including immediate starts.
+  /// Candidates examined per dispatch wake, including immediate starts.
   size_t m_dispatch_queue_depth;
-  /// Also run the unified pass on job arrival batches.
+  /// Also run the FCFS/backfill pass on job arrival batches.
   bool m_dispatch_on_events;
 
   tdiff_t scheduling_interval() const {

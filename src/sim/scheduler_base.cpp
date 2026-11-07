@@ -219,13 +219,13 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
     }
     if (priority_policy != PriorityPolicy::FCFS &&
         priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) {
-      throw std::invalid_argument("unified periodic dispatch requires FCFS ordering");
+      throw std::invalid_argument("fixed periodic dispatch requires FCFS ordering");
     }
     if (queue_impl != QueueImplementation::CIRCULAR) {
-      throw std::invalid_argument("unified periodic dispatch requires queue_impl=circular");
+      throw std::invalid_argument("fixed periodic dispatch requires queue_impl=circular");
     }
     if (backfill_queue_depth != 0) {
-      throw std::invalid_argument("use dispatch_queue_depth instead of backfill_queue_depth for unified dispatch");
+      throw std::invalid_argument("use dispatch_queue_depth instead of backfill_queue_depth for fixed periodic dispatch");
     }
     if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
       throw std::invalid_argument("hybrid backfilling requires reservation_depth > 0");

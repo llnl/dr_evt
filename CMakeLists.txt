@@ -913,9 +913,9 @@ if(DR_EVT_WITH_UNIT_TESTING)
           --config-header ${CMAKE_CURRENT_BINARY_DIR}/dr_evt_config.hpp)
     endif()
     add_test(
-      NAME test_unified_periodic_dispatch
+      NAME test_fixed_periodic_dispatch
       COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_unified_dispatch_tests.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_fixed_periodic_dispatch_tests.py
         $<TARGET_FILE:sim-bin>)
   endif()
   add_test(

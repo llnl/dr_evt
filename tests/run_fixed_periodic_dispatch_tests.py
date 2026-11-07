@@ -62,7 +62,7 @@ def event_reference(jobs, depth, interval=5, capacity=4):
     return [starts[i] for i in range(len(jobs))]
 
 
-with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
+with tempfile.TemporaryDirectory(prefix="dr_evt_fixed_periodic_dispatch_") as directory:
     work = pathlib.Path(directory)
 
     def run_case(name, jobs, expected, *options):
@@ -222,4 +222,4 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_unified_") as directory:
         assert result.returncode != 0, "accepted invalid options: " + repr(options)
         checks += 1
 
-print("Unified dispatch (fixed ticks and timer/event wakes): {} checks passed".format(checks))
+print("Fixed periodic dispatch (ticks and optional arrival wakes): {} checks passed".format(checks))

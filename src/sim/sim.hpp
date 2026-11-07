@@ -832,7 +832,7 @@ protected:
    * stage contains no pre-start-time condition.
    */
   template <bool AccountResources, bool WarmStage = false,
-            bool PeriodicBackfill = false, bool UnifiedDispatch = false,
+            bool PeriodicBackfill = false, bool FixedPeriodicDispatch = false,
             bool DispatchOnEvents = false>
   void advance_to_impl(sim_time_t target_time,
                        FCFSEasyCustomScheduler *custom_scheduler);

@@ -23,7 +23,7 @@ namespace dr_evt {
 /** @brief Periodic FCFS dispatch and hybrid backfill using a circular queue.
  * @details Selected by create_scheduler() only when dispatch_interval > 0.
  * Used for fixed periodic dispatch and, with dispatch_on_events enabled,
- * arrival-triggered unified passes. Ordinary event-driven scheduling and
+ * arrival-triggered FCFS/backfill passes. Ordinary event-driven scheduling and
  * separate periodic backfill use their existing scheduler implementations.
  * The driver invokes schedule() once after processing all same-time
  * events. EASY uses the shared reservation implementation with one protected
@@ -65,7 +65,7 @@ public:
         m_dispatch_queue_depth(dispatch_queue_depth) {}
 
   /**
-   * @brief Schedule the bounded eligible prefix for one unified wake.
+   * @brief Schedule the bounded eligible prefix for one dispatch wake.
    * @details Withheld queue eligibility is restored after the pass, including
    * when the planner throws. Immediate starts consume candidate slots.
    * @param[in] free_nodes Nodes available for immediate starts.
@@ -79,7 +79,7 @@ public:
     sync_to(current_time);
     if (m_dispatch_queue_depth == 0 ||
         active_job_count() <= m_dispatch_queue_depth) {
-      return schedule_unified_pass(free_nodes, running_jobs, current_time);
+      return schedule_dispatch_pass(free_nodes, running_jobs, current_time);
     }
     // Preserve the existing amortized compaction threshold. Compact before
     // bounding eligibility so the base pass cannot remove a withheld entry.
@@ -114,7 +114,7 @@ public:
     m_removed_count = prefix_removed;
     try {
       auto result =
-          schedule_unified_pass(free_nodes, running_jobs, current_time);
+          schedule_dispatch_pass(free_nodes, running_jobs, current_time);
       m_eligible_end_idx += withheld;
       m_removed_count += withheld_removed;
       return result;
@@ -180,16 +180,16 @@ private:
 #endif
 
   /**
-   * @brief Select a protection planner for this unified dispatch pass.
+   * @brief Select a protection planner for this fixed periodic dispatch pass.
    * @param[in] free_nodes Nodes available for immediate starts.
    * @param[in] running_jobs Active jobs used for release projection.
    * @param[in] current_time Scheduling timestamp.
    * @return Identifiers of jobs selected for immediate starts.
    */
   std::vector<job_no_t>
-  schedule_unified_pass(num_nodes_t free_nodes,
-                        const running_jobs_t &running_jobs,
-                        sim_time_t current_time) {
+  schedule_dispatch_pass(num_nodes_t free_nodes,
+                         const running_jobs_t &running_jobs,
+                         sim_time_t current_time) {
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
     // Small scans cannot amortize caching. Exact conservative plans retain
     // bounds across commits and repeat interval shapes throughout the prefix.
@@ -205,7 +205,7 @@ private:
 
 protected:
   /**
-   * @brief Count horizon-skipped jobs in the unified candidate prefix.
+   * @brief Count horizon-skipped jobs in the dispatch candidate prefix.
    * @return true; a horizon skip still consumes a candidate slot.
    */
   bool horizon_skipped_job_uses_depth_slot() const override { return true; }

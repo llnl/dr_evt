@@ -136,13 +136,13 @@ message DR_EVT_Params {
         // remains event driven. Zero keeps event-driven backfill behavior.
         double backfill_interval = 42;
 
-        // Unified dispatch: aligned FCFS/backfill ticks; optional arrival wakes.
+        // Fixed periodic dispatch: aligned FCFS/backfill ticks; optional arrival wakes.
         // Zero disables; mutually exclusive with positive backfill_interval.
         double dispatch_interval = 46;
-        // Entire candidate prefix per unified wake, including immediate starts.
+        // Entire candidate prefix per dispatch wake, including immediate starts.
         // Zero means unlimited; requires dispatch_interval > 0.
         uint64 dispatch_queue_depth = 47;
-        // Also wake unified dispatch on job arrival batches, keeping the tick phase.
+        // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
         bool dispatch_on_events = 48;
 
         // Planning time-limit grid for scheduler projections; zero is exact.
