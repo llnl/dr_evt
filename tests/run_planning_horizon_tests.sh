@@ -69,14 +69,14 @@ for BOUND in unbounded bounded; do
     fi
     mkdir -p "$WORK/$BOUND"
     "$PYTHON_BIN" "$EASY_REFERENCE" "$FIXTURE" --nodes "$FIXTURE_NODES" \
-        --outdir "$WORK/$BOUND" "${HOPT[@]}" > "$WORK/$BOUND.easy.log" 2>&1 || {
+        --outdir "$WORK/$BOUND" ${HOPT[@]+"${HOPT[@]}"} > "$WORK/$BOUND.easy.log" 2>&1 || {
         echo "✗ EASY reference failed ($BOUND)"; sed 's/^/    /' "$WORK/$BOUND.easy.log"; ((FAILED++)); }
     ref_schedule "$WORK/$BOUND/planning_horizon_reference.csv" > "$WORK/$BOUND.easy_ref" 2>/dev/null
     for DEPTH in 1 0; do
         mkdir -p "$WORK/$BOUND/depth$DEPTH"
         "$PYTHON_BIN" "$CONSERVATIVE_REFERENCE" "$FIXTURE" --nodes "$FIXTURE_NODES" \
             --reservation-depth "$DEPTH" --backfill-queue-depth 1 \
-            --outdir "$WORK/$BOUND/depth$DEPTH" "${HOPT[@]}" \
+            --outdir "$WORK/$BOUND/depth$DEPTH" ${HOPT[@]+"${HOPT[@]}"} \
             > "$WORK/$BOUND.depth$DEPTH.log" 2>&1 || {
             echo "✗ conservative reference failed ($BOUND, depth $DEPTH)"; sed 's/^/    /' "$WORK/$BOUND.depth$DEPTH.log"; ((FAILED++)); }
         ref_schedule "$WORK/$BOUND/depth$DEPTH/planning_horizon_hybrid_reference.csv" \
@@ -127,7 +127,7 @@ for BOUND in unbounded bounded; do
         fi
         # shellcheck disable=SC2086
         if ! "$SIMULATOR" "$FIXTURE" --total_nodes "$FIXTURE_NODES" --trace_format simple \
-                --timestamp_format epoch --run_time_mode limit $OPTS "${SIM_HOPT[@]}" \
+                --timestamp_format epoch --run_time_mode limit $OPTS ${SIM_HOPT[@]+"${SIM_HOPT[@]}"} \
                 --outfile "$WORK/$CASE.sim.csv" > "$WORK/$CASE.sim.log" 2>&1; then
             echo "✗ $CASE - simulator failed"; sed 's/^/    /' "$WORK/$CASE.sim.log"; ((FAILED++)); continue
         fi
