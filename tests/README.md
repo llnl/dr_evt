@@ -226,6 +226,31 @@ using a `0.001` time tolerance. The
 differential runner uses the
 [`scheduler_correctness`](test_traces/scheduler_correctness/) fixtures.
 
+### Unified periodic dispatch benchmark
+
+[`benchmark_wait_queues.sh`](benchmark_wait_queues.sh) accepts unified dispatch
+options alongside the existing `easy`, `hybrid`, and `conservative` policy
+choices; `none` is also supported for unified dispatch. For example, the
+documented Spur representation uses conservative backfill, one-second ticks
+plus arrival passes, and queue depth 10,000. Use a Release build with the
+default `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`:
+
+```bash
+./tests/benchmark_wait_queues.sh --backfill-policy conservative \
+  --dispatch-interval 1 --dispatch-on-events --dispatch-queue-depth 10000
+# EASY on five-second ticks, with unlimited examination:
+./tests/benchmark_wait_queues.sh --backfill-policy easy --dispatch-interval 5
+```
+
+The default trace has 2,000 jobs on a 500-node pool. One warmup precedes three
+measured runs; the script reports their median, checks repeated schedule and
+resource outputs are identical, and retains logs, traces, and `results.json`
+in a temporary directory. Use fractional submission times to exercise arrival
+passes between one-second ticks. These are simulator timings, not measurements
+of production schedulers. Unified runs use a circular queue and unlimited
+horizon. `--reservation-depth` controls hybrid protection, and `--runs` controls
+the number of measured runs. Omit `--dispatch-on-events` for timer-only dispatch.
+
 ### Streaming API tests
 
 ```bash

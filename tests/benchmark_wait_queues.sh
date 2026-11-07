@@ -35,6 +35,12 @@ HYBRID_RESERVATION_DEPTH=32
 HYBRID_QUEUE_DEPTH=32
 HYBRID_BACKFILL_INTERVAL=0
 WITH_PYTHON_REFERENCE=0
+DISPATCH_MODE=0
+DISPATCH_INTERVAL=0
+DISPATCH_QUEUE_DEPTH=0
+DISPATCH_ON_EVENTS=0
+DISPATCH_RUNS=3
+DISPATCH_OPTIONS_SET=0
 
 print_usage() {
     echo "Usage: $0 [OPTIONS] [TRACE_FILE]"
@@ -54,11 +60,19 @@ print_usage() {
     echo "                Eligible jobs considered per hybrid pass (default: 32)."
     echo "  --backfill-interval SECONDS"
     echo "                Periodic backfill cadence; 0 keeps event-driven backfill."
+    echo "  --dispatch-interval SECONDS"
+    echo "                Unified periodic dispatch; choose easy, hybrid, conservative, or none."
+    echo "  --dispatch-on-events"
+    echo "                Also schedule arrivals between ticks (requires dispatch interval)."
+    echo "  --dispatch-queue-depth N"
+    echo "                Unified candidates per pass; 0 is unlimited (default: 0)."
+    echo "  --runs N     Measured unified-dispatch runs after one warmup (default: 3)."
     echo "  --with-python-reference"
     echo "                Include the slow Python oracle in a periodic run."
-    echo "  TRACE_FILE    Path to test trace (default: tests/test_traces/scale/huge_10000jobs.csv)"
+    echo "  TRACE_FILE    Default: huge_10000jobs.csv; unified dispatch uses huge_2000jobs.csv."
     echo ""
     echo "EXAMPLES:"
+    echo "  $0 --backfill-policy conservative --dispatch-interval 1 --dispatch-on-events --dispatch-queue-depth 10000"
     echo "  $0                                           # EASY and hybrid, default trace"
     echo "  $0 --backfill-policy easy                    # Reproduce the EASY table only"
     echo "  $0 --backfill-policy hybrid                  # Hybrid comparison (depth 32)"
@@ -69,6 +83,38 @@ print_usage() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --dispatch-on-events)
+            DISPATCH_ON_EVENTS=1
+            DISPATCH_OPTIONS_SET=1
+            shift
+            ;;
+        --dispatch-interval)
+            if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+                echo "Error: --dispatch-interval requires a positive number"
+                exit 1
+            fi
+            DISPATCH_INTERVAL="$2"
+            DISPATCH_MODE=1
+            shift 2
+            ;;
+        --dispatch-queue-depth)
+            if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --dispatch-queue-depth requires a nonnegative integer"
+                exit 1
+            fi
+            DISPATCH_QUEUE_DEPTH="$2"
+            DISPATCH_OPTIONS_SET=1
+            shift 2
+            ;;
+        --runs)
+            if [[ $# -lt 2 || ! "$2" =~ ^[1-9][0-9]*$ ]]; then
+                echo "Error: --runs requires a positive integer"
+                exit 1
+            fi
+            DISPATCH_RUNS="$2"
+            DISPATCH_OPTIONS_SET=1
+            shift 2
+            ;;
         --backfill-policy)
             if [[ $# -lt 2 ]]; then
                 echo "Error: --backfill-policy requires all, easy, hybrid, or conservative"
@@ -120,11 +166,24 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$TRACE_FILE" ]]; then
-    TRACE_FILE="tests/test_traces/scale/huge_10000jobs.csv"
+    if [[ "$DISPATCH_MODE" == "1" ]]; then
+        TRACE_FILE="tests/test_traces/scale/huge_2000jobs.csv"
+    else
+        TRACE_FILE="tests/test_traces/scale/huge_10000jobs.csv"
+    fi
 fi
 
-if [[ "$BENCHMARK_MODE" != "all" && "$BENCHMARK_MODE" != "easy" && "$BENCHMARK_MODE" != "hybrid" && "$BENCHMARK_MODE" != "conservative" ]]; then
+if [[ "$BENCHMARK_MODE" != "all" && "$BENCHMARK_MODE" != "easy" && "$BENCHMARK_MODE" != "hybrid" && "$BENCHMARK_MODE" != "conservative" && !( "$BENCHMARK_MODE" == "none" && "$DISPATCH_MODE" == "1" ) ]]; then
     echo "Error: unsupported backfill policy '$BENCHMARK_MODE' (use all, easy, hybrid, or conservative)"
+    exit 1
+fi
+
+if [[ "$DISPATCH_OPTIONS_SET" == "1" && "$DISPATCH_MODE" == "0" ]]; then
+    echo "Error: --dispatch-on-events, --dispatch-queue-depth, and --runs require --dispatch-interval" >&2
+    exit 1
+fi
+if [[ "$DISPATCH_MODE" == "1" && ( "$BENCHMARK_MODE" == "all" || "$HYBRID_BACKFILL_INTERVAL" != "0" || "$WITH_PYTHON_REFERENCE" != "0" ) ]]; then
+    echo "Error: unified dispatch requires one --backfill-policy (easy, hybrid, conservative, or none), no --backfill-interval, and no Python oracle" >&2
     exit 1
 fi
 
@@ -138,13 +197,93 @@ if [[ ! -f "$TRACE_FILE" ]]; then
     exit 1
 fi
 
-# Common simulation parameters for both benchmark modes.
+# Common simulation parameters for all benchmark modes.
 TOTAL_NODES=500
 MAX_JOBS=50000
 TRACE_FORMAT="simple"
 TIMESTAMP_FORMAT="epoch"
 # Use run_time_mode=limit (jobs run for full time_limit) for consistent benchmarking.
 RUN_TIME_MODE="limit"
+
+# Unified dispatch has only a circular implementation. Measure complete runs
+# rather than compare queue variants or invoke the separate-backfill oracle.
+run_unified_dispatch_benchmark() {
+    if ! select_python_interpreter 3 7; then
+        echo "Error: Python 3.7+ is required for portable timing and reporting" >&2
+        return 1
+    fi
+    "$PYTHON_BIN" - "$SIMULATOR" "$TRACE_FILE" "$BENCHMARK_MODE" \
+        "$DISPATCH_INTERVAL" "$DISPATCH_QUEUE_DEPTH" "$DISPATCH_ON_EVENTS" \
+        "$DISPATCH_RUNS" "$HYBRID_RESERVATION_DEPTH" "$TOTAL_NODES" "$MAX_JOBS" <<'PY'
+import hashlib
+import json
+import math
+from pathlib import Path
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+
+simulator, trace, policy, interval, depth, on_events, runs, reservations, nodes, max_jobs = sys.argv[1:]
+if not math.isfinite(float(interval)) or float(interval) <= 0:
+    sys.exit("Error: --dispatch-interval must be finite and positive")
+outdir = Path(tempfile.mkdtemp(prefix="dr-evt-unified-benchmark-"))
+common = [simulator, str(Path(trace).resolve()),
+          "--priority_policy", "fcfs", "--queue_impl", "circular",
+          "--backfill_policy", policy,
+          "--dispatch_interval", interval, "--dispatch_queue_depth", depth,
+          "--total_nodes", nodes, "--max_jobs", max_jobs,
+          "--trace_format", "simple", "--timestamp_format", "epoch",
+          "--run_time_mode", "limit"]
+if on_events == "1":
+    common.append("--dispatch_on_events")
+if policy == "hybrid":
+    common.extend(["--reservation_depth", reservations])
+print("Unified dispatch: {}; interval: {} s; queue depth: {}; arrival passes: {}".format(
+    policy, interval, depth, on_events == "1"))
+if policy == "hybrid":
+    print("Reservation depth: {}".format(reservations))
+print("Trace: {}; nodes: {}; planning horizon: unlimited".format(trace, nodes))
+print("Timing includes parsing, scheduling, event handling, and trace output.")
+print("Artifacts: {}".format(outdir), flush=True)
+elapsed_runs = []
+reference_hashes = None
+for run in range(int(runs) + 1):
+    label = "warmup" if run == 0 else "run-{}".format(run)
+    output = outdir / (label + ".csv")
+    resources = outdir / (label + "-resources.csv")
+    log = outdir / (label + ".log")
+    command = common + ["--outfile", str(output), "--resource_trace", str(resources)]
+    with log.open("wb") as stream:
+        start = time.perf_counter()
+        result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT)
+        elapsed = time.perf_counter() - start
+    if result.returncode:
+        sys.exit("Simulator failed ({}); see {}".format(result.returncode, log))
+    hashes = [hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in (output, resources)]
+    if reference_hashes is None:
+        reference_hashes = hashes
+    elif hashes != reference_hashes:
+        sys.exit("Repeated schedules differ; artifacts: {}".format(outdir))
+    print("{}: {:.6f} s".format(label, elapsed), flush=True)
+    if run:
+        elapsed_runs.append(elapsed)
+report = {"command": common, "seconds": elapsed_runs,
+          "median_seconds": statistics.median(elapsed_runs),
+          "warmup_runs": 1, "identical_outputs": True,
+          "schedule_sha256": reference_hashes[0],
+          "resource_trace_sha256": reference_hashes[1]}
+(outdir / "results.json").write_text(json.dumps(report, indent=2) + "\n")
+print("Median: {:.6f} s; repeated outputs identical".format(report["median_seconds"]))
+PY
+}
+
+if [[ "$DISPATCH_MODE" == "1" ]]; then
+    run_unified_dispatch_benchmark
+    exit $?
+fi
 
 elapsed_seconds() {
     echo "scale=3; ($2 - $1) / 1000000000" | bc
