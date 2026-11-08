@@ -272,11 +272,13 @@ class HybridBackfillingScheduler:
                 segment = bisect.bisect_right(plan, (start, float('inf'))) - 1
                 end = self.planned_end(start, job.duration)
                 i = segment
-                while i < len(plan) and (i == segment or plan[i][0] < end):
+                while i < len(plan) and (i == segment or
+                        (plan[i][0] <= end if self.backfill_interval > 0.0 else plan[i][0] < end)):
                     if plan[i][1] < job.nodes:
                         break
                     i += 1
-                if i == len(plan) or (i != segment and plan[i][0] >= end):
+                if i == len(plan) or (i != segment and
+                        (plan[i][0] > end if self.backfill_interval > 0.0 else plan[i][0] >= end)):
                     return start
                 while i < len(plan) and plan[i][1] < job.nodes:
                     i += 1
@@ -328,13 +330,14 @@ class HybridBackfillingScheduler:
 
     def can_fit_timeline(self, timeline: list, nodes: int,
                          duration: float) -> bool:
-        """Return whether [current_time, current_time + duration) fits."""
+        """Periodic backfill includes the endpoint; event-driven backfill excludes it."""
         start = self.current_time
         end = self.planned_end(start, duration)
         segment = bisect.bisect_right(
             timeline, (start, float('inf'))) - 1
         i = segment
-        while i < len(timeline) and (i == segment or timeline[i][0] < end):
+        while i < len(timeline) and (i == segment or
+                (timeline[i][0] <= end if self.backfill_interval > 0.0 else timeline[i][0] < end)):
             if timeline[i][1] < nodes:
                 return False
             i += 1

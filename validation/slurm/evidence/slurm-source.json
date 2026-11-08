@@ -1,0 +1,118 @@
+{
+  "revision": "3fb607e00f53006c9076028f4529a071545556d8",
+  "overlays": [
+    {
+      "file": "src/common/sim/sim_funcs.c",
+      "reason": "Find libc on the ARM Linux build host.",
+      "before": "\"/lib/x86_64-linux-gnu/libc.so.6\",",
+      "after": "\"/lib/aarch64-linux-gnu/libc.so.6\",\n                       \"/lib/x86_64-linux-gnu/libc.so.6\",",
+      "source_sha256": "ffa9bdaf46599ca0be1f036ff3463e9b91ef4945a0c3a13ef2990447b988bac8",
+      "patched_sha256": "4fd4be807e3c03a2cdd2431abf17cf1c65adb082705545179f9aa646979164f0"
+    },
+    {
+      "file": "src/common/sim/sim_funcs.c",
+      "reason": "Allow the additional ARM libc path.",
+      "before": "libc_paths[4]",
+      "after": "libc_paths[5]",
+      "source_sha256": "4fd4be807e3c03a2cdd2431abf17cf1c65adb082705545179f9aa646979164f0",
+      "patched_sha256": "5ac44f6e7223fe2159960cdd89e28e3efc93a0a0346add866d5f3378ede7f861"
+    },
+    {
+      "file": "src/common/sim/sim_funcs.c",
+      "reason": "Match the modern glibc declaration.",
+      "before": "int gettimeofday(struct timeval *tv, struct timezone *tz)",
+      "after": "int gettimeofday(struct timeval *tv, void *tz)",
+      "source_sha256": "5ac44f6e7223fe2159960cdd89e28e3efc93a0a0346add866d5f3378ede7f861",
+      "patched_sha256": "99cef7b7fd6f7c3778f2709a08f12912aa8a4728b02c29c38ff115d0b9002f73"
+    },
+    {
+      "file": "src/common/sim/sim_funcs.c",
+      "reason": "Add an opt-in clock control for zero simulated scheduler execution cost.",
+      "before": "static int clock_ticking=0;",
+      "after": "static int clock_ticking=0;\nstatic int validation_controlled_clock(void)\n{\n    static int enabled = -1;\n    if (enabled < 0)\n        enabled = getenv(\"SLURM_VALIDATION_CONTROLLED_CLOCK\") != NULL;\n    return enabled;\n}",
+      "source_sha256": "99cef7b7fd6f7c3778f2709a08f12912aa8a4728b02c29c38ff115d0b9002f73",
+      "patched_sha256": "c5c4824e04aacc60ad44afac12006ac9576a2d05d72ece0d0b6c541a0fe76cc9"
+    },
+    {
+      "file": "src/common/sim/sim_funcs.c",
+      "reason": "Keep host execution from advancing simulation time in controlled-clock mode.",
+      "before": "extern void sim_resume_clock()\n{\n",
+      "after": "extern void sim_resume_clock()\n{\n    if (validation_controlled_clock()) {\n        clock_ticking = 0;\n        return;\n    }\n",
+      "source_sha256": "c5c4824e04aacc60ad44afac12006ac9576a2d05d72ece0d0b6c541a0fe76cc9",
+      "patched_sha256": "e0eefa648a762af20895e639b81a7e67b49ab55ec0dba9507e66bf5fda3eb5e3"
+    },
+    {
+      "file": "src/common/sim/sim_funcs.c",
+      "reason": "Keep clock reads side-effect-free in controlled-clock mode.",
+      "before": "*(sim_utime) = *(sim_utime) + 10;",
+      "after": "if (!validation_controlled_clock()) *(sim_utime) = *(sim_utime) + 10;",
+      "source_sha256": "e0eefa648a762af20895e639b81a7e67b49ab55ec0dba9507e66bf5fda3eb5e3",
+      "patched_sha256": "e845b8e7a8ceb420921b1dda675afbc2d863f602d3e62d98b6ce788c970b9f19"
+    },
+    {
+      "file": "src/common/sim/sim_jobtraces.c",
+      "reason": "Do not create an extra job by reading past the end of a valid trace.",
+      "before": "while(feof(trace_file)==0)",
+      "after": "while (fgetc(trace_file) != EOF && fseek(trace_file, -1, SEEK_CUR) == 0)",
+      "source_sha256": "1df5c42c05d25c6c36e3e81e3bf137f6d3289525d6e59b10cdf1bcbe1e77752b",
+      "patched_sha256": "02bf3732264d2f849e0388df6f770b28e6e4ec6a139d421f11e9c624086b7029"
+    },
+    {
+      "file": "src/plugins/sched/backfill/backfill.c",
+      "reason": "Load native backfill configuration on first use and reconfiguration; log effective settings. Wake at the deadline, so controlled time does not introduce a one-step delay.",
+      "before": "extern int sim_backfill_agent(void)\n{\n\tuint64_t now=get_sim_utime();\n\tdouble wait_time;\n\t/* Read config and partitions; Write jobs and nodes */\n\tslurmctld_lock_t all_locks = {\n\t\tREAD_LOCK, WRITE_LOCK, WRITE_LOCK, READ_LOCK, READ_LOCK };\n\tbool load_config;\n\tbool short_sleep = false;\n\tint backfill_cnt = 0;\n\n\tstatic time_t last_backfill_time = 0;\n\tstatic uint64_t last_backfill_utime = 0;\n\tstatic uint64_t next_backfill_utime = 0;\n\tint run_backfill=0;\n\n\tif(load_config == true){\n\t\t_load_config();\n\t\tconfig_flag = false;\n\t\tload_config = false;\n\t}\n\tif(next_backfill_utime==0){\n\t\tnext_backfill_utime=now+backfill_interval*1000000;\n\t}\n\n\tif (pack_job_list==NULL)\n\t\tpack_job_list = list_create(_pack_map_del);\n\n\tif(next_backfill_utime<now){\n\t\t//agent kinda awaken from sleep\n\t\trun_backfill=1;\n        (void) list_delete_all(pack_job_list, _list_find_all, NULL);\n\t\t//if nothing interesting happence lets sleep more\n\t\twait_time = time(NULL)-last_backfill_time;\n\t\tif ((wait_time < backfill_interval_sleep) ||\n\t\t\t    job_is_completing(NULL) || !_more_work(last_backfill_time)) {\n\t\t\tshort_sleep = true;\n\t\t\trun_backfill=0;\n\t\t}\n\n\t\t//run backfill\n\t\tif(run_backfill == 1){\n\t\t\tlock_slurmctld(all_locks);\n\t\t\tif ((backfill_cnt++ % 2) == 0)\n\t\t\t\t_pack_start_clear();\n\t\t\t(void) _attempt_backfill();\n\t\t\tlast_backfill_utime = get_sim_utime();\n\t\t\tlast_backfill_time = time(NULL);\n\t\t\t(void) bb_g_job_try_stage_in();\n\t\t\tunlock_slurmctld(all_locks);\n\t\t\tshort_sleep = false;\n\t\t}\n\n\t\t//next time to attempt backfill\n\t\tnow=get_sim_utime();\n\t\tif(short_sleep == true){\n\t\t\tnext_backfill_utime=now+1000000;\n\t\t}else{\n\t\t\tnext_backfill_utime=now+backfill_interval*1000000;\n\t\t}\n\t}\n\treturn run_backfill;\n}\n#endif\n",
+      "after": "extern int sim_backfill_agent(void)\n{\n\tuint64_t now=get_sim_utime();\n\tdouble wait_time;\n\t/* Read config and partitions; Write jobs and nodes */\n\tslurmctld_lock_t all_locks = {\n\t\tREAD_LOCK, WRITE_LOCK, WRITE_LOCK, READ_LOCK, READ_LOCK };\n\tstatic bool config_loaded = false;\n\tbool short_sleep = false;\n\tint backfill_cnt = 0;\n\n\tstatic time_t last_backfill_time = 0;\n\tstatic uint64_t last_backfill_utime = 0;\n\tstatic uint64_t next_backfill_utime = 0;\n\tint run_backfill=0;\n\n\tif (!config_loaded || config_flag) {\n\t\t_load_config();\n\t\tconfig_flag = false;\n\t\tconfig_loaded = true;\n        info(\"VALIDATION_BACKFILL interval=%d table_limit=%d partition_depth=%d reservations=%d resolution=%d horizon=%d\",\n             backfill_interval, max_backfill_job_cnt, max_backfill_job_per_part, bf_job_part_count_reserve,\n             backfill_resolution, backfill_window);\n\t}\n\tif(next_backfill_utime==0){\n\t\tnext_backfill_utime=now+backfill_interval*1000000;\n\t}\n\n\tif (pack_job_list==NULL)\n\t\tpack_job_list = list_create(_pack_map_del);\n\n\tif(next_backfill_utime <= now){\n\t\t//agent kinda awaken from sleep\n\t\trun_backfill=1;\n        (void) list_delete_all(pack_job_list, _list_find_all, NULL);\n\t\t//if nothing interesting happence lets sleep more\n\t\twait_time = time(NULL)-last_backfill_time;\n\t\tif ((wait_time < backfill_interval_sleep) ||\n\t\t\t    job_is_completing(NULL) || !_more_work(last_backfill_time)) {\n\t\t\tshort_sleep = true;\n\t\t\trun_backfill=0;\n\t\t}\n\n\t\t//run backfill\n\t\tif(run_backfill == 1){\n\t\t\tlock_slurmctld(all_locks);\n\t\t\tif ((backfill_cnt++ % 2) == 0)\n\t\t\t\t_pack_start_clear();\n\t\t\t(void) _attempt_backfill();\n\t\t\tlast_backfill_utime = get_sim_utime();\n\t\t\tlast_backfill_time = time(NULL);\n\t\t\t(void) bb_g_job_try_stage_in();\n\t\t\tunlock_slurmctld(all_locks);\n\t\t\tshort_sleep = false;\n\t\t}\n\n\t\t//next time to attempt backfill\n\t\tnow=get_sim_utime();\n\t\tif(short_sleep == true){\n\t\t\tnext_backfill_utime=now+1000000;\n\t\t}else{\n\t\t\tnext_backfill_utime=now+backfill_interval*1000000;\n\t\t}\n\t}\n\treturn run_backfill;\n}\n#endif\n",
+      "source_sha256": "6256aa1234ec7ebda8d93e643b6551e88bd1381503a62bbfa92b6b78d51498f7",
+      "patched_sha256": "b298241e736bfe9d74baf9f6cbc25254b6ac989077178a3e13f36692a8368204"
+    },
+    {
+      "file": "src/slurmctld/validation_observer.h",
+      "reason": "Read-only native resource and node-ownership snapshots.",
+      "patched_sha256": "4c2fda7f3220fe208498ceb55bece2c389ed6c66bd430a105863139748078ede"
+    },
+    {
+      "file": "src/slurmctld/simulator.c",
+      "reason": "Include the read-only observer in the simulator controller.",
+      "before": "\nextern int sim_controller()",
+      "after": "\n#include \"validation_observer.h\"\n\nextern int sim_controller()",
+      "source_sha256": "744a287f1605c3e70cc122fafd6e786a4850f4b1763448daf1a56c7fa12c6073",
+      "patched_sha256": "6bf77ea5970d242a6e7cb5964c6e4b13f54c4d0742c51c7a83e004e326a8c1e8"
+    },
+    {
+      "file": "src/slurmctld/simulator.c",
+      "reason": "Capture state after the event/main/backfill batch without requesting a pass.",
+      "before": "\n\t\t//do outputs\n",
+      "after": "\n\t\tvalidation_snapshot();\n\n\t\t//do outputs\n",
+      "source_sha256": "6bf77ea5970d242a6e7cb5964c6e4b13f54c4d0742c51c7a83e004e326a8c1e8",
+      "patched_sha256": "cf33c3313e11c5280d4725371ad69fe82b1934665a55ae2292fd571b85a1029e"
+    }
+  ],
+  "version": "17.11.7",
+  "architecture": "aarch64",
+  "binary_sha256": "df3719fe4336fa0eca7ad857b10559eaf0b42fca033073dc76e9005fd9d6ca53",
+  "configure_flags": [
+    "--enable-simulator",
+    "--enable-front-end",
+    "--disable-x11",
+    "--with-hdf5=no",
+    "--with-hwloc=no"
+  ],
+  "requested_cflags": "-O2 -g -fcommon",
+  "effective_cflags": "CFLAGS = -DNUMA_VERSION1_COMPATIBILITY -O2 -g -fcommon  -ggdb3 -Wall -g -O1 -fno-strict-aliasing -DSLURM_SIMULATOR",
+  "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "harness_sha256": {
+    "observer.h": "4c2fda7f3220fe208498ceb55bece2c389ed6c66bd430a105863139748078ede",
+    "build.sh": "a588409bb7fdf138e9237ece53b777219662bee2a6201f208db1b011f0385e01",
+    "plot.py": "94853b7fb22f838444aa140ecf1d6d599a7217145264a22c8386535e3c0d79ce",
+    "test_audit.py": "a71cee19731fac10d798524659ed13086b2eff3c3155443eebeedde53a338292",
+    "prepare.py": "60188fd01eb01efe929e8dcd82f7c476a953752935977c5dd0480d180b5e9b5d",
+    "compare.py": "2af0bd2534c1c7d548f93b7e238df58c6c0e64e294a33121e23d9ce4026e1a72",
+    "run.sh": "3176f7c6ef0f765d7b521c7b0178068f3ab472ac3559df2aea1e29facc13d4b2",
+    "README.md": "5a85a48be04a68235d52f36b72351cf3c9e24d70da5e9a755c4f2ea1c1110cfa",
+    ".dockerignore": "d528d274275683113196a774bb2c4fb7596698620eb01904887229bee372423a",
+    ".gitignore": "3eee86435e69d845524717fcb550f3e64eaa113da652f0603e41d1f5170bfcbd",
+    "Dockerfile": "b212def9be50ad95bb66a1db8ede1fda7b68a4984f00a55747eb0598edca4e21",
+    "build-and-test.sh": "e4c9af215fc2cc58687b8ac00fcf81258144ab63a1b961d7f44a7efc8072ee38",
+    "record_build.py": "deb650216b4213da03195fe8df5f2b842ab041c83b76491420cf020c3f35cc98"
+  }
+}

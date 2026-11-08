@@ -1,0 +1,164 @@
+{
+  "jobs": [
+    [
+      0,
+      2,
+      120,
+      120
+    ],
+    [
+      0,
+      2,
+      180,
+      180
+    ],
+    [
+      0,
+      4,
+      60,
+      60
+    ],
+    [
+      0,
+      1,
+      120,
+      120
+    ]
+  ],
+  "capacity": 4,
+  "slurm_schedule": [
+    {
+      "start": 0,
+      "end": 120,
+      "nodes": 2,
+      "assignment": "n0000"
+    },
+    {
+      "start": 0,
+      "end": 180,
+      "nodes": 2,
+      "assignment": "n0001"
+    },
+    {
+      "start": 180,
+      "end": 240,
+      "nodes": 4,
+      "assignment": "n0002"
+    },
+    {
+      "start": 240,
+      "end": 360,
+      "nodes": 1,
+      "assignment": "n0003"
+    }
+  ],
+  "dr_evt_schedule": [
+    {
+      "start": 0.0,
+      "end": 120.0,
+      "nodes": 2
+    },
+    {
+      "start": 0.0,
+      "end": 180.0,
+      "nodes": 2
+    },
+    {
+      "start": 180.0,
+      "end": 240.0,
+      "nodes": 4
+    },
+    {
+      "start": 240.0,
+      "end": 360.0,
+      "nodes": 1
+    }
+  ],
+  "slurm_label": "Slurm (license pool)",
+  "capacity_label": "node equivalents",
+  "reservation_depth": 32,
+  "backfill_queue_depth": 64,
+  "backfill_interval_seconds": 30,
+  "plot_note": "Native scheduling; trace-driven virtual time and completion RPCs",
+  "bf_licenses": true,
+  "resource_curves": {
+    "slurm": [
+      [
+        0,
+        4
+      ],
+      [
+        120,
+        2
+      ],
+      [
+        180,
+        4
+      ],
+      [
+        240,
+        1
+      ],
+      [
+        360,
+        0
+      ]
+    ],
+    "dr_evt": [
+      [
+        0,
+        4
+      ],
+      [
+        120.0,
+        2
+      ],
+      [
+        180.0,
+        4
+      ],
+      [
+        240.0,
+        1
+      ],
+      [
+        360.0,
+        0
+      ]
+    ]
+  },
+  "slurm_metrics": {
+    "mean_wait_seconds": 105.0,
+    "makespan_seconds": 360,
+    "resource_area_node_seconds": 960,
+    "utilization_percent": 66.66666666666667,
+    "process_elapsed_seconds": 1.6635054179932922
+  },
+  "dr_evt_metrics": {
+    "mean_wait_seconds": 105.0,
+    "makespan_seconds": 360.0,
+    "resource_area_node_seconds": 960.0,
+    "utilization_percent": 66.66666666666667,
+    "process_elapsed_seconds": 0.07789870799751952
+  },
+  "different_start_times": 0,
+  "audits": {
+    "status": "passed",
+    "native": "reused saved audit",
+    "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/controls/reservation-protection-on",
+    "dr_evt_checks": [
+      "arrival constraints",
+      "exact runtimes",
+      "capacity",
+      "resource trace equals job schedule"
+    ]
+  },
+  "clock": "integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches",
+  "max_start_difference_seconds": 0.0,
+  "resource_curve_difference_node_seconds": 0,
+  "resource_curve_difference_percent": 0.0,
+  "retry_verification": {
+    "first_chronological_divergence": null,
+    "job243": null
+  }
+}

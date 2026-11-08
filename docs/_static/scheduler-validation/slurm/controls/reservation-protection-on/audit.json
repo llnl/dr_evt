@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "native": "reused saved audit",
+  "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/controls/reservation-protection-on",
+  "dr_evt_checks": [
+    "arrival constraints",
+    "exact runtimes",
+    "capacity",
+    "resource trace equals job schedule"
+  ]
+}

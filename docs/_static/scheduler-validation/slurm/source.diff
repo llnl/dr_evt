@@ -1,0 +1,105 @@
+diff --git a/src/sim/scheduler_base.hpp b/src/sim/scheduler_base.hpp
+index bc621b7..2ec7bc0 100644
+--- a/src/sim/scheduler_base.hpp
++++ b/src/sim/scheduler_base.hpp
+@@ -101,9 +101,14 @@ public:
+    * @param[in] nodes Number of nodes required by the interval.
+    * @param[in] duration Interval duration, or zero for a capacity query.
+    * @param[in] start Earliest time the interval may begin.
++   * @tparam IncludeEndpoint When true, require enough free nodes at
++   * start + duration too: a reservation beginning exactly when the job ends
++   * can block the fit. When false, check only [start, start + duration).
++   * This changes the fit test, not the duration of capacity reservations.
+    * @return The earliest fitting start time, or std::nullopt when no timeline
+    *         segment has sufficient capacity.
+    */
++  template <bool IncludeEndpoint = false>
+   std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
+                                          sim_time_t start) const {
+     if (m_free_nodes.empty()) {
+@@ -124,14 +129,22 @@ public:
+       return segment->first <= start ? start : segment->first;
+     }
+     for (;;) {
++      const sim_time_t end = start + duration;
++      const auto after_interval = [end](sim_time_t boundary) {
++        if constexpr (IncludeEndpoint) {
++          return boundary > end;
++        } else {
++          return boundary >= end;
++        }
++      };
+       auto scan = segment;
+       while (scan != m_free_nodes.end() &&
+-             (scan == segment || scan->first < start + duration) &&
++             (scan == segment || !after_interval(scan->first)) &&
+              scan->second >= nodes) {
+         ++scan;
+       }
+       if (scan == m_free_nodes.end() ||
+-          (scan != segment && scan->first >= start + duration)) {
++          (scan != segment && after_interval(scan->first))) {
+         return start;
+       }
+       do {
+diff --git a/src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp b/src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp
+index 2728a4a..86835d0 100644
+--- a/src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp
++++ b/src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp
+@@ -10,6 +10,28 @@
+
+ namespace dr_evt {
+
++namespace {
++class EndpointInclusiveTimeline : public Reservation_Timeline {
++public:
++  explicit EndpointInclusiveTimeline(Reservation_Timeline plan)
++      : Reservation_Timeline(std::move(plan)) {}
++
++  std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
++                                        sim_time_t start) const {
++    return Reservation_Timeline::earliest_fit<true>(nodes, duration, start);
++  }
++};
++} // namespace
++
++std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule(
++    num_nodes_t free_nodes, const running_jobs_t &running_jobs,
++    sim_time_t current_time) {
++  // Slurm includes the endpoint in both admission and reservation placement.
++  // Changing only admission leaves earlier reservations in different places.
++  return schedule_with_protection<EndpointInclusiveTimeline>(
++      free_nodes, running_jobs, current_time);
++}
++
+ std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
+     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+     sim_time_t current_time) {
+diff --git a/src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp b/src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp
+index 2d386bd..e52a16f 100644
+--- a/src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp
++++ b/src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp
+@@ -23,7 +23,10 @@ namespace dr_evt {
+  * @brief Event-driven FCFS dispatch and periodic hybrid/conservative backfill
+  * using a circular queue.
+  * @details State events run FCFS through schedule_event(); timer ticks run
+- * backfill through schedule(). The simulation driver controls these wakes.
++ * backfill through schedule(). Both admission and protected-reservation
++ * searches include capacity changes at the requested interval's endpoint,
++ * matching Slurm. Capacity reservations remain half-open intervals.
++ * The simulation driver controls these wakes.
+  * @note Selected by --backfill_interval I (I > 0), --dispatch_interval 0,
+  * --queue_impl circular, and FCFS ordering, with --backfill_policy hybrid
+  * --reservation_depth N (N > 0), or --backfill_policy conservative.
+@@ -31,6 +34,11 @@ namespace dr_evt {
+ class FCFSPeriodicHybridCircularScheduler final
+     : public FCFSHybridCircularScheduler {
+ public:
++  /** @copydoc SchedulerBase::schedule */
++  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
++                                const running_jobs_t &running_jobs,
++                                sim_time_t current_time) override;
++
+   /**
+    * @brief Construct the opt-in periodic backfill scheduler.
+    * @param[in] total_nodes Cluster capacity available for allocations.

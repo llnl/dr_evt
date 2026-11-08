@@ -1,0 +1,15 @@
+{
+  "revision": "40830a8bdfa5a0967ccf544fc702666912c02e57",
+  "tree": "cc0420deb5dfd5c84dc1f411e4229f0be9455d3f",
+  "configure_flags": [
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DDR_EVT_WITH_SER20=OFF",
+    "-DDR_EVT_WITH_UNIT_TESTING=OFF",
+    "-DDR_EVT_BUILD_PYTHON=OFF",
+    "-DDR_EVT_ENABLE_PROTOBUF=OFF",
+    "-DDR_EVT_ENABLE_GRPC=OFF",
+    "-DDR_EVT_LEGACY_RESERVATION_BARRIER=OFF"
+  ],
+  "binary": "/workspace/dr_evt-builds/40830a8bdfa5a0967ccf544fc702666912c02e57/simulator",
+  "binary_sha256": "3e089e1dc4e125a1b08f1b9a3053205131d1e80da1274b7ae2dd7debc8a1e38d"
+}

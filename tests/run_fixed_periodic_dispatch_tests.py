@@ -81,6 +81,16 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_fixed_periodic_dispatch_") as di
                      "--backfill_policy", "none")
 
     event_options = ("--dispatch_interval", "5", "--dispatch_on_events")
+    # A job ending exactly at the head reservation fits the shared timer/
+    # notification model. Slurm's separate periodic backfill includes that end.
+    endpoint_jobs = [(0, 2, 120), (30, 4, 60), (30, 2, 90), (30, 1, 30)]
+    run_case("spur_endpoint_rule", endpoint_jobs, [0, 120, 30, 180],
+             "--dispatch_interval", "30", "--dispatch_on_events",
+             "--dispatch_queue_depth", "64", "--backfill_policy", "conservative")
+    run_case("slurm_endpoint_rule", endpoint_jobs, [0, 120, 180, 30],
+             "--dispatch_interval", "0", "--backfill_interval", "30",
+             "--backfill_queue_depth", "64", "--backfill_policy", "conservative")
+
     for policy in ("none", "easy", "hybrid", "conservative"):
         run_case("event_prefix_" + policy, [(0, 1, 20)] * 4, [0, 0, 5, 5],
                  *event_options, "--dispatch_queue_depth", "2",

@@ -1,0 +1,55 @@
+------ Sim params ------
+ - seed: 0
+ - max_jobs: 2000
+ - max_time: 161792382137608415728914990893253732774636223810099063006476989558299076204572927321742494638454256139344378550798645307153336038393013008464058780426777426026616717803727574188626614032436072567206003101972607730727481657756824646680038158519781402336173312031774408358985266338583411535483858853909722300416.000000
+ - sim_start_time: 0.000000
+ - warm_start_wait_queue: inherit
+ - infile: /Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-fixed/lambda-performance-rerun/lassen-prefix2000-hybrid-r32-q64/dr_evt/jobs.csv
+ - outfile: /Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-fixed/lambda-performance-rerun/lassen-prefix2000-hybrid-r32-q64/dr_evt/schedule.csv
+ - redis_uri:
+ - redis_key_prefix:
+ - total_nodes: 756
+ - capacity_schedule:
+ - num_max_candidates: 1
+ - reservation_depth: 32
+ - backfill_queue_depth: 64
+ - backfill_interval: 30.000000
+ - per_pass_accounting: false
+ - dispatch_interval: 0.000000
+ - dispatch_queue_depth: 0
+ - dispatch_on_events: false
+ - planning_time_resolution: 1.000000
+ - planning_horizon: 259200.000000
+ - job_flush_interval: 0
+ - is_jobs_set: true
+ - is_time_set: false
+ - backfill_policy: HYBRID
+ - priority_policy: FCFS
+ - cores_per_node: auto (SWF header)
+ - trace_type: STANDARD
+ - trace_format: simple
+ - timestamp_format: epoch
+ - timezone: America/Los_Angeles
+ - run_time_mode: ACTUAL
+ - run_time_distribution: NORMAL
+ - run_time_scale: 1.000000
+ - run_time_stddev: 0.000000
+ - node_release_delay: 0.000000
+ - node_release_delay_model: constant
+ - node_release_delay_spread: 0.000000
+
+
+=== Simulation Statistics ===
+Total jobs: 2000
+Jobs submitted: 2000
+Jobs started: 2000
+Jobs completed: 2000
+Current time: 146245.000
+Total nodes: 756
+Average wait time: 37430.4 sec
+Average turnaround time: 45544.4 sec
+Makespan: 146245.000 sec
+Average queue length: 737.16 jobs
+Peak queue length: 1305 jobs
+
+Wall clock time to run simulation: 0.0357187 (sec)

@@ -1,0 +1,34 @@
+{
+  "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/performance-on/lassen-prefix2000-hybrid-r32-q64",
+  "native_report_sha256": "61b68021a907860234fe20241e0cc51ed442dfaea5a328c4ff6ec2556298dd32",
+  "native_audit": {
+    "status": "passed",
+    "completed_jobs": 2000,
+    "snapshots": 7527,
+    "runtime_node_seconds": 81309892,
+    "native_snapshot_node_seconds": 81309892,
+    "dr_evt_resource_trace_node_seconds": 81309892.0,
+    "checks": [
+      "arrival constraints",
+      "exact runtimes",
+      "license capacity",
+      "private node ownership",
+      "native states and start times",
+      "snapshot allocation equals job schedule",
+      "both resource curve areas",
+      "DR_EVT resource trace equals job schedule"
+    ]
+  },
+  "binary": "/Users/yeom2/work/dr_evt/build/simulator",
+  "binary_sha256": "136883884789507014356bf57136f31a6e8a41aca25652bf58e2a0182db87bd5",
+  "simulation_source_sha256": "177be37b0c4f990021507a951471c9ea5a2098149e5d7031f2705591ecef0bd1",
+  "source_revision": "c6f941f730dfc37640e320fb15c2024b9c45628a",
+  "timing_scope": "DR_EVT subprocess and schedule parsing; native Slurm was not rerun",
+  "libdr_evt.dylib_sha256": "fd5c37038fc2b15a2f9f23e83dcae4b735d78658822c9c9a7a8b708ab6e140d1",
+  "scheduler_source_sha256": {
+    "src/sim/scheduler_base.hpp": "4a387f04870b45866bbe7b73ae31a25711d478ff1ec9426462d7ebe6fe8edc7f",
+    "src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp": "e7c5dd9c0604335cdcec51c454c3d445af925fefecffd84caaaaaa37cd06b96a",
+    "src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp": "b5049f661bc99648e3348775444c562a6f70bcee33aa9023301473d7fe7aaac6",
+    "src/sim/scheduler_fcfs_hybrid_circular.tpp": "3170a49078b1625ab0b9a8c374e6b403783ce61fe4201225e6abfb8ba2378d43"
+  }
+}

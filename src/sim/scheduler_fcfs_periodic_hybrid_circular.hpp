@@ -23,7 +23,10 @@ namespace dr_evt {
  * @brief Event-driven FCFS dispatch and periodic hybrid/conservative backfill
  * using a circular queue.
  * @details State events run FCFS through schedule_event(); timer ticks run
- * backfill through schedule(). The simulation driver controls these wakes.
+ * backfill through schedule(). Both admission and protected-reservation
+ * searches include capacity changes at the requested interval's endpoint,
+ * matching Slurm. Capacity reservations remain half-open intervals.
+ * The simulation driver controls these wakes.
  * @note Selected by --backfill_interval I (I > 0), --dispatch_interval 0,
  * --queue_impl circular, and FCFS ordering, with --backfill_policy hybrid
  * --reservation_depth N (N > 0), or --backfill_policy conservative.
@@ -31,6 +34,19 @@ namespace dr_evt {
 class FCFSPeriodicHybridCircularScheduler final
     : public FCFSHybridCircularScheduler {
 public:
+  /**
+   * @brief Run periodic backfill with endpoint-inclusive fit searches.
+   * @details Admission and future reservations share the same endpoint rule.
+   * Repeated calls at one tick share the backfill examination budget.
+   * @param[in] free_nodes Nodes currently available for allocation.
+   * @param[in] running_jobs Jobs already running at this instant.
+   * @param[in] current_time Current backfill tick time.
+   * @return Jobs selected to start at this tick.
+   */
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
+
   /**
    * @brief Construct the opt-in periodic backfill scheduler.
    * @param[in] total_nodes Cluster capacity available for allocations.
@@ -61,9 +77,9 @@ public:
    * @param[in] current_time Current simulation time.
    * @return Jobs started from the FCFS front.
    */
-  std::vector<job_no_t>
-  schedule_event(num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-                 sim_time_t current_time) override;
+  std::vector<job_no_t> schedule_event(num_nodes_t free_nodes,
+                                       const running_jobs_t &running_jobs,
+                                       sim_time_t current_time) override;
 
 protected:
   /**

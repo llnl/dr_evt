@@ -8,9 +8,12 @@
 #    settled resource traces (time, free, allocated). The intervals are not
 #    multiples of the workloads' 5 s arrival cadence, so ticks fall between
 #    events as well as on them, and ticks pass while nothing is waiting.
-# 2. A zero interval must leave the output byte-identical to a run without the
+# 2. Starts that expose a new bounded queue prefix must enable the next tick
+#    without resetting the current tick's examination budget.
+# 3. Hybrid/conservative admission and reservation placement include endpoints.
+# 4. A zero interval must leave the output byte-identical to a run without the
 #    option.
-# 3. Invalid values and an unsupported queue implementation are rejected.
+# 5. Invalid values and an unsupported queue implementation are rejected.
 #
 # Usage: tests/run_periodic_backfill_tests.sh [simulator]
 #   DR_EVT_BACKFILL_INTERVALS overrides the tick intervals (default "7 30").
@@ -158,7 +161,89 @@ for POLICY_SPEC in "${POLICIES[@]}"; do
 done
 
 echo ""
+echo "Bounded queue retries after backfill starts"
+
+# The first tick starts two jobs from Q=3 and leaves one free node. A third
+# filler moves into Q and must start at the next tick, before any completion.
+# It must not start in a repeated pass at the first tick, which shares Q.
+cat > "$WORK/retry.csv" <<'EOF'
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,1,600,600
+1,4,60,60
+1,1,120,120
+1,1,120,120
+1,1,120,120
+EOF
+cat > "$WORK/retry.expected" <<'EOF'
+0,0,600
+1,600,660
+2,30,150
+3,30,150
+4,60,180
+EOF
+for POLICY_SPEC in "hybrid:32" "conservative:0" "easy:1"; do
+    POLICY="${POLICY_SPEC%%:*}"
+    DEPTH="${POLICY_SPEC##*:}"
+    if "$SIMULATOR" "$WORK/retry.csv" --total_nodes 4 \
+            --trace_format simple --timestamp_format epoch --run_time_mode actual \
+            --queue_impl circular --dispatch_interval 0 --backfill_policy "$POLICY" \
+            --reservation_depth "$DEPTH" --backfill_interval 30 --backfill_queue_depth 3 \
+            --outfile "$WORK/retry.$POLICY.csv" > "$WORK/retry.$POLICY.log" 2>&1; then
+        awk -F, 'NR>1 {printf "%d,%g,%g\n", NR-2, $2, $3}' \
+            "$WORK/retry.$POLICY.csv" > "$WORK/retry.$POLICY.actual"
+        if diff -q "$WORK/retry.expected" "$WORK/retry.$POLICY.actual" > /dev/null; then
+            echo "✓ $POLICY retries the newly eligible queue prefix at the next tick"
+            ((PASSED++))
+            continue
+        fi
+        diff "$WORK/retry.expected" "$WORK/retry.$POLICY.actual"
+    else
+        cat "$WORK/retry.$POLICY.log"
+    fi
+    echo "✗ $POLICY did not preserve the next tick or the per-tick queue budget"
+    ((FAILED++))
+done
+
+echo ""
 echo "Option surface checks"
+
+# C ends exactly when B's reservation begins. Slurm rejects that immediate
+# fit and places C's reservation after B, leaving room for D at the first tick.
+cat > "$WORK/endpoint.csv" <<'EOF'
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,2,120,120
+1,4,60,60
+1,2,90,90
+1,1,30,30
+EOF
+cat > "$WORK/endpoint.expected" <<'EOF'
+0,0,120
+1,120,180
+2,180,270
+3,30,60
+EOF
+for POLICY_SPEC in "hybrid:32" "conservative:0"; do
+    POLICY="${POLICY_SPEC%%:*}"
+    DEPTH="${POLICY_SPEC##*:}"
+    if "$SIMULATOR" "$WORK/endpoint.csv" --total_nodes 4 \
+            --trace_format simple --timestamp_format epoch --run_time_mode actual \
+            --queue_impl circular --dispatch_interval 0 --backfill_policy "$POLICY" \
+            --reservation_depth "$DEPTH" --backfill_interval 30 \
+            --outfile "$WORK/endpoint.$POLICY.csv" > "$WORK/endpoint.$POLICY.log" 2>&1; then
+        awk -F, 'NR>1 {printf "%d,%g,%g\n", NR-2, $2, $3}' \
+            "$WORK/endpoint.$POLICY.csv" > "$WORK/endpoint.$POLICY.actual"
+        if diff -q "$WORK/endpoint.expected" "$WORK/endpoint.$POLICY.actual" > /dev/null; then
+            echo "✓ $POLICY includes endpoints in admission and reservation placement"
+            ((PASSED++))
+            continue
+        fi
+        diff "$WORK/endpoint.expected" "$WORK/endpoint.$POLICY.actual"
+    else
+        cat "$WORK/endpoint.$POLICY.log"
+    fi
+    echo "✗ $POLICY reservation endpoint mismatch"
+    ((FAILED++))
+done
 
 # Explicit zero interval: byte-identical output to a run without the option.
 BASE_IN="${TRACE_DIR}/05_multiple_backfills.csv"

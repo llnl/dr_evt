@@ -178,7 +178,7 @@ jobs:
         id: periodic-backfill
         run: |
           echo "========================================"
-          echo "Running Periodic Backfill Tests (34 workloads x 2 policies x 2 intervals + 2 option checks)"
+          echo "Running Periodic Backfill Tests (reference, retry, endpoint, and option checks)"
           echo "========================================"
           ./tests/run_periodic_backfill_tests.sh
 
@@ -290,7 +290,7 @@ jobs:
       - name: Run Core CTest Tests
         id: core-ctest
         run: |
-          echo "Running 19 native CTest registrations, the trace-tools test, plus MPI when available"
+          echo "Running all configured CTest registrations, including fixed periodic dispatch"
           cd build
           ctest --output-on-failure
 
@@ -299,7 +299,7 @@ jobs:
         run: |
           source venv/bin/activate
           echo "========================================"
-          echo "Running Python API Tests (19 tests)"
+          echo "Running Python API Tests"
           echo "========================================"
           PYTHON_EXECUTABLE=$(command -v python) ./tests/run_python_tests.sh
 
@@ -324,7 +324,7 @@ jobs:
         id: append-job
         run: |
           echo "========================================"
-          echo "Running Append-Job Tests (23 C++ + 5 optional gRPC checks)"
+          echo "Running Append-Job API and optional gRPC checks"
           echo "========================================"
           ./tests/run_append_job_tests.sh
 
@@ -350,7 +350,7 @@ jobs:
         id: progressive-load
         run: |
           echo "========================================"
-          echo "Running Progressive Loading Tests (11 C++ + 5 CLI)"
+          echo "Running Progressive Loading Tests (12 C++ + 6 CLI)"
           echo "========================================"
           ./tests/run_progressive_load_tests.sh
 
@@ -376,23 +376,26 @@ jobs:
           echo ""
           echo "Test Results:"
           echo "  Scheduler correctness - Installed (34 fixtures): ${{ steps.scheduler-correctness-installed.outcome }}"
+          echo "  Node release delay: ${{ steps.node-release-delay.outcome }}"
+          echo "  Periodic backfill (reference, retry, endpoint): ${{ steps.periodic-backfill.outcome }}"
+          echo "  Planning horizon: ${{ steps.planning-horizon.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
           echo "  Column Aliases (8 tests): ${{ steps.column-alias.outcome }}"
           echo "  Run Time Mode (8 tests): ${{ steps.run-time-mode.outcome }}"
           echo "  Unit (7 tests): ${{ steps.unit.outcome }}"
           echo "  Feature (8 tests): ${{ steps.feature.outcome }}"
-          echo "  Conservative (2 tests): ${{ steps.conservative.outcome }}"
+          echo "  Conservative (3 comparisons): ${{ steps.conservative.outcome }}"
           echo "  Replay (5 tests): ${{ steps.replay.outcome }}"
           echo "  Resource History (5 tests): ${{ steps.resource-history.outcome }}"
           echo "  Job Store (6 tests): ${{ steps.job-store.outcome }}"
           echo "  Config (14 tests): ${{ steps.config.outcome }}"
-          echo "  CTest (19 native + trace tools + MPI when available): ${{ steps.core-ctest.outcome }}"
-          echo "  Python API (19 tests): ${{ steps.python-api.outcome }}"
+          echo "  CTest (all configured registrations, including fixed periodic dispatch): ${{ steps.core-ctest.outcome }}"
+          echo "  Python API: ${{ steps.python-api.outcome }}"
           echo "  Market Package (12 tests): ${{ steps.market-package.outcome }}"
-          echo "  Append-Job (23 C++ + 5 optional gRPC checks): ${{ steps.append-job.outcome }}"
-          echo "  Backfill-window focused rerun (5 checks already counted): ${{ steps.backfill-window.outcome }}"
+          echo "  Append-Job API and optional gRPC: ${{ steps.append-job.outcome }}"
+          echo "  Backfill-window focused rerun (4 checks already counted): ${{ steps.backfill-window.outcome }}"
           echo "  Single-Coordinator gRPC: ${{ steps.grpc-single-coordinator.outcome }}"
-          echo "  Progressive Loading (11 C++ + 5 CLI): ${{ steps.progressive-load.outcome }}"
+          echo "  Progressive Loading (12 C++ + 6 CLI): ${{ steps.progressive-load.outcome }}"
           echo "  Queue Input Schema: ${{ steps.queue-input-schema.outcome }}"
           echo "  gRPC Client/Server (2 tests): ${{ steps.grpc.outcome }}"
           echo "  Scale (7 tests): ${{ steps.scale.outcome }}"

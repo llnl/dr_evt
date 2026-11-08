@@ -10,6 +10,44 @@
 
 namespace dr_evt {
 
+namespace {
+/**
+ * @brief Timeline fit policy for Slurm-style periodic hybrid backfill.
+ * @details Both immediate admission and future placement require capacity at
+ * the requested end time. Inherited reserve() still uses [start, end).
+ */
+class EndpointInclusiveTimeline : public Reservation_Timeline {
+public:
+  /**
+   * @brief Take ownership of the pass's free-node plan.
+   * @param[in] plan Baseline capacity timeline to extend during this pass.
+   */
+  explicit EndpointInclusiveTimeline(Reservation_Timeline plan)
+      : Reservation_Timeline(std::move(plan)) {}
+
+  /**
+   * @brief Find the earliest fit, including capacity at the requested end.
+   * @param[in] nodes Required node count.
+   * @param[in] duration Requested duration; nonpositive values query capacity.
+   * @param[in] start Earliest permitted start time.
+   * @return Earliest fitting start, or std::nullopt when no fit exists.
+   */
+  std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
+                                         sim_time_t start) const {
+    return Reservation_Timeline::earliest_fit<true>(nodes, duration, start);
+  }
+};
+} // namespace
+
+std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule(
+    num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+    sim_time_t current_time) {
+  // Slurm includes the endpoint in both admission and reservation placement.
+  // Changing only admission leaves earlier reservations in different places.
+  return schedule_with_protection<EndpointInclusiveTimeline>(
+      free_nodes, running_jobs, current_time);
+}
+
 std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {

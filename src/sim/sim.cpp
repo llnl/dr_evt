@@ -3376,6 +3376,12 @@ void BasicSimulation<TraceType>::advance_to_impl(
         }
       }
     }
+    if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
+      // Starts move waiting jobs into the bounded queue prefix. Reconsider it
+      // at the next tick, while preserving this timestamp's shared queue
+      // budget.
+      m_periodic_backfill_dirty = m_periodic_backfill_dirty || started_at_tick;
+    }
     if constexpr (AccountResources) {
       custom_scheduler->commit_available_nodes(accounting_available_nodes());
     }

@@ -1,0 +1,22 @@
+{
+  "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/controls/reservation-protection-off",
+  "native_report_sha256": "894b903816b1c3f232e74e43142b4d5153c0793904b57fb3fe4345f6dc0b5882",
+  "native_audit": {
+    "runtime_and_capacity": "passed",
+    "private_node_assignments": "passed",
+    "completed_jobs": 4,
+    "snapshots": 11
+  },
+  "binary": "/Users/yeom2/work/dr_evt/build/simulator",
+  "binary_sha256": "136883884789507014356bf57136f31a6e8a41aca25652bf58e2a0182db87bd5",
+  "simulation_source_sha256": "177be37b0c4f990021507a951471c9ea5a2098149e5d7031f2705591ecef0bd1",
+  "source_revision": "c6f941f730dfc37640e320fb15c2024b9c45628a",
+  "timing_scope": "DR_EVT subprocess and schedule parsing; native Slurm was not rerun",
+  "libdr_evt.dylib_sha256": "37ff11e3c06b067c5ba81ef004778ef4f858b54657c32dc7cb1e87ea8f481c79",
+  "scheduler_source_sha256": {
+    "src/sim/scheduler_base.hpp": "a8d6147754cb6caa59e6d029d407f6c11d3e068e6fe426a0a166ff530b615fc9",
+    "src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp": "e7c5dd9c0604335cdcec51c454c3d445af925fefecffd84caaaaaa37cd06b96a",
+    "src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp": "b5049f661bc99648e3348775444c562a6f70bcee33aa9023301473d7fe7aaac6",
+    "src/sim/scheduler_fcfs_hybrid_circular.tpp": "3170a49078b1625ab0b9a8c374e6b403783ce61fe4201225e6abfb8ba2378d43"
+  }
+}

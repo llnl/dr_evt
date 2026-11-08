@@ -1,0 +1,447 @@
+[
+  {
+    "case": "all-fit",
+    "jobs": [
+      [
+        0,
+        1,
+        60,
+        5
+      ],
+      [
+        0,
+        1,
+        60,
+        5
+      ],
+      [
+        0,
+        1,
+        60,
+        5
+      ],
+      [
+        0,
+        1,
+        60,
+        5
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 3,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 20,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 2,
+      "maximum_placement_tests": 0,
+      "partition_candidate_cap": 64
+    }
+  },
+  {
+    "case": "completion-dispatch",
+    "jobs": [
+      [
+        0,
+        4,
+        60,
+        7
+      ],
+      [
+        1,
+        4,
+        60,
+        3
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      7.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      7.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 4,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 40,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 2,
+      "maximum_placement_tests": 0,
+      "partition_candidate_cap": 64
+    }
+  },
+  {
+    "case": "four-job",
+    "jobs": [
+      [
+        0,
+        2,
+        120,
+        120
+      ],
+      [
+        0,
+        2,
+        180,
+        180
+      ],
+      [
+        0,
+        3,
+        60,
+        60
+      ],
+      [
+        0,
+        1,
+        120,
+        120
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      0.0,
+      180.0,
+      180.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      0.0,
+      180.0,
+      120.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 6,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 900,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 12,
+      "maximum_placement_tests": 2,
+      "partition_candidate_cap": 64
+    }
+  },
+  {
+    "case": "periodic-backfill",
+    "jobs": [
+      [
+        0,
+        3,
+        120,
+        120
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        1,
+        60,
+        60
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      120.0,
+      30.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      120.0,
+      30.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 6,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 660,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 8,
+      "maximum_placement_tests": 2,
+      "partition_candidate_cap": 64
+    }
+  },
+  {
+    "case": "queue-depth-2",
+    "jobs": [
+      [
+        0,
+        3,
+        120,
+        120
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        1,
+        60,
+        60
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      120.0,
+      180.0,
+      240.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      120.0,
+      180.0,
+      240.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 6,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 900,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 12,
+      "maximum_placement_tests": 2,
+      "partition_candidate_cap": 2
+    }
+  },
+  {
+    "case": "queue-depth-3",
+    "jobs": [
+      [
+        0,
+        3,
+        120,
+        120
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        1,
+        60,
+        60
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      120.0,
+      180.0,
+      30.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      120.0,
+      180.0,
+      30.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 7,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 900,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 10,
+      "maximum_placement_tests": 3,
+      "partition_candidate_cap": 3
+    }
+  },
+  {
+    "case": "reservation-depth-1",
+    "jobs": [
+      [
+        0,
+        3,
+        120,
+        120
+      ],
+      [
+        1,
+        2,
+        60,
+        60
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        1,
+        180,
+        180
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      120.0,
+      210.0,
+      30.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      120.0,
+      210.0,
+      30.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 7,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 900,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 11,
+      "maximum_placement_tests": 3,
+      "partition_candidate_cap": 64
+    }
+  },
+  {
+    "case": "reservation-depth-2",
+    "jobs": [
+      [
+        0,
+        3,
+        120,
+        120
+      ],
+      [
+        1,
+        2,
+        60,
+        60
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        1,
+        180,
+        180
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      120.0,
+      180.0,
+      240.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      120.0,
+      180.0,
+      240.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 6,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 900,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 13,
+      "maximum_placement_tests": 2,
+      "partition_candidate_cap": 64
+    }
+  },
+  {
+    "case": "reservation-protection",
+    "jobs": [
+      [
+        0,
+        3,
+        120,
+        120
+      ],
+      [
+        1,
+        4,
+        60,
+        60
+      ],
+      [
+        1,
+        1,
+        180,
+        180
+      ]
+    ],
+    "slurm_starts": [
+      0.0,
+      120.0,
+      180.0
+    ],
+    "dr_evt_starts": [
+      0.0,
+      120.0,
+      180.0
+    ],
+    "audits": {
+      "status": "passed",
+      "native_snapshots": 5,
+      "capacity_and_node_ownership": "passed",
+      "resource_area_node_seconds": 780,
+      "resource_curves_agree_with_job_records": true
+    },
+    "native_cycle_audit": {
+      "backfill_cycles": 10,
+      "maximum_placement_tests": 1,
+      "partition_candidate_cap": 64
+    }
+  }
+]

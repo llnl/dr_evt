@@ -101,11 +101,11 @@ server; no pre-existing Redis service is used.
 | Job store | 6 | `run_job_store_tests.sh` | Capacity, growth/abort, reclamation, and statistics |
 | Redis output | 1 integration runner | `run_redis_tests.sh` | Isolated server startup, CSV/hash output, time/resource indexes, namespace replacement, finalized-versus-unfinished visibility, pipelined bulk lookup, and byte-identical job and resource outputs for Redis/file runs of 200 jobs. Redis coverage runs with and without Ser20; the checkpoint portion runs only in the Ser20-enabled configuration. |
 | Redis gRPC example | 1 integration runner | `run_redis_grpc_client_test.sh` | Batch append, advance, pipelined finalized-job lookup, one server fallback query, and original-order merged reporting |
-| Append-job | 34 | `run_append_job_tests.sh` | 30 in-process C++ checks plus 4 optional gRPC checks, including integral streaming-limit validation, known actual runtimes, capacity-aware instantaneous/aggregate utilization and reservations, all-waiting-job status forecasts across backfill queue-depth and planning-horizon limits, periodic backfill, the event-driven planning horizon, warm start, and validation |
+| Append-job | 41 C++ groups + 1 with Ser20 + 4 with gRPC | `run_append_job_tests.sh` | Planner endpoint searches (including fractional times and capacity queries), cached planning, and in-process streaming checks, plus optional gRPC checks, including integral streaming-limit validation, known actual runtimes, capacity-aware instantaneous/aggregate utilization and reservations, all-waiting-job status forecasts across backfill queue-depth and planning-horizon limits, periodic backfill, the event-driven planning horizon, warm start, and validation |
 | Checkpoint/restart | 7 groups | CTest (`test_checkpoint_restart`) and `run_redis_tests.sh` | Exact scheduler continuation plus byte-identical file, progressive-loading, and Redis job/resource output after archive-and-stitch recovery. |
 | Progressive loading | 18 | `run_progressive_load_tests.sh` | 12 C++ checks plus 6 CLI checks for multi-file loading, bounded storage, block-queue integration, periodic backfill across file boundaries, and memory checks |
 | Protobuf configuration | 14 | `run_configs_tests.sh` | Configuration/CLI parity, capacity/simulation-start-time validation, and documented examples |
-| Python API | 21 | `run_python_tests.sh` | 15 test functions recording 21 checks: bindings, callbacks, streaming, checkpoint/restart, monitoring, policy APIs, warm-start execution, and periodic backfill and planning options |
+| Python API | 22 in the full CI build | `run_python_tests.sh` | 16 test functions covering bindings, callbacks, streaming, checkpoint/restart, monitoring, policy APIs, exact lookahead, warm-start execution, and periodic backfill and planning options |
 | gRPC client/server | 2 | `run_grpc_tests.sh` | A single server/client pair, and optionally two servers driven by two MPI clients in lockstep: each round every client reports its next job's arrival time and no client advances past the earliest one, so the two job streams keep a consistent global order |
 | Multi-cluster dispatch | 2 | CTest (`test_python_performance_dispatch`, `test_mpi_performance_dispatch`) | Python/gRPC policy and native MPI coverage for app/workload sampling, CPU/GPU compatibility, runtime scaling, Turnaround, RelPerfOnly, and WaitTimeOnly placement, missing-prediction wait fallback and audit flags, adapted-limit and actual-duration wall-time policies, evaluation metrics, machine-size eligibility, and oversized-request truncation |
 | Backfill-window gRPC | 4 repeated checks | `run_backfill_window_grpc_test.sh` | Focused rerun of the gRPC streaming binary; one check targets the backfill window |
@@ -116,10 +116,11 @@ server; no pre-existing Redis service is used.
 | Maximum time | 3 CLI cases | `run_max_time_tests.sh` | Inclusive cutoff behavior in simulation, replay, and warm-start execution |
 | Warm start | 1 native binary + 9 CLI cases | CTest (`test_warm_start`, `test_warm_start_validation`) | Boundary classification, two-stage execution, runtime modes, capacity transitions, policies/queues, accounting/output, numeric/ISO simulation-start times, zero-start replay, inclusive maximum time, per-file timestamp encoding, periodic backfill anchored at the boundary, and invalid configurations |
 | Node release delay | 1 native binary + 34 differential + 3 option checks | CTest (`test_node_release_delay`, `test_node_release_delay_reference`) | Planning values and sampling of the per-job delay, streaming behavior, replay and warm-start boundaries, checkpoint continuation; the 34 scheduler-correctness workloads with a constant delay against the Python reference, plus zero-delay identity, replay exclusion, and rejected values |
-| Periodic backfill | 34 × 2 policies × 2 intervals differential + 2 option checks | CTest (`test_periodic_backfill_reference`) | The 34 scheduler-correctness workloads under hybrid (depth 1) and conservative backfill with 7 s and 30 s ticks against the Python conservative reference, comparing schedules and settled resource traces; plus zero-interval identity and rejected values |
+| Periodic backfill | 143 checks with default intervals | CTest (`test_periodic_backfill_reference`) | The 34 scheduler-correctness workloads under hybrid (depth 1) and conservative backfill with 7 s and 30 s ticks against the Python conservative reference, comparing schedules and settled resource traces; three bounded-prefix retry checks, two inclusive-endpoint checks, zero-interval identity, and rejected values |
+| Fixed periodic dispatch | 90 checks | CTest (`test_fixed_periodic_dispatch`) or `run_fixed_periodic_dispatch_tests.py` | Tick-only and arrival-enabled dispatch, queue limits, timer phase, reservations, capacity changes, cleanup, rejected options, randomized FCFS reference comparisons, and the distinct Spur/Slurm endpoint rules |
 | Planning horizon | 9 differential + 34 identity + 1 option check | CTest (`test_planning_horizon_reference`) | Event-driven `--planning_horizon` for easy, hybrid, conservative, and sjf against the Python references, with and without a horizon; an explicit unlimited horizon byte-identical to the default on the 34 workloads; rejected values. Periodic horizon cases live in the configuration suite. |
 | SWF input | 8 CLI cases | `run_swf_tests.sh` (CTest `test_swf`) | Standard Workload Format parsing: equivalence with simple-format CSV, header-derived and overridden cores-per-node, MaxNodes as the default machine size, skipped records, malformed lines, and option consistency |
-| Native CTest | 21 native, 2 Python, plus 2 with MPI | CTest | RNG and binary serialization, exact checkpoint/restart, trace policies, replay reclamation, custom scheduling, append/streaming APIs, maximum-time and warm-start coverage, node release delay, capacity parsing, queue implementations, CLI dispatch, command-line input selection, and SWF input; CTest also registers the Python trace-tools and multi-cluster dispatch tests, and the MPI streaming and MPI dispatch tests when MPI is available |
+| Native CTest | Build-dependent | CTest | All enabled registrations, including serialization, planner endpoints, periodic and event-driven dispatch, placement accounting, queue depth, exact checkpoint/restart, batch/streaming equivalence, trace tools, and optional MPI/Python tests; use `ctest --test-dir build -N` for the configured inventory |
 
 The Python reference schedulers have no capacity schedule, so the
 capacity-aware reservations behind `--capacity_schedule` are covered by the
@@ -237,6 +238,32 @@ Python EASY and hybrid schedules with their respective C++ `deque` baselines
 using a `0.001` time tolerance. The
 differential runner uses the
 [`scheduler_correctness`](test_traces/scheduler_correctness/) fixtures.
+
+### Periodic dispatch and endpoint regressions
+
+With the default intervals, `run_periodic_backfill_tests.sh` runs 136 reference
+comparisons, three bounded-prefix retry cases (EASY, hybrid, conservative), two
+endpoint cases (hybrid, conservative), and two option checks. The retry case
+starts jobs at one tick and checks that the newly exposed prefix is examined
+at the next tick, even without a new arrival or release.
+
+The endpoint workload checks both starting now and placing future reservations.
+`run_fixed_periodic_dispatch_tests.py` compares that Slurm-style inclusive rule
+with the half-open rule used to represent Spur's timer/arrival loop. These
+regressions protect DR_EVT's models; they do not execute production schedulers.
+The append API's reservation-search checks cover exact and fractional endpoints,
+point queries, and reservations whose durations remain half-open.
+
+```bash
+ctest --test-dir build --output-on-failure \
+  -R '^(test_append_job_api|test_fixed_periodic_dispatch|test_periodic_backfill_reference)$'
+```
+
+The default resource-time build (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) is
+required for the fixed-periodic reference suite. Full CI uses that build and
+runs all configured CTest tests; quick CI runs these three suites directly.
+Native scheduling comparisons and saved evidence are documented in
+[Scheduling Validation](../docs/user-guide/SCHEDULER_VALIDATION.md).
 
 ### Fixed periodic dispatch benchmark
 
