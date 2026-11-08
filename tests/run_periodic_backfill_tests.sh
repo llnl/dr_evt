@@ -158,6 +158,50 @@ for POLICY_SPEC in "${POLICIES[@]}"; do
 done
 
 echo ""
+echo "Bounded queue retries after backfill starts"
+
+# The first tick starts two jobs from Q=3 and leaves one free node. A third
+# filler moves into Q and must start at the next tick, before any completion.
+# It must not start in a repeated pass at the first tick, which shares Q.
+cat > "$WORK/retry.csv" <<'EOF'
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,1,600,600
+1,4,60,60
+1,1,120,120
+1,1,120,120
+1,1,120,120
+EOF
+cat > "$WORK/retry.expected" <<'EOF'
+0,0,600
+1,600,660
+2,30,150
+3,30,150
+4,60,180
+EOF
+for POLICY_SPEC in "hybrid:32" "conservative:0" "easy:1"; do
+    POLICY="${POLICY_SPEC%%:*}"
+    DEPTH="${POLICY_SPEC##*:}"
+    if "$SIMULATOR" "$WORK/retry.csv" --total_nodes 4 \
+            --trace_format simple --timestamp_format epoch --run_time_mode actual \
+            --queue_impl circular --dispatch_interval 0 --backfill_policy "$POLICY" \
+            --reservation_depth "$DEPTH" --backfill_interval 30 --backfill_queue_depth 3 \
+            --outfile "$WORK/retry.$POLICY.csv" > "$WORK/retry.$POLICY.log" 2>&1; then
+        awk -F, 'NR>1 {printf "%d,%g,%g\n", NR-2, $2, $3}' \
+            "$WORK/retry.$POLICY.csv" > "$WORK/retry.$POLICY.actual"
+        if diff -q "$WORK/retry.expected" "$WORK/retry.$POLICY.actual" > /dev/null; then
+            echo "✓ $POLICY retries the newly eligible queue prefix at the next tick"
+            ((PASSED++))
+            continue
+        fi
+        diff "$WORK/retry.expected" "$WORK/retry.$POLICY.actual"
+    else
+        cat "$WORK/retry.$POLICY.log"
+    fi
+    echo "✗ $POLICY did not preserve the next tick or the per-tick queue budget"
+    ((FAILED++))
+done
+
+echo ""
 echo "Option surface checks"
 
 # Explicit zero interval: byte-identical output to a run without the option.
