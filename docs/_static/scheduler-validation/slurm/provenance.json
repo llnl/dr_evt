@@ -1,0 +1,32 @@
+{
+  "scheduler": "Slurm 26.11.0-0rc2, select/cons_tres",
+  "bf_licenses": true,
+  "clock": "virtual integer seconds; monotonic/RPC time remains real",
+  "compute_adapter": "native allocation requests, node registration, completion and epilog RPCs; no actual compute daemons",
+  "backfill_hook": "serialize event batches with backfill; native placement and reservation code retained",
+  "scripts_sha256": {
+    "run_event.sh": "e9cd0bfb53b200a2686a9ad644f1049001ba60a25389c01757507588d966dc30",
+    "finalize.py": "d4421e366d4cef5e630773821af9d9f7224c7150c5d2f21789092c33cee551e0",
+    "clock.c": "9f00ebe1ce179f0ea4bb016e6f9f3725fdfa5caeb672f226d4591cae76a35748",
+    "run.sh": "2ee3ca8e34614649176b83f9b011db60c4a1380cbcf9d54250363b31bb518ea1",
+    "client.c": "53525eff11d03c7fc0ddc46035dc84b2fde819a79e12eef5cd94da0adaad3092",
+    "build_state_client.sh": "133d7451f2b237edf053f35e9251b51df095aa338978020e67c3e359a7357431",
+    "build.sh": "f3aa9f505bb27fd8bb6edc2fa13ebb42f4c6dd342bab11679b1498113bfd3af5",
+    "event_trace.py": "cfac6a08cc4a9c898e36ced8d7921dd17629bc1100afeb2cd4a7d7dda90a03ec",
+    "run_performance.py": "c0202e8eacf36f6214ec1f7c2d53f84f11ea73b1af6edbfd3a48f14e5c5a3def",
+    "plot_timeline.py": "36f39ef6142c7e299ec268e88e59789ea957832d9bbb6db8565c59fca59f1640",
+    "build_event.sh": "e3d619c96fbea367fff109ad186b6e4c907ca23f2e5ab3edf24a3422c0c3aa1a",
+    "summarize_licenses.py": "545d901793b172b8c296908d8d236606acce51d220758e3edef25f6b5ee814e4",
+    "audit_event.py": "7b45bdbbdfb3f7175124e432c7a16c6423a4c572597bb7d2f4cb3287f2476ff6",
+    "compare.py": "3f513dfbf263829cdca1f07f4b747cb04ada9886aaa5eedbbcc0eaa0fd26a658",
+    "slurm_compare.py": "f9ad573819baebf805b27a7aa1adcf706b085c973cc284e69cc8ba10f00b1464"
+  },
+  "binary_sha256": {
+    "/workspace/slurm-modern-install/sbin/slurmctld": "093398a1fa30983cf451cd860eaf4051f3a1fbad927f0866548cba111bfe108f",
+    "/workspace/slurm-event/sched_backfill.so": "00a704400f90c4d065948ef8489b3db35ae06fdb5ad423e4b9b6c6ac93c6c225",
+    "/workspace/slurm-event/client_state": "d899b342a36c10a702ac7d852d85079c088908c6781b3677aec980c80b6a51b3",
+    "/workspace/slurm-event/libvalidation_clock.so": "19a15ea28dd9c820391ee152ef8c52caced92b0fb3b14672709263373b61d6b7"
+  },
+  "observer": "job-state RPC with details on transitions",
+  "dr_evt_scheduler": "FCFSPeriodicHybridCircularScheduler (scheduler_fcfs_periodic_hybrid_circular.cpp)"
+}
