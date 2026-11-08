@@ -131,14 +131,26 @@
     "makespan_seconds": 240.0,
     "resource_area_node_seconds": 900.0,
     "utilization_percent": 93.75,
-    "process_elapsed_seconds": 0.004173207998974249
+    "process_elapsed_seconds": 0.07821899998816662
   },
   "different_start_times": 0,
   "audits": {
-    "runtime_and_capacity": "passed",
-    "private_node_assignments": "passed",
-    "completed_jobs": 4,
-    "snapshots": 9
+    "status": "passed",
+    "native": "reused saved audit",
+    "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/controls/four-job-pooled",
+    "dr_evt_checks": [
+      "arrival constraints",
+      "exact runtimes",
+      "capacity",
+      "resource trace equals job schedule"
+    ]
   },
-  "clock": "integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches"
+  "clock": "integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches",
+  "max_start_difference_seconds": 0.0,
+  "resource_curve_difference_node_seconds": 0,
+  "resource_curve_difference_percent": 0.0,
+  "retry_verification": {
+    "first_chronological_divergence": null,
+    "job243": null
+  }
 }

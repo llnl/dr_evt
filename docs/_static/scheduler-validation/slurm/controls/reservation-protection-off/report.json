@@ -139,14 +139,30 @@
     "makespan_seconds": 360.0,
     "resource_area_node_seconds": 960.0,
     "utilization_percent": 66.66666666666667,
-    "process_elapsed_seconds": 0.0041299579897895455
+    "process_elapsed_seconds": 0.0778082080068998
   },
   "different_start_times": 2,
   "audits": {
-    "runtime_and_capacity": "passed",
-    "private_node_assignments": "passed",
-    "completed_jobs": 4,
-    "snapshots": 11
+    "status": "passed",
+    "native": "reused saved audit",
+    "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/controls/reservation-protection-off",
+    "dr_evt_checks": [
+      "arrival constraints",
+      "exact runtimes",
+      "capacity",
+      "resource trace equals job schedule"
+    ]
   },
-  "clock": "integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches"
+  "clock": "integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches",
+  "max_start_difference_seconds": 120.0,
+  "resource_curve_difference_node_seconds": 480.0,
+  "resource_curve_difference_percent": 33.333333333333336,
+  "retry_verification": {
+    "first_chronological_divergence": {
+      "job": 4,
+      "slurm_start": 120,
+      "dr_evt_start": 240.0
+    },
+    "job243": null
+  }
 }

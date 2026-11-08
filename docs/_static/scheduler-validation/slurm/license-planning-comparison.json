@@ -5,11 +5,11 @@
   "both_audits": "passed",
   "metrics": {
     "DR_EVT": {
-      "mean_wait_seconds": 37606.31,
-      "makespan_seconds": 146454.0,
+      "mean_wait_seconds": 37430.432,
+      "makespan_seconds": 146245.0,
       "resource_area_node_seconds": 81309892.0,
-      "utilization_percent": 73.43791715881245,
-      "process_elapsed_seconds": 0.0690443750063423
+      "utilization_percent": 73.54286792421429,
+      "process_elapsed_seconds": 0.1345175000024028
     },
     "Slurm bf_licenses on": {
       "mean_wait_seconds": 37430.432,
@@ -28,16 +28,16 @@
   },
   "versus_dr_evt": {
     "on": {
-      "different_start_times": 1524,
-      "max_start_difference_seconds": 19380.0,
-      "resource_curve_difference_node_seconds": 1346976.0,
-      "resource_curve_difference_percent": 1.2165692201744478
+      "different_start_times": 0,
+      "max_start_difference_seconds": 0.0,
+      "resource_curve_difference_node_seconds": 0,
+      "resource_curve_difference_percent": 0.0
     },
     "off": {
       "different_start_times": 1943,
       "max_start_difference_seconds": 110863.0,
-      "resource_curve_difference_node_seconds": 12123504.0,
-      "resource_curve_difference_percent": 10.949773275145064
+      "resource_curve_difference_node_seconds": 12141068.0,
+      "resource_curve_difference_percent": 10.981307912485047
     }
   },
   "off_minus_on_start_times": {
@@ -2047,7 +2047,7 @@
     ]
   },
   "result_directories": {
-    "on": "validation/slurm/results/licenses/controlled/performance-on/lassen-prefix2000-hybrid-r32-q64",
-    "off": "validation/slurm/results/licenses/controlled/paired-license-off/lassen-prefix2000-hybrid-r32-q64"
+    "on": "validation/slurm/results/licenses/controlled/endpoint-fixed/lassen-prefix2000-hybrid-r32-q64",
+    "off": "validation/slurm/results/licenses/controlled/endpoint-fixed/bf-licenses-off/lassen-prefix2000-hybrid-r32-q64"
   }
 }

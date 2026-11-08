@@ -1,18 +1,11 @@
 {
   "status": "passed",
-  "completed_jobs": 2000,
-  "snapshots": 7527,
-  "runtime_node_seconds": 81309892,
-  "native_snapshot_node_seconds": 81309892,
-  "dr_evt_resource_trace_node_seconds": 81309892.0,
-  "checks": [
+  "native": "reused saved audit",
+  "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/performance-on/lassen-prefix2000-hybrid-r32-q64",
+  "dr_evt_checks": [
     "arrival constraints",
     "exact runtimes",
-    "license capacity",
-    "private node ownership",
-    "native states and start times",
-    "snapshot allocation equals job schedule",
-    "both resource curve areas",
-    "DR_EVT resource trace equals job schedule"
+    "capacity",
+    "resource trace equals job schedule"
   ]
 }

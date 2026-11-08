@@ -1,3 +1,3 @@
-scheduler,mean_wait_seconds,makespan_seconds,resource_area_node_seconds,utilization_percent,process_elapsed_seconds
-dr_evt,37606.31,146454.0,81309892.0,73.43791715881245,0.0690443750063423
-slurm,37430.432,146245,81309892,73.54286792421429,716.8364973290008
+scheduler,mean_wait_seconds,makespan_seconds,utilization_percent,resource_area_node_seconds
+dr_evt,37430.432,146245.0,73.54286792421429,81309892.0
+slurm,37430.432,146245,73.54286792421429,81309892
