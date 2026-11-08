@@ -90,12 +90,17 @@ The production-loop descriptions and pseudocode are DR_EVT's explanatory
 summaries of the cited sources. Product and project names identify the systems
 being discussed; they do not imply affiliation or endorsement.
 
-| Category | Trigger behavior | Publicly documented example |
-|---|---|---|
-| Event-driven dispatch and backfill | A relevant state event requests an allocation/reservation cycle | Fluxion; OpenPBS |
-| Separate dispatch and backfill triggers | Events request main dispatch; a separate interval governs backfill; main dispatch also has a periodic pass | Slurm |
-| Timer and notification triggers | An explicit notification or a periodic timer runs the same placement/reservation loop | Spur at the inspected commit |
-| Sessions with a minimum interval | Scheduling work is handled in sessions no more often than the configured minimum interval | LSF |
+| Category | Trigger behavior | Publicly documented example | Academic background |
+|---|---|---|---|
+| Event-driven dispatch and backfill | A relevant state event requests an allocation/reservation cycle | Fluxion; OpenPBS | [Henderson (1995)](https://doi.org/10.1007/3-540-60153-8_34), PBS wake events; [Ahn et al. (2014)](https://doi.org/10.1109/ICPPW.2014.15), Flux architecture |
+| Separate dispatch and backfill triggers | Events request main dispatch; a separate interval governs backfill; main dispatch also has a periodic pass | Slurm | [Simakov et al. (2018)](https://doi.org/10.1007/978-3-319-72971-8_10), separate scheduler threads |
+| Timer and notification triggers | An explicit notification or a periodic timer runs the same placement/reservation loop | Spur at the inspected commit | [Henderson (1995)](https://doi.org/10.1007/3-540-60153-8_34), historical PBS example of event and timer wakes |
+| Sessions with a minimum interval | Scheduling work is handled in sessions no more often than the configured minimum interval | LSF | [Zhou et al. (1993)](https://doi.org/10.1002/spe.4380231203), Utopia/LSF architecture background |
+
+These categories organize this guide. The papers provide historical examples
+and architecture background; they do not define this four-way classification.
+Current loop details use the source and vendor references below. The
+[academic reference notes](#academic-references) distinguish those scopes.
 
 Suppose a fitting job arrives at 2.3 s before a timer wake at 3 s. Fluxion,
 Slurm's main scheduler, Spur's submission notification, and OpenPBS can request
@@ -109,6 +114,12 @@ at 5 s. OpenPBS's fallback timer is discussed in
 
 DR_EVT batches arrivals, completions, node releases, and scheduled capacity
 changes at their exact timestamps before making scheduling decisions.
+**Processing an arrival means putting the job into the waiting queue**, not
+starting it. In a preloaded trace, future arrivals are already stored but
+become eligible for scheduling only at their arrival time. The trace loop
+makes known same-time arrivals eligible and processes all completions/releases
+at that time before dispatch or backfill. A streaming caller that appends
+arrivals after advancing through completions supplies a separate batch.
 There are four supported trigger modes:
 
 ```text
@@ -153,6 +164,7 @@ queue and FCFS or `fcfs_conservative` ordering; custom selectors are unsupported
 
 | Control | Current behavior |
 |---|---|
+| `--diagnostic_no_reservations` | Diagnostic periodic specialization: start fitting jobs in queue order without future reservations; Slurm license-off control only |
 | `--dispatch_interval` | Aligned ticks run both FCFS and backfill; 0 disables fixed periodic dispatch |
 | `--dispatch_on_events` | Also run the combined FCFS/backfill pass on job arrival batches without resetting ticks; requires positive dispatch interval |
 | `--dispatch_queue_depth` | Entire examined prefix per dispatch wake, including immediate starts and out-of-horizon jobs; 0 is unlimited |
@@ -214,6 +226,16 @@ becomes `--planning_horizon 300`. Its zero reservation-count setting removes
 that limit, so use conservative rather than interpreting it as R=0.
 
 Fluxion hybrid exposes `queue-depth` and `reservation-depth` for Q and R.
+For the Slurm license-off diagnostic, `--diagnostic_no_reservations` selects
+a separate template specialization of the periodic hybrid implementation.
+Event wakes and ticks scan every eligible job in FCFS order, skipping those
+that cannot fit the currently free capacity. It creates no future reservations
+and therefore provides no protection of an earlier job's planned start.
+R, Q, H, and planning resolution do not limit this scan. This reference tests
+the adapter's abstract resource pool with future license planning disabled;
+it does not represent ordinary Slurm scheduling on shared physical nodes.
+The protected periodic model and other scheduler loops are unchanged.
+
 Use DR_EVT's `--per_pass_accounting` to select its Flux-style placement loop;
 default hybrid instead shares backfill Q across calls at one timestamp.
 
@@ -556,6 +578,38 @@ Reserved-slot ownership and admission differences are in
 [LSF admission on reserved slots](REALISM_AND_GAPS.md#lsf-admission-on-reserved-slots).
 Accounting and policy evidence limits are in
 [LSF evidence limits](REALISM_AND_GAPS.md#sources).
+
+## Academic references
+
+- Robert L. Henderson (1995),
+  [*Job scheduling under the Portable Batch System*](https://doi.org/10.1007/3-540-60153-8_34),
+  in *Job Scheduling Strategies for Parallel Processing*, pp. 279–294.
+  Sections 3.2.1–3.2.3 describe a scheduler woken by queued jobs, job
+  terminations, or timer expiration, then gathering state and selecting actions.
+  This supports event and timer wake examples; current OpenPBS backfill rules
+  and Spur's notification behavior use their inspected sources.
+- Dong H. Ahn, Jim Garlick, Mark Grondona, Don Lipari, Becky Springmeyer,
+  and Martin Schulz (2014),
+  [*Flux: A Next-Generation Resource Management Framework for Large HPC Centers*](https://doi.org/10.1109/ICPPW.2014.15),
+  in *2014 43rd International Conference on Parallel Processing Workshops*,
+  pp. 9–17. Section IV.A describes Flux's messaging and event infrastructure.
+  It provides architecture context; Fluxion's current placement counters and
+  restart rules are established by the cited `flux-sched` revision.
+- Nikolay A. Simakov, Martins D. Innus, Matthew D. Jones, Robert L. DeLeon,
+  Joseph P. White, Steven M. Gallo, Abani K. Patra, and Thomas R. Furlani (2018),
+  [*A Slurm Simulator: Implementation and Parametric Analysis*](https://doi.org/10.1007/978-3-319-72971-8_10),
+  in *High Performance Computing Systems. Performance Modeling, Benchmarking,
+  and Simulation*, pp. 197–217. Section 3 describes separate controller
+  threads executing the main and backfill schedulers periodically, and how
+  simulation accounts for their execution times. This supplies loop background;
+  [our native Slurm validation](SCHEDULER_VALIDATION.md#periodic-backfill-with-native-slurm)
+  uses the adapter described there.
+- Songnian Zhou, Xiaohu Zheng, Jingwen Wang, and Pierre Delisle (1993),
+  [*Utopia: A load sharing facility for large, heterogeneous distributed computer systems*](https://doi.org/10.1002/spe.4380231203),
+  *Software: Practice and Experience*, 23(12), pp. 1305–1336.
+  This provides historical Utopia/LSF resource-management and task-placement
+  background. The minimum interval and session controls discussed here are
+  supported by the IBM documentation below, rather than this paper.
 
 ## Sources
 

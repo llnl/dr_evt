@@ -1,11 +1,19 @@
 {
   "status": "passed",
-  "native": "reused saved audit",
-  "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/controls/reservation-protection-on",
-  "dr_evt_checks": [
+  "completed_jobs": 4,
+  "snapshots": 13,
+  "runtime_node_seconds": 960,
+  "native_snapshot_node_seconds": 960,
+  "dr_evt_resource_trace_node_seconds": 960.0,
+  "checks": [
     "arrival constraints",
     "exact runtimes",
-    "capacity",
-    "resource trace equals job schedule"
+    "license capacity",
+    "private node ownership",
+    "native states and start times",
+    "snapshot allocation equals job schedule",
+    "both resource curve areas",
+    "DR_EVT resource trace equals job schedule",
+    "main dispatch acknowledged after every state-event batch"
   ]
 }

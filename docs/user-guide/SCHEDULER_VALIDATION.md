@@ -1,13 +1,24 @@
 # Scheduling Validation
 
-DR_EVT matches all 2,000 Lassen job starts and completions in two comparisons:
+DR_EVT matched all 2,000 Lassen job starts and completions in two recorded comparisons:
 FCFS without backfill using Fiction with Flux Core's `sched-simple`, and
 periodic hybrid backfill using native Slurm with pooled license planning.
 Hybrid backfill with Fluxion has similar resource-use curves but different
 starts; a four-job reproducer isolates a node-binding cause.
 
-These results validate the stated workloads and configurations, rather than
-full production behavior.
+These are observations for the recorded workloads and configurations. In the
+Slurm experiment, the order of main scheduling and backfill was not enforced.
+A later run exposed an order that DR_EVT does not reproduce, so the exact
+match does not establish general scheduler equivalence.
+
+An existing scheduler simulator is suitable for direct validation of DR_EVT's
+abstract resource model only if it models interchangeable capacity or can be
+configured to do so. Specific-node reservations can cause placement differences
+outside this model. The Slurm experiment uses private dummy nodes and shared
+license capacity, with `bf_licenses=on` protecting future counts; that option
+alone does not remove node binding. Matching resource representation is
+necessary, but scheduler policy and ordering also affect the comparison.
+
 See [Scheduling Loops](SCHEDULER_LOOPS.md) and
 [Realism and Known Gaps](REALISM_AND_GAPS.md) for the supported policy sets.
 
@@ -160,21 +171,57 @@ arrivals and whole-minute time limits are unchanged.
 
 ### Why use bf_licenses?
 
-Slurm's `bf_licenses` option lets backfill plan the future availability of
-licenses and protect those counts for waiting jobs. Ordinary global licenses
-are integer counts with no individual token identities. We use them as an
-abstract resource pool: `Licenses=capacity:756`, with each job requesting its
-original node count as `capacity` licenses. This represents the same pooled
-node-count capacity that DR_EVT uses while retaining Slurm's native backfill.
+Ordinary Slurm node backfill protects the FCFS head job's planned start through
+two parts of its reservation:
 
-Each job also requests one private dummy compute node. There are 2,000 such
-nodes, so physical node binding does not limit competing jobs. The
-`select/cons_tres` plugin supports this license-aware planning. With
-`bf_licenses` enabled, future license reservations protect the pooled capacity;
-with it disabled, current license limits still apply, but backfill does not
-protect future license capacity. Both cases retain native periodic backfill
-while abstracting resources;
-`sched-simple` also simplifies resource matching but removes backfill.
+- **Resource capacity:** enough resources must remain available throughout
+  the job's planned execution interval.
+- **Node binding:** the reservation identifies the specific compute nodes
+  that supply this capacity. Later jobs must preserve their availability.
+
+These are coupled parts of a node reservation: reserving those nodes protects
+both their capacity and their identities. DR_EVT reserves capacity counts
+without node binding. Our setup removes competition for specific nodes so we
+can compare that count-based protection with Slurm.
+
+Each trace job requests two separate resources from Slurm:
+
+| Slurm resource | Role in this experiment |
+|---|---|
+| One private dummy node per job | Satisfies Slurm's compute-node requirement; no other job requests this node |
+| Shared `capacity` licenses | Represent the 756-node pool; a 32-node trace job requests 32 licenses |
+
+The licenses are interchangeable resource counts, not actual software use.
+**Both the license-on and license-off runs use this same setup.** Reserving a
+job's private dummy node cannot protect its share of the shared license pool.
+Thus, private dummy nodes remove shared-node binding in both runs, while
+`bf_licenses` controls reservation of shared capacity counts:
+
+- **On:** reserve license counts for waiting jobs' planned execution intervals.
+  Later jobs may start only if enough capacity remains for those reservations,
+  matching DR_EVT's protection of future starts.
+- **Off:** enforce current license availability without reserving future counts.
+  Later jobs can consume capacity needed at an earlier job's planned start and
+  delay it. This is an **experimental control**, not ordinary Slurm node
+  backfill behavior, because our dummy nodes provide no shared-capacity protection.
+
+The **license-on run is the intended comparison** with DR_EVT's protected
+backfill and is closer to ordinary Slurm's protection of planned starts.
+Slurm defaults to `bf_licenses` off, but ordinary node reservations already
+protect compute capacity by reserving specific nodes. `bf_licenses`
+adds future planning for a separate resource, normally software-license
+counts. Our setup repurposes licenses as shared node capacity, so we need it
+on to retain capacity protection after removing shared-node binding.
+
+Ordinary Slurm's reservations of specific nodes can still cause the same
+kind of divergence from DR_EVT's count-based reservations demonstrated by
+the Fluxion four-job example. The exact differences depend on node selection
+and workload. **The recorded license-on match demonstrates agreement for
+that run with abstract capacity. It does not establish agreement for other
+scheduler orderings or ordinary Slurm node placement.**
+
+Slurm's native backfill and `select/cons_tres` remain in use;
+`sched-simple`, used in a separate Flux control, also removes backfill.
 
 ### Running native Slurm with an adapter and virtual time
 
@@ -196,21 +243,74 @@ recorded with the results.
 
 Both configurations use **R=32**, **Q=64**, a **72-hour planning horizon**,
 and **one-second planning resolution**. Slurm's `sched_min_interval` and
-`batch_sched_delay` are zero, and `defer` is omitted. DR_EVT uses
+`batch_sched_delay` are zero. The current adapter enables `defer` to queue
+arrivals until their simultaneous event batch is complete. DR_EVT uses
 `--dispatch_interval 0 --backfill_interval 30` to select event-driven FCFS
-dispatch with periodic backfill. Arrivals and completions trigger main FCFS
-dispatch; timer ticks run backfill.
+dispatch with periodic backfill. Arrivals and completions request Slurm's main
+dispatch; timer ticks run backfill. With `bf_licenses` on, main dispatch stops
+when a job lacks enough free licenses. With it off, main dispatch considers
+later jobs instead; DR_EVT's strict FCFS dispatch stops at the first job that
+cannot fit. The current native comparisons gate both main scheduling and
+backfill during simultaneous event batches, as explained below.
 
 Native state and license snapshots check capacity, private node ownership,
 exact runtimes, and completed jobs. Independent audits also verify that both
 schedulers' resource traces agree with their job records.
 
+#### Event ordering and the optional dispatch gate
+
+Main scheduling tries to start waiting jobs when jobs arrive or finish.
+Backfill periodically looks for additional jobs that can run. When both are
+ready at the same timestamp, DR_EVT runs main scheduling first. Slurm's two
+schedulers have independent triggers and can run in either order. The order
+can change which jobs start because backfill examines a limited queue prefix.
+
+The adapter controls when jobs arrive and finish. Its optional gate prevents
+scheduling while simultaneous events are being supplied. It then releases
+both schedulers together, without choosing which runs first. **Event batching
+is controlled; main-versus-backfill order is not.** Both the original exact
+license-on match and the exact diagnostic license-off match are recorded
+outcomes under this limitation. Two delayed starts in one gated license-on
+run demonstrate an order DR_EVT does not reproduce; they do not bound the
+possible divergence. Enforcing main scheduling before backfill would test
+DR_EVT's specific order, rather than all native Slurm behavior.
+
+**An arrival puts a job into the waiting queue; it does not start the job.**
+In DR_EVT's preloaded trace, jobs are stored ahead of time and become eligible
+at arrival. Known same-time arrivals are made eligible and all completions
+and node releases at that time are processed before scheduling. In the
+periodic-backfill model, FCFS dispatch precedes backfill selection. Streaming
+callers can supply arrivals in a separate batch after advancing through
+completions.
+
+Native Slurm can schedule between separate arrival or completion messages.
+Its main scheduler and backfill have independent triggers, so there is no
+general guarantee that main dispatch runs first.
+
+The adapter's opt-in `--batch-main-dispatch` mode adds Slurm's `defer` option
+to queue arrivals without immediate allocation. It holds both main dispatch
+and backfill while all same-time event RPCs are supplied, then releases the
+gates. This matches DR_EVT's **batching of known events**, but **does not force
+main dispatch to run before backfill**. It is a simulation timing control,
+not a claim that real Slurm always batches events this way. Native placement
+and reservation rules are retained. Eight native controls pass. Both current
+published comparisons use this gate and the corrected clock. The adapter
+waits for a completed main-dispatch acknowledgement before advancing virtual
+time after an event batch. When a timestamp repeats, it preserves the subsecond
+counter so Slurm does not observe the clock moving backward. This clock fix
+corrects dispatch timing; it does not order main scheduling before backfill.
+The [diagnostic subpage](SLURM_LICENSE_OFF_DIAGNOSTICS.md) records the earlier
+run that exposed a different scheduler order.
+
 ### Lassen results with bf_licenses on
 
-DR_EVT was rerun against the saved, audited native schedule. All **2,000 jobs**
-pass the DR_EVT checks, and **7,527 native snapshots** pass the Slurm audit.
+Native Slurm was rerun with the current adapter, including the clock fix and
+completed-dispatch acknowledgements, and compared with the current DR_EVT
+build. All **2,000 jobs** pass the DR_EVT checks, and **7,527 native snapshots**
+pass the Slurm audit.
 Every **start and completion time matches exactly**, with **zero area between
-the resource curves**.
+the resource curves**. This is the observed result of this run; the adapter
+still does not enforce main scheduling before backfill.
 
 | Metric | DR_EVT | Slurm, bf_licenses on |
 |---|---:|---:|
@@ -229,93 +329,46 @@ Native Slurm with license-aware backfill planning and DR_EVT's periodic hybrid m
 [Six-panel PDF](../_static/scheduler-validation/slurm/comparison-metrics.pdf)
 · [Resource-curve overview](../_static/scheduler-validation/slurm/comparison.pdf).
 
-### Lassen results with bf_licenses off
+The [license-off diagnostic subpage](SLURM_LICENSE_OFF_DIAGNOSTICS.md)
+groups the license-off Lassen control and both four-job scenarios with
+protected DR_EVT, then presents the no-reservation DR_EVT comparison used to
+test the remaining sources of divergence.
 
-The second run uses identical inputs, native binaries, and capacity limits,
-with `bf_licenses` disabled. Its DR_EVT reference schedule is identical to the
-one above. All **2,000 jobs** and **6,786 native snapshots** pass the audits.
-There are **1,943 differing start times** from DR_EVT, with a largest absolute
-difference of **110,863 seconds**. The area between curves is
-**12,141,068 node-seconds**, or **10.9813%** of the shared capacity-time window.
+```{toctree}
+:maxdepth: 1
 
-| Metric | DR_EVT | Slurm, bf_licenses off |
-|---|---:|---:|
-| Mean waiting time | 10.3973 h | 3.2904 h |
-| Makespan | 40.6236 h | 33.3911 h |
-| Area under resource curve | 81,309,892 node-seconds | 81,309,892 node-seconds |
-| Utilization | 73.5429% | 89.4722% |
-| Maximum waiting time | 18.4183 h | 30.8106 h |
-
-Disabling future license protection lets more jobs start early, reducing
-aggregate waiting and makespan in this workload. It also permits later jobs
-to delay earlier jobs: maximum waiting time increases. These results exercise
-a different reservation policy for the pooled resource.
-
-:::{figure} ../_static/scheduler-validation/slurm/bf-licenses-off/comparison-metrics.svg
-:alt: Six-panel comparison with bf_licenses disabled, showing lower mean wait and makespan, higher utilization, and a longer maximum wait than DR_EVT.
-:width: 100%
-
-Native Slurm backfill with current license limits but no future license reservations.
-:::
-
-[Six-panel PDF](../_static/scheduler-validation/slurm/bf-licenses-off/comparison-metrics.pdf)
-· [Combined on/off metrics](../_static/scheduler-validation/slurm/license-planning-metrics.csv).
-
-### Four-job scenarios: matching and different reservations
-
-Both scenarios use four node equivalents, FCFS order, simultaneous arrivals
-at zero, and actual runtimes equal to time limits. A requests two nodes for
-120 seconds, B two for 180 seconds, and D one for 120 seconds.
-
-In the **original scenario**, C requests **three nodes for 60 seconds**.
-Both Slurm settings and DR_EVT start A/B at zero, D at **120**, and C at
-**180 seconds**. D can continue through C's reservation: their combined
-requirement is four nodes. The original scenario therefore matches with
-license planning either enabled or disabled.
-
-:::{figure} ../_static/scheduler-validation/slurm/controls/four-job-node-assignments.svg
-:alt: Original four-job workload with C requesting three nodes: Slurm license planning on, Slurm off, and DR_EVT all place D at 120 and C at 180 seconds.
-:width: 100%
-
-Original scenario: D and C coexist within the four-node capacity.
-:::
-
-The **reservation-protection scenario** changes only C to request **all four
-nodes**, still for 60 seconds. With `bf_licenses` on, Slurm and DR_EVT protect
-C's **180-second** start and postpone D until **240 seconds**. With planning
-off, Slurm starts D at **120 seconds**, consuming a license across C's planned
-start and delaying C to **240 seconds**.
-
-:::{figure} ../_static/scheduler-validation/slurm/controls/reservation-protection-node-assignments.svg
-:alt: Changing C to four nodes makes Slurm with bf_licenses on match DR_EVT: C starts at 180 and D at 240; with planning off, D starts at 120 and delays C to 240.
-:width: 100%
-
-Changing C's size isolates the protection supplied by future license reservations.
-:::
-
-The node rows show **feasible assignments to node-equivalent slots**. License
-counts have no individual node identities, and DR_EVT does not emit node IDs;
-these rows illustrate pooled placement rather than recorded physical node IDs.
-Workload tables, scripts, and plotting data accompany both figures.
+SLURM_LICENSE_OFF_DIAGNOSTICS
+```
 
 ### Sources of divergence and corrections
 
-Two differences in the periodic-backfill model accounted for the mismatches
-in this controlled license-enabled Lassen run.
+Two DR_EVT fixes made the original license-on comparison match all 2,000
+jobs: keeping the next backfill tick after jobs start, and checking capacity
+at the candidate's exact end time. They are described below. An earlier gated
+license-on run exposed a separate main-versus-backfill ordering difference.
+The current rerun matches exactly, but it still leaves that order uncontrolled.
 
-The first fix keeps the next tick eligible after backfill starts move jobs
-into the bounded queue window. **Job 243 now starts at 5,820 seconds in both
-schedulers**. The
-[pre-fix skipped-tick diagnostic](../_static/scheduler-validation/slurm/divergence/skipped-tick-before-fix/first-divergence.pdf)
-remains available as historical evidence.
+**A backfill tick was skipped after jobs started.** Each periodic pass examines
+a bounded queue prefix. Starting jobs removes them from that prefix and brings
+later waiting jobs into view. DR_EVT could treat the queue as unchanged after
+those starts and skip the next tick, so newly exposed jobs waited longer than
+in Slurm. Starting a job now marks the scheduling state as changed, allowing
+the next tick to examine the new prefix. In the recorded example, job 243
+starts at **5,820 seconds** in both engines after this correction.
+The [earlier plot](../_static/scheduler-validation/slurm/divergence/skipped-tick-before-fix/first-divergence.pdf)
+shows the behavior before the fix.
 
-The second fix checks capacity at a job's planned end for both admission and
-future-reservation placement, matching Slurm's
-[inclusive endpoint rule](SCHEDULER_LOOPS.md#shared-terms). Previously a job
-could fit when it ended exactly as another reservation consumed the remaining
-capacity. Correcting admission alone still allowed different future reservations
-that blocked other jobs. The fix changes fit tests without extending execution
-or reservation durations.
+**DR_EVT allowed a fit at an endpoint where Slurm rejected it.** Suppose a
+candidate needs all available capacity until time 100, and another job has a
+reservation starting at exactly 100. DR_EVT previously allowed the candidate
+to end at 100 without checking the capacity change at that instant. Slurm
+includes that change when checking the fit, so it may reject the candidate.
+This difference affected both starting a job now and choosing a future
+reservation time. DR_EVT now checks capacity at the requested end in both
+searches. Actual job durations and capacity reservations are unchanged:
+a reservation still releases its capacity at its end. The stricter fit check
+is the [endpoint rule](SCHEDULER_LOOPS.md#shared-terms), rather than an added
+execution or node-release delay.
 
 An independent Python reference reproduced the entire pre-endpoint-fix
 DR_EVT schedule. Changing only its endpoint rules gave these results against
@@ -349,22 +402,24 @@ Node release delay is zero in both engines throughout these experiments.
 
 ### License-enabled reference and corrected DR_EVT performance
 
-The native reference is an uninterrupted 2,000-job run with `bf_licenses` on,
+The current native reference is an uninterrupted 2,000-job rerun with
+`bf_licenses` on, the corrected adapter clock, dispatch acknowledgements,
 `info` logging, and no restarts or configuration changes. Its controller/adapter
-phase took **716.8365 seconds**, including RPC, observation, and synchronization.
-The complete validation process, including the earlier DR_EVT comparison and
-plots, took **728.6231 seconds**. This audited reference was reused after the
-DR_EVT corrections.
+phase took **697.8357 seconds**, including startup, RPCs, observation and
+synchronization; DR_EVT execution, audits, plotting and the build are excluded.
+The license-off native reference took **739.2877 seconds** and uses identical
+Slurm and adapter binaries. Both DR_EVT references were refreshed with the same
+current simulator binary. Scheduler order remains uncontrolled in both runs.
 
-The corrected DR_EVT was timed in **five uninterrupted local macOS runs** of
+The current DR_EVT was timed in **five new uninterrupted local macOS runs** of
 the same workload. All five produced byte-identical schedules and resource
 traces, matching native Slurm.
 
 | Corrected DR_EVT process timing | Wall time |
 |---|---:|
-| Median | 0.077173 s |
-| Minimum | 0.073736 s |
-| Maximum | 0.082191 s |
+| Median | 0.078248 s |
+| Minimum | 0.071686 s |
+| Maximum | 0.082682 s |
 
 The timed interval includes process launch, trace input, simulation,
 schedule/resource output and exit. Python output parsing, audits and plotting
@@ -428,9 +483,10 @@ run `python3 plot_endpoint_comparison.py endpoint-comparison.json`.
 The Fiction comparisons use DR_EVT revision `57c3267`, Flux Core `d0309fcf0`,
 Fluxion `9eba598b`, and Fiction `346cbd65`. Machine-readable evidence is in
 [validation/flux/evidence](https://github.com/LLNL/dr_evt/tree/main/validation/flux/evidence).
-The corrected DR_EVT scheduler source hashes and local endpoint fix are
-recorded in its [provenance](../_static/scheduler-validation/slurm/provenance.json)
-and [source patch](../_static/scheduler-validation/slurm/source.diff).
+The DR_EVT simulator snapshot used for these experiments is recorded by its
+[source hashes](../_static/scheduler-validation/slurm/dr_evt-sources.json)
+for committed revision `d545578`. The current native run has its own
+[provenance](../_static/scheduler-validation/slurm/provenance.json).
 The saved native Slurm reference uses Slurm `17abb848e`
 (26.11.0-0rc2). The [Slurm harness](https://github.com/LLNL/dr_evt/blob/main/validation/slurm/README.md)
 records source revisions, clock and synchronization hooks, workload conversion,

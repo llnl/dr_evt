@@ -63,10 +63,11 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    19; // 19: placement-pass accounting; 18: arrival dispatch wakes;
-        // 17: dispatch controls; 16: periodic dirty flag; 15: periodic deadline;
-        // 14: backfill_queue_depth; 13: scalar
-        // event/sample times; 12: release delay; 11: reservation_depth
+    20; // 20: diagnostic reservation policy; 19: placement-pass accounting;
+        // 18: arrival dispatch wakes;
+        // 17: dispatch controls; 16: periodic dirty flag; 15: periodic
+        // deadline; 14: backfill_queue_depth; 13: scalar event/sample times;
+        // 12: release delay; 11: reservation_depth
 
 /// Trace policy identifier stored in a checkpoint so a file written by one
 /// trace type is not restored into another.
@@ -376,7 +377,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
           m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting)),
+          m_params.m_per_pass_accounting,
+          m_params.m_diagnostic_no_reservations)),
       m_custom_scheduler(nullptr), m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -1607,12 +1609,17 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(recorded.m_per_pass_accounting,
                              m_params.m_per_pass_accounting,
                              "per_pass_accounting");
+    require_checkpoint_match(recorded.m_diagnostic_no_reservations,
+                             m_params.m_diagnostic_no_reservations,
+                             "diagnostic_no_reservations");
     require_checkpoint_match(recorded.m_dispatch_on_events,
-                             m_params.m_dispatch_on_events, "dispatch_on_events");
+                             m_params.m_dispatch_on_events,
+                             "dispatch_on_events");
     require_checkpoint_match(recorded.m_dispatch_interval,
                              m_params.m_dispatch_interval, "dispatch_interval");
     require_checkpoint_match(recorded.m_dispatch_queue_depth,
-                             m_params.m_dispatch_queue_depth, "dispatch_queue_depth");
+                             m_params.m_dispatch_queue_depth,
+                             "dispatch_queue_depth");
     require_checkpoint_match(recorded.m_backfill_interval,
                              m_params.m_backfill_interval, "backfill_interval");
     require_checkpoint_match(recorded.m_planning_time_resolution,
@@ -1991,7 +1998,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
           m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting);
+          m_params.m_per_pass_accounting,
+          m_params.m_diagnostic_no_reservations);
       m_scheduler->set_planning_time_resolution(
           m_params.m_planning_time_resolution);
       m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -2361,6 +2369,11 @@ BasicSimulation<TraceType>::get_job_statuses(
   // Every projected job consumes its run window in this query-local serial
   // forecast. An out-of-horizon job remains ESTIMATED rather than RESERVED.
   Reservation_Timeline reservation_profile(std::move(profile));
+  auto forecast_policy = m_params.m_backfill_policy;
+  if (m_params.m_diagnostic_no_reservations) {
+    // Diagnostic forecasts are estimates, never protected reservations.
+    forecast_policy = BackfillPolicy::NONE;
+  }
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   size_t projected_count = 0;
@@ -2384,7 +2397,7 @@ BasicSimulation<TraceType>::get_job_statuses(
     const bool within_horizon =
         *start - m_current_time <= m_params.m_planning_horizon;
     bool reserved = false;
-    switch (m_params.m_backfill_policy) {
+    switch (forecast_policy) {
     case BackfillPolicy::EASY:
       if (!starts_now && !easy_blocked_head_seen) {
         easy_blocked_head_seen = true;
@@ -2601,6 +2614,11 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
 
   // Reserve only the policy-protected jobs.  Unreserved jobs contribute to
   // cumulative demand below, rather than receiving individual placements.
+  auto forecast_policy = m_params.m_backfill_policy;
+  if (m_params.m_diagnostic_no_reservations) {
+    // Diagnostic forecasts are estimates, never protected reservations.
+    forecast_policy = BackfillPolicy::NONE;
+  }
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   for (size_t queue_pos = 0; queue_pos < result_count; ++queue_pos) {
@@ -2613,27 +2631,26 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
     bool reserved = false;
     std::optional<sim_time_t> reservation;
     const bool may_reserve =
-        m_params.m_backfill_policy == BackfillPolicy::CONSERVATIVE ||
-        (m_params.m_backfill_policy == BackfillPolicy::HYBRID &&
+        forecast_policy == BackfillPolicy::CONSERVATIVE ||
+        (forecast_policy == BackfillPolicy::HYBRID &&
          hybrid_reserved < m_params.m_reservation_depth) ||
-        (m_params.m_backfill_policy == BackfillPolicy::EASY &&
-         !easy_blocked_head_seen);
+        (forecast_policy == BackfillPolicy::EASY && !easy_blocked_head_seen);
     if (may_reserve) {
       reservation = earliest_fit(profile, nodes, limit, earliest);
       const bool starts_now = reservation && *reservation <= m_current_time;
       const bool within_horizon =
           reservation &&
           *reservation - m_current_time <= m_params.m_planning_horizon;
-      if (m_params.m_backfill_policy == BackfillPolicy::EASY) {
+      if (forecast_policy == BackfillPolicy::EASY) {
         if (!starts_now) {
           easy_blocked_head_seen = true;
           reserved = within_horizon;
         }
-      } else if (m_params.m_backfill_policy == BackfillPolicy::HYBRID) {
+      } else if (forecast_policy == BackfillPolicy::HYBRID) {
         reserved = !starts_now && within_horizon;
         if (reserved)
           ++hybrid_reserved;
-      } else if (m_params.m_backfill_policy == BackfillPolicy::CONSERVATIVE) {
+      } else if (forecast_policy == BackfillPolicy::CONSERVATIVE) {
         reserved = !starts_now && within_horizon;
       }
       if (reserved)
@@ -2820,7 +2837,8 @@ void BasicSimulation<TraceType>::align_backfill_tick() {
     return;
   }
   if (m_next_backfill_evaluation == std::numeric_limits<sim_time_t>::max()) {
-    m_next_backfill_evaluation = m_current_time + m_params.scheduling_interval();
+    m_next_backfill_evaluation =
+        m_current_time + m_params.scheduling_interval();
   } else if (m_next_backfill_evaluation < m_current_time) {
     // Ticks are not consumed while nothing waits, and the clock may have
     // moved past one at the end of the previous call. Keep the cadence but
@@ -2966,7 +2984,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
     align_backfill_tick();
   }
   m_scheduler->sync_to(m_current_time);
-  [[maybe_unused]] const bool initial_arrivals = record_queue_arrivals(m_current_time);
+  [[maybe_unused]] const bool initial_arrivals =
+      record_queue_arrivals(m_current_time);
   const bool initial_capacity_changed = apply_capacity_changes(m_current_time);
   if constexpr (AccountResources) {
     if (initial_capacity_changed) {
@@ -2994,10 +3013,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
       publish_capacity_outlook();
       auto jobs_to_run = [&] {
         if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
-          return periodic_scheduler->schedule_event(
-              free_nodes, m_running_jobs, m_current_time);
+          return periodic_scheduler->schedule_event(free_nodes, m_running_jobs,
+                                                    m_current_time);
         } else {
-          return m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+          return m_scheduler->schedule(free_nodes, m_running_jobs,
+                                       m_current_time);
         }
       }();
 
@@ -3162,7 +3182,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
             // No nodes were freed yet. Leave the job's original limit in
             // the running map: it remains unavailable through cleanup, but
             // the sampled cleanup release is not projected into a protected
-            // reservation. RELEASE updates state for the next permitted decision.
+            // reservation. RELEASE updates state for the next permitted
+            // decision.
             ++m_jobs_releasing;
           } else {
             processed_end_event = true;
@@ -3270,7 +3291,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
       } else {
         record_queue_arrivals(m_current_time);
       }
-      periodic_evaluation = fixed_periodic_dispatch || m_periodic_backfill_dirty;
+      periodic_evaluation =
+          fixed_periodic_dispatch || m_periodic_backfill_dirty;
       should_schedule = periodic_evaluation;
       m_next_backfill_evaluation += m_params.scheduling_interval();
     } else {
@@ -3292,8 +3314,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
     // not turn the next ordinary event into a backfill pass; the catch-up at
     // the end of the iteration moves it to the next tick instead.
     if constexpr (PeriodicBackfill) {
-      // An idle jump can cross unused ticks. For fixed periodic dispatch, restore
-      // the phase before deciding whether this event is exactly on a tick.
+      // An idle jump can cross unused ticks. For fixed periodic dispatch,
+      // restore the phase before deciding whether this event is exactly on a
+      // tick.
       if constexpr (FixedPeriodicDispatch) {
         align_backfill_tick();
       }
@@ -3305,8 +3328,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
       if constexpr (FixedPeriodicDispatch) {
         should_schedule = periodic_evaluation;
         if constexpr (DispatchOnEvents) {
-          should_schedule = should_schedule || arrival_notification ||
-                            (initial_notification && m_current_time == initial_time);
+          should_schedule =
+              should_schedule || arrival_notification ||
+              (initial_notification && m_current_time == initial_time);
           initial_notification = false;
         }
       }
@@ -3332,7 +3356,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
                        : periodic_scheduler->schedule_event(
                              free_nodes, m_running_jobs, m_current_time);
           } else {
-            return m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+            return m_scheduler->schedule(free_nodes, m_running_jobs,
+                                         m_current_time);
           }
         }();
 
@@ -3370,7 +3395,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
             break; // Process only one START event per job
           }
         }
-        // A fixed periodic dispatch cycle examines its prefix once, including FCFS starts.
+        // A fixed periodic dispatch cycle examines its prefix once, including
+        // FCFS starts.
         if constexpr (FixedPeriodicDispatch) {
           break;
         }

@@ -52,6 +52,7 @@ static constexpr int OPT_NODE_RELEASE_DELAY = 1019;
 static constexpr int OPT_NODE_RELEASE_DELAY_MODEL = 1020;
 static constexpr int OPT_NODE_RELEASE_DELAY_SPREAD = 1021;
 static constexpr int OPT_PER_PASS_ACCOUNTING = 1022;
+static constexpr int OPT_DIAGNOSTIC_NO_RESERVATIONS = 1023;
 
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
@@ -64,8 +65,7 @@ static const struct option sim_longopts[] = {
     {"total_nodes", required_argument, 0, 'n'},
     {"capacity_schedule", required_argument, 0, OPT_CAPACITY_SCHEDULE},
     {"sim_start_time", required_argument, 0, OPT_SIM_START_TIME},
-    {"warm_start_wait_queue", required_argument, 0,
-     OPT_WARM_START_WAIT_QUEUE},
+    {"warm_start_wait_queue", required_argument, 0, OPT_WARM_START_WAIT_QUEUE},
     {"outfile", required_argument, 0, 'o'},
     {"seed", required_argument, 0, 's'},
     {"max_time", required_argument, 0, 't'},
@@ -78,6 +78,8 @@ static const struct option sim_longopts[] = {
     {"dispatch_queue_depth", required_argument, 0, OPT_DISPATCH_QUEUE_DEPTH},
     {"dispatch_on_events", no_argument, 0, OPT_DISPATCH_ON_EVENTS},
     {"per_pass_accounting", no_argument, 0, OPT_PER_PASS_ACCOUNTING},
+    {"diagnostic_no_reservations", no_argument, 0,
+     OPT_DIAGNOSTIC_NO_RESERVATIONS},
     {"planning_time_resolution", required_argument, 0,
      OPT_PLANNING_TIME_RESOLUTION},
     {"planning_horizon", required_argument, 0, OPT_PLANNING_HORIZON},
@@ -125,7 +127,7 @@ Sim_Params::Sim_Params()
       m_backfill_queue_depth(0), m_backfill_interval(0.0),
       m_dispatch_interval(0.0), m_dispatch_queue_depth(0),
       m_dispatch_on_events(false), m_per_pass_accounting(false),
-      m_planning_time_resolution(0.0),
+      m_diagnostic_no_reservations(false), m_planning_time_resolution(0.0),
       m_planning_horizon(std::numeric_limits<tdiff_t>::max()),
       m_warm_start_wait_queue(WarmStartWaitQueuePolicy::INHERIT),
       m_priority_policy(PriorityPolicy::FCFS),
@@ -349,6 +351,9 @@ void Sim_Params::getopt(int &argc, char **&argv) {
       break;
     case OPT_PER_PASS_ACCOUNTING:
       m_per_pass_accounting = true;
+      break;
+    case OPT_DIAGNOSTIC_NO_RESERVATIONS:
+      m_diagnostic_no_reservations = true;
       break;
     case OPT_DISPATCH_ON_EVENTS:
       m_dispatch_on_events = true;
@@ -858,7 +863,8 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "\n"
          "    --warm_start_wait_queue {inherit|drop}\n"
          "        For replay warm starts, inherit (default) reconstructs jobs\n"
-         "        waiting at TIME with their original submit times; drop keeps\n"
+         "        waiting at TIME with their original submit times; drop "
+         "keeps\n"
          "        the legacy behavior of omitting them.\n"
          "\n"
          "    -o, --outfile\n"
@@ -918,15 +924,24 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "\n"
          "    --per_pass_accounting\n"
          "        Event-driven placement passes: immediate starts and future\n"
-         "        reservations share --backfill_queue_depth; Q/R reset per pass.\n"
+         "        reservations share --backfill_queue_depth; Q/R reset per "
+         "pass.\n"
          "        Reservation-only retries stop when their plan is unchanged.\n"
-         "        Requires FCFS, circular queue, and unlimited planning horizon.\n"
+         "        Requires FCFS, circular queue, and unlimited planning "
+         "horizon.\n"
          "\n"
          "    --backfill_interval SECONDS\n"
          "        Run periodic backfill evaluations while retaining "
          "event-driven\n"
          "        FCFS dispatch; 0 disables periodic evaluation. Requires an\n"
          "        enabled --backfill_policy and --queue_impl circular.\n"
+         "\n"
+         "    --diagnostic_no_reservations\n"
+         "        Diagnostic license-off model: consider later fitting jobs\n"
+         "        without reserving future capacity. Requires event-driven\n"
+         "        FCFS dispatch with periodic hybrid/conservative backfill.\n"
+         "        Selected once; reservation policy is compiled into the "
+         "scheduler.\n"
          "\n"
          "    --dispatch_interval SECONDS\n"
          "        Run FCFS and backfill at periodic ticks; 0 disables.\n"
@@ -1183,11 +1198,12 @@ void Sim_Params::print() const {
   msg += " - max_jobs: " + to_string(m_max_jobs) + "\n";
   msg += " - max_time: " + to_string(m_max_time) + "\n";
   msg += " - sim_start_time: " + to_string(m_sim_start_time) + "\n";
-  msg += " - warm_start_wait_queue: " +
-         std::string(m_warm_start_wait_queue == WarmStartWaitQueuePolicy::INHERIT
-                         ? "inherit"
-                         : "drop") +
-         "\n";
+  msg +=
+      " - warm_start_wait_queue: " +
+      std::string(m_warm_start_wait_queue == WarmStartWaitQueuePolicy::INHERIT
+                      ? "inherit"
+                      : "drop") +
+      "\n";
   msg += " - infile: " + m_infile + "\n";
   msg += " - outfile: " + m_outfile + "\n";
   msg += " - redis_uri: " + m_redis_uri + "\n";
@@ -1196,16 +1212,19 @@ void Sim_Params::print() const {
   msg += " - capacity_schedule: " + m_capacity_schedule + "\n";
   msg += " - num_max_candidates: " + to_string(m_num_max_candidates) + "\n";
   msg += " - reservation_depth: " + to_string(m_reservation_depth) + "\n";
-  msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) +
-         "\n";
+  msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) + "\n";
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
   msg += " - per_pass_accounting: " +
          std::string(m_per_pass_accounting ? "true" : "false") + "\n";
+  msg += " - diagnostic_no_reservations: " +
+         std::string(m_diagnostic_no_reservations ? "true" : "false") + "\n";
   msg += " - dispatch_interval: " + to_string(m_dispatch_interval) + "\n";
   msg += " - dispatch_queue_depth: " + to_string(m_dispatch_queue_depth) + "\n";
-  msg += " - dispatch_on_events: " + std::string(m_dispatch_on_events ? "true" : "false") + "\n";
-  msg += " - planning_time_resolution: " +
-         to_string(m_planning_time_resolution) + "\n";
+  msg += " - dispatch_on_events: " +
+         std::string(m_dispatch_on_events ? "true" : "false") + "\n";
+  msg +=
+      " - planning_time_resolution: " + to_string(m_planning_time_resolution) +
+      "\n";
   msg += " - planning_horizon: ";
   if (m_planning_horizon == std::numeric_limits<tdiff_t>::max()) {
     msg += "unlimited\n";

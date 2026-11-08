@@ -27,17 +27,27 @@ namespace dr_evt {
  * searches include capacity changes at the requested interval's endpoint,
  * matching Slurm. Capacity reservations remain half-open intervals.
  * The simulation driver controls these wakes.
+ * @note The driver runs event dispatch before backfill when both are due.
+ * Native Slurm can use another order; the validation adapter's event-batch
+ * gate does not impose this order on Slurm.
+ * @tparam ProtectReservations Preserve future capacity reservations when true.
+ * False selects the diagnostic license-off model: consider later jobs when
+ * an earlier job cannot fit now, without reserving future capacity.
  * @note Selected by --backfill_interval I (I > 0), --dispatch_interval 0,
  * --queue_impl circular, and FCFS ordering, with --backfill_policy hybrid
  * --reservation_depth N (N > 0), or --backfill_policy conservative.
  */
-class FCFSPeriodicHybridCircularScheduler final
+template <bool ProtectReservations>
+class FCFSPeriodicHybridCircularSchedulerImpl final
     : public FCFSHybridCircularScheduler {
 public:
   /**
-   * @brief Run periodic backfill with endpoint-inclusive fit searches.
+   * @brief Run protected periodic backfill or a diagnostic current-capacity
+   * pass.
    * @details Admission and future reservations share the same endpoint rule.
-   * Repeated calls at one tick share the backfill examination budget.
+   * Repeated protected calls at one tick share the examination budget.
+   * The diagnostic specialization scans all eligible jobs without a future
+   * plan.
    * @param[in] free_nodes Nodes currently available for allocation.
    * @param[in] running_jobs Jobs already running at this instant.
    * @param[in] current_time Current backfill tick time.
@@ -59,23 +69,21 @@ public:
    * @param[in] backfill_queue_depth Eligible jobs examined per backfill cycle,
    * that is per tick; zero is unlimited.
    */
-  FCFSPeriodicHybridCircularScheduler(num_nodes_t total_nodes,
-                                      size_t initial_job_count,
-                                      size_t initial_capacity,
-                                      CircularOverflowPolicy overflow_policy,
-                                      BackfillPolicy backfill_policy,
-                                      size_t reservation_depth,
-                                      size_t backfill_queue_depth)
+  FCFSPeriodicHybridCircularSchedulerImpl(
+      num_nodes_t total_nodes, size_t initial_job_count,
+      size_t initial_capacity, CircularOverflowPolicy overflow_policy,
+      BackfillPolicy backfill_policy, size_t reservation_depth,
+      size_t backfill_queue_depth)
       : FCFSHybridCircularScheduler(
             total_nodes, initial_job_count, backfill_policy, initial_capacity,
             overflow_policy, reservation_depth, backfill_queue_depth) {}
 
   /**
-   * @brief Perform an event-driven FCFS pass without backfill scanning.
+   * @brief Perform event dispatch, stopping at the head only when protected.
    * @param[in] free_nodes Nodes currently available for allocation.
    * @param[in] running_jobs Jobs already running at this instant.
    * @param[in] current_time Current simulation time.
-   * @return Jobs started from the FCFS front.
+   * @return Jobs selected in queue order using currently available capacity.
    */
   std::vector<job_no_t> schedule_event(num_nodes_t free_nodes,
                                        const running_jobs_t &running_jobs,
@@ -92,6 +100,13 @@ protected:
    */
   bool horizon_skipped_job_uses_depth_slot() const override { return true; }
 };
+
+/// Abstract-capacity comparison model with protected future capacity.
+using FCFSPeriodicHybridCircularScheduler =
+    FCFSPeriodicHybridCircularSchedulerImpl<true>;
+/// Diagnostic license-off model with no future capacity reservations.
+using FCFSPeriodicNoReservationCircularScheduler =
+    FCFSPeriodicHybridCircularSchedulerImpl<false>;
 
 } // namespace dr_evt
 

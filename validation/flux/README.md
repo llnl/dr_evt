@@ -8,10 +8,34 @@ Every DR_EVT validation invocation uses `--per_pass_accounting`.
 
 ## Build and run the checks
 
-From the repository root:
+Install Git and Docker on the host. The image provides Linux dependencies;
+Flux Core, Fluxion, and Fiction are built from local source checkouts, not
+downloaded by the image. From a fresh repository checkout, obtain the tested
+revisions:
+
+```sh
+mkdir -p external
+git clone https://github.com/flux-framework/flux-core.git external/flux-core
+git -C external/flux-core checkout --detach d0309fcf0e672d90e65b0797168e56a430b9fb57
+git clone https://github.com/flux-framework/flux-sched.git external/flux-sched
+git -C external/flux-sched checkout --detach 9eba598b4e0940d597695e65f20f5357fc513427
+git clone https://github.com/flux-framework/flux-fiction.git external/flux-fiction
+git -C external/flux-fiction checkout --detach 346cbd65bf7da3798e2a351b44e0f57a5b20da96
+```
+
+`flux-sched` supplies Fluxion; `flux-core` also supplies sched-simple.
+No host Flux installation or running cluster is required. Run:
 
 ```sh
 bash validation/flux/run.sh
+```
+
+The runner builds `dr-evt-flux-validation` from the local Dockerfile, exports
+the committed native sources into its build volume, builds and installs them
+there, and runs the checks. To build only the dependency image:
+
+```sh
+docker build -t dr-evt-flux-validation validation/flux
 ```
 
 The default sources are committed checkouts in
@@ -31,7 +55,8 @@ hashes, commands, and logs are retained under `results/`.
 ## Recorded Lassen comparisons
 
 Mount the user-provided `lassen_traces` folder read-only at `/lassen_traces` in
-the prepared container. The trace is not checked into this repository.
+the prepared container. Obtain the source trace from [LLNL's LAST data](https://github.com/LLNL/LAST)
+and place `lassen-756-01.csv` in that folder. The trace is not checked into this repository.
 Run these commands inside that container:
 
 ```sh
@@ -52,6 +77,25 @@ synchronization and resource snapshots. `sched_simple_support.py` adapts
 Fiction's loader and records native hashes and loaded modules. Fluxion is
 unloaded for that run. Its Q bounds outstanding requests, not per-pass tests.
 The two backends are selected explicitly; backfill is rejected for sched-simple.
+
+These are different validation models. Sched-simple uses native FIFO scheduling
+without backfill or future node reservations. Fluxion retains hybrid backfill
+and binds reservations to particular nodes, while DR_EVT reserves interchangeable
+capacity counts. An observed FCFS match does not validate Fluxion backfill or
+ordinary production placement. Equal priorities, one unrestricted queue,
+whole-node exclusive jobs, and an initially empty cluster are experiment
+conditions rather than general claims about Flux deployments.
+
+An existing scheduler simulator is not an appropriate reference for an exact
+comparison with DR_EVT's abstract resource model unless it models
+interchangeable capacity or provides a way to configure that abstraction.
+Specific-node reservations introduce placement effects absent from DR_EVT.
+Sched-simple supplies the no-backfill control here; it cannot validate
+backfill. The separate native Slurm experiment uses private dummy nodes and
+shared license capacity, with `bf_licenses=on` protecting future counts, to
+retain backfill while removing competition for specific nodes. Matching the
+resource model is necessary but does not establish matching scheduler order
+or policy.
 
 ## Minimal reproducer and focused checks
 
@@ -89,6 +133,17 @@ requested scheduler pass, allocation responses, and resulting starts.
 It does not issue extra scheduling passes. Tests use unheld jobs in one
 unrestricted queue. Reservation-only reset investigations are separate from
 these completed comparisons and are not published here.
+
+Fiction advances its emulated time after that handshake; host RPC elapsed time
+is not added to the simulated job schedule. `account_system_latency=false`,
+`quiescent_accumulation_window=0.0`, and `batch_job_starts=true` record the
+timing conditions. Fiction emulates execution and completion using the supplied
+actual runtimes; no resource-release delay is configured. The Fluxion hook and
+sched-simple wrapper observe scheduling state without replacing native
+allocation or reservation decisions. These controls are specific to Fiction;
+they do not use the Slurm adapter's `TIME` counter or dispatch-acknowledgement
+mechanism. Native revisions, synchronization patches, configurations and hashes
+identify the tested setup. A match applies to that recorded workload and setup.
 
 Published figures, plotting data, and compact evidence are checked into
 `docs/_static/scheduler-validation/` and `evidence/`. Raw logs, diagnostic runs,

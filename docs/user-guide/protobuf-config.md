@@ -16,7 +16,7 @@ Configuration field names match the long command-line names with the leading
 |---|---|
 | Input and output | `infile`, `infile_list`, `outfile`, `resource_trace`, `redis_uri`, `redis_key_prefix` |
 | Limits/system | `max_jobs`, `max_time`, `sim_start_time`, `total_nodes`, `capacity_schedule` |
-| Scheduling | `backfill_policy`, `priority_policy`, `num_max_candidates`, `reservation_depth`, `backfill_queue_depth`, `backfill_interval`, `dispatch_interval`, `dispatch_queue_depth`, `dispatch_on_events`, `planning_time_resolution`, `planning_horizon`, `queue_impl`, `block_size` |
+| Scheduling | `backfill_policy`, `priority_policy`, `num_max_candidates`, `reservation_depth`, `backfill_queue_depth`, `backfill_interval`, `dispatch_interval`, `dispatch_queue_depth`, `dispatch_on_events`, `per_pass_accounting`, `diagnostic_no_reservations`, `planning_time_resolution`, `planning_horizon`, `queue_impl`, `block_size` |
 | Queue storage | `wait_queue_capacity`, `wait_queue_overflow` |
 | Job storage | `job_store_capacity`, `job_store_overflow`, `job_flush_interval`, `memory_pressure_fraction` |
 | Resource history | `resource_history_capacity` |

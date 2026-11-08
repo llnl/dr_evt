@@ -1,6 +1,6 @@
 [
-  "/Users/yeom2/work/dr_evt/build/simulator",
-  "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-fixed/controls/four-job-pooled-off/dr_evt/jobs.csv",
+  "/workspace/dr_evt-builds/28a5a473b7eb70aba561ee34c768c5e393edaafd18d967be2071de2a33472fcc/simulator",
+  "/results/controls/four-job-pooled-off/dr_evt/jobs.csv",
   "--total_nodes",
   "4",
   "--trace_format",
@@ -31,7 +31,8 @@
   "--max_jobs",
   "4",
   "--outfile",
-  "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-fixed/controls/four-job-pooled-off/dr_evt/schedule.csv",
+  "/results/controls/four-job-pooled-off/dr_evt/schedule.csv",
   "--resource_trace",
-  "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-fixed/controls/four-job-pooled-off/dr_evt/resources.csv"
+  "/results/controls/four-job-pooled-off/dr_evt/resources.csv",
+  "--diagnostic_no_reservations"
 ]

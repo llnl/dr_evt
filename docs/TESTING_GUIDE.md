@@ -13,7 +13,10 @@ DR_EVT uses four complementary forms of validation:
 - [native scheduling comparisons](user-guide/SCHEDULER_VALIDATION.md) drive Flux
   through Fiction and Slurm through a virtual-time adapter under explicit
   policy and resource assumptions. The 2,000-job FCFS and license-enabled Slurm
-  comparisons match; reduced workloads isolate backfill differences.
+  comparisons matched their recorded runs; reduced workloads isolate backfill
+  differences. The Slurm adapter controls simultaneous event batching and
+  verifies dispatch acknowledgements but leaves main-versus-backfill order
+  uncontrolled, so these matches do not establish general scheduler equivalence.
 
 Agreement between implementations is a regression and consistency check. It is
 not independent proof that an algorithm is correct. Small scheduling fixtures
@@ -26,6 +29,11 @@ regression checks both immediate admission and future-reservation placement
 when a candidate ends exactly at another reservation's start. Slurm-style
 periodic hybrid/conservative backfill checks capacity at that endpoint;
 Spur-style fixed periodic dispatch with arrival notifications excludes it.
+The append-job tests distinguish protected periodic backfill from the
+no-reservation diagnostic: a later fitting job may delay the head only in
+the diagnostic mode, and simultaneous releases are processed before dispatch.
+Checkpoint tests verify diagnostic continuation and reject a restore into the
+protected policy; Python API tests cover the selector.
 The append-job tests also check fractional endpoints, zero-duration capacity
 queries, and unchanged reservation durations. See the
 [endpoint rule explanation](user-guide/SCHEDULER_LOOPS.md#shared-terms).

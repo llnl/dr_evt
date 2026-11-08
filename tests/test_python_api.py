@@ -164,6 +164,10 @@ def test_sim_params(result):
         params = dr_evt.SimParams()
 
         # Test all exposed parameters
+        assert params.diagnostic_no_reservations is False
+        params.diagnostic_no_reservations = True
+        assert params.diagnostic_no_reservations is True
+        params.diagnostic_no_reservations = False
         assert params.per_pass_accounting is False
         params.per_pass_accounting = True
         assert params.per_pass_accounting is True

@@ -1,4 +1,5 @@
 """Plot saved comparison inputs; no scheduler installation is needed."""
+import csv
 import json
 from pathlib import Path
 import sys
@@ -10,6 +11,11 @@ import numpy as np
 
 
 def comparison_title(report):
+    if report.get('diagnostic_no_reservations'):
+        return (f'Slurm bf_licenses off vs DR_EVT no-reservation diagnostic\n'
+                f'{len(report["jobs"]):,} jobs, {report["capacity"]} node equivalents; '
+                f'native backfill interval {report["backfill_interval_seconds"]} s\n'
+                f'{report.get("plot_note", "Current capacity only; no future reservations")}')
     return (f'Periodic hybrid backfill: R={report["reservation_depth"]}, '
             f'Q={report["backfill_queue_depth"]}, '
             f'interval={report["backfill_interval_seconds"]} s\n'
@@ -78,6 +84,9 @@ def plot_metrics(report, path, colors, labels):
     plt.close(fig)
     data = {
         'waiting_time_unit': wait_unit,
+        'scheduler_labels': labels,
+        'diagnostic_no_reservations': report.get('diagnostic_no_reservations', False),
+        'batch_main_dispatch': report.get('batch_main_dispatch', False),
         'waiting_summary': {name: dict(zip(('min', 'mean', 'median', 'p95', 'max'),
                                map(float, (wait.min(), wait.mean(), np.median(wait),
                                            np.percentile(wait, 95), wait.max()))))
@@ -96,19 +105,31 @@ def plot_metrics(report, path, colors, labels):
         },
     }
     path.with_name('plot-data.json').write_text(json.dumps(data, indent=2) + '\n')
+    with path.with_name('plot-summary.csv').open('w', newline='') as stream:
+        writer = csv.writer(stream)
+        keys = ('mean_wait_seconds', 'makespan_seconds', 'utilization_percent',
+                'resource_area_node_seconds')
+        writer.writerow(['scheduler', *keys])
+        for name in names:
+            writer.writerow([name, *(report[name + '_metrics'][key] for key in keys)])
 
 
 def main():
     path = Path(sys.argv[1])
     report = json.loads(path.read_text())
     colors = {'dr_evt': '#2166ac', 'slurm': '#b35806'}
-    labels = {'dr_evt': 'DR_EVT', 'slurm': report.get('slurm_label', 'Slurm simulator')}
+    labels = {'dr_evt': report.get('dr_evt_label', 'DR_EVT'), 'slurm': report.get('slurm_label', 'Slurm simulator')}
+    if report.get('diagnostic_no_reservations'):
+        labels['dr_evt'] = 'DR_EVT diagnostic\n(no reservations)'
+    if 'bf_licenses' in report:
+        labels['slurm'] = 'Slurm license pool\n(bf_licenses ' + ('on' if report['bf_licenses'] else 'off') + ')'
     fig, axes = plt.subplots(2, 2, figsize=(12, 7), constrained_layout=True)
     for name, curve in report['resource_curves'].items():
         axes[0, 0].step([t / 3600 for t, _ in curve], [n for _, n in curve],
                         where='post', label=labels[name], color=colors[name], alpha=.85)
     axes[0, 0].set(xlabel='Simulation time (hours)', ylabel='Allocated nodes',
-                    title='Periodic hybrid backfill: R=32, Q=64, interval=30 s')
+                    title=('Current capacity; no future reservations' if report.get('diagnostic_no_reservations')
+                           else 'Periodic hybrid backfill: R=32, Q=64, interval=30 s'))
     axes[0, 0].legend()
     difference = [(native['start'] - dr['start']) / 3600
                   for native, dr in zip(report['slurm_schedule'], report['dr_evt_schedule'])]

@@ -1,22 +1,13 @@
 {
-  "command": [
-    "/usr/bin/python3",
-    "/dr_evt_source/validation/slurm/licenses/event_trace.py",
-    "--bf-licenses",
-    "on",
-    "--outdir",
-    "/results/performance-on",
-    "--trace",
-    "/dr_evt_source/lassen_traces/lassen-756-01.csv"
-  ],
-  "wall_seconds": 728.6231476680114,
-  "children_user_seconds": 463.804346,
-  "children_system_seconds": 4251.915956,
-  "children_peak_rss_kib": 127164,
-  "native_driver_seconds": 716.8364973290008,
-  "native_driver_scope": "Native controller startup, virtual node registration, scheduling, completion RPCs, state observation and snapshot writes; excludes DR_EVT and plotting",
-  "full_process_scope": "Complete adapter process, including native startup/exit, DR_EVT comparison and plots",
-  "logging": "info from startup through completion",
+  "scope": "Native controller startup, virtual node registration, scheduling, completion RPCs, state observation and snapshot writes; excludes DR_EVT and plotting",
+  "platform": "Linux validation container",
+  "batch_main_dispatch": true,
+  "main_dispatch_acknowledgement": true,
+  "same_time_clock_monotonic": true,
   "interventions": [],
-  "note": "One instrumented validation run; elapsed time includes the adapter and observer, not only scheduler computation"
+  "on_seconds": 697.8356651499926,
+  "off_seconds": 739.2877493780106,
+  "on_evidence": "on/",
+  "off_evidence": "off/",
+  "note": "On was rerun with the same native and adapter binaries as off; scheduler order remains uncontrolled."
 }

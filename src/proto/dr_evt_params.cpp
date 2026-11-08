@@ -55,9 +55,8 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
   } else if (cfg.warm_start_wait_queue() == "drop") {
     sp.m_warm_start_wait_queue = WarmStartWaitQueuePolicy::DROP;
   } else {
-    throw std::runtime_error(
-        "Unknown warm_start_wait_queue in protobuf: " +
-        cfg.warm_start_wait_queue());
+    throw std::runtime_error("Unknown warm_start_wait_queue in protobuf: " +
+                             cfg.warm_start_wait_queue());
   }
 
   sp.m_is_jobs_set = (sp.m_max_jobs > 0u);
@@ -132,6 +131,7 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
   sp.m_dispatch_queue_depth = cfg.dispatch_queue_depth();
   sp.m_dispatch_on_events = cfg.dispatch_on_events();
   sp.m_per_pass_accounting = cfg.per_pass_accounting();
+  sp.m_diagnostic_no_reservations = cfg.diagnostic_no_reservations();
   if (!std::isfinite(cfg.planning_time_resolution()) ||
       cfg.planning_time_resolution() < 0.0) {
     throw std::runtime_error(

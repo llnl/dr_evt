@@ -1,0 +1,34 @@
+{
+  "revision": "17abb848e20054009d136a2c504a23e5462f26c8",
+  "version": "26.11.0-0rc2",
+  "native_source_overlays": [
+    {
+      "file": "src/plugins/sched/backfill/backfill.c",
+      "reason": "Serialize virtual event batches with native backfill cycles; no allocation or reservation algorithm changes.",
+      "base_sha256": "546de95cbd3d512c7eca4ff05cced62621cf35f8a944d0c926c09ae0a415cb81",
+      "instrumented_sha256": "a1b1367abaa596183dbafcaacb20bb73143a9e57c196d9e25e5d5a280acb747b",
+      "record": "event-overlay.json"
+    },
+    {
+      "file": "src/slurmctld/job_scheduler.c",
+      "reason": "Opt-in main-dispatch gate outside equal-time RPC batches; native selection and reservation rules retained.",
+      "base_sha256": "478bd11b57596642a7f87c71243bde121043c6a0da93e09daf832dd38b844f45",
+      "instrumented_sha256": "2b8ce067c4a9790a7b9266528ed93c335b9c3ce4672de3e0df715c001afdf99d",
+      "record": "dispatch-overlay.json"
+    }
+  ],
+  "configure_flags": [
+    "--prefix=/workspace/slurm-modern-install",
+    "--sysconfdir=/workspace/slurm-modern-etc",
+    "--enable-multiple-slurmd",
+    "--disable-x11",
+    "--with-hdf5=no",
+    "--with-hwloc=no"
+  ],
+  "source_sha256": {
+    "src/plugins/sched/backfill/backfill.c": "546de95cbd3d512c7eca4ff05cced62621cf35f8a944d0c926c09ae0a415cb81",
+    "src/plugins/select/cons_tres/job_test.c": "c99c5bf9344fd87aa041feb28d0fe67949d4d5ffe300ef2cd35a4bc0cd9971de",
+    "src/plugins/select/linear/select_linear.c": "3f7feebbeade63592c1869d6f56ce3b163c6ed1790f219a17ef8b5f21a5b3ae3",
+    "src/slurmctld/licenses.c": "02645bf7417506ef38441a38c58335e5b40330ef8e963b2f8bbd0f371bc2f35d"
+  }
+}

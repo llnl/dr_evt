@@ -34008,6 +34008,10 @@
   ],
   "slurm_label": "Slurm (license pool, bf_licenses on)",
   "capacity_label": "node equivalents",
+  "dr_evt_label": "DR_EVT (protected)",
+  "diagnostic_no_reservations": false,
+  "batch_main_dispatch": true,
+  "main_dispatch_acknowledgement": true,
   "reservation_depth": 32,
   "backfill_queue_depth": 64,
   "backfill_interval_seconds": 30,
@@ -54304,38 +54308,25 @@
     "makespan_seconds": 146245,
     "resource_area_node_seconds": 81309892,
     "utilization_percent": 73.54286792421429,
-    "process_elapsed_seconds": 716.8364973290008
+    "process_elapsed_seconds": 697.8356651499926
   },
   "dr_evt_metrics": {
     "mean_wait_seconds": 37430.432,
     "makespan_seconds": 146245.0,
     "resource_area_node_seconds": 81309892.0,
     "utilization_percent": 73.54286792421429,
-    "process_elapsed_seconds": 0.7341579579806421
+    "process_elapsed_seconds": 0.06821641599526629
   },
   "different_start_times": 0,
   "audits": {
-    "status": "passed",
-    "native": "reused saved audit",
-    "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/performance-on/lassen-prefix2000-hybrid-r32-q64",
-    "dr_evt_checks": [
-      "arrival constraints",
-      "exact runtimes",
-      "capacity",
-      "resource trace equals job schedule"
-    ]
+    "runtime_and_capacity": "passed",
+    "private_node_assignments": "passed",
+    "completed_jobs": 2000,
+    "snapshots": 7527
   },
-  "clock": "integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches",
+  "clock": "integer virtual seconds; main dispatch and backfill gated during equal-time RPC batches",
   "timing_scope": "Native controller startup, virtual node registration, scheduling, completion RPCs, state observation and snapshot writes; excludes DR_EVT and plotting",
   "max_start_difference_seconds": 0.0,
   "resource_curve_difference_node_seconds": 0,
-  "resource_curve_difference_percent": 0.0,
-  "retry_verification": {
-    "first_chronological_divergence": null,
-    "job243": {
-      "slurm_start": 5820,
-      "previous_dr_evt_start": 5850.0,
-      "fixed_dr_evt_start": 5820.0
-    }
-  }
+  "resource_curve_difference_percent": 0.0
 }

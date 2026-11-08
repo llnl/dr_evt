@@ -212,9 +212,10 @@ resumed.advance_to(1000.0);
 ```
 
 Checkpoints record the scheduling controls, including
-`per_pass_accounting`, `dispatch_on_events`, and the next tick deadline.
-This build uses checkpoint format 19; older checkpoints must be regenerated.
-Restart preserves the selected accounting policy, arrival notification
+`per_pass_accounting`, `diagnostic_no_reservations`, `dispatch_on_events`,
+and the next tick deadline.
+This build uses checkpoint format 20; older checkpoints must be regenerated.
+Restart preserves the selected reservation and accounting policies, arrival notification
 behavior, and timer phase.
 
 The checkpoint includes resident job records, appended-job status history,
