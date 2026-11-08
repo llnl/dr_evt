@@ -1,0 +1,264 @@
+{
+  "jobs": 2000,
+  "capacity": 756,
+  "bf_licenses": false,
+  "native_slurm_rerun": false,
+  "inputs": {
+    "corrected_report": {
+      "path": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-fixed/bf-licenses-off/lassen-prefix2000-hybrid-r32-q64/report.json",
+      "sha256": "8f32a46ff7abb99ff88bb1112203a6f11639481e21fda1b68fc23cac6725a9b8"
+    },
+    "inclusive_reference": {
+      "path": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/endpoint-rule-experiment/inclusive_searches/reference.py",
+      "sha256": "83e6b4d5220bfa7eaa14ff421b9dc261c850b26796183276d2a23d3fb51400b2"
+    },
+    "native_report": {
+      "path": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/paired-license-off/lassen-prefix2000-hybrid-r32-q64/report.json",
+      "sha256": "012050173527c81f7d5b63ce6f4bfa1b8c55aa2fd06a9d5ae0607f2ca5d279fc"
+    }
+  },
+  "variants": {
+    "corrected_dr_evt": {
+      "different_start_times": 1943,
+      "different_end_times": 1943,
+      "max_start_difference_seconds": 110863,
+      "resource_curve_difference_node_seconds": 12141068,
+      "resource_curve_difference_percent": 10.981307912485047,
+      "first_chronological_difference": {
+        "job": 57,
+        "slurm_start": 13,
+        "reference_start": 30
+      }
+    },
+    "no_future_protection": {
+      "different_start_times": 1941,
+      "different_end_times": 1941,
+      "max_start_difference_seconds": 38036,
+      "resource_curve_difference_node_seconds": 1264820,
+      "resource_curve_difference_percent": 1.391789504893458,
+      "first_chronological_difference": {
+        "job": 57,
+        "slurm_start": 13,
+        "reference_start": 30
+      }
+    },
+    "skip_dispatch_batched": {
+      "different_start_times": 1603,
+      "different_end_times": 1603,
+      "max_start_difference_seconds": 8057,
+      "resource_curve_difference_node_seconds": 939964,
+      "resource_curve_difference_percent": 1.0343226942787704,
+      "first_chronological_difference": {
+        "job": 232,
+        "slurm_start": 847,
+        "reference_start": 798
+      }
+    },
+    "skip_dispatch_serial": {
+      "different_start_times": 0,
+      "different_end_times": 0,
+      "max_start_difference_seconds": 0,
+      "resource_curve_difference_node_seconds": 0,
+      "resource_curve_difference_percent": 0.0,
+      "first_chronological_difference": null
+    }
+  },
+  "changes": {
+    "corrected_dr_evt": "Baseline Python reference reproduces saved corrected C++ DR_EVT",
+    "no_future_protection": "Remove only future pooled reservations; retain strict event dispatch and Q=64 periodic scans",
+    "skip_dispatch_batched": "Also consider later jobs when an earlier job cannot fit now; batch simultaneous events",
+    "skip_dispatch_serial": "Same dispatch past jobs that cannot fit now, without future pool protection; dispatch after each individual completion or arrival, completions first, job-ID order"
+  },
+  "decisions": {
+    "batched": [
+      {
+        "time": 13,
+        "events": [
+          {
+            "kind": "arrival",
+            "job": 56
+          },
+          {
+            "kind": "arrival",
+            "job": 57
+          },
+          {
+            "kind": "arrival",
+            "job": 58
+          },
+          {
+            "kind": "arrival",
+            "job": 59
+          }
+        ],
+        "free_before_dispatch": 504,
+        "starts": [
+          57,
+          58,
+          59
+        ],
+        "free_after_dispatch": 498
+      },
+      {
+        "time": 798,
+        "events": [
+          {
+            "kind": "completion",
+            "job": 135
+          },
+          {
+            "kind": "completion",
+            "job": 180
+          }
+        ],
+        "free_before_dispatch": 2,
+        "starts": [
+          232
+        ],
+        "free_after_dispatch": 0
+      }
+    ],
+    "serial": [
+      {
+        "time": 13,
+        "events": [
+          {
+            "kind": "arrival",
+            "job": 56
+          }
+        ],
+        "free_before_dispatch": 504,
+        "starts": [],
+        "free_after_dispatch": 504
+      },
+      {
+        "time": 13,
+        "events": [
+          {
+            "kind": "arrival",
+            "job": 57
+          }
+        ],
+        "free_before_dispatch": 504,
+        "starts": [
+          57
+        ],
+        "free_after_dispatch": 503
+      },
+      {
+        "time": 13,
+        "events": [
+          {
+            "kind": "arrival",
+            "job": 58
+          }
+        ],
+        "free_before_dispatch": 503,
+        "starts": [
+          58
+        ],
+        "free_after_dispatch": 502
+      },
+      {
+        "time": 13,
+        "events": [
+          {
+            "kind": "arrival",
+            "job": 59
+          }
+        ],
+        "free_before_dispatch": 502,
+        "starts": [
+          59
+        ],
+        "free_after_dispatch": 498
+      },
+      {
+        "time": 798,
+        "events": [
+          {
+            "kind": "completion",
+            "job": 135
+          }
+        ],
+        "free_before_dispatch": 1,
+        "starts": [
+          243
+        ],
+        "free_after_dispatch": 0
+      },
+      {
+        "time": 798,
+        "events": [
+          {
+            "kind": "completion",
+            "job": 180
+          }
+        ],
+        "free_before_dispatch": 1,
+        "starts": [
+          245
+        ],
+        "free_after_dispatch": 0
+      }
+    ]
+  },
+  "first_dispatch_difference": {
+    "time": 13,
+    "blocked_head": 56,
+    "head_request": 512,
+    "free_capacity": 504,
+    "jobs_started_by_native_main_dispatch": [
+      57,
+      58,
+      59
+    ],
+    "corrected_dr_evt_starts": {
+      "57": 30.0,
+      "58": 30.0,
+      "59": 68.0
+    }
+  },
+  "first_batching_difference": {
+    "time": 798,
+    "completing_jobs": [
+      135,
+      180
+    ],
+    "each_release": 1,
+    "earlier_two_license_job": 232,
+    "serial_one_license_starts": [
+      243,
+      245
+    ],
+    "native_job232_start": 847,
+    "batched_job232_start": 798
+  },
+  "source_evidence": {
+    "main_dispatch": "external/slurm/src/slurmctld/job_scheduler.c: ESLURM_LICENSES_UNAVAILABLE breaks scheduling only when bf_licenses is true",
+    "backfill": "external/slurm/src/plugins/sched/backfill/backfill.c: with bf_licenses false, license_job_test checks current availability and skips failures; future license map is absent",
+    "adapter": "validation/slurm/licenses/event_trace.py issues individual COMPLETE RPCs before RELEASE; client.c sends completion and epilog RPCs",
+    "dr_evt": "src/sim/sim.cpp applies the full equal-time state-event batch before dispatch"
+  },
+  "scope": "Exact reconstruction of this saved adapter run, not proof that production Slurm always dispatches between simultaneous completions. Real controller/RPC timing can change that ordering.",
+  "native_log_evidence": [
+    "[2020-08-19T11:29:52.000] sched: _slurm_rpc_allocate_resources JobId=56 NodeList=(null) usec=0",
+    "[2020-08-19T11:29:52.000] sched: _slurm_rpc_allocate_resources JobId=57 NodeList=(null) usec=0",
+    "[2020-08-19T11:29:52.000] sched: Allocate JobId=57 NodeList=n0056 #CPUs=1 Partition=pbatch",
+    "[2020-08-19T11:29:52.000] sched: _slurm_rpc_allocate_resources JobId=58 NodeList=(null) usec=0",
+    "[2020-08-19T11:29:52.000] sched: _slurm_rpc_allocate_resources JobId=59 NodeList=(null) usec=0",
+    "[2020-08-19T11:29:52.000] sched: Allocate JobId=58 NodeList=n0057 #CPUs=1 Partition=pbatch",
+    "[2020-08-19T11:29:52.000] sched: Allocate JobId=59 NodeList=n0058 #CPUs=1 Partition=pbatch",
+    "[2020-08-19T11:42:57.000] _job_complete: JobId=135 WEXITSTATUS 0",
+    "[2020-08-19T11:42:57.000] _job_complete: JobId=135 done",
+    "[2020-08-19T11:42:57.000] sched: Allocate JobId=243 NodeList=n0242 #CPUs=1 Partition=pbatch",
+    "[2020-08-19T11:42:57.000] _job_complete: JobId=180 WEXITSTATUS 0",
+    "[2020-08-19T11:42:57.000] _job_complete: JobId=180 done",
+    "[2020-08-19T11:42:57.000] sched: Allocate JobId=245 NodeList=n0244 #CPUs=1 Partition=pbatch",
+    "[2020-08-19T11:42:57.000] agent msg_type=REQUEST_TERMINATE_JOB ran for 23 seconds",
+    "[2020-08-19T11:43:46.000] _job_complete: JobId=210 WEXITSTATUS 0",
+    "[2020-08-19T11:43:46.000] _job_complete: JobId=210 done",
+    "[2020-08-19T11:43:46.000] sched: Allocate JobId=232 NodeList=n0231 #CPUs=1 Partition=pbatch",
+    "[2020-08-19T11:43:46.000] agent msg_type=REQUEST_TERMINATE_JOB ran for 26 seconds"
+  ]
+}
