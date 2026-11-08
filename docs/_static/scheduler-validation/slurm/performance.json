@@ -1,85 +1,60 @@
 {
-  "scheduler": "DR_EVT event-driven FCFS dispatch with periodic hybrid backfill",
+  "scheduler": "DR_EVT (protected)",
   "jobs": 2000,
   "bf_licenses_reference": true,
+  "diagnostic_no_reservations": false,
   "timing_scope": "Process launch, trace input, simulation, schedule/resource output and process exit; excludes Python output parsing, audits and plotting",
   "warmup": "The preceding validation run populated filesystem caches",
   "interventions": [],
   "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
   "machine": "arm64",
   "provenance": {
-    "native_run": "/Users/yeom2/work/dr_evt/validation/slurm/results/licenses/controlled/performance-on/lassen-prefix2000-hybrid-r32-q64",
-    "native_report_sha256": "61b68021a907860234fe20241e0cc51ed442dfaea5a328c4ff6ec2556298dd32",
-    "native_audit": {
-      "status": "passed",
-      "completed_jobs": 2000,
-      "snapshots": 7527,
-      "runtime_node_seconds": 81309892,
-      "native_snapshot_node_seconds": 81309892,
-      "dr_evt_resource_trace_node_seconds": 81309892.0,
-      "checks": [
-        "arrival constraints",
-        "exact runtimes",
-        "license capacity",
-        "private node ownership",
-        "native states and start times",
-        "snapshot allocation equals job schedule",
-        "both resource curve areas",
-        "DR_EVT resource trace equals job schedule"
-      ]
-    },
-    "binary": "/Users/yeom2/work/dr_evt/build/simulator",
-    "binary_sha256": "136883884789507014356bf57136f31a6e8a41aca25652bf58e2a0182db87bd5",
-    "simulation_source_sha256": "177be37b0c4f990021507a951471c9ea5a2098149e5d7031f2705591ecef0bd1",
-    "source_revision": "c6f941f730dfc37640e320fb15c2024b9c45628a",
-    "timing_scope": "DR_EVT subprocess and schedule parsing; native Slurm was not rerun",
-    "libdr_evt.dylib_sha256": "fd5c37038fc2b15a2f9f23e83dcae4b735d78658822c9c9a7a8b708ab6e140d1",
-    "scheduler_source_sha256": {
-      "src/sim/scheduler_base.hpp": "4a387f04870b45866bbe7b73ae31a25711d478ff1ec9426462d7ebe6fe8edc7f",
-      "src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp": "e7c5dd9c0604335cdcec51c454c3d445af925fefecffd84caaaaaa37cd06b96a",
-      "src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp": "b5049f661bc99648e3348775444c562a6f70bcee33aa9023301473d7fe7aaac6",
-      "src/sim/scheduler_fcfs_hybrid_circular.tpp": "3170a49078b1625ab0b9a8c374e6b403783ce61fe4201225e6abfb8ba2378d43"
-    }
+    "revision": "2495c4290da8c2a7f1c6efc599c9631c9058f6a3",
+    "working_tree": true,
+    "source_diff_sha256": "1ee01bd66abe0889062d46432f234b024635a33e37013011bbf7879c0fc6d5d0",
+    "binary_sha256": "9c5694b0908a71160cfe574eaa74ae4ffdb99cde77fc8e3391d8864f5752ad7d",
+    "configure_flags": "local Release build",
+    "task_validation_and_tests_finished_before_timing": true
   },
   "runs": [
     {
       "run": 1,
-      "wall_seconds": 0.0737360000202898,
-      "user_seconds": 0.053179,
-      "system_seconds": 0.015441,
+      "wall_seconds": 0.08466458399198018,
+      "user_seconds": 0.057166999999999996,
+      "system_seconds": 0.017504,
       "schedule_and_resources_identical": true
     },
     {
       "run": 2,
-      "wall_seconds": 0.0821907080244273,
-      "user_seconds": 0.052712,
-      "system_seconds": 0.019397,
+      "wall_seconds": 0.07863133400678635,
+      "user_seconds": 0.055937,
+      "system_seconds": 0.015894,
       "schedule_and_resources_identical": true
     },
     {
       "run": 3,
-      "wall_seconds": 0.0793886249884963,
-      "user_seconds": 0.05470299999999999,
-      "system_seconds": 0.018286999999999998,
+      "wall_seconds": 0.07811270898673683,
+      "user_seconds": 0.055320999999999995,
+      "system_seconds": 0.015646,
       "schedule_and_resources_identical": true
     },
     {
       "run": 4,
-      "wall_seconds": 0.07717283300007693,
-      "user_seconds": 0.054290000000000005,
-      "system_seconds": 0.016033,
+      "wall_seconds": 0.08017791699967347,
+      "user_seconds": 0.054935999999999985,
+      "system_seconds": 0.017298,
       "schedule_and_resources_identical": true
     },
     {
       "run": 5,
-      "wall_seconds": 0.07663562500965782,
-      "user_seconds": 0.05201799999999998,
-      "system_seconds": 0.015158000000000005,
+      "wall_seconds": 0.08568350001587532,
+      "user_seconds": 0.056345000000000034,
+      "system_seconds": 0.018391000000000005,
       "schedule_and_resources_identical": true
     }
   ],
-  "median_wall_seconds": 0.07717283300007693,
-  "min_wall_seconds": 0.0737360000202898,
-  "max_wall_seconds": 0.0821907080244273,
-  "mean_wall_seconds": 0.07782475820858963
+  "median_wall_seconds": 0.08017791699967347,
+  "min_wall_seconds": 0.07811270898673683,
+  "max_wall_seconds": 0.08568350001587532,
+  "mean_wall_seconds": 0.08145400880021043
 }

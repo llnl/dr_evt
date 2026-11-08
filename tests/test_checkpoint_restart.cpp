@@ -220,9 +220,8 @@ void test_exact_continuation() {
       test_exact_continuation_case(queue_impl, PriorityPolicy::FCFS,
                                    queue_depth);
     }
-    for (const auto priority_policy :
-         {PriorityPolicy::SJF, PriorityPolicy::LJF,
-          PriorityPolicy::FCFS_CONSERVATIVE}) {
+    for (const auto priority_policy : {PriorityPolicy::SJF, PriorityPolicy::LJF,
+                                       PriorityPolicy::FCFS_CONSERVATIVE}) {
       test_exact_continuation_case(QueueImplementation::CIRCULAR,
                                    priority_policy, queue_depth);
     }
@@ -341,11 +340,13 @@ void test_custom_scheduler_continuation(size_t queue_depth) {
  * restore that did not carry the flag would re-save a different checkpoint.
  */
 void test_periodic_backfill_continuation(bool fixed_periodic_dispatch = false,
-                                       bool dispatch_on_events = false) {
+                                         bool dispatch_on_events = false,
+                                         bool diagnostic = false) {
   auto params = make_params();
   params.m_queue_impl = QueueImplementation::CIRCULAR;
   params.m_backfill_policy = BackfillPolicy::HYBRID;
   params.m_reservation_depth = 1;
+  params.m_diagnostic_no_reservations = diagnostic;
   if (fixed_periodic_dispatch) {
     params.m_dispatch_interval = 4;
     params.m_dispatch_queue_depth = 3;
@@ -365,9 +366,13 @@ void test_periodic_backfill_continuation(bool fixed_periodic_dispatch = false,
   const auto expected_stats = uninterrupted.get_statistics();
   assert(expected_stats.jobs_submitted == 2 * scheduler_workload_size);
 
-  if (fixed_periodic_dispatch) {
+  if (fixed_periodic_dispatch || diagnostic) {
     auto mismatched = params;
-    mismatched.m_dispatch_on_events = !dispatch_on_events;
+    if (diagnostic) {
+      mismatched.m_diagnostic_no_reservations = false;
+    } else {
+      mismatched.m_dispatch_on_events = !dispatch_on_events;
+    }
     Simulation incompatible(mismatched);
     checkpoint.seekg(0);
     bool rejected = false;
@@ -837,6 +842,7 @@ int main() {
   test_custom_scheduler_continuation(0);
   test_custom_scheduler_continuation(2);
   test_periodic_backfill_continuation();
+  test_periodic_backfill_continuation(false, false, true);
   test_periodic_backfill_continuation(true);
   test_periodic_backfill_continuation(true, true);
   test_output_continuation();

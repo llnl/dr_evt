@@ -52,6 +52,7 @@ static constexpr int OPT_NODE_RELEASE_DELAY = 1019;
 static constexpr int OPT_NODE_RELEASE_DELAY_MODEL = 1020;
 static constexpr int OPT_NODE_RELEASE_DELAY_SPREAD = 1021;
 static constexpr int OPT_PER_PASS_ACCOUNTING = 1022;
+static constexpr int OPT_DIAGNOSTIC_NO_RESERVATIONS = 1023;
 
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
@@ -78,6 +79,8 @@ static const struct option sim_longopts[] = {
     {"dispatch_queue_depth", required_argument, 0, OPT_DISPATCH_QUEUE_DEPTH},
     {"dispatch_on_events", no_argument, 0, OPT_DISPATCH_ON_EVENTS},
     {"per_pass_accounting", no_argument, 0, OPT_PER_PASS_ACCOUNTING},
+    {"diagnostic_no_reservations", no_argument, 0,
+     OPT_DIAGNOSTIC_NO_RESERVATIONS},
     {"planning_time_resolution", required_argument, 0,
      OPT_PLANNING_TIME_RESOLUTION},
     {"planning_horizon", required_argument, 0, OPT_PLANNING_HORIZON},
@@ -125,7 +128,7 @@ Sim_Params::Sim_Params()
       m_backfill_queue_depth(0), m_backfill_interval(0.0),
       m_dispatch_interval(0.0), m_dispatch_queue_depth(0),
       m_dispatch_on_events(false), m_per_pass_accounting(false),
-      m_planning_time_resolution(0.0),
+      m_diagnostic_no_reservations(false), m_planning_time_resolution(0.0),
       m_planning_horizon(std::numeric_limits<tdiff_t>::max()),
       m_warm_start_wait_queue(WarmStartWaitQueuePolicy::INHERIT),
       m_priority_policy(PriorityPolicy::FCFS),
@@ -349,6 +352,9 @@ void Sim_Params::getopt(int &argc, char **&argv) {
       break;
     case OPT_PER_PASS_ACCOUNTING:
       m_per_pass_accounting = true;
+      break;
+    case OPT_DIAGNOSTIC_NO_RESERVATIONS:
+      m_diagnostic_no_reservations = true;
       break;
     case OPT_DISPATCH_ON_EVENTS:
       m_dispatch_on_events = true;
@@ -928,6 +934,13 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        FCFS dispatch; 0 disables periodic evaluation. Requires an\n"
          "        enabled --backfill_policy and --queue_impl circular.\n"
          "\n"
+         "    --diagnostic_no_reservations\n"
+         "        Diagnostic license-off model: consider later fitting jobs\n"
+         "        without reserving future capacity. Requires event-driven\n"
+         "        FCFS dispatch with periodic hybrid/conservative backfill.\n"
+         "        Selected once; reservation policy is compiled into the "
+         "scheduler.\n"
+         "\n"
          "    --dispatch_interval SECONDS\n"
          "        Run FCFS and backfill at periodic ticks; 0 disables.\n"
          "        Requires FCFS ordering and circular queue; cannot be used\n"
@@ -1201,6 +1214,8 @@ void Sim_Params::print() const {
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
   msg += " - per_pass_accounting: " +
          std::string(m_per_pass_accounting ? "true" : "false") + "\n";
+  msg += " - diagnostic_no_reservations: " +
+         std::string(m_diagnostic_no_reservations ? "true" : "false") + "\n";
   msg += " - dispatch_interval: " + to_string(m_dispatch_interval) + "\n";
   msg += " - dispatch_queue_depth: " + to_string(m_dispatch_queue_depth) + "\n";
   msg += " - dispatch_on_events: " + std::string(m_dispatch_on_events ? "true" : "false") + "\n";

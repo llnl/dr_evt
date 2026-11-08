@@ -21,6 +21,7 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Limit counted waiting-job examinations during backfill; accounting depends on trigger mode and policy. |
+| Scheduling | `--diagnostic_no_reservations` | Diagnostic current-capacity dispatch without future reservations; requires the periodic hybrid/conservative configuration. |
 | Scheduling | `--per_pass_accounting` | Use event-driven FCFS placement passes with per-pass Q/R counters and guarded reservation-only restarts. |
 | Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
 | Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
@@ -372,6 +373,22 @@ For combinations with conservative backfill and a candidate limit, see
 [Scheduling Loops](SCHEDULER_LOOPS.md#supported-policy-combinations).
 Notification and simultaneous-wake differences are in
 [Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
+
+### `--diagnostic_no_reservations`
+
+Select the diagnostic reference for the Slurm adapter with `bf_licenses=off`.
+At each event or periodic tick, scan eligible jobs in FCFS order and start
+any that fit the currently free capacity, continuing past jobs that cannot
+fit. No future capacity is reserved, so a later job may delay an earlier job.
+
+This opt-in template specialization requires circular FCFS ordering,
+`--dispatch_interval 0`, a positive `--backfill_interval`, and hybrid backfill
+with positive reservation depth, or conservative backfill. It cannot be
+combined with `--per_pass_accounting`, `--dispatch_on_events`, or a dispatch
+queue-depth limit. Reservation depth, backfill queue depth, planning horizon,
+and time resolution do not constrain the diagnostic scan because it builds
+no future plan. Existing scheduler loops retain their behavior and gain no
+per-job mode check.
 
 ### `--backfill_interval SECONDS`
 

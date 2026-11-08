@@ -34011,7 +34011,7 @@
   "reservation_depth": 32,
   "backfill_queue_depth": 64,
   "backfill_interval_seconds": 30,
-  "plot_note": "Native scheduling; trace-driven virtual time and completion RPCs",
+  "plot_note": "Original ungated native reference; protected DR_EVT reproduces every job",
   "bf_licenses": true,
   "resource_curves": {
     "slurm": [
@@ -54337,5 +54337,8 @@
       "previous_dr_evt_start": 5850.0,
       "fixed_dr_evt_start": 5820.0
     }
-  }
+  },
+  "dr_evt_label": "DR_EVT (protected)",
+  "batch_main_dispatch": false,
+  "main_dispatch_acknowledgement": false
 }

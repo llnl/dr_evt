@@ -1,0 +1,152 @@
+{
+  "jobs": [
+    [
+      0,
+      2,
+      120,
+      120
+    ],
+    [
+      0,
+      2,
+      180,
+      180
+    ],
+    [
+      0,
+      3,
+      60,
+      60
+    ],
+    [
+      0,
+      1,
+      120,
+      120
+    ]
+  ],
+  "capacity": 4,
+  "slurm_schedule": [
+    {
+      "start": 0,
+      "end": 120,
+      "nodes": 2,
+      "assignment": "n0000"
+    },
+    {
+      "start": 0,
+      "end": 180,
+      "nodes": 2,
+      "assignment": "n0001"
+    },
+    {
+      "start": 180,
+      "end": 240,
+      "nodes": 3,
+      "assignment": "n0002"
+    },
+    {
+      "start": 120,
+      "end": 240,
+      "nodes": 1,
+      "assignment": "n0003"
+    }
+  ],
+  "dr_evt_schedule": [
+    {
+      "start": 0.0,
+      "end": 120.0,
+      "nodes": 2
+    },
+    {
+      "start": 0.0,
+      "end": 180.0,
+      "nodes": 2
+    },
+    {
+      "start": 180.0,
+      "end": 240.0,
+      "nodes": 3
+    },
+    {
+      "start": 120.0,
+      "end": 240.0,
+      "nodes": 1
+    }
+  ],
+  "slurm_label": "Slurm (license pool, bf_licenses on)",
+  "capacity_label": "node equivalents",
+  "dr_evt_label": "DR_EVT (protected)",
+  "diagnostic_no_reservations": false,
+  "batch_main_dispatch": true,
+  "main_dispatch_acknowledgement": true,
+  "reservation_depth": 32,
+  "backfill_queue_depth": 64,
+  "backfill_interval_seconds": 30,
+  "plot_note": "Native scheduling; trace-driven virtual time and completion RPCs",
+  "bf_licenses": true,
+  "resource_curves": {
+    "slurm": [
+      [
+        0,
+        4
+      ],
+      [
+        120,
+        3
+      ],
+      [
+        180,
+        4
+      ],
+      [
+        240,
+        0
+      ]
+    ],
+    "dr_evt": [
+      [
+        0,
+        4
+      ],
+      [
+        120.0,
+        3
+      ],
+      [
+        180.0,
+        4
+      ],
+      [
+        240.0,
+        0
+      ]
+    ]
+  },
+  "slurm_metrics": {
+    "mean_wait_seconds": 75.0,
+    "makespan_seconds": 240,
+    "resource_area_node_seconds": 900,
+    "utilization_percent": 93.75,
+    "process_elapsed_seconds": 1.4901639169838745
+  },
+  "dr_evt_metrics": {
+    "mean_wait_seconds": 75.0,
+    "makespan_seconds": 240.0,
+    "resource_area_node_seconds": 900.0,
+    "utilization_percent": 93.75,
+    "process_elapsed_seconds": 0.008625917020253837
+  },
+  "different_start_times": 0,
+  "audits": {
+    "runtime_and_capacity": "passed",
+    "private_node_assignments": "passed",
+    "completed_jobs": 4,
+    "snapshots": 9
+  },
+  "clock": "integer virtual seconds; main dispatch and backfill gated during equal-time RPC batches",
+  "timing_scope": "Native controller startup, virtual node registration, scheduling, completion RPCs, state observation and snapshot writes; excludes DR_EVT and plotting",
+  "max_start_difference_seconds": 0.0,
+  "resource_curve_difference_node_seconds": 0,
+  "resource_curve_difference_percent": 0.0
+}

@@ -150,6 +150,10 @@ PYBIND11_MODULE(dr_evt, m) {
                      &Sim_Params::m_per_pass_accounting,
                      "bool: Event-driven placement passes with per-pass Q/R "
                      "accounting and guarded reservation-only retries.")
+      .def_readwrite("diagnostic_no_reservations",
+                     &Sim_Params::m_diagnostic_no_reservations,
+                     "bool: Diagnostic periodic license-off model without "
+                     "future capacity reservations.")
       .def_readwrite("dispatch_interval", &Sim_Params::m_dispatch_interval,
                      "float: Aligned interval for both FCFS and backfill; "
                      "0 disables fixed periodic dispatch.")

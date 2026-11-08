@@ -1,5 +1,11 @@
 {
   "waiting_time_unit": "hours",
+  "scheduler_labels": {
+    "dr_evt": "DR_EVT (protected)",
+    "slurm": "Slurm license pool\n(bf_licenses on)"
+  },
+  "diagnostic_no_reservations": false,
+  "batch_main_dispatch": false,
   "waiting_summary": {
     "dr_evt": {
       "min": 0.0,

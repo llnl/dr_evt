@@ -48,15 +48,28 @@ def audit(directory):
     frames = 0
     area = 0
     previous = None
+    snapshot_jobs = {}
     with opener('rt') as stream:
         for line in stream:
             frame = json.loads(line)
             now = frame['time']
             native = frame['native']
+            if native.get('snapshot_encoding') == 'job-deltas-v1':
+                for row in native['job_updates']:
+                    snapshot_jobs[row['id']] = row
+                for job_id in native.get('deleted_job_ids', []):
+                    snapshot_jobs.pop(job_id)
+                native['jobs'] = list(snapshot_jobs.values())
+            if frame.get('main_dispatch_ack_required'):
+                assert frame['main_dispatch_generation_after'] > frame['main_dispatch_generation_before']
             running = [row for row in native['jobs'] if row['state'] & 255 == 1]
             allocated = sum(int(row['licenses'].split(':')[1]) for row in running)
             assert allocated == frame['allocated_node_equivalents'] == native['license_used']
             assert native['license_total'] == capacity and allocated <= capacity
+            if report.get('main_dispatch_acknowledgement') and not report['bf_licenses']:
+                assert not any(row['state'] & 255 == 0 and
+                               int(row['licenses'].split(':')[1]) <= capacity - allocated
+                               for row in native['jobs'])
             assert len({row['assignment'] for row in running}) == len(running)
             expected = sum(row['nodes'] for row in schedule if row['start'] <= now < row['end'])
             assert allocated == expected, (now, allocated, expected)
@@ -85,6 +98,10 @@ def audit(directory):
                          'private node ownership', 'native states and start times',
                          'snapshot allocation equals job schedule', 'both resource curve areas',
                          'DR_EVT resource trace equals job schedule']}
+    if report.get('main_dispatch_acknowledgement'):
+        result['checks'].append('main dispatch acknowledged after every state-event batch')
+        if not report['bf_licenses']:
+            result['checks'].append('no fitting eligible job left waiting in the license-off pool')
     (directory / 'audit.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
 
@@ -92,4 +109,12 @@ def audit(directory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
-    audit(parser.parse_args().directory)
+    directory = parser.parse_args().directory
+    if (directory / 'report.json').exists():
+        audit(directory)
+    else:
+        cases = sorted(path for path in directory.iterdir()
+                       if path.is_dir() and (path / 'report.json').exists())
+        assert cases, 'No completed control reports found'
+        for case in cases:
+            audit(case)

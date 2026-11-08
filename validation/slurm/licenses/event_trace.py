@@ -108,7 +108,11 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                                   for path in (PREFIX / 'sbin/slurmctld', EVENT / 'sched_backfill.so',
                                                CLIENT, EVENT / 'libvalidation_clock.so')},
                 'observer': 'job-state RPC with details on transitions' if CLIENT.name == 'client_state' else 'full job-info RPC'}
-    manifest['dr_evt_scheduler'] = 'FCFSPeriodicHybridCircularScheduler (scheduler_fcfs_periodic_hybrid_circular.cpp)'
+    manifest['dr_evt_scheduler'] = ('FCFSPeriodicHybridCircularScheduler' if enabled
+                                  else 'FCFSPeriodicNoReservationCircularScheduler')
+    manifest['diagnostic_no_reservations'] = not enabled
+    manifest['main_dispatch_acknowledgement'] = batch_main_dispatch
+    manifest['same_time_clock_monotonic'] = True
     manifest['main_dispatch'] = ('deferred submissions and dispatch after complete equal-time RPC batches'
                                  if batch_main_dispatch else 'native dispatch may run between individual event RPCs')
     (directory / 'provenance.json').write_text(json.dumps(manifest, indent=2) + '\n')
@@ -158,21 +162,31 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
             # TIME holds the backfill gate and, with batch_main_dispatch, the
             # main-dispatch gate. RELEASE opens them after every event at now.
             command(f'TIME {EPOCH + now}')
+            dispatch_before = command('DISPATCH')['generation'] if batch_main_dispatch else 0
+            state_changed = False
             for index, row in list(schedule.items()):
                 if index not in completed and row['end'] == now:
                     command(f'COMPLETE {ids[index]} n{index:04d}')
                     completed.add(index)
+                    state_changed = True
             while cursor < len(jobs) and jobs[cursor][0] <= now:
                 _, tokens, limit, _ = jobs[cursor]
                 ids[cursor] = command(f'SUBMIT {tokens} {limit // 60} n{cursor:04d}')['id']
                 cursor += 1
+                state_changed = True
             command('RELEASE')
             # Observe a stable native state while virtual time remains fixed.
             previous, stable = None, 0
             deadline = time.monotonic() + 10
-            while stable < 3:
+            dispatch_after = dispatch_before
+            # RPC responses can precede the queued scheduler pass. Unchanged
+            # snapshots alone do not acknowledge dispatch, especially at t=0.
+            while stable < 3 or (batch_main_dispatch and state_changed and
+                                 dispatch_after <= dispatch_before):
                 time.sleep(.01)
                 snapshot = command('DUMP')
+                if batch_main_dispatch:
+                    dispatch_after = command('DISPATCH')['generation']
                 signature = [(row['id'], row['state'], row['start']) for row in snapshot['jobs']]
                 stable = stable + 1 if signature == previous else 0
                 previous = signature
@@ -199,12 +213,19 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                     assert state == 3 and row['end'] == EPOCH + schedule[index]['end'], row
             assert allocated <= capacity
             assert snapshot['license_total'] == capacity and snapshot['license_used'] == allocated
+            if not enabled:
+                assert not any(row['state'] & 255 == 0 and
+                               int(row['licenses'].split(':')[1]) <= capacity - allocated
+                               for row in snapshot['jobs']), ('Fitting job left waiting after dispatch', now)
             if allocated == 0 and cursor == len(jobs) and len(completed) < len(jobs):
                 idle_since = now if idle_since is None else idle_since
                 assert now - idle_since <= 60, ('Idle pool with pending jobs', snapshot)
             else:
                 idle_since = None
             snapshot_stream.write(json.dumps({'time': now, 'allocated_node_equivalents': allocated,
+                                               'main_dispatch_ack_required': batch_main_dispatch and state_changed,
+                                               'main_dispatch_generation_before': dispatch_before,
+                                               'main_dispatch_generation_after': dispatch_after,
                                                'native': snapshot}) + '\n')
             snapshot_stream.flush()
             frames += 1
@@ -224,10 +245,25 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
         native = [schedule[i] for i in range(len(jobs))]
         dr, dr_elapsed = run_dr_evt(directory / 'dr_evt', jobs,
                                     Path('/workspace/dr_evt-simulator').read_text().strip(),
-                                    capacity, 30, 32, 64, 1, 259200)
+                                    capacity, 30, 32, 64, 1, 259200,
+                                    diagnostic_no_reservations=not enabled)
+        protected_control = None
+        if not enabled and len(jobs) > 4:
+            protected, protected_elapsed = run_dr_evt(
+                directory / 'dr_evt_protected', jobs,
+                Path('/workspace/dr_evt-simulator').read_text().strip(),
+                capacity, 30, 32, 64, 1, 259200)
+            protected_control = {
+                'label': 'DR_EVT (protected control)', 'schedule': protected,
+                'metrics': metrics(jobs, protected, capacity, protected_elapsed),
+                'different_start_times': sum(a['start'] != b['start'] for a, b in zip(native, protected))}
         report = {'jobs': jobs, 'capacity': capacity, 'slurm_schedule': native, 'dr_evt_schedule': dr,
                   'slurm_label': f'Slurm (license pool, bf_licenses {"on" if enabled else "off"})',
                   'capacity_label': 'node equivalents',
+                  'dr_evt_label': 'DR_EVT (protected)' if enabled else 'DR_EVT (no-reservation diagnostic)',
+                  'diagnostic_no_reservations': not enabled,
+                  'batch_main_dispatch': batch_main_dispatch,
+                  'main_dispatch_acknowledgement': batch_main_dispatch,
                   'reservation_depth': 32, 'backfill_queue_depth': 64, 'backfill_interval_seconds': 30,
                   'plot_note': 'Native scheduling; trace-driven virtual time and completion RPCs',
                   'bf_licenses': enabled, 'resource_curves': {'slurm': profile(native), 'dr_evt': profile(dr)},
@@ -236,7 +272,10 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                   'different_start_times': sum(a['start'] != b['start'] for a, b in zip(native, dr)),
                   'audits': {'runtime_and_capacity': 'passed', 'private_node_assignments': 'passed',
                              'completed_jobs': len(completed), 'snapshots': frames},
-                  'clock': 'integer virtual seconds; main FCFS dispatch and periodic backfill serialize with event batches'}
+                  'clock': ('integer virtual seconds; main dispatch and backfill gated during equal-time RPC batches'
+                            if batch_main_dispatch else 'integer virtual seconds; main dispatch may run between RPCs')}
+        if protected_control is not None:
+            report['protected_dr_evt_control'] = protected_control
         report['timing_scope'] = ('Native controller startup, virtual node registration, scheduling, '
                                   'completion RPCs, state observation and snapshot writes; excludes DR_EVT and plotting')
         times = sorted({t for curve in report['resource_curves'].values() for t, _ in curve})
@@ -315,8 +354,7 @@ def main():
             report = run_case(args.outdir / name, jobs, 4, enabled,
                               batch_main_dispatch=args.batch_main_dispatch)
             assert [row['start'] for row in report['slurm_schedule']] == expected
-            if enabled:
-                assert [row['start'] for row in report['dr_evt_schedule']] == expected
+            assert [row['start'] for row in report['dr_evt_schedule']] == expected
             reports.append(report)
         if args.batch_main_dispatch:
             # Both releases must be visible before a later one-license job starts.
@@ -326,6 +364,7 @@ def main():
                 report = run_case(args.outdir / ('simultaneous-releases-' + ('on' if enabled else 'off')),
                                   jobs, 2, enabled, batch_main_dispatch=True)
                 assert [row['start'] for row in report['slurm_schedule']] == [0, 0, 120, 180, 180]
+                assert [row['start'] for row in report['dr_evt_schedule']] == [0, 0, 120, 180, 180]
                 reports.append(report)
         (args.outdir / 'controls.json').write_text(json.dumps(reports, indent=2) + '\n')
         for case in ('pooled', 'protection'):

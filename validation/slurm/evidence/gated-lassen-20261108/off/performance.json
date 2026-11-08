@@ -1,0 +1,60 @@
+{
+  "scheduler": "DR_EVT (diagnostic)",
+  "jobs": 2000,
+  "bf_licenses_reference": false,
+  "diagnostic_no_reservations": true,
+  "timing_scope": "Process launch, trace input, simulation, schedule/resource output and process exit; excludes Python output parsing, audits and plotting",
+  "warmup": "The preceding validation run populated filesystem caches",
+  "interventions": [],
+  "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "provenance": {
+    "revision": "2495c4290da8c2a7f1c6efc599c9631c9058f6a3",
+    "working_tree": true,
+    "source_diff_sha256": "1ee01bd66abe0889062d46432f234b024635a33e37013011bbf7879c0fc6d5d0",
+    "binary_sha256": "9c5694b0908a71160cfe574eaa74ae4ffdb99cde77fc8e3391d8864f5752ad7d",
+    "configure_flags": "local Release build",
+    "task_validation_and_tests_finished_before_timing": true
+  },
+  "runs": [
+    {
+      "run": 1,
+      "wall_seconds": 0.05731599999126047,
+      "user_seconds": 0.032087,
+      "system_seconds": 0.017154,
+      "schedule_and_resources_identical": true
+    },
+    {
+      "run": 2,
+      "wall_seconds": 0.05235549999633804,
+      "user_seconds": 0.031288,
+      "system_seconds": 0.015381999999999996,
+      "schedule_and_resources_identical": true
+    },
+    {
+      "run": 3,
+      "wall_seconds": 0.05802770800073631,
+      "user_seconds": 0.03348599999999999,
+      "system_seconds": 0.01815,
+      "schedule_and_resources_identical": true
+    },
+    {
+      "run": 4,
+      "wall_seconds": 0.05286145900026895,
+      "user_seconds": 0.032035999999999995,
+      "system_seconds": 0.016336000000000003,
+      "schedule_and_resources_identical": true
+    },
+    {
+      "run": 5,
+      "wall_seconds": 0.059868749987799674,
+      "user_seconds": 0.03298900000000002,
+      "system_seconds": 0.01972399999999999,
+      "schedule_and_resources_identical": true
+    }
+  ],
+  "median_wall_seconds": 0.05731599999126047,
+  "min_wall_seconds": 0.05235549999633804,
+  "max_wall_seconds": 0.059868749987799674,
+  "mean_wall_seconds": 0.056085883395280686
+}

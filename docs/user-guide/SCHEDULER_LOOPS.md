@@ -164,6 +164,7 @@ queue and FCFS or `fcfs_conservative` ordering; custom selectors are unsupported
 
 | Control | Current behavior |
 |---|---|
+| `--diagnostic_no_reservations` | Diagnostic periodic specialization: start fitting jobs in queue order without future reservations; Slurm license-off control only |
 | `--dispatch_interval` | Aligned ticks run both FCFS and backfill; 0 disables fixed periodic dispatch |
 | `--dispatch_on_events` | Also run the combined FCFS/backfill pass on job arrival batches without resetting ticks; requires positive dispatch interval |
 | `--dispatch_queue_depth` | Entire examined prefix per dispatch wake, including immediate starts and out-of-horizon jobs; 0 is unlimited |
@@ -225,6 +226,16 @@ becomes `--planning_horizon 300`. Its zero reservation-count setting removes
 that limit, so use conservative rather than interpreting it as R=0.
 
 Fluxion hybrid exposes `queue-depth` and `reservation-depth` for Q and R.
+For the Slurm license-off diagnostic, `--diagnostic_no_reservations` selects
+a separate template specialization of the periodic hybrid implementation.
+Event wakes and ticks scan every eligible job in FCFS order, skipping those
+that cannot fit the currently free capacity. It creates no future reservations
+and therefore provides no protection of an earlier job's planned start.
+R, Q, H, and planning resolution do not limit this scan. This reference tests
+the adapter's abstract resource pool with future license planning disabled;
+it does not represent ordinary Slurm scheduling on shared physical nodes.
+The protected periodic model and other scheduler loops are unchanged.
+
 Use DR_EVT's `--per_pass_accounting` to select its Flux-style placement loop;
 default hybrid instead shares backfill Q across calls at one timestamp.
 

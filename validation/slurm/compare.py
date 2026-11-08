@@ -155,7 +155,8 @@ SimStats={directory}/sim-stats.txt
     return [schedule[i] for i in range(len(jobs))], time.monotonic() - started
 
 
-def run_dr_evt(directory, jobs, binary, capacity, interval, reservations, depth, resolution, horizon):
+def run_dr_evt(directory, jobs, binary, capacity, interval, reservations, depth, resolution, horizon,
+               diagnostic_no_reservations=False):
     directory.mkdir(parents=True, exist_ok=False)
     with (directory / 'jobs.csv').open('w') as stream:
         writer = csv.writer(stream)
@@ -170,6 +171,8 @@ def run_dr_evt(directory, jobs, binary, capacity, interval, reservations, depth,
                '--planning_horizon', str(horizon), '--msec_output',
                '--max_jobs', str(len(jobs)), '--outfile', str(directory / 'schedule.csv'),
                '--resource_trace', str(directory / 'resources.csv')]
+    if diagnostic_no_reservations:
+        command.append('--diagnostic_no_reservations')
     (directory / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
     started = time.monotonic()
     with (directory / 'stdout.log').open('w') as log:

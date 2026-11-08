@@ -208,7 +208,26 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  size_t reservation_depth, size_t backfill_queue_depth,
                  tdiff_t backfill_interval, tdiff_t dispatch_interval,
                  size_t dispatch_queue_depth, bool dispatch_on_events,
-                 bool per_pass_accounting) {
+                 bool per_pass_accounting, bool diagnostic_no_reservations) {
+  if (diagnostic_no_reservations) {
+    if (backfill_interval <= 0.0 || !std::isfinite(backfill_interval) ||
+        dispatch_interval != 0.0 || dispatch_queue_depth != 0 ||
+        dispatch_on_events || per_pass_accounting ||
+        queue_impl != QueueImplementation::CIRCULAR ||
+        (priority_policy != PriorityPolicy::FCFS &&
+         priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) ||
+        (backfill_policy != BackfillPolicy::HYBRID &&
+         backfill_policy != BackfillPolicy::CONSERVATIVE) ||
+        (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0)) {
+      throw std::invalid_argument(
+          "diagnostic_no_reservations requires event-driven FCFS dispatch "
+          "with periodic hybrid/conservative backfill and queue_impl=circular");
+    }
+    return std::make_unique<FCFSPeriodicNoReservationCircularScheduler>(
+        total_nodes, initial_job_count, wait_queue_capacity,
+        wait_queue_overflow, backfill_policy, reservation_depth,
+        backfill_queue_depth);
+  }
   if (per_pass_accounting) {
     if (dispatch_interval != 0.0 || backfill_interval != 0.0 ||
         dispatch_queue_depth != 0 || dispatch_on_events) {

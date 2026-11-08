@@ -119,6 +119,8 @@ message InitRequest {
     bool dispatch_on_events = 30;
     // Event-driven placement passes with per-pass Q/R and guarded retries.
     bool per_pass_accounting = 31;
+    // Diagnostic periodic model: no future capacity reservations.
+    bool diagnostic_no_reservations = 32;
 
     // Planning time-limit grid for scheduler projections; zero is exact.
     double planning_time_resolution = 25;

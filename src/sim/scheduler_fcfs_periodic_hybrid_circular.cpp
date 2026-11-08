@@ -39,16 +39,24 @@ public:
 };
 } // namespace
 
-std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule(
+template <bool ProtectReservations>
+std::vector<job_no_t>
+FCFSPeriodicHybridCircularSchedulerImpl<ProtectReservations>::schedule(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
-  // Slurm includes the endpoint in both admission and reservation placement.
-  // Changing only admission leaves earlier reservations in different places.
-  return schedule_with_protection<EndpointInclusiveTimeline>(
-      free_nodes, running_jobs, current_time);
+  if constexpr (ProtectReservations) {
+    // Slurm includes the endpoint in both admission and reservation placement.
+    return schedule_with_protection<EndpointInclusiveTimeline>(
+        free_nodes, running_jobs, current_time);
+  } else {
+    // Private dummy nodes do not constrain this diagnostic capacity pool.
+    return schedule_event(free_nodes, running_jobs, current_time);
+  }
 }
 
-std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
+template <bool ProtectReservations>
+std::vector<job_no_t>
+FCFSPeriodicHybridCircularSchedulerImpl<ProtectReservations>::schedule_event(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
   sync_to(current_time);
@@ -75,6 +83,26 @@ std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
   }
 
   num_nodes_t available_nodes = free_nodes;
+  if constexpr (!ProtectReservations) {
+    // Slurm with bf_licenses off continues past jobs lacking current capacity.
+    for (size_t idx = 0; idx < m_eligible_end_idx; ++idx) {
+      auto &job = m_wait_queue[idx];
+      if (job.removed || job.nodes_requested > available_nodes) {
+        continue;
+      }
+      jobs_to_run.push_back(job.job_id);
+      available_nodes -= job.nodes_requested;
+      job.removed = true;
+      ++m_removed_count;
+    }
+    while (m_eligible_end_idx > 0 && m_wait_queue.front().removed) {
+      m_wait_queue.pop_front();
+      --m_eligible_end_idx;
+      --m_removed_count;
+    }
+    m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
+    return jobs_to_run;
+  }
   projected_starts_t projected_starts;
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
@@ -100,5 +128,8 @@ std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
   }
   return jobs_to_run;
 }
+
+template class FCFSPeriodicHybridCircularSchedulerImpl<true>;
+template class FCFSPeriodicHybridCircularSchedulerImpl<false>;
 
 } // namespace dr_evt

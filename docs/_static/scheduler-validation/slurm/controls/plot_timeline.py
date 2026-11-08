@@ -38,15 +38,16 @@ def main():
     assert on['jobs'] == off['jobs']
     panels = [('Slurm: license planning on', on['slurm_schedule']),
               ('Slurm: license planning off', off['slurm_schedule']),
-              ('DR_EVT: count-based periodic backfill', on['dr_evt_schedule'])]
+              ('DR_EVT: protected periodic backfill', on['dr_evt_schedule']),
+              ('DR_EVT: no-reservation diagnostic', off['dr_evt_schedule'])]
     data = {'jobs': on['jobs'], 'capacity': 4, 'assignments': {},
             'assignment_kind': 'one feasible mapping onto interchangeable node equivalents; '
                                'neither licenses nor DR_EVT emit these node IDs',
             'native_dummy_node_assignments': {
                 'license_on': [row['assignment'] for row in on['slurm_schedule']],
                 'license_off': [row['assignment'] for row in off['slurm_schedule']]}}
-    fig = plt.figure(figsize=(15, 9), layout='constrained')
-    grid = fig.add_gridspec(3, 2, width_ratios=(1, 2.6))
+    fig = plt.figure(figsize=(15, 11), layout='constrained')
+    grid = fig.add_gridspec(len(panels), 2, width_ratios=(1, 2.6))
     table_axis = fig.add_subplot(grid[:, 0])
     table_axis.axis('off')
     table_axis.set_title('Workload in submission order', loc='left', fontweight='bold')
@@ -57,12 +58,13 @@ def main():
     table.auto_set_font_size(False)
     table.set_fontsize(11)
     table_axis.text(0, .46, '4 node equivalents total\nFCFS; hybrid backfill\n'
-                    'R=32, Q=64; interval=30 s\nDuration equals submitted time limit',
+                    'Protected models: R=32, Q=64\nInterval=30 s; duration equals limit',
                     va='top', fontsize=12, linespacing=1.6)
     table_axis.text(0, .18, 'Observed C / D starts (seconds):\n'
                     f'License on: {on["slurm_schedule"][2]["start"]:g} / {on["slurm_schedule"][3]["start"]:g}\n'
                     f'License off: {off["slurm_schedule"][2]["start"]:g} / {off["slurm_schedule"][3]["start"]:g}\n'
-                    f'DR_EVT: {on["dr_evt_schedule"][2]["start"]:g} / {on["dr_evt_schedule"][3]["start"]:g}',
+                    f'DR_EVT protected: {on["dr_evt_schedule"][2]["start"]:g} / {on["dr_evt_schedule"][3]["start"]:g}\n'
+                    f'DR_EVT diagnostic: {off["dr_evt_schedule"][2]["start"]:g} / {off["dr_evt_schedule"][3]["start"]:g}',
                     va='top', fontsize=12, fontweight='bold', linespacing=1.6)
     table_axis.text(0, .045, 'Rows show one feasible placement.\n'
                     'Licenses have no individual node IDs.', fontsize=10, va='top')
@@ -83,7 +85,7 @@ def main():
                  ylim=(3.55, -.55), yticks=range(4), yticklabels=['N0', 'N1', 'N2', 'N3'])
         axis.set_xticks([0, 120, 180, 240, 300, 360])
         axis.grid(axis='x', alpha=.2)
-        if i == 2:
+        if i == len(panels) - 1:
             axis.set_xlabel('Time (seconds)')
     fig.suptitle('Four-job scheduling with pooled license capacity\n'
                  'Node equivalents are interchangeable; native dummy nodes do not constrain placement',

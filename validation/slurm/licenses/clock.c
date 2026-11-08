@@ -16,6 +16,7 @@ struct validation_clock {
     _Atomic int64_t seconds;
     _Atomic uint64_t microticks;
     _Atomic uint32_t phase; /* 0 idle, 1 event batch, 2 backfill, 3 dispatch */
+    _Atomic uint64_t dispatch_generation; /* completed main-dispatch passes */
 };
 static struct validation_clock *shared;
 static int batch_dispatch;
@@ -81,7 +82,15 @@ void validation_enter_dispatch(void)
 /** Release the dispatch gate after native scheduling finishes. */
 void validation_leave_dispatch(void)
 {
-    if (batch_dispatch) atomic_store(&shared->phase, 0);
+    if (batch_dispatch) {
+        atomic_fetch_add(&shared->dispatch_generation, 1);
+        atomic_store(&shared->phase, 0);
+    }
+}
+/** Read the acknowledgement only after a complete native main-dispatch pass. */
+uint64_t validation_dispatch_generation(void)
+{
+    return atomic_load(&shared->dispatch_generation);
 }
 void validation_set_time(int64_t seconds)
 {
@@ -91,8 +100,12 @@ void validation_set_time(int64_t seconds)
         if (atomic_compare_exchange_weak(&shared->phase, &expected, 1)) break;
         pause_real();
     } while (1);
-    atomic_store(&shared->seconds, seconds);
-    atomic_store(&shared->microticks, 0);
+    /* Repeating TIME at startup must not move gettimeofday() backwards:
+     * Slurm compares it with the last dispatch even with throttling off. */
+    if (atomic_load(&shared->seconds) != seconds) {
+        atomic_store(&shared->seconds, seconds);
+        atomic_store(&shared->microticks, 0);
+    }
 }
 void validation_release_batch(void) { atomic_store(&shared->phase, 0); }
 

@@ -97,5 +97,25 @@ is a simulation timing choice rather than a universal production ordering.
 are retained. This control includes a two-release regression with licenses
 enabled and disabled. It changes validation timing, not DR_EVT scheduler code.
 All eight native controls pass, including the two simultaneous-release cases.
-The corrected adapter has not yet been rerun on the full Lassen trace; the
-existing full-trace plots retain their original provenance.
+The full trace has now been rerun with a no-reservation DR_EVT reference and
+completed-dispatch acknowledgements. All 2,000 starts/completions and resource
+curves match. The first gated attempt missed the time-zero dispatch; delaying
+only those two jobs reproduces its 972 differing starts. The corrected clock
+preserves subsecond time when TIME repeats a second, and the driver waits for
+main dispatch to finish before advancing after arrivals/completions. The audit
+also checks that no fitting eligible job remains waiting in the license-off pool.
+See `validation/slurm/evidence/gated-lassen-20261108/` for the complete results,
+controlled startup/order replays, audits, plots and performance records. The
+original serial-event results above remain historical evidence.
+
+## Scope of the observed matches
+
+The adapter batches simultaneous events, then releases main scheduling and
+backfill together. It does not enforce which runs first. DR_EVT runs main
+scheduling first and does not reproduce every order Slurm can use. The exact
+license-on and diagnostic license-off matches are observations for recorded
+runs, not evidence of equivalence across native scheduling orders. The two
+delayed starts in the gated license-on run do not bound possible divergence.
+Enforcing main scheduling before backfill would test that specific ordering.
+The gated license-on run predates the final adapter clock and acknowledgement
+corrections and has not been rerun with them.

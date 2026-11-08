@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "completed_jobs": 5,
+  "snapshots": 10,
+  "runtime_node_seconds": 480,
+  "native_snapshot_node_seconds": 480,
+  "dr_evt_resource_trace_node_seconds": 480.0,
+  "checks": [
+    "arrival constraints",
+    "exact runtimes",
+    "license capacity",
+    "private node ownership",
+    "native states and start times",
+    "snapshot allocation equals job schedule",
+    "both resource curve areas",
+    "DR_EVT resource trace equals job schedule",
+    "main dispatch acknowledged after every state-event batch"
+  ]
+}

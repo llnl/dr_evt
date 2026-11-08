@@ -63,10 +63,11 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    19; // 19: placement-pass accounting; 18: arrival dispatch wakes;
-        // 17: dispatch controls; 16: periodic dirty flag; 15: periodic deadline;
-        // 14: backfill_queue_depth; 13: scalar
-        // event/sample times; 12: release delay; 11: reservation_depth
+    20; // 20: diagnostic reservation policy; 19: placement-pass accounting;
+        // 18: arrival dispatch wakes;
+        // 17: dispatch controls; 16: periodic dirty flag; 15: periodic
+        // deadline; 14: backfill_queue_depth; 13: scalar event/sample times;
+        // 12: release delay; 11: reservation_depth
 
 /// Trace policy identifier stored in a checkpoint so a file written by one
 /// trace type is not restored into another.
@@ -376,7 +377,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
           m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting)),
+          m_params.m_per_pass_accounting,
+          m_params.m_diagnostic_no_reservations)),
       m_custom_scheduler(nullptr), m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -1607,6 +1609,9 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(recorded.m_per_pass_accounting,
                              m_params.m_per_pass_accounting,
                              "per_pass_accounting");
+    require_checkpoint_match(recorded.m_diagnostic_no_reservations,
+                             m_params.m_diagnostic_no_reservations,
+                             "diagnostic_no_reservations");
     require_checkpoint_match(recorded.m_dispatch_on_events,
                              m_params.m_dispatch_on_events, "dispatch_on_events");
     require_checkpoint_match(recorded.m_dispatch_interval,
@@ -1991,7 +1996,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
           m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting);
+          m_params.m_per_pass_accounting,
+          m_params.m_diagnostic_no_reservations);
       m_scheduler->set_planning_time_resolution(
           m_params.m_planning_time_resolution);
       m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -2361,6 +2367,11 @@ BasicSimulation<TraceType>::get_job_statuses(
   // Every projected job consumes its run window in this query-local serial
   // forecast. An out-of-horizon job remains ESTIMATED rather than RESERVED.
   Reservation_Timeline reservation_profile(std::move(profile));
+  auto forecast_policy = m_params.m_backfill_policy;
+  if (m_params.m_diagnostic_no_reservations) {
+    // Diagnostic forecasts are estimates, never protected reservations.
+    forecast_policy = BackfillPolicy::NONE;
+  }
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   size_t projected_count = 0;
@@ -2384,7 +2395,7 @@ BasicSimulation<TraceType>::get_job_statuses(
     const bool within_horizon =
         *start - m_current_time <= m_params.m_planning_horizon;
     bool reserved = false;
-    switch (m_params.m_backfill_policy) {
+    switch (forecast_policy) {
     case BackfillPolicy::EASY:
       if (!starts_now && !easy_blocked_head_seen) {
         easy_blocked_head_seen = true;
@@ -2601,6 +2612,11 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
 
   // Reserve only the policy-protected jobs.  Unreserved jobs contribute to
   // cumulative demand below, rather than receiving individual placements.
+  auto forecast_policy = m_params.m_backfill_policy;
+  if (m_params.m_diagnostic_no_reservations) {
+    // Diagnostic forecasts are estimates, never protected reservations.
+    forecast_policy = BackfillPolicy::NONE;
+  }
   bool easy_blocked_head_seen = false;
   size_t hybrid_reserved = 0;
   for (size_t queue_pos = 0; queue_pos < result_count; ++queue_pos) {
@@ -2613,10 +2629,10 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
     bool reserved = false;
     std::optional<sim_time_t> reservation;
     const bool may_reserve =
-        m_params.m_backfill_policy == BackfillPolicy::CONSERVATIVE ||
-        (m_params.m_backfill_policy == BackfillPolicy::HYBRID &&
+        forecast_policy == BackfillPolicy::CONSERVATIVE ||
+        (forecast_policy == BackfillPolicy::HYBRID &&
          hybrid_reserved < m_params.m_reservation_depth) ||
-        (m_params.m_backfill_policy == BackfillPolicy::EASY &&
+        (forecast_policy == BackfillPolicy::EASY &&
          !easy_blocked_head_seen);
     if (may_reserve) {
       reservation = earliest_fit(profile, nodes, limit, earliest);
@@ -2624,16 +2640,16 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
       const bool within_horizon =
           reservation &&
           *reservation - m_current_time <= m_params.m_planning_horizon;
-      if (m_params.m_backfill_policy == BackfillPolicy::EASY) {
+      if (forecast_policy == BackfillPolicy::EASY) {
         if (!starts_now) {
           easy_blocked_head_seen = true;
           reserved = within_horizon;
         }
-      } else if (m_params.m_backfill_policy == BackfillPolicy::HYBRID) {
+      } else if (forecast_policy == BackfillPolicy::HYBRID) {
         reserved = !starts_now && within_horizon;
         if (reserved)
           ++hybrid_reserved;
-      } else if (m_params.m_backfill_policy == BackfillPolicy::CONSERVATIVE) {
+      } else if (forecast_policy == BackfillPolicy::CONSERVATIVE) {
         reserved = !starts_now && within_horizon;
       }
       if (reserved)

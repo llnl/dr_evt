@@ -1844,6 +1844,68 @@ void test_periodic_easy_scheduler_selection() {
   std::cout << "  PASSED" << std::endl;
 }
 
+/** @brief Distinguish protected backfill from the no-reservation diagnostic. */
+void test_diagnostic_no_reservations() {
+  for (const bool diagnostic : {false, true}) {
+    auto params = make_params();
+    params.m_total_nodes = 4;
+    params.m_backfill_policy = BackfillPolicy::HYBRID;
+    params.m_reservation_depth = 32;
+    params.m_backfill_interval = 30;
+    params.m_diagnostic_no_reservations = diagnostic;
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+    std::vector<job_no_t> jobs;
+    // The first release is between ticks, so the diagnostic must dispatch
+    // the fitting later job immediately rather than waiting for a timer.
+    jobs.push_back(sim.append_job(0, 2, kTestQueueInput, 121));
+    jobs.push_back(sim.append_job(0, 2, kTestQueueInput, 180));
+    jobs.push_back(sim.append_job(0, 4, kTestQueueInput, 60));
+    jobs.push_back(sim.append_job(0, 1, kTestQueueInput, 120));
+    sim.advance_to(1);
+    const auto pending = sim.get_job_statuses({jobs[2]});
+    assert(pending[0].start_time_kind ==
+           (diagnostic ? Simulation::Start_Time_Kind::ESTIMATED
+                       : Simulation::Start_Time_Kind::RESERVED));
+    sim.advance_to(400);
+    const auto statuses = sim.get_job_statuses(jobs);
+    const std::vector<double> expected =
+        diagnostic ? std::vector<double>{0, 0, 241, 121}
+                   : std::vector<double>{0, 0, 180, 240};
+    for (size_t i = 0; i < jobs.size(); ++i) {
+      assert(statuses[i].start_time == expected[i]);
+    }
+  }
+  auto params = make_params();
+  params.m_total_nodes = 2;
+  params.m_backfill_policy = BackfillPolicy::HYBRID;
+  params.m_reservation_depth = 32;
+  params.m_backfill_interval = 30;
+  params.m_diagnostic_no_reservations = true;
+  Simulation sim(params);
+  sim.get_trace().load_data(0);
+  std::vector<job_no_t> jobs;
+  jobs.push_back(sim.append_job(0, 1, kTestQueueInput, 120));
+  jobs.push_back(sim.append_job(0, 1, kTestQueueInput, 120));
+  jobs.push_back(sim.append_job(1, 2, kTestQueueInput, 60));
+  jobs.push_back(sim.append_job(1, 1, kTestQueueInput, 60));
+  jobs.push_back(sim.append_job(1, 1, kTestQueueInput, 60));
+  sim.advance_to(300);
+  const auto statuses = sim.get_job_statuses(jobs);
+  const std::vector<double> expected{0, 0, 120, 180, 180};
+  for (size_t i = 0; i < jobs.size(); ++i) {
+    assert(statuses[i].start_time == expected[i]);
+  }
+  params.m_backfill_interval = 0;
+  bool rejected = false;
+  try {
+    Simulation incompatible(params);
+  } catch (const std::invalid_argument &) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
 // Periodic hybrid evaluation retains event-driven FCFS dispatch, but reserves
 // backfill scans for ticks. A candidate that arrives between ticks therefore
 // waits for the first tick even though it fits before the blocked head.
@@ -2152,7 +2214,8 @@ void test_fixed_periodic_backfill() {
 
 // Timer and arrival batches share the same bounded FCFS/backfill pass.
 void test_fixed_periodic_dispatch_on_arrivals() {
-  std::cout << "\n=== Fixed periodic dispatch with arrival wakes ===" << std::endl;
+  std::cout << "\n=== Fixed periodic dispatch with arrival wakes ==="
+            << std::endl;
   for (const auto policy :
        {BackfillPolicy::NONE, BackfillPolicy::EASY, BackfillPolicy::HYBRID,
         BackfillPolicy::CONSERVATIVE}) {
@@ -2227,7 +2290,8 @@ void test_fixed_periodic_dispatch_on_arrivals() {
   assert(batches.get_job_statuses({new_arrival})[0].start_time == 5);
 
   // A completion and newly submitted job at the same API boundary must be
-  // processed before one FCFS/backfill pass, even when the queue was synced first.
+  // processed before one FCFS/backfill pass, even when the queue was synced
+  // first.
   auto boundary_params = params;
   boundary_params.m_total_nodes = 1;
   Simulation boundary(boundary_params);
@@ -2400,6 +2464,7 @@ int main() {
     test_resource_area_and_time_accounted_utilization();
     test_prediction_horizon();
     test_periodic_hybrid_backfill();
+    test_diagnostic_no_reservations();
     test_periodic_backfill_idle_ticks();
     test_periodic_backfill_run_until_exclusive();
     test_periodic_easy_scheduler_selection();

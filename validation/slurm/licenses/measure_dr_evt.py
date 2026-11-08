@@ -45,10 +45,12 @@ def main():
                              'system_seconds': after.ru_stime - before.ru_stime,
                              'schedule_and_resources_identical': True})
     times = [row['wall_seconds'] for row in measurements]
+    report = json.loads((result / 'report.json').read_text())
     performance = {
-        'scheduler': 'DR_EVT event-driven FCFS dispatch with periodic hybrid backfill',
+        'scheduler': report.get('dr_evt_label', 'DR_EVT event-driven FCFS dispatch with periodic hybrid backfill'),
         'jobs': len(json.loads((result / 'report.json').read_text())['jobs']),
-        'bf_licenses_reference': True,
+        'bf_licenses_reference': report.get('bf_licenses', True),
+        'diagnostic_no_reservations': report.get('diagnostic_no_reservations', False),
         'timing_scope': 'Process launch, trace input, simulation, schedule/resource output and process exit; excludes Python output parsing, audits and plotting',
         'warmup': 'The preceding validation run populated filesystem caches',
         'interventions': [], 'platform': platform.platform(),

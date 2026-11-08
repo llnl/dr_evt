@@ -26,6 +26,11 @@ regression checks both immediate admission and future-reservation placement
 when a candidate ends exactly at another reservation's start. Slurm-style
 periodic hybrid/conservative backfill checks capacity at that endpoint;
 Spur-style fixed periodic dispatch with arrival notifications excludes it.
+The append-job tests distinguish protected periodic backfill from the
+no-reservation diagnostic: a later fitting job may delay the head only in
+the diagnostic mode, and simultaneous releases are processed before dispatch.
+Checkpoint tests verify diagnostic continuation and reject a restore into the
+protected policy; Python API tests cover the selector.
 The append-job tests also check fractional endpoints, zero-duration capacity
 queries, and unchanged reservation durations. See the
 [endpoint rule explanation](user-guide/SCHEDULER_LOOPS.md#shared-terms).
