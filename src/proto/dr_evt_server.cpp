@@ -209,12 +209,10 @@ public:
             sp.m_warm_start_wait_queue =
                 dr_evt::WarmStartWaitQueuePolicy::INHERIT;
           } else if (r.warm_start_wait_queue() == "drop") {
-            sp.m_warm_start_wait_queue =
-                dr_evt::WarmStartWaitQueuePolicy::DROP;
+            sp.m_warm_start_wait_queue = dr_evt::WarmStartWaitQueuePolicy::DROP;
           } else {
-            throw std::runtime_error(
-                "Unknown warm_start_wait_queue: " +
-                r.warm_start_wait_queue());
+            throw std::runtime_error("Unknown warm_start_wait_queue: " +
+                                     r.warm_start_wait_queue());
           }
           sp.m_redis_uri = r.redis_uri();
           sp.m_redis_key_prefix = r.redis_key_prefix();
@@ -438,10 +436,10 @@ public:
             } else if (status.expected_start_time) {
               job->set_expected_start_time(*status.expected_start_time);
               using StartTimeKind = dr_evt::Simulation::Start_Time_Kind;
-              job->set_start_time_kind(
-                  status.start_time_kind == StartTimeKind::RESERVED
-                      ? START_TIME_KIND_RESERVED
-                      : START_TIME_KIND_ESTIMATED);
+              job->set_start_time_kind(status.start_time_kind ==
+                                               StartTimeKind::RESERVED
+                                           ? START_TIME_KIND_RESERVED
+                                           : START_TIME_KIND_ESTIMATED);
             }
           }
           break;

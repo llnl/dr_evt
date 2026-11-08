@@ -146,8 +146,7 @@ PYBIND11_MODULE(dr_evt, m) {
                      "dispatch stays event-driven. 0 (default) backfills at "
                      "every event. Requires an enabled backfill policy and "
                      "FCFS ordering.")
-      .def_readwrite("per_pass_accounting",
-                     &Sim_Params::m_per_pass_accounting,
+      .def_readwrite("per_pass_accounting", &Sim_Params::m_per_pass_accounting,
                      "bool: Event-driven placement passes with per-pass Q/R "
                      "accounting and guarded reservation-only retries.")
       .def_readwrite("diagnostic_no_reservations",
@@ -157,12 +156,14 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readwrite("dispatch_interval", &Sim_Params::m_dispatch_interval,
                      "float: Aligned interval for both FCFS and backfill; "
                      "0 disables fixed periodic dispatch.")
-      .def_readwrite("dispatch_on_events", &Sim_Params::m_dispatch_on_events,
-                     "bool: Also run fixed periodic dispatch on arrival batches without "
-                     "resetting periodic ticks; requires dispatch_interval > 0.")
-      .def_readwrite("dispatch_queue_depth", &Sim_Params::m_dispatch_queue_depth,
-                     "int: Entire candidate prefix per dispatch wake, including "
-                     "immediate FCFS starts; 0 is unlimited.")
+      .def_readwrite(
+          "dispatch_on_events", &Sim_Params::m_dispatch_on_events,
+          "bool: Also run fixed periodic dispatch on arrival batches without "
+          "resetting periodic ticks; requires dispatch_interval > 0.")
+      .def_readwrite(
+          "dispatch_queue_depth", &Sim_Params::m_dispatch_queue_depth,
+          "int: Entire candidate prefix per dispatch wake, including "
+          "immediate FCFS starts; 0 is unlimited.")
       .def_readwrite("planning_time_resolution",
                      &Sim_Params::m_planning_time_resolution,
                      "float: Grid, in seconds, that planned run times are "

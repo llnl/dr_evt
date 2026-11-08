@@ -320,6 +320,7 @@ jobs:
           echo "========================================"
           ./tests/run_grpc_tests.sh
 
+      # Includes the protected/no-reservation periodic scheduling regressions.
       - name: Run Append-Job Tests
         id: append-job
         run: |

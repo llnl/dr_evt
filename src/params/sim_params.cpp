@@ -65,8 +65,7 @@ static const struct option sim_longopts[] = {
     {"total_nodes", required_argument, 0, 'n'},
     {"capacity_schedule", required_argument, 0, OPT_CAPACITY_SCHEDULE},
     {"sim_start_time", required_argument, 0, OPT_SIM_START_TIME},
-    {"warm_start_wait_queue", required_argument, 0,
-     OPT_WARM_START_WAIT_QUEUE},
+    {"warm_start_wait_queue", required_argument, 0, OPT_WARM_START_WAIT_QUEUE},
     {"outfile", required_argument, 0, 'o'},
     {"seed", required_argument, 0, 's'},
     {"max_time", required_argument, 0, 't'},
@@ -864,7 +863,8 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "\n"
          "    --warm_start_wait_queue {inherit|drop}\n"
          "        For replay warm starts, inherit (default) reconstructs jobs\n"
-         "        waiting at TIME with their original submit times; drop keeps\n"
+         "        waiting at TIME with their original submit times; drop "
+         "keeps\n"
          "        the legacy behavior of omitting them.\n"
          "\n"
          "    -o, --outfile\n"
@@ -924,9 +924,11 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "\n"
          "    --per_pass_accounting\n"
          "        Event-driven placement passes: immediate starts and future\n"
-         "        reservations share --backfill_queue_depth; Q/R reset per pass.\n"
+         "        reservations share --backfill_queue_depth; Q/R reset per "
+         "pass.\n"
          "        Reservation-only retries stop when their plan is unchanged.\n"
-         "        Requires FCFS, circular queue, and unlimited planning horizon.\n"
+         "        Requires FCFS, circular queue, and unlimited planning "
+         "horizon.\n"
          "\n"
          "    --backfill_interval SECONDS\n"
          "        Run periodic backfill evaluations while retaining "
@@ -1196,11 +1198,12 @@ void Sim_Params::print() const {
   msg += " - max_jobs: " + to_string(m_max_jobs) + "\n";
   msg += " - max_time: " + to_string(m_max_time) + "\n";
   msg += " - sim_start_time: " + to_string(m_sim_start_time) + "\n";
-  msg += " - warm_start_wait_queue: " +
-         std::string(m_warm_start_wait_queue == WarmStartWaitQueuePolicy::INHERIT
-                         ? "inherit"
-                         : "drop") +
-         "\n";
+  msg +=
+      " - warm_start_wait_queue: " +
+      std::string(m_warm_start_wait_queue == WarmStartWaitQueuePolicy::INHERIT
+                      ? "inherit"
+                      : "drop") +
+      "\n";
   msg += " - infile: " + m_infile + "\n";
   msg += " - outfile: " + m_outfile + "\n";
   msg += " - redis_uri: " + m_redis_uri + "\n";
@@ -1209,8 +1212,7 @@ void Sim_Params::print() const {
   msg += " - capacity_schedule: " + m_capacity_schedule + "\n";
   msg += " - num_max_candidates: " + to_string(m_num_max_candidates) + "\n";
   msg += " - reservation_depth: " + to_string(m_reservation_depth) + "\n";
-  msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) +
-         "\n";
+  msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) + "\n";
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
   msg += " - per_pass_accounting: " +
          std::string(m_per_pass_accounting ? "true" : "false") + "\n";
@@ -1218,9 +1220,11 @@ void Sim_Params::print() const {
          std::string(m_diagnostic_no_reservations ? "true" : "false") + "\n";
   msg += " - dispatch_interval: " + to_string(m_dispatch_interval) + "\n";
   msg += " - dispatch_queue_depth: " + to_string(m_dispatch_queue_depth) + "\n";
-  msg += " - dispatch_on_events: " + std::string(m_dispatch_on_events ? "true" : "false") + "\n";
-  msg += " - planning_time_resolution: " +
-         to_string(m_planning_time_resolution) + "\n";
+  msg += " - dispatch_on_events: " +
+         std::string(m_dispatch_on_events ? "true" : "false") + "\n";
+  msg +=
+      " - planning_time_resolution: " + to_string(m_planning_time_resolution) +
+      "\n";
   msg += " - planning_horizon: ";
   if (m_planning_horizon == std::numeric_limits<tdiff_t>::max()) {
     msg += "unlimited\n";

@@ -18,9 +18,9 @@
 #include "sim/scheduler_fcfs_hybrid_deque.hpp"
 #include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
 #include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
-#include "sim/scheduler_periodic_fcfs_hybrid_circular.hpp"
 #include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include "sim/scheduler_ljf_easy.hpp"
+#include "sim/scheduler_periodic_fcfs_hybrid_circular.hpp"
 #include "sim/scheduler_sjf_easy.hpp"
 #include <algorithm>
 #include <cmath>
@@ -249,34 +249,43 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
         wait_queue_overflow, reservation_depth, backfill_queue_depth);
   }
   if (dispatch_on_events && dispatch_interval <= 0.0) {
-    throw std::invalid_argument("dispatch_on_events requires dispatch_interval > 0");
+    throw std::invalid_argument(
+        "dispatch_on_events requires dispatch_interval > 0");
   }
   if (!std::isfinite(dispatch_interval) || dispatch_interval < 0.0) {
-    throw std::invalid_argument("dispatch_interval must be finite and nonnegative");
+    throw std::invalid_argument(
+        "dispatch_interval must be finite and nonnegative");
   }
   if (dispatch_interval > 0.0) {
     if (backfill_interval != 0.0) {
-      throw std::invalid_argument("dispatch_interval and backfill_interval are mutually exclusive");
+      throw std::invalid_argument(
+          "dispatch_interval and backfill_interval are mutually exclusive");
     }
     if (priority_policy != PriorityPolicy::FCFS &&
         priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) {
-      throw std::invalid_argument("fixed periodic dispatch requires FCFS ordering");
+      throw std::invalid_argument(
+          "fixed periodic dispatch requires FCFS ordering");
     }
     if (queue_impl != QueueImplementation::CIRCULAR) {
-      throw std::invalid_argument("fixed periodic dispatch requires queue_impl=circular");
+      throw std::invalid_argument(
+          "fixed periodic dispatch requires queue_impl=circular");
     }
     if (backfill_queue_depth != 0) {
-      throw std::invalid_argument("use dispatch_queue_depth instead of backfill_queue_depth for fixed periodic dispatch");
+      throw std::invalid_argument(
+          "use dispatch_queue_depth instead of backfill_queue_depth for fixed "
+          "periodic dispatch");
     }
     if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
-      throw std::invalid_argument("hybrid backfilling requires reservation_depth > 0");
+      throw std::invalid_argument(
+          "hybrid backfilling requires reservation_depth > 0");
     }
     return std::make_unique<PeriodicFCFSHybridCircularScheduler>(
         total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
         wait_queue_overflow, reservation_depth, dispatch_queue_depth);
   }
   if (dispatch_queue_depth != 0) {
-    throw std::invalid_argument("dispatch_queue_depth requires dispatch_interval > 0");
+    throw std::invalid_argument(
+        "dispatch_queue_depth requires dispatch_interval > 0");
   }
   if (!std::isfinite(backfill_interval) || backfill_interval < 0.0) {
     throw std::invalid_argument(

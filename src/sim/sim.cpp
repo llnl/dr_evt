@@ -1613,11 +1613,13 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
                              m_params.m_diagnostic_no_reservations,
                              "diagnostic_no_reservations");
     require_checkpoint_match(recorded.m_dispatch_on_events,
-                             m_params.m_dispatch_on_events, "dispatch_on_events");
+                             m_params.m_dispatch_on_events,
+                             "dispatch_on_events");
     require_checkpoint_match(recorded.m_dispatch_interval,
                              m_params.m_dispatch_interval, "dispatch_interval");
     require_checkpoint_match(recorded.m_dispatch_queue_depth,
-                             m_params.m_dispatch_queue_depth, "dispatch_queue_depth");
+                             m_params.m_dispatch_queue_depth,
+                             "dispatch_queue_depth");
     require_checkpoint_match(recorded.m_backfill_interval,
                              m_params.m_backfill_interval, "backfill_interval");
     require_checkpoint_match(recorded.m_planning_time_resolution,
@@ -2632,8 +2634,7 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
         forecast_policy == BackfillPolicy::CONSERVATIVE ||
         (forecast_policy == BackfillPolicy::HYBRID &&
          hybrid_reserved < m_params.m_reservation_depth) ||
-        (forecast_policy == BackfillPolicy::EASY &&
-         !easy_blocked_head_seen);
+        (forecast_policy == BackfillPolicy::EASY && !easy_blocked_head_seen);
     if (may_reserve) {
       reservation = earliest_fit(profile, nodes, limit, earliest);
       const bool starts_now = reservation && *reservation <= m_current_time;
@@ -2836,7 +2837,8 @@ void BasicSimulation<TraceType>::align_backfill_tick() {
     return;
   }
   if (m_next_backfill_evaluation == std::numeric_limits<sim_time_t>::max()) {
-    m_next_backfill_evaluation = m_current_time + m_params.scheduling_interval();
+    m_next_backfill_evaluation =
+        m_current_time + m_params.scheduling_interval();
   } else if (m_next_backfill_evaluation < m_current_time) {
     // Ticks are not consumed while nothing waits, and the clock may have
     // moved past one at the end of the previous call. Keep the cadence but
@@ -2982,7 +2984,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
     align_backfill_tick();
   }
   m_scheduler->sync_to(m_current_time);
-  [[maybe_unused]] const bool initial_arrivals = record_queue_arrivals(m_current_time);
+  [[maybe_unused]] const bool initial_arrivals =
+      record_queue_arrivals(m_current_time);
   const bool initial_capacity_changed = apply_capacity_changes(m_current_time);
   if constexpr (AccountResources) {
     if (initial_capacity_changed) {
@@ -3010,10 +3013,11 @@ void BasicSimulation<TraceType>::advance_to_impl(
       publish_capacity_outlook();
       auto jobs_to_run = [&] {
         if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
-          return periodic_scheduler->schedule_event(
-              free_nodes, m_running_jobs, m_current_time);
+          return periodic_scheduler->schedule_event(free_nodes, m_running_jobs,
+                                                    m_current_time);
         } else {
-          return m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+          return m_scheduler->schedule(free_nodes, m_running_jobs,
+                                       m_current_time);
         }
       }();
 
@@ -3178,7 +3182,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
             // No nodes were freed yet. Leave the job's original limit in
             // the running map: it remains unavailable through cleanup, but
             // the sampled cleanup release is not projected into a protected
-            // reservation. RELEASE updates state for the next permitted decision.
+            // reservation. RELEASE updates state for the next permitted
+            // decision.
             ++m_jobs_releasing;
           } else {
             processed_end_event = true;
@@ -3286,7 +3291,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
       } else {
         record_queue_arrivals(m_current_time);
       }
-      periodic_evaluation = fixed_periodic_dispatch || m_periodic_backfill_dirty;
+      periodic_evaluation =
+          fixed_periodic_dispatch || m_periodic_backfill_dirty;
       should_schedule = periodic_evaluation;
       m_next_backfill_evaluation += m_params.scheduling_interval();
     } else {
@@ -3308,8 +3314,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
     // not turn the next ordinary event into a backfill pass; the catch-up at
     // the end of the iteration moves it to the next tick instead.
     if constexpr (PeriodicBackfill) {
-      // An idle jump can cross unused ticks. For fixed periodic dispatch, restore
-      // the phase before deciding whether this event is exactly on a tick.
+      // An idle jump can cross unused ticks. For fixed periodic dispatch,
+      // restore the phase before deciding whether this event is exactly on a
+      // tick.
       if constexpr (FixedPeriodicDispatch) {
         align_backfill_tick();
       }
@@ -3321,8 +3328,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
       if constexpr (FixedPeriodicDispatch) {
         should_schedule = periodic_evaluation;
         if constexpr (DispatchOnEvents) {
-          should_schedule = should_schedule || arrival_notification ||
-                            (initial_notification && m_current_time == initial_time);
+          should_schedule =
+              should_schedule || arrival_notification ||
+              (initial_notification && m_current_time == initial_time);
           initial_notification = false;
         }
       }
@@ -3348,7 +3356,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
                        : periodic_scheduler->schedule_event(
                              free_nodes, m_running_jobs, m_current_time);
           } else {
-            return m_scheduler->schedule(free_nodes, m_running_jobs, m_current_time);
+            return m_scheduler->schedule(free_nodes, m_running_jobs,
+                                         m_current_time);
           }
         }();
 
@@ -3386,7 +3395,8 @@ void BasicSimulation<TraceType>::advance_to_impl(
             break; // Process only one START event per job
           }
         }
-        // A fixed periodic dispatch cycle examines its prefix once, including FCFS starts.
+        // A fixed periodic dispatch cycle examines its prefix once, including
+        // FCFS starts.
         if constexpr (FixedPeriodicDispatch) {
           break;
         }

@@ -107,6 +107,8 @@ jobs:
           $GITHUB_WORKSPACE/install/bin/tests/test_progressive_load
           $GITHUB_WORKSPACE/install/bin/tests/test_queue_input
 
+      # Covers protected versus no-reservation periodic dispatch, simultaneous
+      # releases, and pending-start classification, with assertions enabled.
       - name: Run Streaming Append API Tests
         id: append-job
         run: $GITHUB_WORKSPACE/install/bin/tests/test_append_job_api

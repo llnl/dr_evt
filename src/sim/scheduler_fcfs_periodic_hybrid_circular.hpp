@@ -27,6 +27,9 @@ namespace dr_evt {
  * searches include capacity changes at the requested interval's endpoint,
  * matching Slurm. Capacity reservations remain half-open intervals.
  * The simulation driver controls these wakes.
+ * @note The driver runs event dispatch before backfill when both are due.
+ * Native Slurm can use another order; the validation adapter's event-batch
+ * gate does not impose this order on Slurm.
  * @tparam ProtectReservations Preserve future capacity reservations when true.
  * False selects the diagnostic license-off model: consider later jobs when
  * an earlier job cannot fit now, without reserving future capacity.
@@ -98,7 +101,7 @@ protected:
   bool horizon_skipped_job_uses_depth_slot() const override { return true; }
 };
 
-/// Production comparison model with protected future capacity.
+/// Abstract-capacity comparison model with protected future capacity.
 using FCFSPeriodicHybridCircularScheduler =
     FCFSPeriodicHybridCircularSchedulerImpl<true>;
 /// Diagnostic license-off model with no future capacity reservations.

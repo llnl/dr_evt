@@ -3,12 +3,13 @@ set -euo pipefail
 validation_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo_dir=$(cd "$validation_dir/../../.." && pwd)
 results=${SLURM_LICENSE_RESULTS:-"$repo_dir/validation/slurm/results/licenses/run-$(date -u +%Y%m%dT%H%M%SZ)"}
+build_volume=${SLURM_LICENSE_BUILD_VOLUME:-dr-evt-slurm-license-build}
 mkdir -p "$results"
 exec docker run --rm --hostname localhost \
     --mount "type=bind,src=$repo_dir,dst=/dr_evt_source,readonly" \
     --mount "type=bind,src=$repo_dir/external/slurm,dst=/slurm-modern-source,readonly" \
     --mount "type=bind,src=$results,dst=/results" \
-    --mount "type=volume,src=dr-evt-slurm-license-build,dst=/workspace" \
+    --mount "type=volume,src=$build_volume,dst=/workspace" \
     --entrypoint bash dr-evt-slurm-validation -c \
     'export DR_EVT_VALIDATION_WORKING_TREE=1 &&
      bash /dr_evt_source/validation/slurm/licenses/build.sh &&

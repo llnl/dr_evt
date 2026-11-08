@@ -1,4 +1,5 @@
 """Plot saved comparison inputs; no scheduler installation is needed."""
+import csv
 import json
 from pathlib import Path
 import sys
@@ -104,6 +105,13 @@ def plot_metrics(report, path, colors, labels):
         },
     }
     path.with_name('plot-data.json').write_text(json.dumps(data, indent=2) + '\n')
+    with path.with_name('plot-summary.csv').open('w', newline='') as stream:
+        writer = csv.writer(stream)
+        keys = ('mean_wait_seconds', 'makespan_seconds', 'utilization_percent',
+                'resource_area_node_seconds')
+        writer.writerow(['scheduler', *keys])
+        for name in names:
+            writer.writerow([name, *(report[name + '_metrics'][key] for key in keys)])
 
 
 def main():

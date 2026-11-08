@@ -238,7 +238,8 @@ public:
   bool m_diagnostic_no_reservations;
 
   tdiff_t scheduling_interval() const {
-    return m_dispatch_interval > 0.0 ? m_dispatch_interval : m_backfill_interval;
+    return m_dispatch_interval > 0.0 ? m_dispatch_interval
+                                     : m_backfill_interval;
   }
   /// Planning time-limit grid for scheduler projections; zero is exact.
   tdiff_t m_planning_time_resolution;
