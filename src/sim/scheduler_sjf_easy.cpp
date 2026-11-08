@@ -6,7 +6,16 @@
  ******************************************************************************/
 
 /** @file scheduler_sjf_easy.cpp
- * @brief Shortest-job-first scheduling implementation.
+ * @brief Shortest-job-first starts with EASY backfill.
+ * @details Order runnable jobs by requested time limit, shortest first. When
+ * the FCFS head must wait, protect its predicted start before allowing
+ * backfill. The queue container is fixed by this implementation.
+ * @note CLI: --priority_policy sjf --backfill_policy easy, with both
+ * dispatch/backfill intervals zero and no --per_pass_accounting.
+ * --queue_impl does not select another container. --backfill_policy none
+ * disables backfill; hybrid and conservative are unsupported.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #include "sim/scheduler_sjf_easy.hpp"

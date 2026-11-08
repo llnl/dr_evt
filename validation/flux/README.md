@@ -2,8 +2,12 @@
 
 This container harness compares DR_EVT policy sets with native Flux schedulers
 driven by Fiction. The [published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md)
-presents the identical FCFS run using sched-simple, the hybrid-backfill
-comparison using Fluxion, and the four-job start-time divergence.
+presents the identical FCFS run, the hybrid-backfill comparison, and the
+four-job start-time divergence with Fiction. The FCFS run uses `sched-simple`,
+with Fluxion unloaded. The hybrid-backfill run and four-job reproducer use
+Fluxion to make scheduling and resource-placement decisions; they do not use
+`sched-simple`. Fiction drives simulated arrivals and completions in both
+experiments. DR_EVT implements its own capacity-count scheduler.
 Every DR_EVT validation invocation uses `--per_pass_accounting`.
 
 ## Build and run the checks
@@ -81,8 +85,9 @@ The two backends are selected explicitly; backfill is rejected for sched-simple.
 These are different validation models. Sched-simple uses native FIFO scheduling
 without backfill or future node reservations. Fluxion retains hybrid backfill
 and binds reservations to particular nodes, while DR_EVT reserves interchangeable
-capacity counts. An observed FCFS match does not validate Fluxion backfill or
-ordinary production placement. Equal priorities, one unrestricted queue,
+capacity counts. DR_EVT does not model Fluxion's resource graph, node matching,
+or node-specific reservations. An observed FCFS match does not validate
+Fluxion backfill or ordinary production placement. Equal priorities, one unrestricted queue,
 whole-node exclusive jobs, and an initially empty cluster are experiment
 conditions rather than general claims about Flux deployments.
 

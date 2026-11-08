@@ -461,6 +461,12 @@ Job priority/ordering policy.
 - `fcfs_alt` - Alternative FCFS implementation for differential testing
 - `fcfs_conservative` - FCFS implementation that maintains conservative
   reservations; currently uses the `deque` wait queue
+- `fcfs_1s_evt_group` - Event-driven FCFS with one-second forecast event grouping,
+  reproducing the tested OpenPBS 23.06 rule.
+  Requires a circular queue, zero dispatch/backfill intervals, and unlimited
+  planning horizon. It checks predicted capacity after an inclusive one-second
+  group of future events while preserving actual event timestamps. See the
+  [forecast rule and worked example](SCHEDULER_VALIDATION.md#the-rule-inside-openpbss-future-start-calculation).
 - `sjf` - Shortest Job First (by run time estimate)
 - `ljf` - Longest Job First (by run time estimate)
 

@@ -6,14 +6,19 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_hybrid_circular.tpp
- * @brief Shared FCFS traversal with a compile-time protection planner.
- * @details Used by event-driven hybrid/conservative scheduling, separate
- * periodic backfill, and fixed periodic dispatch (including arrival wakes).
- * Existing modes use Reservation_Timeline; only fixed periodic conservative dispatch
- * can select Reservation_Search_Cache. Fixed periodic EASY uses hybrid protection
- * with reservation depth 1; existing EASY modes use separate implementations.
- * @note This template is not selected directly by an option. The concrete
- * scheduler headers document the options that activate each caller.
+ * @brief Shared FCFS queue scan with a supplied capacity-reservation
+ * planner.
+ * @details Used by event-driven hybrid/conservative backfill, separate
+ * periodic backfill, and fixed periodic dispatch. It protects future
+ * capacity counts, not particular nodes. The calling scheduler supplies its
+ * forecast and examination rules.
+ * @note CLI: No option selects this helper directly. Callers use
+ * --queue_impl circular with --backfill_policy hybrid or conservative;
+ * --backfill_interval I selects separate periodic backfill and
+ * --dispatch_interval I selects periodic dispatch. Both intervals zero
+ * selects event-driven scheduling.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 template <typename ProtectionTimeline>

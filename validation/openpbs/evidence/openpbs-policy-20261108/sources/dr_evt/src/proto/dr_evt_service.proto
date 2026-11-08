@@ -1,0 +1,431 @@
+/******************************************************************************
+ *                                                                            *
+ *    Copyright 2023   Lawrence Livermore National Security, LLC and other    *
+ *    Whole Cell Simulator Project Developers. See the top-level COPYRIGHT    *
+ *    file for details.                                                       *
+ *                                                                            *
+ *    SPDX-License-Identifier: MIT                                            *
+ *                                                                            *
+ ******************************************************************************/
+
+syntax = "proto3";
+
+package dr_evt_grpc;
+
+// Single bidirectional-streaming RPC exposing DR_EVT's C++ streaming API
+// (batch run, append_job, advance_to, run_until_exclusive, and monitoring)
+// over the network. AppendJobRequest is the genuine streaming case: it adds
+// a previously unknown job and immediately enqueues it. A Session()
+// can host successive server-side Simulation instances: each InitRequest
+// creates one, and FinishSimulationRequest releases it.
+service SimulationService {
+    rpc Session(stream ClientMessage) returns (stream ServerMessage);
+}
+
+// ---- Client -> Server ----
+
+message ClientMessage {
+    // Echoed back on the matching ServerMessage so the client can correlate
+    // out-of-order or interleaved responses. Not interpreted by the server.
+    uint64 request_id = 1;
+    oneof request {
+        InitRequest init = 2;
+        InitializeTraceRequest initialize_trace = 3;
+        AdvanceToRequest advance_to = 4;
+        RunUntilExclusiveRequest run_until_exclusive = 5;
+        GetCurrentTimeRequest get_current_time = 6;
+        GetNodesInUseRequest get_nodes_in_use = 7;
+        GetAvailableNodesRequest get_available_nodes = 8;
+        GetActiveJobCountRequest get_active_job_count = 9;
+        GetFCFSHeadShadowTimeRequest get_fcfs_head_shadow_time = 10;
+        GetStatisticsRequest get_statistics = 11;
+        GetTraceSizeRequest get_trace_size = 12;
+        AppendJobRequest append_job = 13;
+        AppendJobsRequest append_jobs = 14;
+        FinishSimulationRequest finish_simulation = 15;
+        GetBackfillWindowRequest get_backfill_window = 16;
+        GetCurrentUtilizationRequest get_current_utilization = 17;
+        RunRequest run = 18;
+        GetPredictionHorizonRequest get_prediction_horizon = 19;
+        SaveCheckpointRequest save_checkpoint = 20;
+        LoadCheckpointRequest load_checkpoint = 21;
+        GetJobStatusesRequest get_job_statuses = 22;
+    }
+}
+
+// First message on a new stream: constructs the server-side Simulation
+// from a flat Sim_Params-equivalent config (same fields as the existing
+// protobuf --config schema). Must be sent before any other request.
+message InitRequest {
+    uint32 total_nodes = 1;
+    string trace_format = 2;       // "simple", "lassen", or "swf" (default: "simple")
+    string timestamp_format = 3;   // retained "epoch"/"iso" compatibility value
+    string timezone = 4;
+    string backfill_policy = 5;    // "easy", "conservative", "hybrid", or "none"
+    string priority_policy = 6;    // "fcfs", "fcfs_alt", "fcfs_openpbs", "sjf", or "ljf"
+    string run_time_mode = 7;      // "actual", "distribution", or "limit" (default: "actual")
+    bool msec_output = 8;
+    string infile = 9;             // trace file path (server-side path)
+
+    // Queue implementation (FCFS scheduler only). Empty string keeps
+    // Sim_Params' own default (circular).
+    string queue_impl = 10;        // "circular", "deque", "multimap", or "block"
+
+    // Required client-provided label for this simulation. The server validates
+    // it as a filename component and adds its own unique suffix when creating
+    // per-session output files.
+    string session_name = 11;
+
+    // Block size for block queue implementation (must be power of 2).
+    // Ignored unless queue_impl is "block". 0 keeps Sim_Params' own
+    // default (128).
+    uint32 block_size = 12;
+
+    // Initial capacity for circular queue implementation. Ignored
+    // unless queue_impl is "circular". 0 keeps Sim_Params' own default
+    // (size of the job trace, large enough it can never overflow).
+    uint64 wait_queue_capacity = 13;
+
+    // What to do if a circular queue insert would exceed
+    // wait_queue_capacity. Ignored unless queue_impl is "circular".
+    // Empty string keeps Sim_Params' own default (grow).
+    string wait_queue_overflow = 14; // "abort" or "grow"
+
+    // Global simulation start time. A positive value selects native replay
+    // warm-start execution for RunRequest; zero preserves ordinary execution.
+    double sim_start_time = 15;
+    // "inherit" (default) reconstructs jobs waiting at a replay warm
+    // boundary; "drop" preserves the legacy omission behavior.
+    string warm_start_wait_queue = 27;
+    // When set together, job and resource-history output is written to Redis.
+    string redis_uri = 16;
+    string redis_key_prefix = 17;
+    uint64 job_flush_interval = 18; // 0 follows job-store capacity
+    // Waiting jobs that hold reservations under backfill_policy "hybrid";
+    // must be positive with hybrid and is ignored otherwise.
+    uint64 reservation_depth = 19;
+    // Eligible waiting jobs, head included, examined per backfill pass by
+    // every scheduler. Zero leaves the scan unlimited.
+    uint64 backfill_queue_depth = 23;
+
+    // Seconds between periodic backfill evaluations; FCFS dispatch remains
+    // event driven. Zero retains event-driven backfill behavior.
+    double backfill_interval = 24;
+    // Aligned FCFS/backfill cadence; zero disables fixed periodic dispatch.
+    double dispatch_interval = 28;
+    // Entire examined candidate prefix per dispatch wake; zero is unlimited.
+    uint64 dispatch_queue_depth = 29;
+    // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
+    bool dispatch_on_events = 30;
+    // Event-driven placement passes with per-pass Q/R and guarded retries.
+    bool per_pass_accounting = 31;
+    // Diagnostic periodic model: no future capacity reservations.
+    bool diagnostic_no_reservations = 32;
+
+    // Planning time-limit grid for scheduler projections; zero is exact.
+    double planning_time_resolution = 25;
+
+    // Maximum reservation look-ahead for periodic backfill. Presence is
+    // explicit so zero is a valid immediate horizon.
+    optional double planning_horizon = 26;
+
+    // Seconds a job's nodes stay unavailable after it ends (default 0).
+    // Not applied to replayed history.
+    double node_release_delay = 20;
+    // "constant" (default), "exponential", or "uniform".
+    string node_release_delay_model = 21;
+    // Half-width of the uniform per-node cleanup time; ignored otherwise.
+    double node_release_delay_spread = 22;
+}
+
+// Runs the configured input trace to completion. Unlike AdvanceToRequest,
+// this invokes Simulation::run(), including replay and warm-start setup.
+message RunRequest {}
+
+// Declares this simulation complete. The server processes all remaining
+// submitted work, writes its reports, returns final statistics, then releases
+// the simulation so this same Session stream may be initialized again.
+message FinishSimulationRequest {}
+
+message InitializeTraceRequest {
+    uint64 max_jobs = 1;           // 0 = no limit
+}
+
+// Adds a job the server has never seen before and immediately enqueues it
+// for scheduling.
+message AppendJobRequest {
+    double submit_time = 1;
+    uint32 num_nodes = 2;
+    // Numeric queue ID by default (e.g. "1" for Queue1), or a legacy queue
+    // name (e.g. "pbatch") when DR_EVT_LEGACY_QUEUE_INPUT is enabled.
+    string queue = 3;
+    double limit_time = 4;  // positive whole-second time limit
+    optional double actual_run_time = 5; // known execution time, if available
+}
+
+// One job's data within an AppendJobsRequest - same fields as
+// AppendJobRequest, factored out so a batch can carry several.
+message JobAppendData {
+    double submit_time = 1;
+    uint32 num_nodes = 2;
+    // Uses the same compile-time queue representation as AppendJobRequest.
+    string queue = 3;
+    double limit_time = 4;  // positive whole-second time limit
+    optional double actual_run_time = 5;
+}
+
+// The batch counterpart to AppendJobRequest: several genuinely new jobs
+// in one round-trip instead of one per job. Requests must already be
+// sorted by submit_time, non-decreasing (same as
+// Trace::append_jobs()/Simulation::append_jobs() require) - the server
+// validates this, and every request's submit_time >= current_time,
+// before appending any of them; see those functions' own doc comments
+// for what "all-or-nothing" does and doesn't cover (capacity exhaustion
+// mid-batch is not pre-validated the same way).
+message AppendJobsRequest {
+    repeated JobAppendData requests = 1;
+}
+
+message AdvanceToRequest {
+    double target_time = 1;
+}
+
+message RunUntilExclusiveRequest {
+    double target_time = 1;
+}
+
+message GetCurrentTimeRequest {}
+message GetNodesInUseRequest {}
+message GetAvailableNodesRequest {}
+message GetActiveJobCountRequest {}
+// Returns only the FCFS-head reservation time. Use GetBackfillWindowRequest
+// when the resource-change times that lead to that reservation are needed.
+message GetFCFSHeadShadowTimeRequest {}
+// Returns the current FCFS/EASY backfill opportunity in one consistent
+// snapshot.  Release events are calculated with the jobs' time limits, the
+// same estimates used by the FCFS head reservation calculation.
+message GetBackfillWindowRequest {}
+// Instantaneous nodes-in-use / total-nodes ratio. This is distinct from the
+// resource-area-based utilization in GetStatisticsResponse.
+message GetCurrentUtilizationRequest {}
+// Estimate how long the currently waiting resource-time demand takes to drain
+// after the FCFS-head shadow time. Computed only when queried.
+message GetPredictionHorizonRequest {
+    double utilization = 1;
+}
+message GetStatisticsRequest {}
+message GetTraceSizeRequest {}
+// Returns a binary, same-build simulation checkpoint in the response.
+message SaveCheckpointRequest {}
+// Replaces the current session state from SaveCheckpointResponse.checkpoint.
+message LoadCheckpointRequest {
+    bytes checkpoint = 1;
+}
+
+// ---- Server -> Client ----
+
+message ServerMessage {
+    // Echoes the ClientMessage.request_id this responds to. 0 for
+    // unsolicited server-initiated messages, if any are added later.
+    uint64 request_id = 1;
+    oneof response {
+        ErrorResponse error = 2;
+        InitResponse init = 3;
+        InitializeTraceResponse initialize_trace = 4;
+        AdvanceToResponse advance_to = 5;
+        RunUntilExclusiveResponse run_until_exclusive = 6;
+        GetCurrentTimeResponse get_current_time = 7;
+        GetNodesInUseResponse get_nodes_in_use = 8;
+        GetAvailableNodesResponse get_available_nodes = 9;
+        GetActiveJobCountResponse get_active_job_count = 10;
+        GetFCFSHeadShadowTimeResponse get_fcfs_head_shadow_time = 11;
+        GetStatisticsResponse get_statistics = 12;
+        GetTraceSizeResponse get_trace_size = 13;
+        AppendJobResponse append_job = 14;
+        AppendJobsResponse append_jobs = 15;
+        FinishSimulationResponse finish_simulation = 16;
+        GetBackfillWindowResponse get_backfill_window = 17;
+        GetCurrentUtilizationResponse get_current_utilization = 18;
+        RunResponse run = 19;
+        GetPredictionHorizonResponse get_prediction_horizon = 20;
+        SaveCheckpointResponse save_checkpoint = 21;
+        LoadCheckpointResponse load_checkpoint = 22;
+        GetJobStatusesResponse get_job_statuses = 23;
+    }
+}
+
+// Returned instead of the expected response type when a request fails
+// (e.g. Init not sent first, trace load failure, exception from the
+// underlying Simulation call). request_id still identifies which
+// request failed.
+message ErrorResponse {
+    string message = 1;
+}
+
+message InitResponse {
+    bool ok = 1;
+    string session_id = 2;
+    string simulated_trace_file = 3;
+    // Empty with Redis output; use <redis_key_prefix>:resources:csv instead.
+    string resource_trace_file = 4;
+    string statistics_file = 5;
+    string redis_key_prefix = 6;
+}
+
+message SaveCheckpointResponse {
+    bytes checkpoint = 1;
+}
+
+message LoadCheckpointResponse {}
+
+message InitializeTraceResponse {
+    uint64 num_jobs_loaded = 1;
+}
+
+message AppendJobResponse {
+    uint32 job_idx = 1;
+}
+
+message AppendJobsResponse {
+    // Each new job's job_idx, in the same order as the request's requests
+    // field. All returned jobs have already been enqueued for scheduling.
+    repeated uint32 job_idx = 1;
+}
+
+// Queries jobs previously created by AppendJob or AppendJobs. Results use the
+// same order as job_idx, including duplicates. An unknown ID fails the whole
+// request with ErrorResponse.
+message GetJobStatusesRequest {
+    repeated uint32 job_idx = 1;
+    // Maximum waiting-queue prefix to temporarily plan and report. Zero
+    // (default) considers every waiting job; this does not alter scheduling.
+    uint64 estimation_depth = 2;
+}
+
+enum JobState {
+    JOB_STATE_UNSPECIFIED = 0;
+    JOB_STATE_PENDING = 1;
+    JOB_STATE_RUNNING = 2;
+    JOB_STATE_COMPLETED = 3;
+    JOB_STATE_REJECTED = 4;
+}
+
+enum StartTimeKind {
+    START_TIME_KIND_NONE = 0;
+    START_TIME_KIND_RESERVED = 1;
+    START_TIME_KIND_ESTIMATED = 2;
+}
+
+message ScheduledJobTimes {
+    double start_time = 1;
+    double end_time = 2;
+}
+
+message JobStatus {
+    uint32 job_idx = 1;
+    JobState state = 2;
+    oneof timing {
+        // Present once the scheduler has started the job. end_time is the
+        // simulated completion time and may still be in the future.
+        ScheduledJobTimes scheduled = 3;
+        // Present while pending when a reservation-derived or estimated start
+        // is available. start_time_kind distinguishes a protected scheduler
+        // reservation from an estimate that respects retained reservations.
+        double expected_start_time = 4;
+    }
+    StartTimeKind start_time_kind = 5;
+}
+
+message GetJobStatusesResponse {
+    repeated JobStatus jobs = 1;
+}
+
+message AdvanceToResponse {}
+
+message RunResponse {}
+
+message RunUntilExclusiveResponse {}
+
+message GetCurrentTimeResponse {
+    double current_time = 1;
+}
+
+message GetNodesInUseResponse {
+    uint32 nodes_in_use = 1;
+}
+
+message GetAvailableNodesResponse {
+    uint32 available_nodes = 1;
+}
+
+message GetCurrentUtilizationResponse {
+    double utilization = 1;
+}
+
+message GetPredictionHorizonResponse {
+    double horizon = 1;
+}
+
+message GetActiveJobCountResponse {
+    uint64 active_job_count = 1;
+}
+
+message GetFCFSHeadShadowTimeResponse {
+    // Earliest FCFS-head start time, or -1 when no job is waiting.
+    double shadow_time = 1;
+}
+
+// Resources predicted to be released at one point in simulation time.
+// Multiple jobs ending together are represented by one, summed event.
+message ResourceRelease {
+    double time = 1;
+    uint32 nodes_released = 2;
+}
+
+message GetBackfillWindowResponse {
+    double current_time = 1;
+    uint32 available_nodes = 2;
+    // Earliest start of the FCFS queue head, or -1 when there is no head.
+    double shadow_time = 3;
+    // Ordered release events for all running jobs. May be nonempty when there
+    // is no FCFS head.
+    repeated ResourceRelease releases = 4;
+}
+
+message GetStatisticsResponse {
+    uint64 jobs_submitted = 1;
+    uint64 jobs_completed = 2;
+    uint64 jobs_running = 3;
+    uint64 jobs_waiting = 4;
+    double current_time = 5;
+    uint32 total_nodes = 6;
+    uint32 nodes_in_use = 7;
+    uint32 nodes_available = 8;
+    double utilization = 9;
+    double avg_wait_time = 10;
+    double avg_turnaround_time = 11;
+    double makespan = 12;
+    // Scheduled-job resource area for the server's standard scheduler, in
+    // node-seconds.
+    double resource_area = 13;
+    double avg_run_time = 14;
+    // Mean max(1, turnaround / max(run_time, 10 seconds)).
+    double avg_bounded_slowdown = 15;
+    // Jobs that have begun execution. jobs_submitted counts jobs accepted
+    // into the wait queue; before this field existed it counted starts.
+    uint64 jobs_started = 16;
+}
+
+message GetTraceSizeResponse {
+    uint64 trace_size = 1;
+}
+
+message FinishSimulationResponse {
+    GetStatisticsResponse statistics = 1;
+    string session_id = 2;
+    string simulated_trace_file = 3;
+    // Empty with Redis output; use <redis_key_prefix>:resources:csv instead.
+    string resource_trace_file = 4;
+    string statistics_file = 5;
+    string redis_key_prefix = 6;
+}

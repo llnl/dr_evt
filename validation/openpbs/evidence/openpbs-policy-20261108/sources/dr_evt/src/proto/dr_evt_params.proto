@@ -1,0 +1,186 @@
+/******************************************************************************
+ *         Copyright 2023 Lawrence Livermore National Security, LLC           *
+ *         See the top-level LICENSE file for details.                        *
+ *                                                                            *
+ *         SPDX-License-Identifier: MIT                                       *
+ ******************************************************************************/
+
+syntax = "proto3";
+
+package dr_evt_proto;
+
+message DR_EVT_Params {
+    message Simulation_Params {
+        // Random-number seed (default: deterministic zero).
+        uint32 seed = 1;
+
+        // The maximum number of jobs to run.
+        uint32 max_jobs = 2;
+        // The upper limit of simulation time to run.
+        double max_time = 3;
+
+        string infile = 4;
+        // Path to a file listing multiple trace files, one per line -
+        // progressive loading (see docs/dev/OUTPUT_TRACE_BUFFERS.md): each is
+        // loaded in turn as the
+        // simulation reaches it, so job_store_capacity can actually
+        // bound memory. Mutually exclusive with infile - do not set
+        // both. Files must already be sorted by submit_time, both
+        // within each file and across the sequence.
+        string infile_list = 5;
+        string outfile = 6;
+        string resource_trace = 7;      // Optional resource usage trace output file
+
+        // Enable verbose output for debugging and testing
+        // (default: false for production runs)
+        bool verbose = 8;
+
+        // Scheduling parameters
+        uint32 total_nodes = 9;         // System node count (default: 795)
+        string backfill_policy = 10;     // "easy", "conservative", "hybrid", or "none" (default: "easy")
+        string priority_policy = 11;    // "fcfs", "fcfs_alt", "fcfs_conservative", "fcfs_openpbs", "sjf", or "ljf" (default: "fcfs")
+
+        // Trace format parameters
+        string trace_type = 12;         // "standard", "pcon", or "swf" (default: "standard")
+        string trace_format = 13;       // "simple", "lassen", or "swf" (default: "simple")
+        string timestamp_format = 14;   // retained "epoch"/"iso" compatibility value (default: "epoch")
+        string timezone = 15;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
+
+        // Run time determination parameters
+        // Scheduler uses time_limit as the best estimator for planning
+        string run_time_mode = 16;      // "actual", "distribution", or "limit" (default: "actual")
+        string run_time_distribution = 17; // "normal", "lognormal", or "uniform" (default: "normal")
+        double run_time_scale = 18;     // Scale factor (default: 1.0)
+        double run_time_stddev = 19;    // Standard deviation factor (default: 0.0)
+
+        // Queue implementation (FCFS scheduler only)
+        string queue_impl = 20;         // "circular", "deque", "multimap", or "block" (default: "circular")
+
+        // Block size for block queue implementation (must be power of 2)
+        uint32 block_size = 21;         // 4, 8, 16, 32, 64, 128, or 256 (default: 128)
+
+        // Initial capacity for circular queue implementation. 0 means
+        // the size of the job trace (large enough it can never overflow).
+        uint64 wait_queue_capacity = 22;  // (default: 0)
+
+        // What to do if a circular queue insert would exceed wait_queue_capacity
+        string wait_queue_overflow = 23;  // "abort" or "grow" (default: "grow")
+
+        // Initial capacity for the job-record store (Trace::m_data, a
+        // boost::circular_buffer). 0 means the size of the job trace
+        // (large enough it can never overflow).
+        uint64 job_store_capacity = 24; // (default: 0)
+
+        // What to do if a job-store insert would exceed job_store_capacity
+        string job_store_overflow = 25; // "abort" or "grow" (default: "grow")
+        // Before growing the job-record store for a new batch, refuse
+        // if doing so would push projected peak usage past this
+        // fraction of actual available system memory (Linux only; a
+        // no-op elsewhere). Must be > 0.0 and <= 1.0 (e.g. 0.8 for
+        // 80%); 0.0 (the default) disables the check entirely.
+        // Independent of job_store_overflow.
+        double memory_pressure_fraction = 26;
+
+        // Initial capacity for the resource-history circular buffer. 0
+        // auto-sizes to twice the number of loaded jobs, with a minimum
+        // capacity of 4096 entries. No overflow-policy field: unlike
+        // job_store, every entry here is always immediately safe to reclaim,
+        // so reclaiming when full never needs an abort/grow fallback.
+        uint64 resource_history_capacity = 27; // (default: 0)
+
+        // Number of processed job departures between opportunistic writes and
+        // reclamation of the completed front prefix. 0 follows the current
+        // job-store capacity. Capacity pressure and explicit/final flushes
+        // remain independent triggers.
+        uint64 job_flush_interval = 28; // (default: 0)
+
+        // Maximum feasible jobs passed to an experimental external backfill
+        // selector in one decision. 0 keeps Sim_Params' default (1).
+        uint64 num_max_candidates = 29;
+
+        // Optional CSV with time,total_nodes change points. Values may not
+        // exceed total_nodes; reductions do not preempt running jobs.
+        string capacity_schedule = 30;
+
+        // Global simulation start time. A positive value enables replay-based
+        // warm start; replay jobs already running at the boundary seed resources.
+        double sim_start_time = 31;
+
+        // "inherit" (default) reconstructs jobs waiting at a replay warm
+        // boundary; "drop" preserves the legacy omission behavior.
+        string warm_start_wait_queue = 45;
+
+        // When both are nonempty, write simulated-job and resource-history
+        // output to Redis instead of outfile/resource_trace. Requires
+        // DR_EVT_WITH_REDIS=ON.
+        string redis_uri = 32;
+        string redis_key_prefix = 33;
+
+        // Automatic checkpoint destination and completed-job cadence.
+        // Progressive loading also checkpoints at each input-file boundary.
+        string checkpoint_file = 34;
+        uint64 checkpoint_interval_jobs = 35;
+        // SWF input only: processors per node used to convert allocated
+        // processors to nodes. 0 derives it from the file header.
+        uint32 cores_per_node = 36;
+
+        // Waiting jobs that hold reservations under backfill_policy
+        // "hybrid"; must be positive with hybrid and is ignored otherwise.
+        uint64 reservation_depth = 37;
+
+        // Eligible waiting jobs, head included, examined per backfill pass
+        // by every scheduler. Zero leaves the scan unlimited.
+        uint64 backfill_queue_depth = 41;
+
+        // Seconds between periodic backfill evaluations; FCFS dispatch
+        // remains event driven. Zero keeps event-driven backfill behavior.
+        double backfill_interval = 42;
+
+        // Fixed periodic dispatch: aligned FCFS/backfill ticks; optional arrival wakes.
+        // Zero disables; mutually exclusive with positive backfill_interval.
+        double dispatch_interval = 46;
+        // Entire candidate prefix per dispatch wake, including immediate starts.
+        // Zero means unlimited; requires dispatch_interval > 0.
+        uint64 dispatch_queue_depth = 47;
+        // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
+        bool dispatch_on_events = 48;
+        // Event-driven placement passes with per-pass Q/R and guarded retries.
+        bool per_pass_accounting = 49;
+        // Diagnostic periodic model: no future capacity reservations.
+        bool diagnostic_no_reservations = 50;
+
+        // Planning time-limit grid for scheduler projections; zero is exact.
+        double planning_time_resolution = 43;
+
+        // Maximum reservation look-ahead for backfill planning, event-driven
+        // or periodic (Slurm bf_window). Presence is explicit so zero is a
+        // valid immediate horizon.
+        optional double planning_horizon = 44;
+
+        // Seconds a job's nodes stay unavailable after it ends before another
+        // job can start on them (default 0: reusable at the job's end). Not
+        // applied to replayed history.
+        double node_release_delay = 38;
+        // "constant" (default), "exponential", or "uniform": per-node cleanup
+        // time whose maximum over the job's nodes is the job's delay.
+        string node_release_delay_model = 39;
+        // Half-width of the uniform per-node cleanup time; ignored otherwise.
+        double node_release_delay_spread = 40;
+    }
+
+    message Tracing_Params {
+        // The maximum number of jobs to trace.
+        uint32 max_jobs = 1;
+        // The upper limit of time in job history (as a timestamp) to trace.
+        string max_time = 2;
+
+        string infile = 3;
+        string outfile = 4;
+        string outfile_dat = 5;    // Optional detected-DAT-session report
+        string outfile_sub = 6;    // Optional hourly submission statistics
+        string outfile_subsum = 7; // Optional hour-of-week submission summary
+    }
+
+    Simulation_Params sim_setup = 1;
+    Tracing_Params trace_setup = 2;
+}

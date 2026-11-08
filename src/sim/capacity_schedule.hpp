@@ -5,8 +5,14 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file sim/capacity_schedule.hpp
- * @brief Time-varying machine-capacity input.
+/** @file capacity_schedule.hpp
+ * @brief Scheduled changes to interchangeable cluster capacity.
+ * @details Loads time,total_nodes changes used by the simulation driver and
+ * future capacity forecasts. Capacity reductions do not preempt running
+ * jobs. This is shared input support, not a selectable scheduler.
+ * @note Enable with --capacity_schedule FILE and set the maximum with
+ * --total_nodes N. Simulation_Params uses capacity_schedule and total_nodes;
+ * InitRequest has no capacity_schedule field.
  */
 
 #ifndef DR_EVT_SIM_CAPACITY_SCHEDULE_HPP

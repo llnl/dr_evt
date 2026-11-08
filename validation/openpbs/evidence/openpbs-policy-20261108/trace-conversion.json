@@ -1,0 +1,8 @@
+{
+  "source_sha256": "463379d4f61ba1fb75e2ec32380538bb3e44f00b9210ff67db3327aa8715dd04",
+  "selected_jobs": 2000,
+  "selection": "earliest jobs in stable arrival order",
+  "conversion": "Relative arrivals, actual runtimes and walltime limits rounded up to integer seconds; runtime >= 1; limit >= runtime.",
+  "initial_state": "empty",
+  "capacity": 756
+}

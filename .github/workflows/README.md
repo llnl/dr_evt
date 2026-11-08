@@ -35,6 +35,10 @@ This directory contains GitHub Actions workflows for automated testing.
   and Python coverage
 - Ser20-disabled native serialization build and tests
 - Sphinx and Doxygen documentation build with warnings treated as errors
+- OpenPBS harness audit tests (5, Python standard library only) and adapter
+  Doxygen documentation with warnings treated as errors
+- Separate OpenPBS forecast policy: native behavior/checkpoint tests and
+  command-line cases in placement-pass integration, through CTest
 - Python API tests
 - Market package platform and job-stream tests (12)
 - gRPC client/server tests (2)
@@ -72,6 +76,9 @@ This directory contains GitHub Actions workflows for automated testing.
 - Progressive-loading C++ API test - installed `test_progressive_load`
 - Queue-input schema test - installed `test_queue_input`
 - Streaming append API test - installed `test_append_job_api`
+- OpenPBS harness audit tests (5) -
+  `python3 -m unittest discover -s validation/openpbs -p test_compare.py -v`
+- OpenPBS forecast policy - installed `test_openpbs_forecast`
 
 **Compiler:**
 - GCC 14 only
@@ -93,6 +100,13 @@ The append API includes 41 test groups, one additional group with Ser20, and
 four wire-level checks when gRPC is enabled. Full CI also runs checkpoint and
 batch/streaming continuation tests. The workflow summaries report each runner's
 outcome without treating overlapping checks as distinct tests.
+
+The OpenPBS audits check the harness's capacity accounting, arrival and
+duration validation, trace conversion, and forecast-fit calculation. They do
+not build or run OpenPBS. The full native replay requires the pinned external
+source and the supplied Lassen trace and runs separately; see the
+[OpenPBS harness](../../validation/openpbs/README.md). Its original 2,000-job
+replay differs, while the replay with every time multiplied by two matches.
 
 ## Status Badges
 

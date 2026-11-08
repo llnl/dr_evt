@@ -1,0 +1,72 @@
+{
+  "policy": "fcfs_1s_evt_group",
+  "checks": {
+    "gcc": [
+      {
+        "step": "build",
+        "exit_code": 0,
+        "seconds": 18.27637309199781
+      },
+      {
+        "step": "install",
+        "exit_code": 0,
+        "seconds": 0.06830004201037809
+      },
+      {
+        "step": "ctest",
+        "exit_code": 0,
+        "seconds": 9.091554962011287
+      },
+      {
+        "step": "python-api",
+        "exit_code": 0,
+        "seconds": 0.06332137499703094
+      },
+      {
+        "step": "grpc",
+        "exit_code": 0,
+        "seconds": 2.6209316680033226
+      }
+    ],
+    "clang": [
+      {
+        "step": "build",
+        "exit_code": 0,
+        "seconds": 14.645437714003492
+      },
+      {
+        "step": "install",
+        "exit_code": 0,
+        "seconds": 0.0587424999976065
+      },
+      {
+        "step": "ctest",
+        "exit_code": 0,
+        "seconds": 9.192101795983035
+      },
+      {
+        "step": "python-api",
+        "exit_code": 0,
+        "seconds": 0.06573687499621883
+      },
+      {
+        "step": "grpc",
+        "exit_code": 0,
+        "seconds": 2.6502773349930067
+      }
+    ]
+  },
+  "python_policy_smoke": "passed with both compilers",
+  "documentation": "passed with warnings treated as errors",
+  "query_selection": "one policy check per query; compile-time specialization removes grouping checks inside job loops",
+  "implementation_commit": "1abb5c11ecb448ddf97a9994b6955e8431a7a9d3",
+  "native_replay_note": "Native replay evidence uses the earlier preserved source snapshot. These checks cover the renamed policy and compile-time query refactor.",
+  "logs": {
+    "summary.json": "4f3ade3c8b374b3a0ddafb62722473e42bf80052dd9adbe9d5d8b9352bf1b3a8",
+    "clang-logs.tar.gz": "1c2696b234cfb1178ab8200b9627802f4c9b1539d7fc81641c398c51d7ccc1fb",
+    "clang-summary.json": "e6e3076f55204d9ad2e9884766da191618c9c7e1a9a23f7b8ce519642fad4d8d",
+    "gcc-summary.json": "0551c9c96fa04ae0215cd50155c23f0b2e5b6fb4b8b8a4acd61df235fdf426d8",
+    "gcc-logs.tar.gz": "e1873420c28838c7845556dec8f09bd7c511b82e847624a237c500f1396a587a",
+    "documentation.log": "3da4118c39e2372683066f29426d6b2e17c422921c67dda9f24108eba003c6e1"
+  }
+}

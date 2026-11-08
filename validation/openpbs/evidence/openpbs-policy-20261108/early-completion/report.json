@@ -1,0 +1,89 @@
+{
+  "name": "early-completion",
+  "jobs": 3,
+  "capacity": 4,
+  "dr_priority": "fcfs_openpbs",
+  "reservation_depth": 1,
+  "exact_match": true,
+  "different_jobs": 0,
+  "differences": [],
+  "openpbs_schedule": [
+    [
+      0,
+      60
+    ],
+    [
+      60,
+      80
+    ],
+    [
+      80,
+      280
+    ]
+  ],
+  "dr_evt_schedule": [
+    [
+      0.0,
+      60.0
+    ],
+    [
+      60.0,
+      80.0
+    ],
+    [
+      80.0,
+      280.0
+    ]
+  ],
+  "openpbs_profile": [
+    [
+      0,
+      3
+    ],
+    [
+      60,
+      4
+    ],
+    [
+      80,
+      1
+    ],
+    [
+      280,
+      0
+    ]
+  ],
+  "dr_evt_profile": [
+    [
+      0,
+      3
+    ],
+    [
+      60.0,
+      4
+    ],
+    [
+      80.0,
+      1
+    ],
+    [
+      280.0,
+      0
+    ]
+  ],
+  "openpbs_metrics": {
+    "mean_wait_seconds": 46.666666666666664,
+    "mean_turnaround_seconds": 140.0,
+    "makespan_seconds": 280,
+    "utilization": 0.4107142857142857
+  },
+  "dr_evt_metrics": {
+    "mean_wait_seconds": 46.666666666666664,
+    "mean_turnaround_seconds": 140.0,
+    "makespan_seconds": 280.0,
+    "utilization": 0.4107142857142857
+  },
+  "openpbs_wall_seconds": 0.015998332994058728,
+  "dr_evt_wall_seconds": 0.0038082920073065907,
+  "capacity_and_ownership_audit_passed": true
+}

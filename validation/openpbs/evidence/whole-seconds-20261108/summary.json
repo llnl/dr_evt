@@ -1,0 +1,485 @@
+[
+  {
+    "name": "adjacent-release-calendar",
+    "jobs": 4,
+    "capacity": 3,
+    "reservation_depth": 1,
+    "exact_match": false,
+    "different_jobs": 2,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 2.75,
+      "mean_turnaround_seconds": 11.25,
+      "makespan_seconds": 13,
+      "utilization": 0.9230769230769231
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 5.25,
+      "mean_turnaround_seconds": 13.75,
+      "makespan_seconds": 22.0,
+      "utilization": 0.5454545454545454
+    }
+  },
+  {
+    "name": "backfill-allowed",
+    "jobs": 3,
+    "capacity": 4,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 40.0,
+      "mean_turnaround_seconds": 93.33333333333333,
+      "makespan_seconds": 140,
+      "utilization": 0.8214285714285714
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 40.0,
+      "mean_turnaround_seconds": 93.33333333333333,
+      "makespan_seconds": 140.0,
+      "utilization": 0.8214285714285714
+    }
+  },
+  {
+    "name": "backfill-blocked",
+    "jobs": 3,
+    "capacity": 4,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 86.66666666666667,
+      "mean_turnaround_seconds": 200.0,
+      "makespan_seconds": 340,
+      "utilization": 0.47058823529411764
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 86.66666666666667,
+      "mean_turnaround_seconds": 200.0,
+      "makespan_seconds": 340.0,
+      "utilization": 0.47058823529411764
+    }
+  },
+  {
+    "name": "depth-one",
+    "jobs": 4,
+    "capacity": 4,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 80.0,
+      "mean_turnaround_seconds": 190.0,
+      "makespan_seconds": 300,
+      "utilization": 0.8333333333333334
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 80.0,
+      "mean_turnaround_seconds": 190.0,
+      "makespan_seconds": 300.0,
+      "utilization": 0.8333333333333334
+    }
+  },
+  {
+    "name": "depth-two",
+    "jobs": 4,
+    "capacity": 4,
+    "reservation_depth": 2,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 125.0,
+      "mean_turnaround_seconds": 235.0,
+      "makespan_seconds": 440,
+      "utilization": 0.5681818181818182
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 125.0,
+      "mean_turnaround_seconds": 235.0,
+      "makespan_seconds": 440.0,
+      "utilization": 0.5681818181818182
+    }
+  },
+  {
+    "name": "early-completion",
+    "jobs": 3,
+    "capacity": 4,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 46.666666666666664,
+      "mean_turnaround_seconds": 140.0,
+      "makespan_seconds": 280,
+      "utilization": 0.4107142857142857
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 46.666666666666664,
+      "mean_turnaround_seconds": 140.0,
+      "makespan_seconds": 280.0,
+      "utilization": 0.4107142857142857
+    }
+  },
+  {
+    "name": "endpoint",
+    "jobs": 3,
+    "capacity": 4,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 40.0,
+      "mean_turnaround_seconds": 126.66666666666667,
+      "makespan_seconds": 140,
+      "utilization": 1.0
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 40.0,
+      "mean_turnaround_seconds": 126.66666666666667,
+      "makespan_seconds": 140.0,
+      "utilization": 1.0
+    }
+  },
+  {
+    "name": "random-00",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 191.9,
+      "mean_turnaround_seconds": 214.56666666666666,
+      "makespan_seconds": 606,
+      "utilization": 0.8238448844884488
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 191.9,
+      "mean_turnaround_seconds": 214.56666666666666,
+      "makespan_seconds": 606.0,
+      "utilization": 0.8238448844884488
+    }
+  },
+  {
+    "name": "random-01",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 2,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 130.26666666666668,
+      "mean_turnaround_seconds": 158.96666666666667,
+      "makespan_seconds": 490,
+      "utilization": 0.825765306122449
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 130.26666666666668,
+      "mean_turnaround_seconds": 158.96666666666667,
+      "makespan_seconds": 490.0,
+      "utilization": 0.825765306122449
+    }
+  },
+  {
+    "name": "random-02",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 32,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 141.93333333333334,
+      "mean_turnaround_seconds": 173.96666666666667,
+      "makespan_seconds": 621,
+      "utilization": 0.8256843800322061
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 141.93333333333334,
+      "mean_turnaround_seconds": 173.96666666666667,
+      "makespan_seconds": 621.0,
+      "utilization": 0.8256843800322061
+    }
+  },
+  {
+    "name": "random-03",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 103.93333333333334,
+      "mean_turnaround_seconds": 130.43333333333334,
+      "makespan_seconds": 406,
+      "utilization": 0.8201970443349754
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 103.93333333333334,
+      "mean_turnaround_seconds": 130.43333333333334,
+      "makespan_seconds": 406.0,
+      "utilization": 0.8201970443349754
+    }
+  },
+  {
+    "name": "random-04",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 2,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 163.53333333333333,
+      "mean_turnaround_seconds": 190.3,
+      "makespan_seconds": 529,
+      "utilization": 0.8646030245746692
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 163.53333333333333,
+      "mean_turnaround_seconds": 190.3,
+      "makespan_seconds": 529.0,
+      "utilization": 0.8646030245746692
+    }
+  },
+  {
+    "name": "random-05",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 32,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 137.23333333333332,
+      "mean_turnaround_seconds": 163.76666666666668,
+      "makespan_seconds": 437,
+      "utilization": 0.8492562929061785
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 137.23333333333332,
+      "mean_turnaround_seconds": 163.76666666666668,
+      "makespan_seconds": 437.0,
+      "utilization": 0.8492562929061785
+    }
+  },
+  {
+    "name": "random-06",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 150.9,
+      "mean_turnaround_seconds": 182.03333333333333,
+      "makespan_seconds": 574,
+      "utilization": 0.7939895470383276
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 150.9,
+      "mean_turnaround_seconds": 182.03333333333333,
+      "makespan_seconds": 574.0,
+      "utilization": 0.7939895470383276
+    }
+  },
+  {
+    "name": "random-07",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 2,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 103.0,
+      "mean_turnaround_seconds": 128.0,
+      "makespan_seconds": 434,
+      "utilization": 0.8315092165898618
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 103.0,
+      "mean_turnaround_seconds": 128.0,
+      "makespan_seconds": 434.0,
+      "utilization": 0.8315092165898618
+    }
+  },
+  {
+    "name": "random-08",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 32,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 112.26666666666667,
+      "mean_turnaround_seconds": 134.83333333333334,
+      "makespan_seconds": 460,
+      "utilization": 0.8046195652173913
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 112.26666666666667,
+      "mean_turnaround_seconds": 134.83333333333334,
+      "makespan_seconds": 460.0,
+      "utilization": 0.8046195652173913
+    }
+  },
+  {
+    "name": "random-09",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 143.06666666666666,
+      "mean_turnaround_seconds": 170.4,
+      "makespan_seconds": 640,
+      "utilization": 0.7392578125
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 143.06666666666666,
+      "mean_turnaround_seconds": 170.4,
+      "makespan_seconds": 640.0,
+      "utilization": 0.7392578125
+    }
+  },
+  {
+    "name": "random-10",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 2,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 145.43333333333334,
+      "mean_turnaround_seconds": 164.76666666666668,
+      "makespan_seconds": 508,
+      "utilization": 0.7522145669291339
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 145.43333333333334,
+      "mean_turnaround_seconds": 164.76666666666668,
+      "makespan_seconds": 508.0,
+      "utilization": 0.7522145669291339
+    }
+  },
+  {
+    "name": "random-11",
+    "jobs": 30,
+    "capacity": 8,
+    "reservation_depth": 32,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 227.46666666666667,
+      "mean_turnaround_seconds": 259.53333333333336,
+      "makespan_seconds": 653,
+      "utilization": 0.8717457886676876
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 227.46666666666667,
+      "mean_turnaround_seconds": 259.53333333333336,
+      "makespan_seconds": 653.0,
+      "utilization": 0.8717457886676876
+    }
+  },
+  {
+    "name": "separated-release-calendar",
+    "jobs": 4,
+    "capacity": 3,
+    "reservation_depth": 1,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 10.5,
+      "mean_turnaround_seconds": 27.5,
+      "makespan_seconds": 44,
+      "utilization": 0.5454545454545454
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 10.5,
+      "mean_turnaround_seconds": 27.5,
+      "makespan_seconds": 44.0,
+      "utilization": 0.5454545454545454
+    }
+  },
+  {
+    "name": "simultaneous-events",
+    "jobs": 4,
+    "capacity": 4,
+    "reservation_depth": 2,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 11.25,
+      "mean_turnaround_seconds": 33.75,
+      "makespan_seconds": 60,
+      "utilization": 0.875
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 11.25,
+      "mean_turnaround_seconds": 33.75,
+      "makespan_seconds": 60.0,
+      "utilization": 0.875
+    }
+  },
+  {
+    "name": "lassen-prefix2000-r32",
+    "jobs": 2000,
+    "capacity": 756,
+    "reservation_depth": 32,
+    "exact_match": false,
+    "different_jobs": 1433,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 23620.5925,
+      "mean_turnaround_seconds": 31734.53,
+      "makespan_seconds": 143232,
+      "utilization": 0.7508990113645498
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 23287.413,
+      "mean_turnaround_seconds": 31401.3505,
+      "makespan_seconds": 143569.0,
+      "utilization": 0.7491364235717125
+    }
+  },
+  {
+    "name": "lassen-prefix2000-r32-spacing2",
+    "jobs": 2000,
+    "capacity": 756,
+    "reservation_depth": 32,
+    "exact_match": true,
+    "different_jobs": 0,
+    "capacity_and_ownership_audit_passed": true,
+    "openpbs_metrics": {
+      "mean_wait_seconds": 46574.826,
+      "mean_turnaround_seconds": 62802.701,
+      "makespan_seconds": 287138,
+      "utilization": 0.7491364235717125
+    },
+    "dr_evt_metrics": {
+      "mean_wait_seconds": 46574.826,
+      "mean_turnaround_seconds": 62802.701,
+      "makespan_seconds": 287138.0,
+      "utilization": 0.7491364235717125
+    }
+  }
+]

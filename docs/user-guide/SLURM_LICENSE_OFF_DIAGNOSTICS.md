@@ -83,7 +83,7 @@ Changing C's size isolates the protection supplied by future license reservation
 :::
 
 These Slurm scenarios illustrate **protection of an earlier job's planned start**;
-the [Fluxion four-job example](SCHEDULER_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences) illustrates **binding reservations to specific
+the [Fiction four-job example](SCHEDULER_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences) illustrates **binding reservations to specific
 nodes**. The Slurm node rows are drawn feasible assignments to interchangeable
 capacity slots, not recorded node bindings. Workload tables, scripts, and
 plotting data accompany both figures.

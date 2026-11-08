@@ -6,8 +6,20 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_periodic_hybrid_circular.hpp
- * @brief Event-driven FCFS dispatch and periodic hybrid/conservative backfill
- * using a circular queue.
+ * @brief FCFS starts after events and hybrid/conservative backfill on timer
+ * ticks.
+ * @details State events start fitting FCFS heads; timer ticks examine later
+ * jobs. Admission and forecast searches also check capacity at the requested
+ * end timestamp, as in the tested Slurm rule. Normal mode protects earlier
+ * capacity reservations; the diagnostic mode omits that protection.
+ * @note CLI: --priority_policy fcfs --queue_impl circular
+ * --backfill_interval I, with I > 0 and --dispatch_interval 0. Use
+ * --backfill_policy hybrid --reservation_depth R (R > 0), or
+ * --backfill_policy conservative. Omit --per_pass_accounting.
+ * --diagnostic_no_reservations selects the diagnostic variant.
+ * --backfill_queue_depth limits examinations.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_CIRCULAR_HPP

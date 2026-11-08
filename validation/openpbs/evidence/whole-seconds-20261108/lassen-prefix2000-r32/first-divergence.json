@@ -1,0 +1,45 @@
+{
+  "first_differing_time": 9731,
+  "openpbs_starts": [
+    548
+  ],
+  "dr_evt_starts": [
+    740
+  ],
+  "free_capacity_before_dispatch": 1,
+  "reservation_differences": [
+    {
+      "job_id": 229,
+      "reconstructed_dr_evt": 13006,
+      "openpbs": 13007
+    }
+  ],
+  "adjacent_projected_releases": [
+    {
+      "job_id": 528,
+      "units": 1,
+      "projected_release": 13006
+    },
+    {
+      "job_id": 536,
+      "units": 1,
+      "projected_release": 13006
+    },
+    {
+      "job_id": 546,
+      "units": 1,
+      "projected_release": 13007
+    }
+  ],
+  "candidate_fit_checks": [
+    {
+      "job_id": 548,
+      "units": 1,
+      "requested_seconds": 3600,
+      "fits_reconstructed_dr_evt_plan": false,
+      "fits_native_plan": true
+    }
+  ],
+  "method": "Independent half-open capacity sweep reconstructed from the common running state, requested walltimes, FCFS queue and protection depth; native forecasts read from the same replay.",
+  "native_source": "src/scheduler/simulate.cpp: SIM_NEXT_EVENT uses a minimum window of one second and processes events through the window endpoint, including with opt_backfill_fuzzy=off."
+}

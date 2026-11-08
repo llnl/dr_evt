@@ -5,6 +5,21 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_fcfs_hybrid_deque.hpp
+ * @brief FCFS starts and hybrid/conservative backfill using a deque queue.
+ * @details Hybrid protects up to R waiting jobs; conservative protects every
+ * examined waiting job. Later jobs may start only when they preserve those
+ * capacity reservations. Default examination accounting is shared across
+ * calls at the same timestamp.
+ * @note CLI: --priority_policy fcfs --backfill_policy hybrid
+ * --reservation_depth R --queue_impl deque, with R > 0. For conservative use
+ * --priority_policy fcfs_conservative --backfill_policy conservative. Use
+ * --dispatch_interval 0 and --backfill_interval 0; omit
+ * --per_pass_accounting.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
+ */
+
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_HYBRID_DEQUE_HPP
 #define DR_EVT_SIM_SCHEDULER_FCFS_HYBRID_DEQUE_HPP
 

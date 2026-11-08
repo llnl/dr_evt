@@ -6,8 +6,17 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_periodic_easy_circular.hpp
- * @brief Event-driven FCFS dispatch and periodic EASY backfill using a
- * circular queue.
+ * @brief FCFS starts after events and EASY backfill on separate timer ticks.
+ * @details Arrivals and resource releases can start fitting queue-head jobs
+ * immediately. Later jobs are considered for backfill only on configured
+ * ticks, while preserving the waiting head reservation. This is separate
+ * periodic backfill, not periodic dispatch of the entire queue.
+ * @note CLI: --priority_policy fcfs --queue_impl circular --backfill_policy
+ * easy --backfill_interval I, with I > 0 and --dispatch_interval 0. Omit
+ * --per_pass_accounting. --backfill_queue_depth limits backfill
+ * examinations.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_EASY_CIRCULAR_HPP

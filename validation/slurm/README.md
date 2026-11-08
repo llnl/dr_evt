@@ -94,7 +94,7 @@ protect compute capacity; the option adds future planning for separate
 license resources. We use licenses as node capacity, so enabling it is closer
 to ordinary Slurm's protection of planned starts in this setup.
 Ordinary Slurm's specific-node reservations can nevertheless cause the same
-kind of divergence from DR_EVT shown in the Fluxion four-job example.
+kind of divergence from DR_EVT shown in the Fiction four-job example.
 The recorded license-on match demonstrates agreement for that run with
 abstract capacity. Main-versus-backfill order is not enforced, so it does
 not establish agreement for every order Slurm can use or ordinary node placement.

@@ -1,0 +1,31 @@
+{
+  "native_scheduler_sources_verified_unchanged": 63,
+  "native_scheduler_revision": "cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a",
+  "primary_jobs": 2000,
+  "primary_different_schedules": 1433,
+  "spacing_control_jobs": 2000,
+  "spacing_control_different_schedules": 0,
+  "matching_small_controls": 20,
+  "expected_adjacent_release_difference_jobs": 2,
+  "small_controls": 21,
+  "native_library_source_patches": [],
+  "source_of_native_forecasts": "Same captured primary replay; compact native-events.csv contains the first-divergence time batch only. Full events and logs remain under ignored results.",
+  "primary_comparison_exit": "Exact-match assertion detected the measured divergence; capacity and ownership audits passed. The current runner asserts expected small outcomes and the spacing-control match.",
+  "primary_dr_evt_manifest": "Recovered from the preserved source snapshot and validated against its content-derived snapshot identity.",
+  "reproduction_check": "build-and-test.sh passed all five audit tests, 21 small comparisons, and both 50-job trace comparisons.",
+  "scripts_sha256": {
+    "link.py": "11932291a97ce59e428845bb732a35c0dad2859f00aa90536524dd7c833a992a",
+    "build-and-test.sh": "da574b276841cce659ca874856435a0158b17aca775ced70af51323b237fe864",
+    "plot.py": "89c989142670679c26af8baff9f9382b0239449ec13ac1917123978381f69740",
+    "Dockerfile": "3c2a14347244005f5d3527419b9bc7952a3702c533035362cbbc454ba4df7ead",
+    "primary-recorded-compare.py": "4ca47ca19d82c42b5a25bd1ecf1cd7e6b641475c3229dc8c98c8214428b4d5a4",
+    "run.sh": "4d1a90d4ec1c3dc4af9f9813841774d7f918f8ada4a1cc167ac9e051bd744c32",
+    "diagnose.py": "b64f2258f07edd579a4698c3445c40cdbabff18e1f0f09ada99420805c5bc3c5",
+    "spacing-recorded-compare.py": "6a01a5be844635d0af2b7af656e3f44a312be1b5893fc59f2d764d98196d7675",
+    "reference.cpp": "55ed0bc2e76bc997380e62226601061f5b9b8cac8f4da3cf63b2ceb9c02fcb31",
+    "test_compare.py": "5d30f134687e95dbfb3fec49ad436118fefcc6ccbe4f9f2583f1085df0f2411b",
+    "compare.py": "4ca47ca19d82c42b5a25bd1ecf1cd7e6b641475c3229dc8c98c8214428b4d5a4",
+    "native_resource_definitions.hpp": "8257451463916d9a5f7e1ccf487a7a35e7ccde550f892ae21fc39c169a508297",
+    "spacing-replay.py": "c325043ea5da6ec0dfc9a3e264352cddfb365c8c609b79bd4a4b2fc712caed37"
+  }
+}

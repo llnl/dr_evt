@@ -6,7 +6,15 @@
  ******************************************************************************/
 
 /** @file reservation_search_cache.hpp
- * @brief Per-pass lower bounds for repeated reservation interval searches.
+ * @brief Cached search bounds for repeated capacity-reservation queries.
+ * @details Retains verified lower bounds while future reservations subtract
+ * capacity. Used by fixed periodic conservative dispatch to avoid repeating
+ * equivalent searches; this does not change the reservation rule.
+ * @note CLI: No option selects this helper directly. Its caller uses
+ * --priority_policy fcfs --queue_impl circular --dispatch_interval I (I > 0)
+ * --backfill_policy conservative, with --backfill_interval 0.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #ifndef DR_EVT_SIM_RESERVATION_SEARCH_CACHE_HPP

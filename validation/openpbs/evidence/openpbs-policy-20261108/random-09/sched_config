@@ -1,0 +1,8 @@
+strict_ordering: true ALL
+fair_share: false ALL
+preemptive_sched: false ALL
+dedicated_prefix: ded
+primetime_prefix: p_
+nonprimetime_prefix: np_
+resources: "ncpus,mem,arch,host,vnode,capacity"
+max_job_check: ALL_JOBS

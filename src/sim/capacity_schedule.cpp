@@ -5,6 +5,16 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file capacity_schedule.cpp
+ * @brief Parsing and validation of scheduled cluster capacity changes.
+ * @details Reads the capacity schedule shared by simulation events and
+ * reservation forecasts. This implements input validation, not queue order,
+ * timing, or backfill policy.
+ * @note Enable with --capacity_schedule FILE and set the maximum with
+ * --total_nodes N. Simulation_Params uses capacity_schedule and total_nodes;
+ * InitRequest has no capacity_schedule field.
+ */
+
 #include "sim/capacity_schedule.hpp"
 #include "trace/parse_utils.hpp"
 #include <fstream>

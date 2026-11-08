@@ -1,0 +1,13 @@
+start,0,1,1
+start,0,2,2
+plan,0,3.validation,11
+start,0,4,3
+snapshot,0,0,3
+end,10,1,2
+plan,10,3.validation,11
+snapshot,10,0,2
+end,11,2,1
+end,11,4,0
+start,11,3,2
+snapshot,11,0,2
+end,13,3,0

@@ -1,0 +1,70 @@
+{
+  "status": "passed",
+  "execution": "Local execution of every shell step in tests.yml and quick-test.yml; checkout represented by source snapshot. GitHub Actions itself was not invoked, and action-based image publication/artifact upload was not executed.",
+  "compilers": [
+    "GCC 14",
+    "Clang 18"
+  ],
+  "jobs": [
+    {
+      "job": "test-gcc",
+      "steps": 34,
+      "failed": 0
+    },
+    {
+      "job": "ser20-disabled",
+      "steps": 2,
+      "failed": 0
+    },
+    {
+      "job": "redis-OFF",
+      "steps": 4,
+      "failed": 0
+    },
+    {
+      "job": "redis-ON",
+      "steps": 4,
+      "failed": 0
+    },
+    {
+      "job": "quick-gcc",
+      "steps": 12,
+      "failed": 0
+    },
+    {
+      "job": "test-clang",
+      "steps": 34,
+      "failed": 0
+    },
+    {
+      "job": "documentation",
+      "steps": 5,
+      "failed": 0
+    }
+  ],
+  "total_steps": 95,
+  "failed_steps": 0,
+  "local_adjustments": [
+    "Build parallelism limited to two jobs.",
+    "OpenMPI compiler and launcher pinned because local containers also contain another MPI implementation.",
+    "Workspace and installation paths rewritten to isolated local job directories."
+  ],
+  "source_archive_sha256": "e9f7cb1ab08d2bd474aef06607235ede419a8e7449668cee4d176d4bfd59dc59",
+  "source_manifest_sha256": "e3eafec6fedf6bba6e1ebb755f177dcc1aaf94b6ec7185f0c6baddcf65af5edb",
+  "runner_sha256": "d6a4c5cbe2a8093cd1439af2b5c8b3e9cd5ed5030d66caa8dcece4ddb2dd2f60",
+  "post_snapshot_changes": [
+    "docs/user-guide/SCHEDULER_VALIDATION.md",
+    "validation/openpbs/README.md"
+  ],
+  "final_documentation_rebuild": {
+    "status": "passed",
+    "command": "make -C docs html SPHINXOPTS=\"-W --keep-going\"",
+    "log_sha256": "947b11a298234dded84135c2fc83bb74eb1cd21b005d2194acbe26a70a09436f"
+  },
+  "format_check": "clang-format 18, LLVM style; all new C++ files and changed tracked C++ ranges pass. Historical evidence snapshots preserved.",
+  "local_log_directory": "validation/openpbs/results/development/openpbs-policy/full-ci",
+  "log_archives": {
+    "gcc": "055b3a852d7a60ea8bd3c193602f0316fdebd3e471348006f02ab8eb89ea12df",
+    "clang": "379103d34fbf6187bcfdf740050fd7b3478e445a00e661310d63dab4fc9757d2"
+  }
+}

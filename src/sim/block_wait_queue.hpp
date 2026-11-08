@@ -5,6 +5,16 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file block_wait_queue.hpp
+ * @brief Block waiting-queue storage and candidate search.
+ * @details Stores waiting jobs in blocks and skips blocks whose metadata
+ * rules out a fitting backfill candidate. This implements queue
+ * storage/search, not scheduling triggers or reservation policy.
+ * @note Used by --priority_policy fcfs --queue_impl block --backfill_policy
+ * easy, with both intervals zero. --block_size chooses 4, 8, 16, 32, 64,
+ * 128, or 256. Protobuf uses queue_impl: "block" and block_size.
+ */
+
 #ifndef DR_EVT_SIM_BLOCK_WAIT_QUEUE_HPP
 #define DR_EVT_SIM_BLOCK_WAIT_QUEUE_HPP
 
