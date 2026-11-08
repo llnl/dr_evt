@@ -2280,6 +2280,15 @@ void test_fixed_periodic_cached_planner_lookahead() {
 }
 
 void test_reservation_search_bounds() {
+  Reservation_Timeline endpoint(
+      std::vector<std::pair<sim_time_t, num_nodes_t>>{{0, 2}, {10, 0}, {20, 2}});
+  assert(endpoint.earliest_fit(2, 10, 0) == 0);
+  assert(endpoint.earliest_fit<true>(2, 10, 0) == 20);
+  assert(endpoint.earliest_fit<true>(2, 9.5, 0) == 0);
+  assert(endpoint.earliest_fit<true>(2, 0, 10) == 20);
+  endpoint.reserve(0, 2, 10);
+  assert(endpoint.earliest_fit<true>(2, 0, 20) == 20);
+
   Reservation_Timeline reference(
       std::vector<std::pair<sim_time_t, num_nodes_t>>{
           {0, 0}, {10, 4}, {12, 0}, {20, 4}, {25, 8}});

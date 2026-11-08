@@ -204,6 +204,44 @@ done
 echo ""
 echo "Option surface checks"
 
+# C ends exactly when B's reservation begins. Slurm rejects that immediate
+# fit and places C's reservation after B, leaving room for D at the first tick.
+cat > "$WORK/endpoint.csv" <<'EOF'
+job_submit_time,num_nodes,time_limit,actual_run_time
+0,2,120,120
+1,4,60,60
+1,2,90,90
+1,1,30,30
+EOF
+cat > "$WORK/endpoint.expected" <<'EOF'
+0,0,120
+1,120,180
+2,180,270
+3,30,60
+EOF
+for POLICY_SPEC in "hybrid:32" "conservative:0"; do
+    POLICY="${POLICY_SPEC%%:*}"
+    DEPTH="${POLICY_SPEC##*:}"
+    if "$SIMULATOR" "$WORK/endpoint.csv" --total_nodes 4 \
+            --trace_format simple --timestamp_format epoch --run_time_mode actual \
+            --queue_impl circular --dispatch_interval 0 --backfill_policy "$POLICY" \
+            --reservation_depth "$DEPTH" --backfill_interval 30 \
+            --outfile "$WORK/endpoint.$POLICY.csv" > "$WORK/endpoint.$POLICY.log" 2>&1; then
+        awk -F, 'NR>1 {printf "%d,%g,%g\n", NR-2, $2, $3}' \
+            "$WORK/endpoint.$POLICY.csv" > "$WORK/endpoint.$POLICY.actual"
+        if diff -q "$WORK/endpoint.expected" "$WORK/endpoint.$POLICY.actual" > /dev/null; then
+            echo "✓ $POLICY includes endpoints in admission and reservation placement"
+            ((PASSED++))
+            continue
+        fi
+        diff "$WORK/endpoint.expected" "$WORK/endpoint.$POLICY.actual"
+    else
+        cat "$WORK/endpoint.$POLICY.log"
+    fi
+    echo "✗ $POLICY reservation endpoint mismatch"
+    ((FAILED++))
+done
+
 # Explicit zero interval: byte-identical output to a run without the option.
 BASE_IN="${TRACE_DIR}/05_multiple_backfills.csv"
 "$SIMULATOR" "$BASE_IN" --total_nodes "$TOTAL_NODES" --trace_format simple \

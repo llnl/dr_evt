@@ -101,9 +101,14 @@ public:
    * @param[in] nodes Number of nodes required by the interval.
    * @param[in] duration Interval duration, or zero for a capacity query.
    * @param[in] start Earliest time the interval may begin.
+   * @tparam IncludeEndpoint When true, require enough free nodes at
+   * start + duration too: a reservation beginning exactly when the job ends
+   * can block the fit. When false, check only [start, start + duration).
+   * This changes the fit test, not the duration of capacity reservations.
    * @return The earliest fitting start time, or std::nullopt when no timeline
    *         segment has sufficient capacity.
    */
+  template <bool IncludeEndpoint = false>
   std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
                                          sim_time_t start) const {
     if (m_free_nodes.empty()) {
@@ -124,14 +129,22 @@ public:
       return segment->first <= start ? start : segment->first;
     }
     for (;;) {
+      const sim_time_t end = start + duration;
+      const auto after_interval = [end](sim_time_t boundary) {
+        if constexpr (IncludeEndpoint) {
+          return boundary > end;
+        } else {
+          return boundary >= end;
+        }
+      };
       auto scan = segment;
       while (scan != m_free_nodes.end() &&
-             (scan == segment || scan->first < start + duration) &&
+             (scan == segment || !after_interval(scan->first)) &&
              scan->second >= nodes) {
         ++scan;
       }
       if (scan == m_free_nodes.end() ||
-          (scan != segment && scan->first >= start + duration)) {
+          (scan != segment && after_interval(scan->first))) {
         return start;
       }
       do {

@@ -10,6 +10,28 @@
 
 namespace dr_evt {
 
+namespace {
+class EndpointInclusiveTimeline : public Reservation_Timeline {
+public:
+  explicit EndpointInclusiveTimeline(Reservation_Timeline plan)
+      : Reservation_Timeline(std::move(plan)) {}
+
+  std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
+                                        sim_time_t start) const {
+    return Reservation_Timeline::earliest_fit<true>(nodes, duration, start);
+  }
+};
+} // namespace
+
+std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule(
+    num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+    sim_time_t current_time) {
+  // Slurm includes the endpoint in both admission and reservation placement.
+  // Changing only admission leaves earlier reservations in different places.
+  return schedule_with_protection<EndpointInclusiveTimeline>(
+      free_nodes, running_jobs, current_time);
+}
+
 std::vector<job_no_t> FCFSPeriodicHybridCircularScheduler::schedule_event(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
