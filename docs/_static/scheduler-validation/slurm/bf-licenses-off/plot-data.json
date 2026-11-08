@@ -8042,7 +8042,7 @@
       "makespan_seconds": 120196.0,
       "resource_area_node_seconds": 81309892.0,
       "utilization_percent": 89.48115344584446,
-      "process_elapsed_seconds": 0.019514999992679805
+      "process_elapsed_seconds": 0.019747666985495016
     },
     "slurm": {
       "mean_wait_seconds": 12064.0315,

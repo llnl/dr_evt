@@ -117,5 +117,8 @@ license-on and diagnostic license-off matches are observations for recorded
 runs, not evidence of equivalence across native scheduling orders. The two
 delayed starts in the gated license-on run do not bound possible divergence.
 Enforcing main scheduling before backfill would test that specific ordering.
-The gated license-on run predates the final adapter clock and acknowledgement
-corrections and has not been rerun with them.
+License-on has now been rerun with the corrected clock and dispatch
+acknowledgements and matches all 2,000 starts/completions. Both current DR_EVT
+references have also been verified against the acknowledged license-off native
+record. Current results are in `validation/slurm/evidence/license-on-acknowledged-20261108/`.
+The earlier two-delay license-on run remains historical ordering evidence.

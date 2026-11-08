@@ -1,5 +1,22 @@
 # Historical EPFL Slurm simulator comparison
 
+This harness is historical. Current validation targets native Slurm
+26.11.0-0rc2; this simulator is based on Slurm 17.11.7. Equivalence between the
+two scheduling implementations has not been established. Version age alone
+is not evidence of a scheduling mismatch: both inspected versions include
+periodic backfill, bounded reservation/examination depths, and inclusive
+endpoint checks. The checked EPFL revision `3fb607e00f53006c9076028f4529a071545556d8` has consumable license
+counts, but its backfill planner reserves specific-node bitmaps and checks
+license availability at the current time. It has no `bf_licenses` option for
+future license-capacity planning. The inspected scheduling code has no ready-made
+abstract-count backfill mode equivalent to the current native Slurm setup.
+Its main scheduler also continues past jobs lacking current license capacity,
+whereas Slurm 26.11.0-0rc2 with `bf_licenses=on` stops main dispatch and leaves
+those jobs to license-aware backfill. These version/configuration differences
+can produce different schedules from the protected DR_EVT reference. Their
+complete effects have not been measured in a controlled comparison. This
+conclusion applies to that checkout, not every simulator or later revision.
+
 This harness compares DR_EVT's event-driven FCFS with separate periodic
 backfill against the native Slurm scheduler in `external/slurm_simulator`.
 The checked-out simulator is based on Slurm 17.11.7. Main-scheduler minimum

@@ -13,7 +13,10 @@ DR_EVT uses four complementary forms of validation:
 - [native scheduling comparisons](user-guide/SCHEDULER_VALIDATION.md) drive Flux
   through Fiction and Slurm through a virtual-time adapter under explicit
   policy and resource assumptions. The 2,000-job FCFS and license-enabled Slurm
-  comparisons match; reduced workloads isolate backfill differences.
+  comparisons matched their recorded runs; reduced workloads isolate backfill
+  differences. The Slurm adapter controls simultaneous event batching and
+  verifies dispatch acknowledgements but leaves main-versus-backfill order
+  uncontrolled, so these matches do not establish general scheduler equivalence.
 
 Agreement between implementations is a regression and consistency check. It is
 not independent proof that an algorithm is correct. Small scheduling fixtures

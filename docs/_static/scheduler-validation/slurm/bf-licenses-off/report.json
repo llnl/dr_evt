@@ -38099,7 +38099,7 @@
     "makespan_seconds": 120196.0,
     "resource_area_node_seconds": 81309892.0,
     "utilization_percent": 89.48115344584446,
-    "process_elapsed_seconds": 0.019514999992679805
+    "process_elapsed_seconds": 0.019747666985495016
   },
   "different_start_times": 0,
   "audits": {
@@ -48118,12 +48118,15 @@
       "makespan_seconds": 146245.0,
       "resource_area_node_seconds": 81309892.0,
       "utilization_percent": 73.54286792421429,
-      "process_elapsed_seconds": 0.0683862500009127
+      "process_elapsed_seconds": 0.07061974998214282
     },
     "different_start_times": 1943
   },
   "timing_scope": "Native controller startup, virtual node registration, scheduling, completion RPCs, state observation and snapshot writes; excludes DR_EVT and plotting",
   "max_start_difference_seconds": 0.0,
   "resource_curve_difference_node_seconds": 0,
-  "resource_curve_difference_percent": 0.0
+  "resource_curve_difference_percent": 0.0,
+  "native_record_reused_from": "validation/slurm/evidence/gated-lassen-20261108/off",
+  "dr_evt_reference_revision": "d5455785d2cfa6c76439b4a9860f1ea7d19c2cb9",
+  "dr_evt_reference_binary_sha256": "538f0453023045254f0d42518e90a54a8ea7cea87d6de47e0ed7e730106b5ad8"
 }

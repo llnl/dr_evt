@@ -45,5 +45,8 @@
   "diagnostic_no_reservations": true,
   "main_dispatch_acknowledgement": true,
   "same_time_clock_monotonic": true,
-  "main_dispatch": "deferred submissions and dispatch after complete equal-time RPC batches"
+  "main_dispatch": "deferred submissions and dispatch after complete equal-time RPC batches",
+  "native_record_reused_from": "validation/slurm/evidence/gated-lassen-20261108/off",
+  "dr_evt_reference_revision": "d5455785d2cfa6c76439b4a9860f1ea7d19c2cb9",
+  "dr_evt_reference_binary_sha256": "538f0453023045254f0d42518e90a54a8ea7cea87d6de47e0ed7e730106b5ad8"
 }

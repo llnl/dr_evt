@@ -9,41 +9,42 @@ control rather than ordinary Slurm backfill on shared compute nodes.
 
 ## Comparison with protected DR_EVT
 
-### Original Lassen results with bf_licenses off
+### Lassen results with bf_licenses off versus protected DR_EVT
 
 This **experimental control** keeps the same abstract resource pool but removes
 protection of earlier jobs' planned starts. It does not measure ordinary Slurm
 backfill on shared compute nodes.
 
-The second run uses identical inputs, native binaries, and capacity limits,
-with `bf_licenses` disabled. This original comparison used **protected DR_EVT**,
-whose schedule matched the license-on run. All **2,000 jobs** and **6,786 native snapshots** pass the audits.
-There are **1,943 differing start times** from DR_EVT, with a largest absolute
-difference of **110,863 seconds**. The area between curves is
-**12,141,068 node-seconds**, or **10.9813%** of the shared capacity-time window.
+This comparison uses the completed, acknowledged license-off native run
+and the current protected DR_EVT reference. The native Slurm and adapter
+binaries are identical to those in the current license-on run. All **2,000
+jobs** and **6,779 native snapshots** pass the audits.
+There are **1,943 differing start times**, with a largest absolute difference
+of **110,851 seconds**. The area between curves is **12,260,066 node-seconds**,
+or **11.0889%** of the shared capacity-time window.
 
 | Metric | DR_EVT | Slurm, bf_licenses off |
 |---|---:|---:|
-| Mean waiting time | 10.3973 h | 3.2904 h |
-| Makespan | 40.6236 h | 33.3911 h |
+| Mean waiting time | 10.3973 h | 3.3511 h |
+| Makespan | 40.6236 h | 33.3878 h |
 | Area under resource curve | 81,309,892 node-seconds | 81,309,892 node-seconds |
-| Utilization | 73.5429% | 89.4722% |
-| Maximum waiting time | 18.4183 h | 30.8106 h |
+| Utilization | 73.5429% | 89.4812% |
+| Maximum waiting time | 18.4183 h | 30.8072 h |
 
 Disabling reservation of future shared capacity lets more jobs start early, reducing
 aggregate waiting and makespan in this workload. It also permits later jobs
 to delay earlier jobs: maximum waiting time increases. These results exercise
 a different reservation policy for the pooled resource.
 
-:::{figure} ../_static/scheduler-validation/slurm/bf-licenses-off/original-protected-comparison/comparison-metrics.svg
+:::{figure} ../_static/scheduler-validation/slurm/bf-licenses-off/protected-comparison/comparison-metrics.svg
 :alt: Six-panel comparison with bf_licenses disabled, showing lower mean wait and makespan, higher utilization, and a longer maximum wait than DR_EVT.
 :width: 100%
 
 Experimental control: shared capacity limits apply, but earlier jobs' planned starts are not protected.
 :::
 
-[Six-panel PDF](../_static/scheduler-validation/slurm/bf-licenses-off/original-protected-comparison/comparison-metrics.pdf)
-This figure retains the original run, before equal-time main-dispatch gating.
+[Six-panel PDF](../_static/scheduler-validation/slurm/bf-licenses-off/protected-comparison/comparison-metrics.pdf)
+This figure uses the acknowledged native run and current protected reference.
 
 ### Four-job scenarios: matching and different reservations
 
@@ -126,7 +127,7 @@ Current-capacity dispatch without future reservations matches the gated native l
 The uninterrupted native controller/adapter run took **739.2877 seconds** in
 the Linux container, including RPCs, observation, acknowledgements, and snapshot
 writes. Five subsequent local macOS diagnostic runs had a median of
-**0.057316 seconds** (range **0.052355–0.059869**), including process launch,
+**0.055111 seconds** (range **0.050730–0.063799**), including process launch,
 input, simulation, output and exit. These are different timing scopes and
 environments; the recorded native duration is not scheduler computation alone.
 
@@ -186,17 +187,18 @@ off, verifies that no fitting eligible job remains waiting.
 
 ## Gated license-on control: main dispatch versus backfill order
 
-This control changed the adapter timing; it did not undo the DR_EVT fixes.
-The original ungated license-on result remains an exact 2,000-job match.
-The gated license-on run was recorded before the later dispatch-acknowledgement
-and repeated-timestamp clock corrections used in the final license-off run.
-License-on has not been rerun with those latest adapter corrections.
+The current license-on rerun uses the corrected clock and completed-dispatch
+acknowledgements and matches all 2,000 starts and completions. Its results are
+on the [validation page](SCHEDULER_VALIDATION.md). The order of main scheduling
+and backfill remains uncontrolled; an exact match in this run does not show
+that DR_EVT reproduces every order Slurm can use.
 
-The original license-on run matches protected DR_EVT exactly. A fresh gated
-license-on run has **two jobs delayed by one 30-second tick**, with
-**80 node-seconds** between resource curves. These are the observed differences
-in this run, not a bound on divergence under other scheduling orders. This comes from the relative
-order of Slurm's independently triggered main scheduler and backfill.
+An **earlier gated license-on run**, before those adapter corrections, had
+**two jobs delayed by one 30-second tick** and **80 node-seconds** between
+resource curves. Those observed differences do not bound possible divergence
+under other orders. They came from Slurm running backfill before main
+scheduling, whereas DR_EVT runs main scheduling first. This earlier run is
+retained as diagnostic evidence rather than the current published comparison.
 
 At **23,460 seconds**, Slurm starts fitting head job **469 in backfill**,
 using one of its 64 examination slots. Job **614 is 65th** in the queue and
@@ -215,17 +217,22 @@ job 469 one backfill slot at that single tick reproduces **every start and
 completion** in the gated native run. This is a controlled explanation of
 these two differences; it does not impose a universal order on Slurm.
 
-[Six-panel gated license-on PDF](../_static/scheduler-validation/slurm/gated-license-on/comparison-metrics.pdf)
+[Earlier ordering-control PDF](https://github.com/LLNL/dr_evt/blob/main/validation/slurm/evidence/gated-lassen-20261108/on/comparison-metrics.pdf)
 · [Controlled reference data](../_static/scheduler-validation/slurm/divergence/gated-ordering/ordering-diagnosis.json).
 
 ## Saved evidence and reproduction
 
-The complete archive is in
-[validation/slurm/evidence/gated-lassen-20261108](https://github.com/LLNL/dr_evt/tree/main/validation/slurm/evidence/gated-lassen-20261108).
-It includes reports, audits, lossless snapshot deltas, input and output CSVs,
-configuration, source/binary hashes, both controlled replays, and plotting data
-and scripts. The native scheduler binaries are identical across the gated
-on/off controls; the off run uses the corrected clock and acknowledgement client.
+The current archive is in
+[validation/slurm/evidence/license-on-acknowledged-20261108](https://github.com/LLNL/dr_evt/tree/main/validation/slurm/evidence/license-on-acknowledged-20261108).
+It contains the rerun license-on results, the reused acknowledged license-off
+native record with refreshed DR_EVT references, independent audits, lossless
+snapshot deltas, configurations, source/binary hashes, current plotting data
+and scripts, and fresh local DR_EVT timings. Both comparisons use identical
+native/adapter binaries and the same current simulator binary.
+
+The [earlier diagnostic archive](https://github.com/LLNL/dr_evt/tree/main/validation/slurm/evidence/gated-lassen-20261108)
+retains the startup and scheduler-order controlled replays and both four-job
+scenarios. Earlier results there are historical evidence.
 
 For either Lassen plot folder, run `python3 plot.py plot-input.json`.
 For the four-job folder, run `python3 plot_timeline.py . --case pooled` or

@@ -2,9 +2,9 @@
   "jobs": 2000,
   "capacity": 756,
   "matched_inputs_and_native_scheduler_binaries": true,
-  "adapter_binaries_identical": false,
+  "adapter_binaries_identical": true,
   "main_dispatch_acknowledgement": {
-    "on": false,
+    "on": true,
     "off": true
   },
   "both_audits": "passed",
@@ -14,21 +14,21 @@
       "makespan_seconds": 146245.0,
       "resource_area_node_seconds": 81309892.0,
       "utilization_percent": 73.54286792421429,
-      "process_elapsed_seconds": 0.06919424998341128
+      "process_elapsed_seconds": 0.06821641599526629
     },
     "DR_EVT (no-reservation diagnostic)": {
       "mean_wait_seconds": 12064.0315,
       "makespan_seconds": 120196.0,
       "resource_area_node_seconds": 81309892.0,
       "utilization_percent": 89.48115344584446,
-      "process_elapsed_seconds": 0.019514999992679805
+      "process_elapsed_seconds": 0.019747666985495016
     },
     "Slurm bf_licenses on": {
-      "mean_wait_seconds": 37430.462,
+      "mean_wait_seconds": 37430.432,
       "makespan_seconds": 146245,
       "resource_area_node_seconds": 81309892,
       "utilization_percent": 73.54286792421429,
-      "process_elapsed_seconds": 723.7726378299994
+      "process_elapsed_seconds": 697.8356651499926
     },
     "Slurm bf_licenses off": {
       "mean_wait_seconds": 12064.0315,
@@ -46,10 +46,10 @@
   "protected_off_control_different_starts": 1943,
   "versus_dr_evt": {
     "on": {
-      "different_start_times": 2,
-      "max_start_difference_seconds": 30.0,
-      "resource_curve_difference_node_seconds": 80.0,
-      "resource_curve_difference_percent": 7.23581016924379e-05
+      "different_start_times": 0,
+      "max_start_difference_seconds": 0.0,
+      "resource_curve_difference_node_seconds": 0,
+      "resource_curve_difference_percent": 0.0
     },
     "off": {
       "different_start_times": 0,
@@ -621,7 +621,7 @@
       -21428,
       -17535,
       -11838,
-      -18045,
+      -18015,
       -11854,
       -21807,
       -28661,
@@ -675,7 +675,7 @@
       -15814,
       -31034,
       -15934,
-      -16182,
+      -16152,
       -17735,
       -1498,
       -16207,
@@ -2065,7 +2065,7 @@
     ]
   },
   "result_directories": {
-    "on": "/dr_evt_source/validation/slurm/results/licenses/gated-diagnostic-20261108/paired/lassen-prefix2000-hybrid-r32-q64",
-    "off": "/results/paired-license-off/lassen-prefix2000-hybrid-r32-q64"
+    "on": "/Users/yeom2/work/dr_evt/validation/slurm/evidence/license-on-acknowledged-20261108/on",
+    "off": "/Users/yeom2/work/dr_evt/validation/slurm/evidence/license-on-acknowledged-20261108/off"
   }
 }

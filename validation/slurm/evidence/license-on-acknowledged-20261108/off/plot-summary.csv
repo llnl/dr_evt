@@ -1,0 +1,3 @@
+scheduler,mean_wait_seconds,makespan_seconds,utilization_percent,resource_area_node_seconds
+dr_evt,12064.0315,120196.0,89.48115344584446,81309892.0
+slurm,12064.0315,120196,89.48115344584446,81309892
