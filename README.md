@@ -8,13 +8,13 @@ hybrid, and conservative backfilling algorithms. It models scheduling approaches
 through a set of policies: queue ordering, dispatch and backfill triggers,
 examination and reservation depths, planning horizon and resolution, and
 reservation admission. See [Scheduling Loops and
-DR_EVT Configurations](https://dr-evt.readthedocs.io/en/latest/user-guide/SCHEDULER_LOOPS.html)
+DR_EVT Configurations](docs/user-guide/SCHEDULER_LOOPS.md)
 for supported combinations and [Realism and Known
-Gaps](https://dr-evt.readthedocs.io/en/latest/user-guide/REALISM_AND_GAPS.html) for
+Gaps](docs/user-guide/REALISM_AND_GAPS.md) for
 model scope and evidence limits. **Uniquely supports online
-simulation via gRPC**, enabling [coordinated multi-cluster simulations](https://dr-evt.readthedocs.io/en/latest/user-guide/client-server-use-cases.html)
+simulation via gRPC**, enabling [coordinated multi-cluster simulations](docs/user-guide/client-server-use-cases.md)
 where distributed schedulers interact in real-time.
-Another use case is the [Fugaku Power-Usage Simulation Experiment](https://dr-evt.readthedocs.io/en/latest/user-guide/fugaku-power-experiment.html).
+Another use case is the [Fugaku Power-Usage Simulation Experiment](docs/user-guide/fugaku-power-experiment.md).
 
 **[📚 Read the Full Documentation on ReadTheDocs →](https://dr-evt.readthedocs.io/)**
 
@@ -44,7 +44,7 @@ A basic Linux build requires CMake 3.24 or later, a C++20 compiler, and Boost
 1.70 or later. Ser20 supplies RNG-state serialization and is fetched during
 configuration when it is not already installed or present under
 `external/ser20`. If Boost is unavailable, CMake can fetch it too. The
-[Installation Guide](https://dr-evt.readthedocs.io/en/latest/getting-started/installation.html)
+[Installation Guide](docs/getting-started/installation.md)
 covers dependency selection, optional features, and platform-specific setup.
 
 ### Build
@@ -138,9 +138,9 @@ head resources.csv
 DR_EVT accepts a job trace or an ordered list of trace files for progressive
 loading. Settings may come from command-line options, a Protobuf text
 configuration, or both. Complete input schemas and output definitions are in
-[Input Trace Files](https://dr-evt.readthedocs.io/en/latest/user-guide/trace-formats.html)
+[Input Trace Files](docs/user-guide/trace-formats.md)
 and
-[Output Trace Files](https://dr-evt.readthedocs.io/en/latest/user-guide/output-traces.html).
+[Output Trace Files](docs/user-guide/output-traces.md).
 
 The defaults use FCFS priority and EASY backfilling. For strict FCFS without
 backfilling, for example, use:
@@ -177,13 +177,13 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
 ```
 
 Options written after `--config` override values from the file. See
-[Protobuf Configuration](https://dr-evt.readthedocs.io/en/latest/user-guide/protobuf-config.html)
+[Protobuf Configuration](docs/user-guide/protobuf-config.md)
 for all fields and progressive-input configuration.
 
 For a guided example, see the
-[Quick Start Guide](https://dr-evt.readthedocs.io/en/latest/getting-started/quickstart.html).
+[Quick Start Guide](docs/getting-started/quickstart.md).
 All flags are listed in the
-[Command-Line Reference](https://dr-evt.readthedocs.io/en/latest/user-guide/command-line.html).
+[Command-Line Reference](docs/user-guide/command-line.md).
 
 ### Replay
 
@@ -229,9 +229,9 @@ ${CMAKE_INSTALL_PREFIX}/bin/tracer \
   --resource_trace replay-resources.csv
 ```
 
-See [Input Trace Files](https://dr-evt.readthedocs.io/en/latest/user-guide/trace-formats.html)
+See [Input Trace Files](docs/user-guide/trace-formats.md)
 for the fields needed by each mode and
-[Output Trace Files](https://dr-evt.readthedocs.io/en/latest/user-guide/output-traces.html)
+[Output Trace Files](docs/user-guide/output-traces.md)
 for the optional analysis reports.
 
 ## Optional interfaces
@@ -257,8 +257,8 @@ cmake --build build -j4
 cmake --install build
 ```
 
-See the [Python API](https://dr-evt.readthedocs.io/en/latest/api/PYTHON_API.html)
-and [gRPC setup guide](https://dr-evt.readthedocs.io/en/latest/user-guide/grpc-setup.html)
+See the [Python API](docs/api/PYTHON_API.md)
+and [gRPC setup guide](docs/user-guide/grpc-setup.md)
 for usage.
 
 ## APIs and integration
@@ -268,13 +268,13 @@ for usage.
 - **gRPC service:** expose the streaming API to remote clients and distributed
   controllers.
 
-See the [User Guide](https://dr-evt.readthedocs.io/en/latest/user-guide/overview.html)
+See the [User Guide](docs/user-guide/overview.md)
 for the documentation map.
 
 Most users can run the native C++ `simulator` directly, as shown in the
-[Quick Start](https://dr-evt.readthedocs.io/en/latest/getting-started/quickstart.html),
+[Quick Start](docs/getting-started/quickstart.md),
 or use the in-process
-[Python API](https://dr-evt.readthedocs.io/en/latest/api/PYTHON_API.html).
+[Python API](docs/api/PYTHON_API.md).
 Neither interface requires client/server setup; the distributed gRPC service
 below is optional.
 
@@ -287,7 +287,7 @@ available for remote deployment, while MPI provides an optional test and
 experiment launcher.
 
 <p align="center">
-  <a href="https://dr-evt.readthedocs.io/en/latest/user-guide/client-server-use-cases.html">
+  <a href="docs/user-guide/client-server-use-cases.md">
     <img src="docs/_static/client-server-architecture.svg"
          alt="Clients connect over gRPC to servers that own independent simulations"
          width="900">
@@ -295,9 +295,9 @@ experiment launcher.
 </p>
 
 Deployment patterns are described in
-[Client/Server Use Cases](https://dr-evt.readthedocs.io/en/latest/user-guide/client-server-use-cases.html).
+[Client/Server Use Cases](docs/user-guide/client-server-use-cases.md).
 The internal execution flow is described in
-[Simulation Pipeline and Job Lifecycle](https://dr-evt.readthedocs.io/en/latest/dev/JOB_LIFECYCLE.html).
+[Simulation Pipeline and Job Lifecycle](docs/dev/JOB_LIFECYCLE.md).
 
 ## Documentation
 
@@ -316,16 +316,16 @@ The generated site is written to `docs/_build/html/index.html`.
 
 ### Documentation index
 
-- [Installation](https://dr-evt.readthedocs.io/en/latest/getting-started/installation.html)
-- [Quick Start](https://dr-evt.readthedocs.io/en/latest/getting-started/quickstart.html)
-- [User Guide](https://dr-evt.readthedocs.io/en/latest/user-guide/overview.html)
-- [Command-Line Options](https://dr-evt.readthedocs.io/en/latest/user-guide/command-line.html)
-- [Backfilling Algorithms](https://dr-evt.readthedocs.io/en/latest/BACKFILLING_ALGORITHMS.html)
-- [C++ API](https://dr-evt.readthedocs.io/en/latest/api/CPP_API.html)
-- [Streaming API](https://dr-evt.readthedocs.io/en/latest/api/STREAMING_API.html)
-- [Python API](https://dr-evt.readthedocs.io/en/latest/api/PYTHON_API.html)
-- [gRPC Client/Server](https://dr-evt.readthedocs.io/en/latest/CLIENT_SERVER_GUIDE.html)
-- [Developer Notes](https://dr-evt.readthedocs.io/en/latest/dev/README.html)
+- [Installation](docs/getting-started/installation.md)
+- [Quick Start](docs/getting-started/quickstart.md)
+- [User Guide](docs/user-guide/overview.md)
+- [Command-Line Options](docs/user-guide/command-line.md)
+- [Backfilling Algorithms](docs/BACKFILLING_ALGORITHMS.md)
+- [C++ API](docs/api/CPP_API.md)
+- [Streaming API](docs/api/STREAMING_API.md)
+- [Python API](docs/api/PYTHON_API.md)
+- [gRPC Client/Server](docs/CLIENT_SERVER_GUIDE.md)
+- [Developer Notes](docs/dev/README.md)
 
 Docker and rootless Podman packaging are available; setup details remain with
 the
@@ -339,7 +339,7 @@ files.
 Please submit bug fixes and improvements as
 [pull requests](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork).
 Testing procedures are documented in the
-[Testing Guide](https://dr-evt.readthedocs.io/en/latest/TESTING_GUIDE.html).
+[Testing Guide](docs/TESTING_GUIDE.md).
 
 ## License and attribution
 
