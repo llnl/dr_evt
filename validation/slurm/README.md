@@ -17,12 +17,29 @@ The result root also contains `license-planning-metrics.csv`,
 `license-planning-comparison.json`, and `summarize_licenses.py` for the
 matched on/off comparison.
 
-With `select/cons_tres` and `bf_licenses`, 756 global `capacity` licenses
-represent the `pbatch` node capacity. Each job requests its original node
-count as licenses and has a private dummy compute node. License counts have
-no individual node identities, so node binding does not constrain this pool.
-Disabling `bf_licenses` removes future license reservations while retaining
-the same license capacity limits and physical-node abstraction.
+Ordinary Slurm backfill protects the FCFS head job's planned start through
+resource capacity and node binding: enough capacity must be available over
+the planned interval, and a reservation identifies the specific nodes that
+supply it. Reserving those nodes protects both their capacity and identities.
+This experiment removes competition for those nodes: each job has one
+private dummy node and requests its original node
+count as shared `capacity` licenses, from a pool of 756. A private-node
+reservation cannot protect the shared license capacity.
+
+Both license-on and license-off runs use this setup; `bf_licenses` does not
+change node binding. With it on, Slurm reserves future license counts,
+matching DR_EVT's protection of planned starts. With it off, only current
+license limits apply, so later jobs can delay earlier jobs. **License-on is
+the intended abstract-resource comparison. License-off is an experimental
+control, not ordinary Slurm node backfill behavior.**
+Slurm defaults to `bf_licenses` off because ordinary node reservations already
+protect compute capacity; the option adds future planning for separate
+license resources. We use licenses as node capacity, so enabling it is closer
+to ordinary Slurm's protection of planned starts in this setup.
+Ordinary Slurm's specific-node reservations can nevertheless cause the same
+kind of divergence from DR_EVT shown in the Fluxion four-job example.
+The license-on match validates abstract-capacity backfill, not ordinary
+Slurm node placement.
 Backfill remains enabled at 30-second intervals; dispatch throttling is zero.
 DR_EVT selects `FCFSPeriodicHybridCircularScheduler`, implemented in
 `src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp`, with FCFS ordering,
@@ -33,6 +50,20 @@ completion, and epilog RPCs. A recorded synchronization hook serializes event
 batches with native backfill; allocation and reservation algorithms remain
 native Slurm. The lightweight observer fetches full job records on state
 transitions; pending-job forecast timestamps may be stale in snapshots.
+
+The license-off [divergence diagnosis](licenses/LICENSE_OFF_FINDINGS.md)
+isolates changes in main dispatch as well as future license protection.
+It also identifies dispatch between simultaneous completion RPCs in the
+saved adapter run. `licenses/event_trace.py --batch-main-dispatch` controls
+that ordering by deferring submissions and gating main dispatch alongside
+backfill until the full equal-time batch is applied. Eight native controls,
+including simultaneous releases with license planning on and off, pass with
+this mode. The saved full-trace plots still describe the original RPC ordering.
+An arrival queues a job without starting it. DR_EVT's trace loop makes known
+same-time arrivals eligible and processes completions/releases before
+scheduling. The optional adapter mode matches this batching, but does not
+force main dispatch before backfill after the gates open. Real Slurm can
+schedule between messages and uses independent main/backfill triggers.
 
 Small-case figures show feasible assignments to node-equivalent rows for
 license planning on, off, and DR_EVT. The Lassen figure has six metric panels.

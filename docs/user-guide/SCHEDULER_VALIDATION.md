@@ -160,21 +160,56 @@ arrivals and whole-minute time limits are unchanged.
 
 ### Why use bf_licenses?
 
-Slurm's `bf_licenses` option lets backfill plan the future availability of
-licenses and protect those counts for waiting jobs. Ordinary global licenses
-are integer counts with no individual token identities. We use them as an
-abstract resource pool: `Licenses=capacity:756`, with each job requesting its
-original node count as `capacity` licenses. This represents the same pooled
-node-count capacity that DR_EVT uses while retaining Slurm's native backfill.
+Ordinary Slurm node backfill protects the FCFS head job's planned start through
+two parts of its reservation:
 
-Each job also requests one private dummy compute node. There are 2,000 such
-nodes, so physical node binding does not limit competing jobs. The
-`select/cons_tres` plugin supports this license-aware planning. With
-`bf_licenses` enabled, future license reservations protect the pooled capacity;
-with it disabled, current license limits still apply, but backfill does not
-protect future license capacity. Both cases retain native periodic backfill
-while abstracting resources;
-`sched-simple` also simplifies resource matching but removes backfill.
+- **Resource capacity:** enough resources must remain available throughout
+  the job's planned execution interval.
+- **Node binding:** the reservation identifies the specific compute nodes
+  that supply this capacity. Later jobs must preserve their availability.
+
+These are coupled parts of a node reservation: reserving those nodes protects
+both their capacity and their identities. DR_EVT reserves capacity counts
+without node binding. Our setup removes competition for specific nodes so we
+can compare that count-based protection with Slurm.
+
+Each trace job requests two separate resources from Slurm:
+
+| Slurm resource | Role in this experiment |
+|---|---|
+| One private dummy node per job | Satisfies Slurm's compute-node requirement; no other job requests this node |
+| Shared `capacity` licenses | Represent the 756-node pool; a 32-node trace job requests 32 licenses |
+
+The licenses are interchangeable resource counts, not actual software use.
+**Both the license-on and license-off runs use this same setup.** Reserving a
+job's private dummy node cannot protect its share of the shared license pool.
+Thus, private dummy nodes remove shared-node binding in both runs, while
+`bf_licenses` controls reservation of shared capacity counts:
+
+- **On:** reserve license counts for waiting jobs' planned execution intervals.
+  Later jobs may start only if enough capacity remains for those reservations,
+  matching DR_EVT's protection of future starts.
+- **Off:** enforce current license availability without reserving future counts.
+  Later jobs can consume capacity needed at an earlier job's planned start and
+  delay it. This is an **experimental control**, not ordinary Slurm node
+  backfill behavior, because our dummy nodes provide no shared-capacity protection.
+
+The **license-on run is the intended comparison** with DR_EVT's protected
+backfill and is closer to ordinary Slurm's protection of planned starts.
+Slurm defaults to `bf_licenses` off, but ordinary node reservations already
+protect compute capacity by reserving specific nodes. `bf_licenses`
+adds future planning for a separate resource, normally software-license
+counts. Our setup repurposes licenses as shared node capacity, so we need it
+on to retain capacity protection after removing shared-node binding.
+
+Ordinary Slurm's reservations of specific nodes can still cause the same
+kind of divergence from DR_EVT's count-based reservations demonstrated by
+the Fluxion four-job example. The exact differences depend on node selection
+and workload. **An exact license-on match validates backfill with abstract
+capacity, not ordinary Slurm node placement.**
+
+Slurm's native backfill and `select/cons_tres` remain in use;
+`sched-simple`, used in a separate Flux control, also removes backfill.
 
 ### Running native Slurm with an adapter and virtual time
 
@@ -198,12 +233,41 @@ Both configurations use **R=32**, **Q=64**, a **72-hour planning horizon**,
 and **one-second planning resolution**. Slurm's `sched_min_interval` and
 `batch_sched_delay` are zero, and `defer` is omitted. DR_EVT uses
 `--dispatch_interval 0 --backfill_interval 30` to select event-driven FCFS
-dispatch with periodic backfill. Arrivals and completions trigger main FCFS
-dispatch; timer ticks run backfill.
+dispatch with periodic backfill. Arrivals and completions request Slurm's main
+dispatch; timer ticks run backfill. With `bf_licenses` on, main dispatch stops
+when a job lacks enough free licenses. With it off, main dispatch considers
+later jobs instead; DR_EVT's strict FCFS dispatch stops at the first job that
+cannot fit. In the saved runs, the adapter gates backfill during event batches
+but allows main dispatch between individual RPCs, whereas DR_EVT applies all
+simultaneous events before dispatch.
 
 Native state and license snapshots check capacity, private node ownership,
 exact runtimes, and completed jobs. Independent audits also verify that both
 schedulers' resource traces agree with their job records.
+
+#### Event ordering and the optional dispatch gate
+
+**An arrival puts a job into the waiting queue; it does not start the job.**
+In DR_EVT's preloaded trace, jobs are stored ahead of time and become eligible
+at arrival. Known same-time arrivals are made eligible and all completions
+and node releases at that time are processed before scheduling. In the
+periodic-backfill model, FCFS dispatch precedes backfill selection. Streaming
+callers can supply arrivals in a separate batch after advancing through
+completions.
+
+Native Slurm can schedule between separate arrival or completion messages.
+Its main scheduler and backfill have independent triggers, so there is no
+general guarantee that main dispatch runs first.
+
+The adapter's opt-in `--batch-main-dispatch` mode adds Slurm's `defer` option
+to queue arrivals without immediate allocation. It holds both main dispatch
+and backfill while all same-time event RPCs are supplied, then releases the
+gates. This matches DR_EVT's **batching of known events**, but **does not force
+main dispatch to run before backfill**. It is a simulation timing control,
+not a claim that real Slurm always batches events this way. Native placement
+and reservation rules are retained. The mode passes eight native controls;
+the full Lassen plots below use the original adapter without this dispatch
+gate and with `defer` omitted.
 
 ### Lassen results with bf_licenses on
 
@@ -231,6 +295,10 @@ Native Slurm with license-aware backfill planning and DR_EVT's periodic hybrid m
 
 ### Lassen results with bf_licenses off
 
+This **experimental control** keeps the same abstract resource pool but removes
+protection of earlier jobs' planned starts. It does not measure ordinary Slurm
+backfill on shared compute nodes.
+
 The second run uses identical inputs, native binaries, and capacity limits,
 with `bf_licenses` disabled. Its DR_EVT reference schedule is identical to the
 one above. All **2,000 jobs** and **6,786 native snapshots** pass the audits.
@@ -246,7 +314,7 @@ difference of **110,863 seconds**. The area between curves is
 | Utilization | 73.5429% | 89.4722% |
 | Maximum waiting time | 18.4183 h | 30.8106 h |
 
-Disabling future license protection lets more jobs start early, reducing
+Disabling reservation of future shared capacity lets more jobs start early, reducing
 aggregate waiting and makespan in this workload. It also permits later jobs
 to delay earlier jobs: maximum waiting time increases. These results exercise
 a different reservation policy for the pooled resource.
@@ -255,7 +323,7 @@ a different reservation policy for the pooled resource.
 :alt: Six-panel comparison with bf_licenses disabled, showing lower mean wait and makespan, higher utilization, and a longer maximum wait than DR_EVT.
 :width: 100%
 
-Native Slurm backfill with current license limits but no future license reservations.
+Experimental control: shared capacity limits apply, but earlier jobs' planned starts are not protected.
 :::
 
 [Six-panel PDF](../_static/scheduler-validation/slurm/bf-licenses-off/comparison-metrics.pdf)
@@ -293,10 +361,11 @@ start and delaying C to **240 seconds**.
 Changing C's size isolates the protection supplied by future license reservations.
 :::
 
-The node rows show **feasible assignments to node-equivalent slots**. License
-counts have no individual node identities, and DR_EVT does not emit node IDs;
-these rows illustrate pooled placement rather than recorded physical node IDs.
-Workload tables, scripts, and plotting data accompany both figures.
+These Slurm scenarios illustrate **protection of an earlier job's planned start**;
+the Fluxion four-job example above illustrates **binding reservations to specific
+nodes**. The Slurm node rows are drawn feasible assignments to interchangeable
+capacity slots, not recorded node bindings. Workload tables, scripts, and
+plotting data accompany both figures.
 
 ### Sources of divergence and corrections
 
