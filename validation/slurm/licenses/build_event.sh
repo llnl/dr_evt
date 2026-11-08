@@ -20,12 +20,31 @@ path = Path('/workspace/slurm-modern-source/'+name)
 if path.read_text() != after:
     path.write_text(after)
 Path('/results/event-overlay.json').write_text(json.dumps({'file':name,'reason':'Serialize virtual event batches with native backfill cycles; no allocation or reservation algorithm changes.','before':before,'after':after},indent=2)+'\n')
+# Backfill gating alone allows main dispatch between simultaneous completion
+# RPCs. Gate _schedule before it acquires controller locks so every release and
+# arrival in the batch is visible first. The clock library makes this opt-in;
+# the native allocation and reservation algorithms are retained.
+name = 'src/slurmctld/job_scheduler.c'
+before = subprocess.check_output(['git','-c','safe.directory=/slurm-modern-source','-C','/slurm-modern-source','show','HEAD:'+name],text=True)
+after = before.replace('#include "src/slurmctld/licenses.h"', '#include "src/slurmctld/licenses.h"\n#include <dlfcn.h>', 1)
+old = '\t\tjob_cnt = _schedule(full_queue);'
+assert after.count(old) == 1
+after = after.replace(old, '\t\tvoid (*validation_enter)(void) = dlsym(RTLD_DEFAULT, "validation_enter_dispatch");\n'
+    '\t\tvoid (*validation_leave)(void) = dlsym(RTLD_DEFAULT, "validation_leave_dispatch");\n'
+    '\t\tif (validation_enter) validation_enter();\n' + old + '\n'
+    '\t\tif (validation_leave) validation_leave();', 1)
+Path('/workspace/slurm-modern-source/'+name).write_text(after)
+Path('/results/dispatch-overlay.json').write_text(json.dumps({'file':name,'reason':'Opt-in main-dispatch gate outside equal-time RPC batches; native selection and reservation rules retained.','before':before,'after':after},indent=2)+'\n')
 PY
 make -C /workspace/slurm-modern-build/src/plugins/sched/backfill -j4
 cp /workspace/slurm-modern-build/src/plugins/sched/backfill/.libs/sched_backfill.so /workspace/slurm-event/
+make -C /workspace/slurm-modern-build/src/slurmctld -j4
+cp /workspace/slurm-modern-build/src/slurmctld/.libs/slurmctld /workspace/slurm-modern-install/sbin/slurmctld
 # Leave the shared native source ready for an ordinary, uninstrumented rebuild.
 git -c safe.directory=/slurm-modern-source -C /slurm-modern-source \
     show HEAD:src/plugins/sched/backfill/backfill.c > /workspace/slurm-modern-source/src/plugins/sched/backfill/backfill.c
+git -c safe.directory=/slurm-modern-source -C /slurm-modern-source \
+    show HEAD:src/slurmctld/job_scheduler.c > /workspace/slurm-modern-source/src/slurmctld/job_scheduler.c
 gcc -O2 -I/workspace/slurm-modern-build -I/workspace/slurm-modern-source \
     /dr_evt_source/validation/slurm/licenses/client.c -o /workspace/slurm-event/client \
     -L/workspace/slurm-modern-build/src/api/.libs -lslurmfull -L/workspace/slurm-event -lvalidation_clock \

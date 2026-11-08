@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <time.h>
@@ -14,9 +15,10 @@
 struct validation_clock {
     _Atomic int64_t seconds;
     _Atomic uint64_t microticks;
-    _Atomic uint32_t phase; /* 0 idle, 1 event batch, 2 backfill */
+    _Atomic uint32_t phase; /* 0 idle, 1 event batch, 2 backfill, 3 dispatch */
 };
 static struct validation_clock *shared;
+static int batch_dispatch;
 static int (*real_clock_gettime)(clockid_t, struct timespec *);
 static int (*real_nanosleep)(const struct timespec *, struct timespec *);
 static int (*real_cond_wait)(pthread_cond_t *, pthread_mutex_t *, const struct timespec *);
@@ -28,6 +30,8 @@ __attribute__((constructor)) static void initialize(void)
     real_cond_wait = dlsym(RTLD_NEXT, "pthread_cond_timedwait");
     const char *path = getenv("SLURM_VALIDATION_CLOCK_FILE");
     if (!path) return;
+    const char *batch = getenv("SLURM_VALIDATION_BATCH_DISPATCH");
+    batch_dispatch = batch && !strcmp(batch, "1");
     int fd = open(path, O_RDWR);
     if (fd < 0) abort();
     shared = mmap(NULL, sizeof(*shared), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -51,6 +55,34 @@ void validation_enter_backfill(void)
     } while (1);
 }
 void validation_leave_backfill(void) { atomic_store(&shared->phase, 0); }
+
+/**
+ * Hold main dispatch until the supplied same-time arrival/completion batch is applied.
+ * DR_EVT's trace loop makes known same-time arrivals eligible, processes all
+ * completions/releases at that time, then dispatches. Streaming callers that
+ * append arrivals after advancing can instead create a separate dispatch cycle.
+ * Without this gate, dispatch can consume one release before another simultaneous
+ * release arrives through its RPC, unlike DR_EVT's batch processing. Enabled by
+ * SLURM_VALIDATION_BATCH_DISPATCH=1; native scheduling decisions are unchanged.
+ * Queued arrivals do not start during the batch. After release, main dispatch
+ * and backfill keep their independent triggers; this gate does not order them.
+ */
+void validation_enter_dispatch(void)
+{
+    if (!batch_dispatch) return;
+    uint32_t expected;
+    do {
+        expected = 0;
+        if (atomic_compare_exchange_weak(&shared->phase, &expected, 3)) return;
+        pause_real();
+    } while (1);
+}
+
+/** Release the dispatch gate after native scheduling finishes. */
+void validation_leave_dispatch(void)
+{
+    if (batch_dispatch) atomic_store(&shared->phase, 0);
+}
 void validation_set_time(int64_t seconds)
 {
     uint32_t expected;
