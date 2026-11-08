@@ -131,40 +131,15 @@ def plot_case(entry, capture, root, capacity):
              f"fiction match policy: {entry['fiction_match_policy']}")
     if entry.get('fiction_scheduler') == 'sched-simple':
         title += ' · scheduler: sched-simple'
-    figure, axes = plt.subplots(3, 1, figsize=(12, 9), layout='constrained')
+    figure, axis = plt.subplots(figsize=(12, 5), layout='constrained')
     figure.suptitle(title)
     for i, (label, color) in enumerate(zip(LABELS, COLORS)):
-        axes[0].step(times / 3600, values[i], where='post', label=label,
+        axis.step(times / 3600, values[i], where='post', label=label,
                      color=color, linewidth=1.8 if i == 0 else 1.1,
                      linestyle='-' if i == 0 else '--')
-        axes[1].step(times, values[i], where='post', label=label, color=color,
-                     linewidth=2 if i == 0 else 1.5, linestyle='-' if i == 0 else '--')
-    arrivals = sorted({job['submit'] for job in schedules[0]})
-    first_finish = max(job['finish'] for schedule in schedules
-                       for job in schedule if job['submit'] == start)
-    zoom_end = min(end, start + (first_finish - start) * 1.08)
-    if len(arrivals) > 1:
-        zoom_end = min(zoom_end, arrivals[1])
-    zoom_start = start
-    zoom_title = 'First burst — zoom'
-    different_steps = np.flatnonzero(difference[:-1])
-    if len(different_steps):
-        first_difference = times[different_steps[0]]
-        zoom_start = max(start, first_difference - 300)
-        zoom_end = min(end, first_difference + 600)
-        zoom_title = f'Zoom near first resource-curve difference at {first_difference:g} s'
-    axes[0].set(xlabel='Simulation time (hours)', ylabel='Allocated nodes',
+    axis.set(xlabel='Simulation time (hours)', ylabel='Allocated nodes',
                 title='Full resource-manager curves', ylim=(-0.15, capacity + 0.4))
-    axes[0].legend(loc='upper right')
-    axes[1].set(xlabel='Simulation time (seconds)', ylabel='Allocated nodes',
-                title=zoom_title, xlim=(zoom_start, zoom_end),
-                ylim=(-0.15, capacity + 0.4))
-    axes[2].step(times / 3600, difference, where='post', color='#7a4799')
-    axes[2].axhline(0, color='gray', linewidth=0.6)
-    axes[2].set(xlabel='Simulation time (hours)', ylabel='Node difference',
-                ylim=(-capacity, capacity),
-                title=(f'dr_evt − Fiction · area between curves: {difference_area:g} node-s'
-                       f" · normalized: {100 * result['normalized_area_between_curves']:.3f}%"))
+    axis.legend(loc='upper right')
     save(figure, directory, 'resource-curves')
 
     figure, axes = plt.subplots(2, 3, figsize=(15, 9), layout='constrained')
@@ -225,7 +200,6 @@ def plot_case(entry, capture, root, capacity):
             'dr_evt_allocated_nodes': values[0].tolist(),
             'fiction_allocated_nodes': values[1].tolist(),
             'dr_evt_minus_fiction_nodes': difference.tolist(),
-            'zoom_window_seconds': [float(zoom_start), float(zoom_end)],
         },
     }
     for name, data in [('comparison-metrics.json', result), ('plot-data.json', plot_data)]:

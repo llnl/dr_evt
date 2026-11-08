@@ -94,5 +94,5 @@
     "--resource_trace",
     "/results/sched-simple-lassen-prefix2000/none_r0_q64_lassen-756-01_jobs_2000/dr_evt-resources.csv"
   ],
-  "plot_script_sha256": "19d489c44f5ddd93552c8b8d19188c2a206cf9126fb69fa05e139ab999141cab"
+  "plot_script_sha256": "cde7045a23598bddf99219d62745c400d46a9999dad58bdcbce5c8e265d0bad1"
 }

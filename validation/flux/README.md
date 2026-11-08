@@ -22,8 +22,8 @@ fresh volume after changing native source revisions or synchronization overlays.
 DR_EVT is exported from its current commit and built with Release optimization
 and `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
 
-The default run checks synchronization, Fiction smoke cases, paired small
-policies, two 2,000-job synthetic FCFS traces, sched-simple's thirty small
+The default run checks synchronization, Fiction smoke cases, paired
+policies, sched-simple's thirty small
 comparisons, and both minimal-reproducer matchers. Backend revisions, source
 hashes, commands, and logs are retained under `results/`.
 `FLUX_VALIDATION_RESULTS` overrides the host results directory.
@@ -53,22 +53,13 @@ Fiction's loader and records native hashes and loaded modules. Fluxion is
 unloaded for that run. Its Q bounds outstanding requests, not per-pass tests.
 The two backends are selected explicitly; backfill is rejected for sched-simple.
 
-## Synthetic workloads and minimal reproducer
+## Minimal reproducer and focused checks
 
 ```sh
-python3 /validation/test_paired.py "$(cat /workspace/dr_evt-simulator)"   --suite large --policy none --queue-depth 64
-python3 /validation/test_paired.py "$(cat /workspace/dr_evt-simulator)"   --suite large --policy hybrid --queue-depth 64 --reference-timeout 900
 python3 /validation/test_sched_simple.py "$(cat /workspace/dr_evt-simulator)"
 python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)"   --match-policy lonodex --check-deletions --outdir /results/minimal-divergence-low
 python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)"   --match-policy hinodex --check-deletions --outdir /results/minimal-divergence-high
 ```
-
-The synthetic traces have 2,000 jobs each on four nodes, in bursts of 24 or 48
-spaced 4,000 simulation seconds apart. They use 1–4 nodes and 10–80-second
-limits equal to actual durations. FCFS matches; hybrid R=32/Q=64 has small
-resource-curve differences. `test_paired.py` exits nonzero for a schedule
-mismatch; this is an expected outcome for the published hybrid comparisons,
-not a claim of exact backfill agreement. Timeouts remain incomplete runs.
 
 The [minimal reproducer](DIVERGENCE.md) verifies the identified node-reservation
 placement difference with four jobs. Expected divergences and matching controls
