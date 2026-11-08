@@ -117,7 +117,7 @@ Hybrid backfill: aggregate metrics and the distribution of waiting-time differen
 Once a scheduling decision differs, subsequent queue and resource states can
 differ too; aggregate curves and waiting metrics help assess the overall effect.
 
-## Minimal start-time divergence
+## Minimal reproducer for backfill start-time differences
 
 The following reproducer has **four jobs on four nodes total**, one core per
 node. Jobs use FCFS order, durations equal time limits, Q=2048, and no horizon
