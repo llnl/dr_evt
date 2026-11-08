@@ -15,28 +15,31 @@ This directory contains GitHub Actions workflows for automated testing.
 - Scheduler correctness tests (34) - `tests/run_scheduler_correctness_tests.sh`
 - Node release delay tests (34 differential + 3 option checks) -
   `tests/run_node_release_delay_tests.sh`
+- Periodic backfill reference, bounded-prefix retry, and endpoint tests -
+  `tests/run_periodic_backfill_tests.sh`
+- Planning-horizon and backfill queue-depth tests
 - Queue implementation differential tests
 - Column alias tests (8)
 - Run-time mode tests (8)
 - Unit tests (7)
 - Feature tests (8)
-- Conservative backfilling tests (2)
+- Conservative backfilling comparisons (3)
 - Replay tests (5: one reclamation-boundary binary and four CLI comparisons)
 - Resource-history tests (5)
 - Job-store tests (6)
 - Config tests (14), including power-usage `trace_type`, capacity-schedule,
   and warm-start coverage
-- Native CTest suite (21 native registrations, the Python trace-tools and
-  multi-cluster dispatch registrations, and the MPI streaming and MPI dispatch
-  registrations when MPI is available), including the
-  custom FCFS scheduler's focused and 2,000-job comparisons
+- All configured CTest registrations, including fixed periodic dispatch,
+  Spur/Slurm endpoint distinctions, placement-pass accounting, planner capacity
+  queries, checkpoint/restart, batch/streaming equivalence, and optional MPI
+  and Python coverage
 - Ser20-disabled native serialization build and tests
 - Sphinx and Doxygen documentation build with warnings treated as errors
-- Python API tests (18)
+- Python API tests
 - Market package platform and job-stream tests (12)
 - gRPC client/server tests (2)
-- Append-job tests (23 C++ + 5 optional gRPC checks)
-- FCFS/EASY backfill-window focused rerun of the five-check gRPC binary
+- Append-job API tests and four optional gRPC checks
+- FCFS/EASY backfill-window focused rerun of the four-check gRPC binary
 - Synchronized single-coordinator gRPC test
 - Progressive-loading tests (C++ + CLI)
 - Queue-input schema test
@@ -60,6 +63,11 @@ This directory contains GitHub Actions workflows for automated testing.
 **What it runs:**
 - Scheduler correctness fixtures (34) - `tests/run_scheduler_correctness_tests.sh`
 - Node release delay differential tests (34 + 3) - `tests/run_node_release_delay_tests.sh`
+- Periodic backfill reference, bounded-prefix retry, and inclusive endpoint tests -
+  `tests/run_periodic_backfill_tests.sh`
+- Fixed periodic dispatch and arrival-notification tests, including the
+  Spur/Slurm endpoint distinction - `tests/run_fixed_periodic_dispatch_tests.py`
+- Planning-horizon reference tests - `tests/run_planning_horizon_tests.sh`
 - Ser20 caller-owned-memory serialization test - installed `t_state_ser20`
 - Progressive-loading C++ API test - installed `test_progressive_load`
 - Queue-input schema test - installed `test_queue_input`
@@ -74,40 +82,17 @@ This directory contains GitHub Actions workflows for automated testing.
 
 ## Test Coverage
 
-Total tests referenced by the full suite:
+The maintained counts and runner coverage are in the
+[Test Suite inventory](../../tests/README.md#inventory). CTest registration
+counts depend on optional build features; inspect the configured suite with
+`ctest --test-dir build -N`.
 
-| Category | Count | Verified in this doc pass? |
-|----------|-------|------------------------------|
-| Scheduler correctness | 34 | CI runner |
-| Custom FCFS | 8 | CTest; six focused checks and two golden schedules, including warm-start accounting and 2,000 jobs |
-| Queue implementation differential | 34 fixtures × 4 implementations | CI runner |
-| Column aliases | 8 | CI runner |
-| Run-time mode | 8 | CI runner |
-| Unit | 7 | CI runner |
-| Feature | 8 | CI runner; includes time-varying capacity and native warm start |
-| Conservative | 2 | CI runner |
-| Replay | 5 | CI runner; reclamation safety plus resource equivalence |
-| Resource history | 5 | CI runner |
-| Job store | 6 | CI runner |
-| Config | 14 | CI runner; includes power-usage, capacity-schedule, and warm-start configuration coverage |
-| Native CTest | 21 native, 2 Python, plus 2 with MPI | CI runner; RNG and binary serialization, trace policies, replay reclamation, custom scheduling, append/streaming APIs, warm starts, node release delay, capacity parsing, queues, CLI dispatch, and SWF input |
-| Trace tools | 4 checks in 1 CTest registration | CI runner; capacity inference, simulator-format conversion, checkpoint output stitching, and warm-start boundary/output behavior |
-| Python API | 20 | CI runner |
-| Market package | 12 | CI runner; platforms, jobs and trace preparation |
-| gRPC client/server | 2 | CI runner |
-| Append-job | 28: 23 C++ + 5 optional gRPC checks | CI runner |
-| FCFS/EASY backfill-window gRPC | 5 repeated checks; 1 targeted | CI runner |
-| Single-coordinator gRPC | 1 | CI runner; synchronized independent systems |
-| Progressive loading | 11 C++ + 5 CLI | CI runner |
-| Queue input schema | 1 binary | CI runner; queue variants and replay/simulation runtime validation |
-| Redis output | 1 integration runner | Dedicated Redis-enabled GCC build; server startup, typed batched job/resource serialization, structured resource and Pcon hashes, indexes, namespace replacement, finalized-versus-unfinished visibility, pipelined bulk lookup, and byte-identical job and resource outputs for Redis/file runs of 200 jobs |
-| Redis gRPC example | 1 integration runner | Real client/server batch append, advance, pipelined Redis lookup, missing-ID server fallback, and ordered merge |
-| Scale | 7 | CI runner |
-
-The workflow summary in `tests.yml` is the authoritative CI-oriented list.
-See `docs/TESTING_GUIDE.md` for the fuller test catalog and the distinction
-between individual assertions, fixtures, binaries, and runner-level counts.
-The native CTest row overlaps with individually listed tests that CTest invokes.
+Periodic backfill has 143 checks with default intervals; fixed periodic dispatch
+has 90. Both full and quick workflows run the retry and endpoint regressions.
+The append API includes 41 test groups, one additional group with Ser20, and
+four wire-level checks when gRPC is enabled. Full CI also runs checkpoint and
+batch/streaming continuation tests. The workflow summaries report each runner's
+outcome without treating overlapping checks as distinct tests.
 
 ## Status Badges
 

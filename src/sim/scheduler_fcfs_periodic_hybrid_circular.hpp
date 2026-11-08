@@ -34,10 +34,18 @@ namespace dr_evt {
 class FCFSPeriodicHybridCircularScheduler final
     : public FCFSHybridCircularScheduler {
 public:
-  /** @copydoc SchedulerBase::schedule */
+  /**
+   * @brief Run periodic backfill with endpoint-inclusive fit searches.
+   * @details Admission and future reservations share the same endpoint rule.
+   * Repeated calls at one tick share the backfill examination budget.
+   * @param[in] free_nodes Nodes currently available for allocation.
+   * @param[in] running_jobs Jobs already running at this instant.
+   * @param[in] current_time Current backfill tick time.
+   * @return Jobs selected to start at this tick.
+   */
   std::vector<job_no_t> schedule(num_nodes_t free_nodes,
-                                const running_jobs_t &running_jobs,
-                                sim_time_t current_time) override;
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override;
 
   /**
    * @brief Construct the opt-in periodic backfill scheduler.
@@ -69,9 +77,9 @@ public:
    * @param[in] current_time Current simulation time.
    * @return Jobs started from the FCFS front.
    */
-  std::vector<job_no_t>
-  schedule_event(num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-                 sim_time_t current_time) override;
+  std::vector<job_no_t> schedule_event(num_nodes_t free_nodes,
+                                       const running_jobs_t &running_jobs,
+                                       sim_time_t current_time) override;
 
 protected:
   /**

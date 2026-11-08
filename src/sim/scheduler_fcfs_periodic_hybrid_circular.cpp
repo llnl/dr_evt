@@ -11,13 +11,29 @@
 namespace dr_evt {
 
 namespace {
+/**
+ * @brief Timeline fit policy for Slurm-style periodic hybrid backfill.
+ * @details Both immediate admission and future placement require capacity at
+ * the requested end time. Inherited reserve() still uses [start, end).
+ */
 class EndpointInclusiveTimeline : public Reservation_Timeline {
 public:
+  /**
+   * @brief Take ownership of the pass's free-node plan.
+   * @param[in] plan Baseline capacity timeline to extend during this pass.
+   */
   explicit EndpointInclusiveTimeline(Reservation_Timeline plan)
       : Reservation_Timeline(std::move(plan)) {}
 
+  /**
+   * @brief Find the earliest fit, including capacity at the requested end.
+   * @param[in] nodes Required node count.
+   * @param[in] duration Requested duration; nonpositive values query capacity.
+   * @param[in] start Earliest permitted start time.
+   * @return Earliest fitting start, or std::nullopt when no fit exists.
+   */
   std::optional<sim_time_t> earliest_fit(num_nodes_t nodes, tdiff_t duration,
-                                        sim_time_t start) const {
+                                         sim_time_t start) const {
     return Reservation_Timeline::earliest_fit<true>(nodes, duration, start);
   }
 };

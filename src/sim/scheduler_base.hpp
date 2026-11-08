@@ -640,8 +640,9 @@ protected:
  * disables. Mutually exclusive with positive backfill_interval.
  * @param[in] dispatch_queue_depth Entire candidate prefix per dispatch wake,
  * including FCFS starts; zero is unlimited. Requires dispatch_interval > 0.
- * @param[in] dispatch_on_events Also request the FCFS/backfill pass on job arrival
- * batches without changing the timer cadence; requires dispatch_interval > 0.
+ * @param[in] dispatch_on_events Also request the FCFS/backfill pass on job
+ * arrival batches without changing the timer cadence; requires
+ * dispatch_interval > 0.
  * @param[in] per_pass_accounting Use event-driven placement passes with
  * per-pass Q/R counters and guarded reservation-only restarts.
  * @return Owning pointer to a SchedulerBase implementation.

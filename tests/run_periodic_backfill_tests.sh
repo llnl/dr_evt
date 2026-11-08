@@ -8,9 +8,12 @@
 #    settled resource traces (time, free, allocated). The intervals are not
 #    multiples of the workloads' 5 s arrival cadence, so ticks fall between
 #    events as well as on them, and ticks pass while nothing is waiting.
-# 2. A zero interval must leave the output byte-identical to a run without the
+# 2. Starts that expose a new bounded queue prefix must enable the next tick
+#    without resetting the current tick's examination budget.
+# 3. Hybrid/conservative admission and reservation placement include endpoints.
+# 4. A zero interval must leave the output byte-identical to a run without the
 #    option.
-# 3. Invalid values and an unsupported queue implementation are rejected.
+# 5. Invalid values and an unsupported queue implementation are rejected.
 #
 # Usage: tests/run_periodic_backfill_tests.sh [simulator]
 #   DR_EVT_BACKFILL_INTERVALS overrides the tick intervals (default "7 30").

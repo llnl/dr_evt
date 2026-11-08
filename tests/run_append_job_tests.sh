@@ -8,8 +8,8 @@
 # sitting in a preloaded m_data. See
 # docs/dev/OUTPUT_TRACE_BUFFERS.md for the design.
 #
-# The in-process binary contains 23 focused append, batch, capacity,
-# advancement, accounting, and memory-pressure checks. When gRPC is built,
+# The in-process binary covers append, batch, capacity, advancement,
+# accounting, planner endpoints, and memory pressure. When gRPC is built,
 # the runner also executes wire-level append, monitoring, and warm-start batch
 # checks against a real server.
 
