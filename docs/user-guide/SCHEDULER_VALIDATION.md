@@ -101,7 +101,7 @@ Equal resource areas alone cannot rule out jobs claiming the same node; the
 native ownership checks test that separately.
 
 :::{figure} ../_static/scheduler-validation/fluxion/resource-curves.svg
-:alt: Closely following dr_evt and Fiction allocated-node curves for hybrid backfill with reservation depth 32 and queue depth 64, with a zoom around the first difference and the signed node difference below.
+:alt: Full dr_evt and Fiction allocated-node curves for hybrid backfill with reservation depth 32 and queue depth 64, showing closely following resource use over simulation time.
 :width: 100%
 
 Hybrid backfill: similar resource use with differences in when nodes are occupied.
@@ -114,16 +114,6 @@ Hybrid backfill: similar resource use with differences in when nodes are occupie
 Hybrid backfill: aggregate metrics and the distribution of waiting-time differences.
 :::
 
-Two additional 2,000-job synthetic traces use four nodes and the same R=32/Q=64.
-Their resource-curve differences are smaller:
-
-| Synthetic workload | Mean wait: dr_evt / fiction | Area between curves | Shared-window percentage |
-|---|---:|---:|---:|
-| Bursts of 24 jobs | 287.960 / 288.955 s | 1,420 node-seconds | 0.1069% |
-| Bursts of 48 jobs | 608.290 / 608.080 s | 1,940 node-seconds | 0.2940% |
-
-In each synthetic comparison, resource area, makespan, and utilization are
-equal. With backfill disabled, both synthetic traces match completely.
 Once a scheduling decision differs, subsequent queue and resource states can
 differ too; aggregate curves and waiting metrics help assess the overall effect.
 
@@ -140,8 +130,6 @@ per-pass resets do not explain this difference.
 
 Specific-node reservations delay D by 10 seconds while preserving C's start.
 :::
-
-[Download the updated slide](../_static/scheduler-validation/four-job-backfill-divergence.pptx).
 
 With `lonodex`, A occupies nodes 0,1 until 70; B occupies nodes 2,3 until 80.
 C protects nodes 0,1,2 for 80–90. At 70 the free nodes 0,1 are both protected,
@@ -165,8 +153,8 @@ See the [reproducer details](https://github.com/LLNL/dr_evt/blob/main/validation
 ## Evidence and reproduction
 
 The [container harness](https://github.com/LLNL/dr_evt/blob/main/validation/flux/README.md)
-contains commands for both native schedulers, the recorded trace, synthetic
-workloads, resource audits, and the minimal reproducer. Raw Lassen source logs
+contains commands for both native schedulers, the recorded trace, resource
+audits, and the minimal reproducer. Raw Lassen source logs
 and the separate reservation-reset investigation are not part of these results.
 
 Published figure folders contain the standalone plotting script, saved inputs,

@@ -4,7 +4,7 @@ On a system with **4 nodes total**, Fluxion's specific-node reservation delays
 backfill job D until 80 seconds. DR_EVT's node-count plan starts D at 70 while
 preserving head job C's start at 80. The
 [published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md#minimal-start-time-divergence)
-includes the updated slide.
+includes the node-assignment diagram.
 
 Both runs use FCFS, event-driven dispatch, DR_EVT `--per_pass_accounting`,
 Q=2048, unlimited horizon, and zero simulated release delay. Every node has
@@ -18,7 +18,7 @@ reaches Q; depth-triggered pass resets are a separate issue.
 | C, waiting head | 6 | 3 | 10 |
 | D, backfill candidate | 6 | 1 | 50 |
 
-## Low-ID-first case shown in the slide
+## Low-ID-first case
 
 Submit A before B at time 0, and C before D at time 6. `lonodex` selects low
 node IDs first:
@@ -37,7 +37,7 @@ node 3, still occupied until 80. Fluxion starts D then.
 DR_EVT protects three-node capacity rather than node IDs. One feasible
 assignment gives D node 0 at 70–120 and C nodes 1,2,3 at 80–90. This keeps
 running jobs on their nodes and preserves C's start. DR_EVT does not emit
-this assignment; the slide illustrates why its count-based decision fits.
+this assignment; the diagram illustrates why its count-based decision fits.
 
 Swapping A and B's equal-time input order places B on 0,1 and A on 2,3.
 Now node 3 is released at 70 and lies outside C's reservation. D starts at
