@@ -174,6 +174,10 @@ jobs:
           echo "========================================"
           ./tests/run_node_release_delay_tests.sh
 
+      - name: Run OpenPBS Validation Audit Tests
+        id: openpbs-audits
+        run: python3 -m unittest discover -s validation/openpbs -p test_compare.py -v
+
       - name: Run Periodic Backfill Tests
         id: periodic-backfill
         run: |
@@ -378,6 +382,7 @@ jobs:
           echo "Test Results:"
           echo "  Scheduler correctness - Installed (34 fixtures): ${{ steps.scheduler-correctness-installed.outcome }}"
           echo "  Node release delay: ${{ steps.node-release-delay.outcome }}"
+          echo "  OpenPBS validation audits (5 tests): ${{ steps.openpbs-audits.outcome }}"
           echo "  Periodic backfill (reference, retry, endpoint): ${{ steps.periodic-backfill.outcome }}"
           echo "  Planning horizon: ${{ steps.planning-horizon.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
@@ -549,3 +554,8 @@ jobs:
         run: |
           export PATH="$GITHUB_WORKSPACE/docs-venv/bin:$PATH"
           make -C docs html SPHINXOPTS="-W --keep-going"
+
+      - name: Check OpenPBS Adapter Doxygen Documentation
+        run: |
+          mkdir -p validation/openpbs/results
+          doxygen validation/openpbs/Doxyfile

@@ -23,7 +23,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="dr-evt-placement-pass-") as tmp:
         root = Path(tmp)
 
-        def run(name, jobs, policy="hybrid", q=1, enabled=True, extra=()):
+        def run(name, jobs, policy="hybrid", q=1, enabled=True, extra=(),
+                priority="fcfs", capacity=4):
             trace = root / (name + ".csv")
             output = root / (name + "-out.csv")
             with trace.open("w") as stream:
@@ -31,10 +32,12 @@ def main():
                 for row in jobs:
                     stream.write(",".join(map(str, row)) + "\n")
             command = [str(simulator), "--infile", str(trace), "--outfile", str(output),
-                       "--total_nodes", "4", "--trace_format", "simple",
-                       "--timestamp_format", "epoch", "--priority_policy", "fcfs",
+                       "--total_nodes", str(capacity), "--trace_format", "simple",
+                       "--timestamp_format", "epoch",
                        "--queue_impl", "circular", "--backfill_policy", policy,
                        "--reservation_depth", "32", "--backfill_queue_depth", str(q)]
+            if priority is not None:
+                command += ["--priority_policy", priority]
             if enabled:
                 command.append("--per_pass_accounting")
             result = subprocess.run(command[:1] + list(extra) + command[1:], capture_output=True,
@@ -45,6 +48,19 @@ def main():
                 return sorted((float(row["job_submit_time"]), int(row["num_nodes"]),
                                float(row["time_limit"]), float(row["begin_time"]),
                                float(row["end_time"])) for row in csv.DictReader(stream))
+
+        # The distinct OpenPBS policy activates its forecast without needing
+        # the per-pass flag. Adjacent releases group; separated ones do not.
+        native = run("openpbs-adjacent",
+                     [(0, 1, 10), (0, 1, 11), (0, 2, 2), (0, 1, 11)],
+                     q=0, enabled=False, priority="fcfs_1s_evt_group", capacity=3)
+        assert native == [(0, 1, 10, 0, 10), (0, 1, 11, 0, 11),
+                          (0, 1, 11, 0, 11), (0, 2, 2, 11, 13)], native
+        spaced = run("openpbs-separated",
+                     [(0, 1, 20), (0, 1, 22), (0, 2, 4), (0, 1, 22)],
+                     q=0, enabled=False, priority="fcfs_1s_evt_group", capacity=3)
+        assert spaced == [(0, 1, 20, 0, 20), (0, 1, 22, 0, 22),
+                          (0, 1, 22, 22, 44), (0, 2, 4, 20, 24)], spaced
 
         # A full-machine runner followed by two waiting jobs triggers the
         # reservation-only guard at Q=1. Completion still starts both jobs.
@@ -81,6 +97,11 @@ def main():
             assert run("config", [(0, 4, 10), (0, 4, 5)], enabled=False,
                        extra=("--config", str(config))) == [
                            (0, 4, 5, 10, 15), (0, 4, 10, 0, 10)]
+            config.write_text('priority_policy: "fcfs_1s_evt_group"\n')
+            assert run("grouped-config",
+                       [(0, 1, 10), (0, 1, 11), (0, 2, 2), (0, 1, 11)],
+                       q=0, enabled=False, priority=None, capacity=3,
+                       extra=("--config", str(config))) == native
     print("placement-pass integration checks passed (2,000-job Q=32/64, R=32)")
 
 

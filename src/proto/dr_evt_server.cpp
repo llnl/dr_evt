@@ -9,7 +9,13 @@
  ******************************************************************************/
 
 /** @file dr_evt_server.cpp
- * @brief gRPC server exposing streaming simulation operations.
+ * @brief Streaming simulation service with Protobuf scheduler configuration.
+ * @details Clients select scheduling behavior in InitRequest, using fields
+ * corresponding to CLI options without --. priority_policy: "fcfs_1s_evt_group"
+ * selects the OpenPBS forecast; per_pass_accounting: true selects per-scan
+ * accounting. These requests construct the same built-in schedulers as CLI
+ * runs. See dr_evt_service.proto for supported combinations; custom callback
+ * schedulers are API-only.
  */
 
 #include <atomic>
@@ -249,6 +255,8 @@ public:
             sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS;
           else if (r.priority_policy() == "fcfs_alt")
             sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS_ALT;
+          else if (r.priority_policy() == "fcfs_1s_evt_group")
+            sp.m_priority_policy = dr_evt::PriorityPolicy::FCFS_1S_EVT_GROUP;
           else if (r.priority_policy() == "sjf")
             sp.m_priority_policy = dr_evt::PriorityPolicy::SJF;
           else if (r.priority_policy() == "ljf")

@@ -423,6 +423,8 @@ void Sim_Params::getopt(int &argc, char **&argv) {
         m_priority_policy = PriorityPolicy::FCFS_ALT;
       } else if (policy == "fcfs_conservative") {
         m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
+      } else if (policy == "fcfs_1s_evt_group") {
+        m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
       } else if (policy == "sjf") {
         m_priority_policy = PriorityPolicy::SJF;
       } else if (policy == "ljf") {
@@ -966,12 +968,17 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "(Slurm bf_window); such a job holds no reservation, keeps its queue "
          "position, and is retested every pass. Omitted means unlimited.\n"
          "\n"
-         "    -p, --priority_policy {fcfs|fcfs_alt|fcfs_conservative|sjf|ljf}\n"
+         "    -p, --priority_policy "
+         "{fcfs|fcfs_alt|fcfs_conservative|fcfs_1s_evt_group|sjf|ljf}\n"
          "        Job priority/ordering policy (default: fcfs).\n"
          "        fcfs: First-Come-First-Served\n"
          "        fcfs_alt: Alternative FCFS implementation (for testing)\n"
          "        fcfs_conservative: FCFS with conservative/no backfilling "
          "support\n"
+         "        fcfs_1s_evt_group: Event-driven FCFS with inclusive "
+         "one-second "
+         "forecast event grouping (circular queue, unlimited planning "
+         "horizon).\n"
          "        sjf: Shortest-Job-First\n"
          "        ljf: Longest-Job-First\n"
          "\n"
@@ -1253,6 +1260,8 @@ void Sim_Params::print() const {
     msg += "FCFS_ALT";
   else if (m_priority_policy == PriorityPolicy::FCFS_CONSERVATIVE)
     msg += "FCFS_CONSERVATIVE";
+  else if (m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP)
+    msg += "FCFS_1S_EVT_GROUP";
   else if (m_priority_policy == PriorityPolicy::SJF)
     msg += "SJF";
   else

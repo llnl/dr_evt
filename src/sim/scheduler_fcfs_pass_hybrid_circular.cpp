@@ -5,15 +5,36 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_fcfs_pass_hybrid_circular.cpp
+ * @brief Event-driven FCFS queue scans with limits reset for each scan.
+ * @details A pass is one attempt to scan the waiting queue at the current
+ * simulation time. Starts and successful reservations count toward Q; failed
+ * tests after reaching R also count. A new pass restarts at the head with
+ * fresh Q/R, without advancing time. Identical reservation-only retries are
+ * stopped by a simulation guard. The OpenPBS subclass reuses this scan with
+ * its own forecast.
+ * @note CLI: --per_pass_accounting --priority_policy fcfs --queue_impl
+ * circular. --backfill_queue_depth sets Q (0 is unlimited).
+ * --backfill_policy hybrid --reservation_depth R protects R jobs; easy
+ * protects one and conservative protects all examined jobs. Keep both
+ * intervals zero and omit --planning_horizon for unlimited look-ahead.
+ * --priority_policy fcfs_1s_evt_group selects the OpenPBS forecast without
+ * requiring --per_pass_accounting.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
+ */
+
 #include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
+#include "sim/forecast_1s_evt_group_timeline.hpp"
+#include "sim/scheduler_fcfs_1s_evt_group_circular.hpp"
 #include <tuple>
 
 namespace dr_evt {
 
-std::vector<job_no_t>
-FCFSPassHybridCircularScheduler::schedule(num_nodes_t free_nodes,
-                                          const running_jobs_t &running_jobs,
-                                          sim_time_t current_time) {
+template <typename Timeline>
+std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
+    num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+    sim_time_t current_time) {
   if (m_planning_horizon != std::numeric_limits<tdiff_t>::max()) {
     throw std::invalid_argument(
         "per_pass_accounting requires an unlimited planning_horizon");
@@ -57,8 +78,8 @@ FCFSPassHybridCircularScheduler::schedule(num_nodes_t free_nodes,
   const size_t pass_limit = active_job_count() + 2;
   for (size_t pass = 0; pass < pass_limit; ++pass) {
     ++m_last_pass_count;
-    auto plan =
-        reservation_timeline(free_nodes, running_jobs, current_time, projected);
+    Timeline plan(reservation_timeline(free_nodes, running_jobs, current_time,
+                                       projected));
     std::vector<reservation_t> reservations;
     size_t tested = 0;
     size_t cursor = 0;
@@ -138,6 +159,21 @@ FCFSPassHybridCircularScheduler::schedule(num_nodes_t free_nodes,
   // Defensive ceiling in addition to exact repeated-plan detection.
   m_last_retry_stopped = true;
   return starts;
+}
+
+std::vector<job_no_t>
+FCFSPassHybridCircularScheduler::schedule(num_nodes_t free_nodes,
+                                          const running_jobs_t &running_jobs,
+                                          sim_time_t current_time) {
+  return schedule_with_forecast<Reservation_Timeline>(free_nodes, running_jobs,
+                                                      current_time);
+}
+
+std::vector<job_no_t> FCFSOneSecondEventGroupCircularScheduler::schedule(
+    num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+    sim_time_t current_time) {
+  return schedule_with_forecast<OneSecondEventGroupTimeline>(
+      free_nodes, running_jobs, current_time);
 }
 
 } // namespace dr_evt

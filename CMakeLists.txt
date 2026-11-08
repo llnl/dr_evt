@@ -762,6 +762,14 @@ set_target_properties(test_placement_pass_accounting-bin PROPERTIES
   OUTPUT_NAME test_placement_pass_accounting)
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_placement_pass_accounting-bin)
 
+add_executable(test_openpbs_forecast-bin tests/test_openpbs_forecast.cpp)
+target_include_directories(test_openpbs_forecast-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_openpbs_forecast-bin PRIVATE dr_evt)
+set_target_properties(test_openpbs_forecast-bin PROPERTIES
+  OUTPUT_NAME test_openpbs_forecast)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_openpbs_forecast-bin)
+
 add_executable(test_capacity_schedule-bin tests/test_capacity_schedule.cpp)
 target_include_directories(test_capacity_schedule-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
@@ -891,6 +899,8 @@ if(DR_EVT_WITH_UNIT_TESTING)
     COMMAND $<TARGET_FILE:test_block_queue-bin>)
   add_test(NAME test_placement_pass_accounting
     COMMAND $<TARGET_FILE:test_placement_pass_accounting-bin>)
+  add_test(NAME test_openpbs_forecast
+    COMMAND $<TARGET_FILE:test_openpbs_forecast-bin>)
   add_test(
     NAME test_capacity_schedule
     COMMAND $<TARGET_FILE:test_capacity_schedule-bin>)

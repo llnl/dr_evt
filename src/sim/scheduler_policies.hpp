@@ -5,6 +5,19 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_policies.hpp
+ * @brief Scheduler policy values shared by CLI, Protobuf, and APIs.
+ * @details Defines waiting-job ordering and which jobs receive future
+ * capacity protection. EASY protects one waiting job; hybrid protects R;
+ * conservative protects every examined job; none prevents backfill.
+ * @note CLI: --priority_policy selects ordering or the OpenPBS forecast;
+ * --backfill_policy selects protection. --reservation_depth supplies hybrid
+ * R. These declarations do not schedule jobs; create_scheduler() chooses the
+ * implementation.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
+ */
+
 #ifndef DR_EVT_SIM_SCHEDULER_POLICIES_HPP
 #define DR_EVT_SIM_SCHEDULER_POLICIES_HPP
 
@@ -60,7 +73,10 @@ enum class PriorityPolicy {
   SJF,
 
   /** Longest-Job-First: Order by estimated run_time (descending) */
-  LJF
+  LJF,
+
+  /** FCFS with one-second forecast event grouping and event-driven backfill. */
+  FCFS_1S_EVT_GROUP
 };
 
 /**

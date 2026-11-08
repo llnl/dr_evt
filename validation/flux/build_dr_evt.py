@@ -19,12 +19,16 @@ working_tree = os.environ.get('DR_EVT_VALIDATION_WORKING_TREE') == '1'
 archive = git('archive', 'HEAD')
 source_hashes = {}
 if working_tree:
-    # Snapshot tracked working files only; ignore external clones and raw results.
+    # Include new implementation/test files before staging, while excluding
+    # external clones, validation experiments, and raw workload results.
     import io
     import tarfile
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode='w') as snapshot:
-        for name in sorted(git('ls-files', '-z').decode().split('\0')):
+        names = set(git('ls-files', '-z').decode().split('\0'))
+        names.update(git('ls-files', '-z', '--others', '--exclude-standard',
+                         '--', 'src', 'tests', 'python').decode().split('\0'))
+        for name in sorted(names):
             if not name or not (SOURCE / name).is_file():
                 continue
             source_hashes[name] = hashlib.sha256((SOURCE / name).read_bytes()).hexdigest()

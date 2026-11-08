@@ -10,6 +10,36 @@ syntax = "proto3";
 package dr_evt_proto;
 
 message DR_EVT_Params {
+    // Scheduler selection (the same rules as the CLI):
+    // - Ordinary event-driven FCFS/EASY: priority_policy: "fcfs",
+    //   backfill_policy: "easy", queue_impl: "circular"; both intervals zero.
+    // - Event-driven hybrid: backfill_policy: "hybrid", reservation_depth: R
+    //   with R > 0. Use FCFS ordering.
+    // - Per-scan accounting: per_pass_accounting: true, FCFS ordering,
+    //   queue_impl: "circular", both intervals zero, planning_horizon omitted.
+    //   A pass is one attempt to scan the waiting queue at the current time.
+    //   Starts and successful reservations count toward Q; after R reservations,
+    //   failed start-only tests also count. Q/R reset on each attempt; simulation
+    //   time does not advance between attempts. Q is backfill_queue_depth.
+    // - OpenPBS forecast: priority_policy: "fcfs_1s_evt_group", queue_impl: "circular",
+    //   both intervals zero, planning_horizon omitted. per_pass_accounting is
+    //   not required. Group predicted events through T+1 after the earliest event
+    //   T, inclusive, then check fit at the last actual event in the group.
+    //   A lone release at T is checked at T, without an automatic extra delay.
+    // - Separate periodic backfill: backfill_interval: I > 0, FCFS ordering,
+    //   queue_impl: "circular", dispatch_interval: 0. Queue-head starts remain
+    //   event driven; backfill uses timer ticks.
+    // - Fixed periodic dispatch: dispatch_interval: I > 0, FCFS ordering,
+    //   queue_impl: "circular", backfill_interval: 0, backfill_queue_depth: 0.
+    //   dispatch_queue_depth bounds all examined jobs, including immediate starts.
+    //   dispatch_on_events additionally wakes on arrival batches.
+    // - Diagnostic unprotected backfill: diagnostic_no_reservations: true with
+    //   separate periodic hybrid/conservative backfill; no future reservations.
+    // Per-scan accounting cannot be combined with either periodic interval.
+    // Hybrid requires positive reservation_depth. Conservative protects every
+    // examined waiting job; EASY protects one. Queue-depth zero is unlimited.
+    // CLI names are field names prefixed with --; boolean switches map to true.
+    // Scheduling uses interchangeable capacity counts, not a node resource graph.
     message Simulation_Params {
         // Random-number seed (default: deterministic zero).
         uint32 seed = 1;
@@ -36,9 +66,12 @@ message DR_EVT_Params {
         bool verbose = 8;
 
         // Scheduling parameters
+        // CLI: --total_nodes.
         uint32 total_nodes = 9;         // System node count (default: 795)
+        // CLI: --backfill_policy.
         string backfill_policy = 10;     // "easy", "conservative", "hybrid", or "none" (default: "easy")
-        string priority_policy = 11;    // "fcfs", "fcfs_alt", "fcfs_conservative", "sjf", or "ljf" (default: "fcfs")
+        // CLI: --priority_policy.
+        string priority_policy = 11;    // "fcfs", "fcfs_alt", "fcfs_conservative", "fcfs_1s_evt_group", "sjf", or "ljf" (default: "fcfs")
 
         // Trace format parameters
         string trace_type = 12;         // "standard", "pcon", or "swf" (default: "standard")
@@ -54,16 +87,20 @@ message DR_EVT_Params {
         double run_time_stddev = 19;    // Standard deviation factor (default: 0.0)
 
         // Queue implementation (FCFS scheduler only)
+        // CLI: --queue_impl.
         string queue_impl = 20;         // "circular", "deque", "multimap", or "block" (default: "circular")
 
         // Block size for block queue implementation (must be power of 2)
+        // CLI: --block_size.
         uint32 block_size = 21;         // 4, 8, 16, 32, 64, 128, or 256 (default: 128)
 
         // Initial capacity for circular queue implementation. 0 means
         // the size of the job trace (large enough it can never overflow).
+        // CLI: --wait_queue_capacity.
         uint64 wait_queue_capacity = 22;  // (default: 0)
 
         // What to do if a circular queue insert would exceed wait_queue_capacity
+        // CLI: --wait_queue_overflow.
         string wait_queue_overflow = 23;  // "abort" or "grow" (default: "grow")
 
         // Initial capacity for the job-record store (Trace::m_data, a
@@ -126,35 +163,45 @@ message DR_EVT_Params {
 
         // Waiting jobs that hold reservations under backfill_policy
         // "hybrid"; must be positive with hybrid and is ignored otherwise.
+        // CLI: --reservation_depth.
         uint64 reservation_depth = 37;
 
         // Eligible waiting jobs, head included, examined per backfill pass
         // by every scheduler. Zero leaves the scan unlimited.
+        // CLI: --backfill_queue_depth.
         uint64 backfill_queue_depth = 41;
 
         // Seconds between periodic backfill evaluations; FCFS dispatch
         // remains event driven. Zero keeps event-driven backfill behavior.
+        // CLI: --backfill_interval.
         double backfill_interval = 42;
 
         // Fixed periodic dispatch: aligned FCFS/backfill ticks; optional arrival wakes.
         // Zero disables; mutually exclusive with positive backfill_interval.
+        // CLI: --dispatch_interval.
         double dispatch_interval = 46;
         // Entire candidate prefix per dispatch wake, including immediate starts.
         // Zero means unlimited; requires dispatch_interval > 0.
+        // CLI: --dispatch_queue_depth.
         uint64 dispatch_queue_depth = 47;
         // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
+        // CLI: --dispatch_on_events.
         bool dispatch_on_events = 48;
         // Event-driven placement passes with per-pass Q/R and guarded retries.
+        // CLI: --per_pass_accounting.
         bool per_pass_accounting = 49;
         // Diagnostic periodic model: no future capacity reservations.
+        // CLI: --diagnostic_no_reservations.
         bool diagnostic_no_reservations = 50;
 
         // Planning time-limit grid for scheduler projections; zero is exact.
+        // CLI: --planning_time_resolution.
         double planning_time_resolution = 43;
 
         // Maximum reservation look-ahead for backfill planning, event-driven
         // or periodic (Slurm bf_window). Presence is explicit so zero is a
         // valid immediate horizon.
+        // CLI: --planning_horizon.
         optional double planning_horizon = 44;
 
         // Seconds a job's nodes stay unavailable after it ends before another

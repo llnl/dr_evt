@@ -117,6 +117,14 @@ jobs:
         id: serialization
         run: $GITHUB_WORKSPACE/install/bin/tests/t_state_ser20
 
+      - name: Run OpenPBS Validation Audit Tests
+        id: openpbs-audits
+        run: python3 -m unittest discover -s validation/openpbs -p test_compare.py -v
+
+      - name: Run OpenPBS Forecast Policy Tests
+        id: openpbs-forecast
+        run: $GITHUB_WORKSPACE/install/bin/tests/test_openpbs_forecast
+
       - name: Summary
         if: always()
         run: |
@@ -130,4 +138,6 @@ jobs:
           echo "Streaming append API: ${{ steps.append-job.outcome }}"
           echo "Ser20 memory serialization: ${{ steps.serialization.outcome }}"
           echo "Trace schema / progressive-loading API: ${{ steps.trace-schema.outcome }}"
+          echo "OpenPBS validation audits (5 tests): ${{ steps.openpbs-audits.outcome }}"
+          echo "OpenPBS forecast policy: ${{ steps.openpbs-forecast.outcome }}"
           echo "========================================"
