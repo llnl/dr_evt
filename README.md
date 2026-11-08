@@ -10,7 +10,7 @@ examination and reservation depths, planning horizon and resolution, and
 reservation admission. See [Scheduling Loops and
 DR_EVT Configurations](https://dr-evt.readthedocs.io/en/latest/user-guide/SCHEDULER_LOOPS.html)
 for supported combinations and [Realism and Known
-Gaps](https://dr-evt.readthedocs.io/en/latest/user-guide/REALISM_AND_GAPS.html) for
+Gaps](docs/user-guide/REALISM_AND_GAPS.md) for
 model scope and evidence limits. **Uniquely supports online
 simulation via gRPC**, enabling [coordinated multi-cluster simulations](https://dr-evt.readthedocs.io/en/latest/user-guide/client-server-use-cases.html)
 where distributed schedulers interact in real-time.
