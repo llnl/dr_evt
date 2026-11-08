@@ -6,10 +6,15 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_easy_block_depth.cpp
- * @brief Block-queue FCFS backfill under --backfill_queue_depth.
- * @details Kept in its own translation unit: compiled together with
- * schedule(), this code consumed the compiler's per-file inlining budget and
- * the default block search lost about 10 percent of its speed.
+ * @brief Bounded EASY candidate search for the block waiting queue.
+ * @details Scan waiting jobs in FCFS order so the examination limit counts
+ * jobs skipped by block-level search shortcuts. This helper belongs to the
+ * block scheduler, not a separate scheduling policy.
+ * @note CLI: --priority_policy fcfs --backfill_policy easy --queue_impl
+ * block --backfill_queue_depth N, with N > 0. Use --dispatch_interval 0 and
+ * --backfill_interval 0; omit --per_pass_accounting.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #include "sim/scheduler_fcfs_easy_block.hpp"

@@ -1,0 +1,96 @@
+{
+  "name": "separated-release-calendar",
+  "jobs": 4,
+  "capacity": 3,
+  "reservation_depth": 1,
+  "exact_match": true,
+  "different_jobs": 0,
+  "differences": [],
+  "openpbs_schedule": [
+    [
+      0,
+      20
+    ],
+    [
+      0,
+      22
+    ],
+    [
+      20,
+      24
+    ],
+    [
+      22,
+      44
+    ]
+  ],
+  "dr_evt_schedule": [
+    [
+      0.0,
+      20.0
+    ],
+    [
+      0.0,
+      22.0
+    ],
+    [
+      20.0,
+      24.0
+    ],
+    [
+      22.0,
+      44.0
+    ]
+  ],
+  "openpbs_profile": [
+    [
+      0,
+      2
+    ],
+    [
+      20,
+      3
+    ],
+    [
+      24,
+      1
+    ],
+    [
+      44,
+      0
+    ]
+  ],
+  "dr_evt_profile": [
+    [
+      0,
+      2
+    ],
+    [
+      20.0,
+      3
+    ],
+    [
+      24.0,
+      1
+    ],
+    [
+      44.0,
+      0
+    ]
+  ],
+  "openpbs_metrics": {
+    "mean_wait_seconds": 10.5,
+    "mean_turnaround_seconds": 27.5,
+    "makespan_seconds": 44,
+    "utilization": 0.5454545454545454
+  },
+  "dr_evt_metrics": {
+    "mean_wait_seconds": 10.5,
+    "mean_turnaround_seconds": 27.5,
+    "makespan_seconds": 44.0,
+    "utilization": 0.5454545454545454
+  },
+  "openpbs_wall_seconds": 0.016136542020831257,
+  "dr_evt_wall_seconds": 0.0035667500051204115,
+  "capacity_and_ownership_audit_passed": true
+}

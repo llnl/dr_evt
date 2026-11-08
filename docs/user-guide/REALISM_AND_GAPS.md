@@ -7,7 +7,7 @@ approaches. Production schedulers can differ in triggers, accounting,
 admission, and placement. Similar controls do not guarantee identical decisions.
 Different defaults
 alone are configuration choices, not model gaps. Workload-specific evidence is
-in [Scheduling Validation](SCHEDULER_VALIDATION.md).
+in [Simulation Validation](SCHEDULER_VALIDATION.md).
 
 **Examination depth Q** limits counted waiting-job evaluations:
 `--backfill_queue_depth` for backfill, or `--dispatch_queue_depth` for the
@@ -104,6 +104,22 @@ all candidates but uses aligned ticks and optional arrival wakes. Combining
 PBS's event triggers, relative fallback, and full-candidate cap remains future
 work.
 
+Backfill allows a later job to use spare capacity only if it will not delay
+an earlier waiting job's predicted start. To make that current decision,
+OpenPBS examines a hypothetical future using requested time limits to predict
+capacity releases. Inside this forecast, even `opt_backfill_fuzzy=off` groups
+events through one second after the earliest remaining event and checks the
+waiting job after applying the group. Releases at 10 and 11 are checked
+together at 11; releases at 10 and 12 are checked separately, first at 10.
+Actual scheduling-loop triggers remain separate, and a forecast with only a
+release at 10 does not add a one-second delay. Default DR_EVT checks each distinct
+predicted release time; the separate `fcfs_1s_evt_group` policy reproduces OpenPBS's
+forecast grouping. A later predicted start can allow a different job to
+run ahead of the waiting job. The
+[native OpenPBS validation](SCHEDULER_VALIDATION.md#openpbs-with-server-wide-capacity)
+identifies this source difference, reproduces it with four jobs, and shows
+exact agreement when every time in the Lassen replay is multiplied by two.
+
 ### LSF admission on reserved slots
 
 The cited IBM backfill guide requires a job borrowing reserved
@@ -127,6 +143,11 @@ node topology and placement, or node failures. Scheduled capacity changes
 alter the pool size; they do not model those mechanisms. Health checks, missed
 notifications, state inconsistency, and failure recovery are outside the model;
 timers used only for those purposes need no simulation equivalent.
+
+DR_EVT does not model Fluxion's resource graph, node matching, or reservations
+bound to particular nodes. The Fiction validation compares schedules and
+capacity use while retaining that difference in resource models. Its FCFS
+comparison uses `sched-simple`, with Fluxion unloaded.
 
 PBS's explicit advance reservations (`pbs_rsub`), per-queue protection-depth
 overrides, and prime/dedicated-time eligibility windows are also outside the

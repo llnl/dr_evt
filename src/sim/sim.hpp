@@ -441,6 +441,33 @@ public:
                               size_t estimation_depth = 0) const;
 
 protected:
+  /**
+   * @brief Query job status with a compile-time-selected forecast rule.
+   * @details GroupEvents enables inclusive one-second forecast groups.
+   * Selection occurs once in the public query; the job loop has no policy
+   * checks and ordinary forecasts allocate no grouping event list.
+   * @tparam GroupEvents Whether to group predicted events.
+   * @param[in] job_idxs Requested job identifiers, or empty to enumerate.
+   * @param[in] estimation_depth Maximum pending-job prefix; zero is unlimited.
+   * @return Job statuses following the selected forecast rule.
+   */
+  template <bool GroupEvents>
+  std::vector<Job_Status>
+  get_job_statuses_impl(const std::vector<job_no_t> &job_idxs,
+                        size_t estimation_depth) const;
+
+  /**
+   * @brief Estimate queue drain with a compile-time-selected forecast rule.
+   * @tparam GroupEvents Whether to group predicted reservation events.
+   * @param[in] utilization Expected usable-capacity factor; zero means one.
+   * @param[in] estimation_depth Maximum waiting-job prefix; zero is unlimited.
+   * @return Pending-job start estimates without per-job forecast-policy checks.
+   */
+  template <bool GroupEvents>
+  std::vector<Queue_Drain_Start_Estimate>
+  get_queue_drain_start_times_impl(double utilization,
+                                   size_t estimation_depth) const;
+
 #if defined(DR_EVT_HAS_SER20)
   /** Estimate serialized checkpoint bytes before allocating a buffer. */
   size_t checkpoint_reserve_bytes() const;

@@ -1,0 +1,72 @@
+{
+  "name": "endpoint",
+  "jobs": 3,
+  "capacity": 4,
+  "reservation_depth": 1,
+  "exact_match": true,
+  "different_jobs": 0,
+  "differences": [],
+  "openpbs_schedule": [
+    [
+      0,
+      120
+    ],
+    [
+      120,
+      140
+    ],
+    [
+      0,
+      120
+    ]
+  ],
+  "dr_evt_schedule": [
+    [
+      0.0,
+      120.0
+    ],
+    [
+      120.0,
+      140.0
+    ],
+    [
+      0.0,
+      120.0
+    ]
+  ],
+  "openpbs_profile": [
+    [
+      0,
+      4
+    ],
+    [
+      140,
+      0
+    ]
+  ],
+  "dr_evt_profile": [
+    [
+      0,
+      4
+    ],
+    [
+      140.0,
+      0
+    ]
+  ],
+  "openpbs_metrics": {
+    "mean_wait_seconds": 40.0,
+    "mean_turnaround_seconds": 126.66666666666667,
+    "makespan_seconds": 140,
+    "utilization": 1.0
+  },
+  "dr_evt_metrics": {
+    "mean_wait_seconds": 40.0,
+    "mean_turnaround_seconds": 126.66666666666667,
+    "makespan_seconds": 140.0,
+    "utilization": 1.0
+  },
+  "openpbs_wall_seconds": 0.01583337498595938,
+  "dr_evt_wall_seconds": 0.0036704580124933273,
+  "capacity_and_ownership_audit_passed": true
+}

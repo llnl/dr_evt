@@ -6,10 +6,22 @@
  ******************************************************************************/
 
 /** @file scheduler_base.cpp
- * @brief Reservation projection and policy-to-scheduler factory implementation.
+ * @brief Shared capacity forecasts and scheduler selection.
+ * @details Forecasts subtract requested capacity over complete reservation
+ * intervals. The factory chooses queue order, backfill protection,
+ * examination accounting, and timing. The simulation driver owns event and
+ * timer wakes; this shared code is not a standalone scheduler.
+ * @note CLI: Concrete selection uses --priority_policy, --backfill_policy,
+ * --queue_impl, --per_pass_accounting, --backfill_interval, and
+ * --dispatch_interval. --reservation_depth and the backfill/dispatch queue
+ * depths configure the chosen policy. See the concrete scheduler file for a
+ * complete supported combination.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #include "sim/scheduler_base.hpp"
+#include "sim/scheduler_fcfs_1s_evt_group_circular.hpp"
 #include "sim/scheduler_fcfs_easy_block.hpp"
 #include "sim/scheduler_fcfs_easy_circular.hpp"
 #include "sim/scheduler_fcfs_easy_deque.hpp"
@@ -209,6 +221,19 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  tdiff_t backfill_interval, tdiff_t dispatch_interval,
                  size_t dispatch_queue_depth, bool dispatch_on_events,
                  bool per_pass_accounting, bool diagnostic_no_reservations) {
+  if (priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
+    if (dispatch_interval != 0.0 || backfill_interval != 0.0 ||
+        dispatch_queue_depth != 0 || dispatch_on_events ||
+        diagnostic_no_reservations ||
+        queue_impl != QueueImplementation::CIRCULAR) {
+      throw std::invalid_argument("fcfs_1s_evt_group requires event-driven "
+                                  "scheduling, queue_impl=circular, "
+                                  "and protected reservations");
+    }
+    return std::make_unique<FCFSOneSecondEventGroupCircularScheduler>(
+        total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
+        wait_queue_overflow, reservation_depth, backfill_queue_depth);
+  }
   if (diagnostic_no_reservations) {
     if (backfill_interval <= 0.0 || !std::isfinite(backfill_interval) ||
         dispatch_interval != 0.0 || dispatch_queue_depth != 0 ||

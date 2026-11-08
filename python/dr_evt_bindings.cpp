@@ -55,6 +55,7 @@ PYBIND11_MODULE(dr_evt, m) {
                             "Selects the waiting-job priority policy.")
       .value("FCFS", PriorityPolicy::FCFS)
       .value("FCFS_CONSERVATIVE", PriorityPolicy::FCFS_CONSERVATIVE)
+      .value("FCFS_1S_EVT_GROUP", PriorityPolicy::FCFS_1S_EVT_GROUP)
       .value("SJF", PriorityPolicy::SJF)
       .value("LJF", PriorityPolicy::LJF)
       .export_values();

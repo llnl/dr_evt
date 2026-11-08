@@ -1,0 +1,14 @@
+start,0,1,2
+start,0,2,4
+snapshot,0,0,4
+plan,5,3.validation,30
+snapshot,5,0,4
+end,30,1,2
+end,30,2,0
+start,30,3,4
+plan,30,4.validation,50
+snapshot,30,0,4
+end,50,3,0
+start,50,4,1
+snapshot,50,0,1
+end,60,4,0

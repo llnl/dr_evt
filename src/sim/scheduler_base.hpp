@@ -5,6 +5,21 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_base.hpp
+ * @brief Shared capacity forecasts and scheduler selection.
+ * @details Forecasts subtract requested capacity over complete reservation
+ * intervals. The factory chooses queue order, backfill protection,
+ * examination accounting, and timing. The simulation driver owns event and
+ * timer wakes; this shared code is not a standalone scheduler.
+ * @note CLI: Concrete selection uses --priority_policy, --backfill_policy,
+ * --queue_impl, --per_pass_accounting, --backfill_interval, and
+ * --dispatch_interval. --reservation_depth and the backfill/dispatch queue
+ * depths configure the chosen policy. See the concrete scheduler file for a
+ * complete supported combination.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
+ */
+
 #ifndef DR_EVT_SIM_SCHEDULER_BASE_HPP
 #define DR_EVT_SIM_SCHEDULER_BASE_HPP
 
@@ -54,6 +69,8 @@ using projected_starts_t = std::vector<Running_Job>;
  * availability and protection plans before extending either plan.
  */
 class Reservation_Timeline {
+  // The opt-in native forecast model retains event times before coalescing.
+  friend class OneSecondEventGroupTimeline;
   using segment_t = std::pair<sim_time_t, num_nodes_t>;
   std::vector<segment_t> m_free_nodes;
 

@@ -5,8 +5,13 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file proto/dr_evt_params.cpp
- * @brief Protobuf configuration-to-parameter conversion implementation.
+/** @file dr_evt_params.cpp
+ * @brief Protobuf configuration-to-parameter conversion.
+ * @details Enabled by --config FILE. Simulation_Params scheduling fields
+ * become Sim_Params values used by create_scheduler(). In particular
+ * priority_policy: "fcfs_1s_evt_group" selects the OpenPBS forecast and
+ * per_pass_accounting: true selects per-scan accounting. See
+ * dr_evt_params.proto for interval, queue, and horizon constraints.
  */
 
 #include "proto/dr_evt_params.hpp"
@@ -173,6 +178,8 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
       sp.m_priority_policy = PriorityPolicy::FCFS;
     } else if (policy == "fcfs_conservative") {
       sp.m_priority_policy = PriorityPolicy::FCFS_CONSERVATIVE;
+    } else if (policy == "fcfs_1s_evt_group") {
+      sp.m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
     } else if (policy == "sjf") {
       sp.m_priority_policy = PriorityPolicy::SJF;
     } else if (policy == "ljf") {

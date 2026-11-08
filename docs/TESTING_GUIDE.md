@@ -18,6 +18,27 @@ DR_EVT uses four complementary forms of validation:
   verifies dispatch acknowledgements but leaves main-versus-backfill order
   uncontrolled, so these matches do not establish general scheduler equivalence.
 
+The native OpenPBS scheduler-library comparison uses private vnodes and shared
+server capacity. Its original 2,000-job Lassen replay has 1,433 differing
+schedules. The first difference comes from OpenPBS skipping a capacity check
+between predicted releases one second apart. Replaying the same jobs with
+every arrival time, actual runtime, and requested time limit multiplied by two
+produces exact agreement. See the
+[OpenPBS explanation](user-guide/SCHEDULER_VALIDATION.md#openpbs-with-server-wide-capacity)
+and [harness commands](https://github.com/LLNL/dr_evt/blob/main/validation/openpbs/README.md).
+
+The separate `fcfs_1s_evt_group` policy reproduces that native forecast grouping.
+Its native regression also checks pending-status and queue-drain queries
+against ordinary FCFS: the grouped forecast can predict 11 while the real
+job starts at a fitting release at 10. The placement-pass integration checks
+the policy name through both CLI arguments and a Protobuf configuration.
+Its focused C++ test covers inclusive groups, separated/lone releases without
+an artificial delay, current fits, full-interval protection, retained calendar
+events, actual streaming starts, and checkpoint continuation when enabled.
+Placement-pass integration tests also exercise the command-line selector.
+Quick CI runs its native test binary; full CI runs it and the integration
+runner through CTest. The native OpenPBS comparison remains a separate replay.
+
 Agreement between implementations is a regression and consistency check. It is
 not independent proof that an algorithm is correct. Small scheduling fixtures
 are therefore also designed for direct inspection against the policy rules in
@@ -97,8 +118,16 @@ ctest --test-dir build --output-on-failure \
 
 Quick CI runs the append API and both dispatch runners. Full CI runs all
 configured CTest registrations with GCC and Clang, including queue-depth,
-checkpoint/restart, and batch/streaming checks. Native Flux and Slurm trace
-experiments are reproduced separately with the validation harnesses.
+checkpoint/restart, and batch/streaming checks. Quick and full CI also run the
+five OpenPBS harness audit tests, which need only Python's standard library:
+
+```bash
+python3 -m unittest discover -s validation/openpbs -p test_compare.py -v
+```
+
+These tests check the comparison harness, not native scheduling. Native Flux,
+Slurm, and OpenPBS replays are reproduced separately with the validation
+harnesses; OpenPBS requires its pinned source checkout and the Lassen trace.
 
 Run only the replay-based warm-start behavior and CLI validation registrations with:
 

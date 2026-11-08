@@ -1,0 +1,20 @@
+# Document the adapter without scanning the external OpenPBS source tree.
+PROJECT_NAME = "DR_EVT OpenPBS validation adapter"
+OUTPUT_DIRECTORY = validation/openpbs/results/doxygen
+INPUT = validation/openpbs/reference.cpp
+FILE_PATTERNS = *.cpp
+RECURSIVE = NO
+EXTRACT_ALL = YES
+EXTRACT_STATIC = YES
+ENABLE_PREPROCESSING = YES
+SEARCH_INCLUDES = NO
+GENERATE_HTML = YES
+GENERATE_LATEX = NO
+GENERATE_XML = NO
+HAVE_DOT = NO
+QUIET = YES
+WARNINGS = YES
+WARN_IF_UNDOCUMENTED = YES
+WARN_IF_DOC_ERROR = YES
+WARN_NO_PARAMDOC = YES
+WARN_AS_ERROR = YES

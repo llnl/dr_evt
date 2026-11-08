@@ -1,9 +1,9 @@
-# Scheduling Validation
+# Simulation Validation
 
 DR_EVT matched all 2,000 Lassen job starts and completions in two recorded comparisons:
-FCFS without backfill using Fiction with Flux Core's `sched-simple`, and
+FCFS without backfill using Fiction, and
 periodic hybrid backfill using native Slurm with pooled license planning.
-Hybrid backfill with Fluxion has similar resource-use curves but different
+Hybrid backfill using Fiction has similar resource-use curves but different
 starts; a four-job reproducer isolates a node-binding cause.
 
 These are observations for the recorded workloads and configurations. In the
@@ -18,6 +18,16 @@ outside this model. The Slurm experiment uses private dummy nodes and shared
 license capacity, with `bf_licenses=on` protecting future counts; that option
 alone does not remove node binding. Matching resource representation is
 necessary, but scheduler policy and ordering also affect the comparison.
+
+DR_EVT models interchangeable capacity counts. It does not model Fluxion's
+resource graph, node matching, or reservations tied to particular nodes.
+Fiction drives simulated arrivals and completions in both comparisons.
+The scheduler backend differs between the experiments:
+
+| Fiction experiment | Scheduler making allocation and reservation decisions |
+|---|---|
+| FCFS without backfill | `sched-simple`; Fluxion is unloaded |
+| Hybrid backfill | Fluxion; `sched-simple` is not used |
 
 See [Scheduling Loops](SCHEDULER_LOOPS.md) and
 [Realism and Known Gaps](REALISM_AND_GAPS.md) for the supported policy sets.
@@ -37,7 +47,7 @@ Both schedulers use equal priorities, FCFS order, no system latency or node
 release delay, and an unlimited planning horizon. Fair share, usage accounting,
 preemption, GPUs, and heterogeneous topology are excluded.
 DR_EVT uses `--per_pass_accounting` to select the event-driven placement
-implementation representing Flux's passes: immediate starts and reservations
+implementation: immediate starts and reservations
 count toward Q, and Q/R reset each pass. The resource-time reservation rule is
 `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
 
@@ -54,14 +64,15 @@ Both engines use FCFS without backfill, with Q=64. For `sched-simple`, Q bounds
 outstanding allocation requests, rather than jobs examined per pass. It stops
 at the first blocked queue head; jobs behind that head cannot start early.
 It uses a simple node/core pool and assigns concrete resources at job start.
-`sched-simple` has no backfill: its forecast estimates starts in a copied pool
-without protecting future nodes in scheduling state.
+Fluxion is not used in this run. `sched-simple` has no backfill: its forecast
+estimates starts in a copied pool without protecting future nodes in
+scheduling state.
 
 All **2,000 start and completion times match at millisecond output precision**.
 The resource-manager curves and waiting-time metrics are identical.
 All **2,925 native resource snapshots** pass capacity and node-ownership checks.
 
-| Metric | dr_evt | fiction with sched-simple |
+| Metric | dr_evt | Fiction |
 |---|---:|---:|
 | Mean waiting time | 11.4116 h | 11.4116 h |
 | Makespan | 41.1710 h | 41.1710 h |
@@ -90,18 +101,21 @@ FCFS without backfill: identical waiting-time and utilization metrics.
 Thirty smaller comparisons also match at Q=1, Q=2, and Q=64. They cover blocked
 heads, simultaneous events, early completions, and mixed queues.
 
-## Hybrid backfill with Fluxion
+## Hybrid backfill with Fiction
 
-The same 2,000 Lassen jobs use hybrid backfill **(R=32,Q=64)** and Fluxion's
-**`lonodex` (low-node-ID-first)** resource matching. DR_EVT protects available
-node counts over time; Fluxion reserves particular nodes.
+Fiction runs Fluxion's hybrid-backfill scheduler for the same 2,000 Lassen
+jobs, with **R=32,Q=64**. Fluxion makes the scheduling and resource-placement
+decisions; `sched-simple` is not used in this experiment. Fluxion uses
+**`lonodex` (low-node-ID-first)** resource matching and reserves particular
+nodes. DR_EVT protects available node counts over time; it does not reproduce
+that resource matching or those node-specific reservations.
 
 Both runs use the same resource area, and all **2,920 native snapshots** pass
 capacity and ownership checks. The area between curves is **2,947,190.112
 node-seconds**, or **2.6612%** of the shared capacity-time window. The cause of
 every trace difference has not been isolated.
 
-| Metric | dr_evt | fiction with Fluxion |
+| Metric | dr_evt | Fiction |
 |---|---:|---:|
 | Mean waiting time | 10.1647 h | 10.5460 h |
 | Makespan | 40.2895 h | 40.6922 h |
@@ -135,7 +149,7 @@ or simulated release delay. The queue cap exceeds the entire workload, so
 per-pass resets do not explain this difference.
 
 :::{figure} ../_static/scheduler-validation/four-job-backfill-divergence.png
-:alt: Four-job example using low-node-ID-first matching. Fluxion reserves nodes 0, 1, and 2 for head job C at 80 seconds, so backfill job D waits until 80; a feasible dr_evt count-based schedule starts D at 70 while preserving C's start at 80.
+:alt: Four-job example using low-node-ID-first matching. Fiction reserves nodes 0, 1, and 2 for head job C at 80 seconds, so backfill job D waits until 80; a feasible dr_evt count-based schedule starts D at 70 while preserving C's start at 80.
 :width: 100%
 
 Specific-node reservations delay D by 10 seconds while preserving C's start.
@@ -143,7 +157,7 @@ Specific-node reservations delay D by 10 seconds while preserving C's start.
 
 With `lonodex`, A occupies nodes 0,1 until 70; B occupies nodes 2,3 until 80.
 C protects nodes 0,1,2 for 80–90. At 70 the free nodes 0,1 are both protected,
-so Fluxion cannot start D there for its 50-second duration. D waits until node
+so Fiction cannot start D there for its 50-second duration. D waits until node
 3 becomes available at 80. DR_EVT starts D at 70 while preserving three-node
 capacity for C at 80. The lower diagram shows one feasible physical assignment
 for that count-based decision; DR_EVT itself does not emit node IDs.
@@ -215,13 +229,14 @@ on to retain capacity protection after removing shared-node binding.
 
 Ordinary Slurm's reservations of specific nodes can still cause the same
 kind of divergence from DR_EVT's count-based reservations demonstrated by
-the Fluxion four-job example. The exact differences depend on node selection
+the Fiction four-job example. The exact differences depend on node selection
 and workload. **The recorded license-on match demonstrates agreement for
 that run with abstract capacity. It does not establish agreement for other
 scheduler orderings or ordinary Slurm node placement.**
 
 Slurm's native backfill and `select/cons_tres` remain in use;
-`sched-simple`, used in a separate Flux control, also removes backfill.
+`sched-simple`, used in the separate Fiction FCFS comparison, also removes
+backfill.
 
 ### Running native Slurm with an adapter and virtual time
 
@@ -431,6 +446,279 @@ measurements have different execution environments and timing scopes.
 · [DR_EVT timing script](../_static/scheduler-validation/slurm/measure_dr_evt.py)
 · [Native performance record](../_static/scheduler-validation/slurm/native-performance.json).
 
+## OpenPBS with server-wide capacity
+
+The native OpenPBS 23.06.06 scheduler library was compared with DR_EVT using
+private vnodes and a server-wide consumable `capacity` resource (`flag=q`).
+Each job requests its own vnode and its original node count from a pool of
+756 interchangeable units. Vnode identities do not compete; native calendar
+checks protect future shared capacity. The scheduler library is unmodified.
+An adapter supplies server snapshots, launch acknowledgements, actual
+completions, and virtual time; no database or MOM daemons are used.
+
+The comparison uses FCFS order, strict ordering, R=32, unlimited candidate
+examination, and `opt_backfill_fuzzy=off`. It runs a native scheduling cycle
+after each equal-time batch of arrivals and completions. DR_EVT uses
+event-driven hybrid backfill with `--per_pass_accounting`. Computation-time
+cycle limits, relative fallback triggers, deployment latency, and ordinary
+node-bound placement are outside this experiment.
+
+OpenPBS calendars use integer seconds. Relative arrivals, actual runtimes,
+and requested walltimes are rounded upward; duration is at least one second,
+and shorter limits are extended to duration. Both schedulers receive the same
+converted chronological 2,000-job Lassen prefix on an initially empty pool.
+
+The primary replay has **1,433 differing job schedules**. Both schedulers pass
+capacity bounds, private-vnode ownership, execution-duration, and resource-area
+checks. OpenPBS's utilization is **75.09%**, compared with DR_EVT's **74.91%**;
+mean waits are **23,620.5925 s** and **23,287.413 s**, respectively. Similar
+aggregate metrics do not imply matching job starts.
+
+::::{figure} ../_static/scheduler-validation/openpbs/comparison.svg
+:alt: Native OpenPBS and DR_EVT capacity curves, cumulative starts, and per-job waits for the 2,000-job primary replay
+
+Native shared-capacity comparison with original converted timing. Capacity
+curves remain similar while many individual starts differ.
+::::
+
+[Primary PDF](../_static/scheduler-validation/openpbs/comparison.pdf)
+and [replay with every time multiplied by two (PDF)](../_static/scheduler-validation/openpbs/spacing-control.pdf).
+
+### The current scheduling decision and its future prediction
+
+In this experiment, jobs are considered in arrival order. If an earlier job
+cannot start because there is too little free capacity, a later job may use
+spare capacity **only if it will not delay the earlier job's predicted start**.
+This permission to run a later job ahead of a waiting job is called backfill.
+The scheduler therefore needs a future-start prediction before deciding which
+later jobs it can start now. R=32 means this experiment protects the predicted
+starts of up to 32 waiting jobs; the small example below uses R=1.
+
+Two operations happen at different levels:
+
+- **The outer scheduling loop handles actual events.** In this validation,
+  all arrivals and actual completions at the same timestamp are processed,
+  then the scheduler decides which jobs to start. Actual completions at
+  seconds 10 and 11 trigger separate decisions at those times.
+- **The future-start calculation examines a hypothetical future during one
+  current decision.** It starts from the current running jobs and existing
+  capacity commitments, predicts when capacity will be released, and searches
+  for a time when a waiting job can run. It uses requested time limits to
+  predict completion, because actual runtimes are not known to the scheduler.
+  This calculation does not advance the outer loop or complete any actual job.
+
+For example, while deciding what to start at time zero, a scheduler may
+calculate whether a waiting job could start at second 10. Time remains zero
+throughout that calculation. The resulting prediction is a capacity commitment
+used to judge later candidates, not an instruction to wait until second 10
+before making the current decision. A later candidate must fit throughout its
+requested runtime without violating the protected jobs' capacity commitments.
+Capacity released at a time is available for a job starting at that same time.
+
+### The rule inside OpenPBS's future-start calculation
+
+The following rule applies **inside the hypothetical calculation**, under the
+`opt_backfill_fuzzy=off` setting used here. It does not round actual arrivals
+or completions, combine outer-loop triggers, or run the scheduler every second.
+
+1. Check whether the waiting job can run in the current simulated state.
+2. If it cannot, find the earliest remaining predicted event. Call its time T.
+   A running job finishing and releasing capacity is one such event.
+3. Form a group containing that event and every following predicted event
+   whose time is at most **T + 1 second**, including events exactly at T + 1.
+4. Apply all events in that group to the hypothetical state. There is no
+   capacity-fit check between the events in the group.
+5. When the group frees capacity, check whether the waiting job can run in the
+   resulting state. The predicted start being checked is the time of the last
+   event actually applied, not automatically T + 1.
+6. If it still cannot run, form the next group from the earliest unprocessed
+   event and repeat. Stop when a valid start is found or no events remain.
+
+Here are two examples of grouping predicted completions:
+
+| Predicted finish times in seconds | First group | First capacity-fit check |
+|---|---|---:|
+| 10, 11, 100 | Completions at 10 and 11 | At 11, after both completions |
+| 10, 12, 100 | Completion at 10 only | At 10, after that completion |
+
+In the first row, the group begins at 10 and includes 11. The state just after
+10 is calculated, but the waiting job is not checked against that state.
+In the second row, 12 is outside the group's endpoint of 11, so the first
+check is at 10. If that state has enough capacity, the predicted start is 10.
+**There is no automatic one-second delay:** T + 1 defines the group endpoint,
+but the check uses the last event actually processed. The job finishing at
+100 remains running at the first check in both rows. This rule groups nearby
+events; it does not wait for all running jobs to finish. Events at 10, 11, 12,
+and 13 would form groups {10, 11} and {12, 13}, with a check after each group
+if the search needs to continue.
+
+The native calendar can also contain planned starts and policy changes.
+OpenPBS rechecks eligibility when a group releases resources or a relevant
+policy change occurs. The examples here use completions to show how grouping
+changes the capacity state presented to that check. In the native source,
+[`simulate_events()`](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/scheduler/simulate.cpp#L188-L219)
+forms and applies the group, and
+[`calc_run_time()`](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/src/scheduler/simulate.cpp#L749-L773)
+checks the waiting job after that function returns.
+
+OpenPBS [documents event grouping](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/doc/man1/pbs_sched_attributes.7B#L138-L157)
+as a tradeoff between forecasting speed and the precision of predicted start
+times: one fit check per group takes less work than a check after each event.
+However, `off` is documented as "Finest granularity; no speedup." Its value is
+zero, and the implementation replaces zero with one before calculating the
+group's endpoint. For integer-second events, that endpoint becomes T + 1,
+and the comparison includes events exactly at the endpoint. This is the
+source of the remaining grouping under `off`; the rule above describes the
+measured implementation rather than assuming `off` checks after every event.
+
+The change was introduced by
+[OpenPBS PR #2394, "Make opt_backfill_fuzzy less fuzzy"](https://github.com/openpbs/openpbs/pull/2394),
+merged on May 26, 2021 as commit `7a2d95abb0f117ab628790baefb8aaa89a58c074`.
+The author explains that grouping events speeds forecasting, but group
+boundaries that shift between scheduling cycles can also make predicted
+starts drift. The change aligned groups to clock boundaries to make those
+predictions more stable. Before this change, `off` used an endpoint of T and
+processed events at that timestamp only. The same patch changed `off` to use
+one second, producing the T + 1 grouping described above. Neither the PR
+description nor its discussion explains why that remaining grouping is needed
+with `off`; the documented speed/stability rationale concerns fuzzy forecasting.
+
+### A complete four-job example
+
+There are **three interchangeable capacity slots**. All four jobs arrive at
+second zero, in order A, B, H, S. Requested time limits equal actual runtimes
+in this example, so predicted and actual completions agree for a given start.
+
+| Job | Slots needed | Runtime and requested limit in seconds |
+|---|---:|---:|
+| A | 1 | 10 |
+| B | 1 | 11 |
+| H | 2 | 2 |
+| S | 1 | 11 |
+
+A and B start at zero and occupy two slots. One slot is free. H is next in
+line, but it needs two slots and must wait. **The decision still being made at
+time zero is whether S may use the spare slot without delaying H.** To make
+that decision, each scheduler first predicts when H could start if S waits.
+The hypothetical available capacity before allocating H is:
+
+| Future time in seconds | Predicted completion | Free slots if S waits |
+|---|---|---:|
+| 0 | None yet; A and B are running | 1 |
+| 10 | A finishes and releases one slot | 2 — enough for H |
+| 11 | B finishes and releases one more slot | 3 |
+
+DR_EVT checks after each distinct predicted release time. It checks the state
+at second 10, finds two free slots, and protects H's start at 10. If S started
+at zero, it would occupy a slot until 11, leaving only one free slot at 10.
+That would delay H, so DR_EVT makes S wait. The actual starts are H at 10 and
+S at 11; H uses two slots and S uses the third from 11 to 12.
+
+OpenPBS finds A's predicted completion at 10 as the earliest future event.
+Its group therefore runs through 11, so it includes B's predicted completion
+at 11. Inside the hypothetical state, A's finish increases free slots from
+one to two, and B's finish increases them from two to three. **Only then does
+OpenPBS check H**, at second 11. It never checks H against the intermediate
+state with two free slots at 10, and therefore protects H's start at 11.
+S can run from zero to 11 without delaying that prediction: at 11, both B and
+S release their slots before H starts. OpenPBS therefore allows S at zero.
+Its actual starts are S at zero and H at 11.
+
+The different forecasts change a decision at time zero. The actual scheduling
+loop still handles A's completion at 10 and B's at 11 separately. In the
+OpenPBS schedule, H cannot start at 10 because B and S still occupy two slots.
+The forecast grouping has already allowed S to start, which is why the later
+real completion at 10 does not undo the difference.
+
+### The first different decision in the Lassen replay
+
+The same mechanism appears in the larger replay. At **9,731 seconds**, both
+schedulers have the same running jobs, waiting queue, and one free capacity
+unit. They must decide which waiting job, if any, can use that unit now while
+preserving their commitments to earlier waiting jobs.
+
+Jobs 528 and 536 are predicted to finish at **13,006 seconds**; job 546 is
+predicted to finish at **13,007 seconds**. These are hypothetical future
+completions being examined during the current decision at 9,731.
+DR_EVT checks capacity after the releases at 13,006 and predicts that waiting
+job 229 can start then. OpenPBS includes the release at 13,007 in the same
+forecast group, checks afterward, and predicts job 229's start at 13,007.
+The other 31 protected start predictions agree at this decision.
+
+An independent capacity calculation confirms the consequence. Starting job
+548 now would leave too little capacity for job 229 at 13,006, but enough at
+13,007. OpenPBS therefore starts job 548; DR_EVT rejects it and starts job 740
+instead. The mismatch is in their future-start predictions and resulting
+current choices. Actual completion times and outer-loop triggers are unchanged.
+
+### Repeating the input with every time multiplied by two
+
+To test whether the one-second grouping explains the mismatch, we replay the
+same input after multiplying **every arrival time, actual runtime, and
+requested time limit by two**. Job order and capacity requests stay the same.
+In the four-job example, A now runs for 20 seconds and B for 22 seconds.
+OpenPBS's first group starts at 20 and ends at 21, so it includes A's finish
+but excludes B's at 22. Both schedulers check H at 20 and protect that start.
+S would run until 22 if started at zero and would delay H, so both make S wait.
+Both then start H at 20 and S at 22.
+
+The original converted input uses integer seconds. Multiplying all times by
+two places distinct predicted releases at least two seconds apart, so they
+fall in separate forecast groups. The two full Lassen replays test the same
+resource requests and job order under these two timing conditions.
+
+Seven other hand-derived controls and twelve seeded 30-job comparisons match
+exactly. They cover allowed/blocked backfill, early completion, simultaneous
+events, half-open fit endpoints, and R=1/R=2/R=32 protection. The adjacent-event
+case requires the difference just explained. We also repeated the entire
+2,000-job Lassen replay with every time multiplied by two.
+**All 2,000 starts and completions match in that replay.** The original replay
+still has 1,433 differing schedules. The matching replay supports the identified
+cause; it does not make the original results an exact match. Both inputs,
+schedules, and audits are retained in the evidence.
+
+### Selecting the separate OpenPBS forecast policy in DR_EVT
+
+OpenPBS 23.06.06 has no supported setting that removes this grouping:
+`opt_backfill_fuzzy=off` and numeric zero both become a one-second interval in
+`simulate_events()`. Changing the native implementation would be required to
+check after every distinct event time.
+
+DR_EVT provides a separate `fcfs_1s_evt_group` policy that reproduces the inclusive
+one-second forecast groups. Select it explicitly; the default `fcfs` policy
+continues to check each distinct predicted release time. For example:
+
+```bash
+simulator converted-jobs.csv --total_nodes 756 \
+  --trace_format simple --timestamp_format epoch --run_time_mode actual \
+  --priority_policy fcfs_1s_evt_group --queue_impl circular \
+  --backfill_policy hybrid --reservation_depth 32 --backfill_queue_depth 0
+```
+
+This policy uses the existing FCFS placement-pass engine with a separate
+forecast planner. It checks the current time first, then checks future capacity
+after each OpenPBS-style group. It retains exact reservation intervals and
+actual arrival/completion timestamps. A group containing only a release at
+10 is still checked at 10. Events at 10 and 11 are checked together at 11.
+The same planner supplies pending-job status predictions.
+
+Use event-driven dispatch, a circular queue, and unlimited planning horizon.
+The native comparison uses integer-second converted inputs, a fixed shared
+capacity pool, and unlimited candidate examination. Node placement, fairshare,
+server/MOM execution, computation-time limits, and other OpenPBS policies are
+outside this compatibility model. Python uses `PriorityPolicy.FCFS_1S_EVT_GROUP`;
+Protobuf configuration and gRPC requests accept `priority_policy: "fcfs_1s_evt_group"`.
+
+With this policy, **all 21 small cases and all 2,000 starts and completions
+in the original converted Lassen replay match native OpenPBS exactly**. The
+second replay with every time multiplied by two also matches all 2,000 jobs.
+Every capacity, ownership, duration, and resource-area audit passes. See the
+[separate policy evidence](https://github.com/LLNL/dr_evt/blob/main/validation/openpbs/evidence/openpbs-policy-20261108/README.md).
+
+See the [OpenPBS harness](https://github.com/LLNL/dr_evt/blob/main/validation/openpbs/README.md) for commands,
+adapter boundaries, and recorded evidence. These results validate the measured
+scheduler-library behavior under the stated abstraction and timing controls.
+
 ## Evidence and reproduction
 
 The figures and tables report DR_EVT validation experiments. Scheduler names
@@ -446,12 +734,12 @@ and the separate reservation-reset investigation are not part of these results.
 Published figure folders contain the standalone plotting script, saved inputs,
 exact plotting numbers, summary CSVs, and resource-manager curve CSVs:
 
-- sched-simple: [plotting script](../_static/scheduler-validation/sched-simple/plot_comparison.py),
+- Fiction, FCFS without backfill: [plotting script](../_static/scheduler-validation/sched-simple/plot_comparison.py),
   [inputs](../_static/scheduler-validation/sched-simple/plot-input.json),
   [numbers](../_static/scheduler-validation/sched-simple/plot-data.json),
   [summary](../_static/scheduler-validation/sched-simple/plot-summary.csv),
   [provenance](../_static/scheduler-validation/sched-simple/provenance.json).
-- Fluxion: [plotting script](../_static/scheduler-validation/fluxion/plot_comparison.py),
+- Fiction, hybrid backfill: [plotting script](../_static/scheduler-validation/fluxion/plot_comparison.py),
   [inputs](../_static/scheduler-validation/fluxion/plot-input.json),
   [numbers](../_static/scheduler-validation/fluxion/plot-data.json),
   [summary](../_static/scheduler-validation/fluxion/plot-summary.csv),
@@ -480,8 +768,10 @@ For the control folder, run `python3 plot_timeline.py . --case pooled` and
 `python3 plot_timeline.py . --case protection`. For the divergence folder,
 run `python3 plot_endpoint_comparison.py endpoint-comparison.json`.
 
-The Fiction comparisons use DR_EVT revision `57c3267`, Flux Core `d0309fcf0`,
-Fluxion `9eba598b`, and Fiction `346cbd65`. Machine-readable evidence is in
+The Fiction comparisons use DR_EVT revision `57c3267`, Fiction `346cbd65`,
+and Flux Core `d0309fcf0`. Only the hybrid-backfill comparison uses Fluxion
+`9eba598b`; the FCFS comparison uses Flux Core's `sched-simple`.
+Machine-readable evidence is in
 [validation/flux/evidence](https://github.com/LLNL/dr_evt/tree/main/validation/flux/evidence).
 The DR_EVT simulator snapshot used for these experiments is recorded by its
 [source hashes](../_static/scheduler-validation/slurm/dr_evt-sources.json)

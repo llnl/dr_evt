@@ -5,7 +5,7 @@ examination and reservation depths, planning horizon and resolution, and
 reservation admission. This page explains the supported combinations and how
 they represent selected production scheduling behaviors.
 [Realism and Known Gaps](REALISM_AND_GAPS.md) records differences and excluded
-scope; [Scheduling Validation](SCHEDULER_VALIDATION.md) reports measured
+scope; [Simulation Validation](SCHEDULER_VALIDATION.md) reports measured
 comparisons. Detailed policy definitions are in
 [Scheduling Policies](../BACKFILLING_ALGORITHMS.md).
 

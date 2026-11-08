@@ -1,10 +1,14 @@
 # Four-job start-time divergence
 
-On a system with **4 nodes total**, Fluxion's specific-node reservation delays
+On a system with **4 nodes total**, Fiction's specific-node reservation delays
 backfill job D until 80 seconds. DR_EVT's node-count plan starts D at 70 while
 preserving head job C's start at 80. The
 [published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences)
 includes the node-assignment diagram.
+
+Fiction uses Fluxion for scheduling, resource matching, and node-specific
+reservations in this reproducer. It does not use `sched-simple`. DR_EVT uses
+its own capacity-count backfill scheduler.
 
 Both runs use FCFS, event-driven dispatch, DR_EVT `--per_pass_accounting`,
 Q=2048, unlimited horizon, and zero simulated release delay. Every node has
@@ -32,7 +36,7 @@ node IDs first:
 
 At 70, A releases nodes 0,1. Both are reserved for C's 80–90 window, so D's
 50-second run cannot use either. The only node outside C's reservation is
-node 3, still occupied until 80. Fluxion starts D then.
+node 3, still occupied until 80. Fiction starts D then.
 
 DR_EVT protects three-node capacity rather than node IDs. One feasible
 assignment gives D node 0 at 70–120 and C nodes 1,2,3 at 80–90. This keeps

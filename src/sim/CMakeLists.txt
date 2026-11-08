@@ -13,6 +13,8 @@ set_full_path(THIS_DIR_HEADERS
     scheduler_fcfs_hybrid_deque.hpp
     scheduler_fcfs_hybrid_circular.hpp
     scheduler_fcfs_pass_hybrid_circular.hpp
+    scheduler_fcfs_1s_evt_group_circular.hpp
+    forecast_1s_evt_group_timeline.hpp
     scheduler_periodic_fcfs_hybrid_circular.hpp
     scheduler_fcfs_periodic_easy_circular.hpp
     scheduler_fcfs_periodic_hybrid_circular.hpp

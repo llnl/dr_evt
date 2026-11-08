@@ -5,6 +5,19 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
+/** @file scheduler_fcfs_easy_custom.hpp
+ * @brief FCFS starts with an API-selected EASY backfill candidate.
+ * @details Protect the waiting FCFS head, report feasible later candidates
+ * to a caller-provided selector, and start the selected candidate. Resources
+ * remain interchangeable capacity counts.
+ * @note CLI: No CLI or Protobuf field activates this scheduler by itself.
+ * Use the C++/Python Simulation constructor with cost and selection
+ * callbacks. --num_max_candidates bounds the candidates offered after that
+ * API path is selected. Dispatch and backfill intervals must be zero.
+ * Protobuf: Simulation_Params.num_max_candidates sets the candidate limit;
+ * InitRequest exposes no custom-selector callbacks or candidate limit.
+ */
+
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_EASY_CUSTOM_HPP
 #define DR_EVT_SIM_SCHEDULER_FCFS_EASY_CUSTOM_HPP
 

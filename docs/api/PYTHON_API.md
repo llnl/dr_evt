@@ -108,7 +108,7 @@ arguments use legacy names or numeric IDs.
 - `BackfillPolicy.NONE`, `BackfillPolicy.EASY`,
   `BackfillPolicy.CONSERVATIVE`, `BackfillPolicy.HYBRID`
 - `PriorityPolicy.FCFS`, `PriorityPolicy.FCFS_CONSERVATIVE`,
-  `PriorityPolicy.SJF`, `PriorityPolicy.LJF`
+  `PriorityPolicy.FCFS_1S_EVT_GROUP`, `PriorityPolicy.SJF`, `PriorityPolicy.LJF`
 - `ReleaseDelayModel.CONSTANT`, `ReleaseDelayModel.EXPONENTIAL`,
   `ReleaseDelayModel.UNIFORM` (see `--node_release_delay_model` in
   [Command-Line Options](../user-guide/command-line.md))
@@ -196,6 +196,13 @@ order; `estimation_depth` then also limits the returned queue prefix.
 `get_queue_drain_start_times(utilization, estimation_depth=0)` is a separate
 fast resource-area approximation. It returns queue-order estimates without
 per-job first-fit placement; it is available through C++ and Python, not gRPC.
+
+With `PriorityPolicy.FCFS_1S_EVT_GROUP`, both pending-status and queue-drain
+queries use inclusive one-second forecast event groups. Each query selects
+its compiled forecast implementation once before scanning the waiting queue.
+`if constexpr` removes grouping checks and grouping-event storage from the
+ordinary query implementation. Actual arrival and completion events keep
+their original times.
 
 `BackfillWindow` exposes `current_time`, `available_nodes`,
 `shadow_time`, and an ordered list of `ResourceRelease` values. Each release

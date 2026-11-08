@@ -6,7 +6,20 @@
  ******************************************************************************/
 
 /** @file scheduler_periodic_fcfs_hybrid_circular.hpp
- * @brief Periodic FCFS dispatch and hybrid backfill using a circular queue.
+ * @brief FCFS dispatch and backfill together at fixed timer ticks.
+ * @details Each wake scans the waiting queue, counting both immediate starts
+ * and waiting candidates toward its examination limit. EASY protects one
+ * job; hybrid protects R; conservative protects all examined jobs. Optional
+ * arrival wakes leave the timer phase unchanged. This models dispatch timing
+ * and capacity counts, not a production resource graph.
+ * @note CLI: --priority_policy fcfs --queue_impl circular
+ * --dispatch_interval I (I > 0), with --backfill_interval 0 and no
+ * --per_pass_accounting. --dispatch_queue_depth Q sets the examination limit
+ * (0 is unlimited); keep --backfill_queue_depth 0. --dispatch_on_events adds
+ * arrival wakes. Choose --backfill_policy none, easy, hybrid, or
+ * conservative; hybrid requires --reservation_depth R > 0.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #ifndef DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_CIRCULAR_HPP

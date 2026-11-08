@@ -1,0 +1,42 @@
+{
+  "openpbs": [
+    "/workspace/openpbs-reference",
+    "/results/openpbs-policy/full/random-05/native-input.csv",
+    "8",
+    "32",
+    "/results/openpbs-policy/full/random-05/native.csv",
+    "/results/openpbs-policy/full/random-05/native-events.csv"
+  ],
+  "dr_evt": [
+    "/workspace/dr_evt-builds/6bfee1fb0c19498ea6bfe5ff681da83c69d1afe4afd58e69031047ee9b967c57/simulator",
+    "/results/openpbs-policy/full/random-05/jobs.csv",
+    "--total_nodes",
+    "8",
+    "--trace_format",
+    "simple",
+    "--timestamp_format",
+    "epoch",
+    "--run_time_mode",
+    "actual",
+    "--priority_policy",
+    "fcfs_openpbs",
+    "--queue_impl",
+    "circular",
+    "--backfill_policy",
+    "hybrid",
+    "--reservation_depth",
+    "32",
+    "--per_pass_accounting",
+    "--backfill_queue_depth",
+    "30",
+    "--backfill_interval",
+    "0",
+    "--dispatch_interval",
+    "0",
+    "--msec_output",
+    "--outfile",
+    "/results/openpbs-policy/full/random-05/dr_evt.csv",
+    "--resource_trace",
+    "/results/openpbs-policy/full/random-05/dr_evt-resources.csv"
+  ]
+}

@@ -6,7 +6,16 @@
  ******************************************************************************/
 
 /** @file scheduler_fcfs_easy_multimap.cpp
- * @brief Differential-testing implementation of FCFS scheduling.
+ * @brief FCFS starts and EASY backfill using a multimap waiting queue.
+ * @details Jobs are considered in arrival order. When the head must wait,
+ * protect its predicted start and allow later jobs only when they do not
+ * delay it. All resources are interchangeable capacity counts.
+ * @note CLI: --priority_policy fcfs --backfill_policy easy --queue_impl
+ * multimap. Use --dispatch_interval 0 and --backfill_interval 0; omit
+ * --per_pass_accounting. --backfill_policy none disables backfill.
+ * --priority_policy fcfs_alt also selects this queue.
+ * Protobuf: Simulation_Params and InitRequest use the same field names
+ * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
 #include "sim/scheduler_fcfs_easy_multimap.hpp"

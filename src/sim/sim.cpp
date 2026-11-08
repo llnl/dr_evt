@@ -13,6 +13,7 @@
 
 #include "sim/sim.hpp"
 #include "sim/block_wait_queue.hpp"
+#include "sim/forecast_1s_evt_group_timeline.hpp"
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
@@ -2276,6 +2277,17 @@ template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  if (m_params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
+    return get_job_statuses_impl<true>(job_idxs, estimation_depth);
+  }
+  return get_job_statuses_impl<false>(job_idxs, estimation_depth);
+}
+
+template <typename TraceType>
+template <bool GroupEvents>
+std::vector<typename BasicSimulation<TraceType>::Job_Status>
+BasicSimulation<TraceType>::get_job_statuses_impl(
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
   const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::vector<Job_Status> result;
   std::multimap<job_no_t, size_t> requested_pending_statuses;
@@ -2368,7 +2380,14 @@ BasicSimulation<TraceType>::get_job_statuses(
   // HYBRID prefix, or CONSERVATIVE queue retain capacity in this profile.
   // Every projected job consumes its run window in this query-local serial
   // forecast. An out-of-horizon job remains ESTIMATED rather than RESERVED.
-  Reservation_Timeline reservation_profile(std::move(profile));
+  auto reservation_profile = [&profile] {
+    if constexpr (GroupEvents) {
+      return OneSecondEventGroupTimeline(
+          Reservation_Timeline(std::move(profile)));
+    } else {
+      return Reservation_Timeline(std::move(profile));
+    }
+  }();
   auto forecast_policy = m_params.m_backfill_policy;
   if (m_params.m_diagnostic_no_reservations) {
     // Diagnostic forecasts are estimates, never protected reservations.
@@ -2517,6 +2536,18 @@ template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>
 BasicSimulation<TraceType>::get_queue_drain_start_times(
     double utilization, size_t estimation_depth) const {
+  if (m_params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
+    return get_queue_drain_start_times_impl<true>(utilization,
+                                                  estimation_depth);
+  }
+  return get_queue_drain_start_times_impl<false>(utilization, estimation_depth);
+}
+
+template <typename TraceType>
+template <bool GroupEvents>
+std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>
+BasicSimulation<TraceType>::get_queue_drain_start_times_impl(
+    double utilization, size_t estimation_depth) const {
   if (!std::isfinite(utilization) || utilization < 0.0 || utilization > 1.0) {
     throw std::invalid_argument("utilization must be finite and in [0, 1]");
   }
@@ -2614,6 +2645,21 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
 
   // Reserve only the policy-protected jobs.  Unreserved jobs contribute to
   // cumulative demand below, rather than receiving individual placements.
+  auto grouped_profile = [&] {
+    if constexpr (GroupEvents) {
+      return OneSecondEventGroupTimeline(Reservation_Timeline(profile));
+    } else {
+      return nullptr;
+    }
+  }();
+  const auto find_fit = [&](num_nodes_t nodes, tdiff_t limit,
+                            sim_time_t earliest) {
+    if constexpr (GroupEvents) {
+      return grouped_profile.earliest_fit(nodes, limit, earliest);
+    } else {
+      return earliest_fit(profile, nodes, limit, earliest);
+    }
+  };
   auto forecast_policy = m_params.m_backfill_policy;
   if (m_params.m_diagnostic_no_reservations) {
     // Diagnostic forecasts are estimates, never protected reservations.
@@ -2636,7 +2682,7 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
          hybrid_reserved < m_params.m_reservation_depth) ||
         (forecast_policy == BackfillPolicy::EASY && !easy_blocked_head_seen);
     if (may_reserve) {
-      reservation = earliest_fit(profile, nodes, limit, earliest);
+      reservation = find_fit(nodes, limit, earliest);
       const bool starts_now = reservation && *reservation <= m_current_time;
       const bool within_horizon =
           reservation &&
@@ -2653,8 +2699,12 @@ BasicSimulation<TraceType>::get_queue_drain_start_times(
       } else if (forecast_policy == BackfillPolicy::CONSERVATIVE) {
         reserved = !starts_now && within_horizon;
       }
-      if (reserved)
+      if (reserved) {
         reserve(profile, *reservation, nodes, limit);
+        if constexpr (GroupEvents) {
+          grouped_profile.reserve(*reservation, nodes, limit);
+        }
+      }
     }
     plans.push_back({pending_id, nodes, limit, reservation, reserved});
   }
