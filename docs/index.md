@@ -11,6 +11,8 @@ multi-cluster simulations in a distributed fashion and digital-twin scheduler in
 
 Scheduler behavior is verified against a from-scratch Python reference implementation
 (consistency check between implementations, not independently derived ground truth).
+Selected workloads also have [native scheduling comparisons](user-guide/SCHEDULER_VALIDATION.md),
+including an identical 2,000-job FCFS run and quantified backfill differences.
 
 [GitHub Repository](https://github.com/LLNL/dr_evt)
 
@@ -29,6 +31,9 @@ getting-started/tutorial
 
 user-guide/overview
 user-guide/command-line
+user-guide/SCHEDULER_LOOPS
+user-guide/REALISM_AND_GAPS
+user-guide/SCHEDULER_VALIDATION
 user-guide/protobuf-config
 user-guide/trace-formats
 user-guide/output-traces
@@ -66,8 +71,6 @@ CLIENT_SERVER_GUIDE
 dev/README
 dev/WAIT_QUEUES
 dev/JOB_LIFECYCLE
-dev/SCHEDULER_LOOPS
-dev/REALISM_AND_GAPS
 dev/PERFORMANCE_ANALYSIS
 dev/SCHEDULING_PREDICTIONS
 dev/design-decisions/README

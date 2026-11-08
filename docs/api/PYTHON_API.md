@@ -64,6 +64,7 @@ or `None`.
 | `num_max_candidates` | `int` |
 | `reservation_depth` | `int` |
 | `backfill_queue_depth` | `int`; waiting jobs examined per backfill pass (0 is unlimited) |
+| `per_pass_accounting` | `bool`; count whole event-driven placement passes, reset Q/R per pass, and guard reservation-only retries (default `False`) |
 | `dispatch_interval` | `float`; aligned ticks run both FCFS and backfill (0 disables) |
 | `dispatch_queue_depth` | `int`; full candidate prefix per dispatch wake, including immediate starts (0 is unlimited) |
 | `dispatch_on_events` | `bool`; also dispatch on job arrival batches without resetting ticks; requires positive `dispatch_interval` (default `False`) |
@@ -77,7 +78,7 @@ or `None`.
 | `verbose` | `bool` |
 
 The scheduling attributes mirror the
-`--backfill_queue_depth`, `--backfill_interval`, `--dispatch_interval`,
+`--backfill_queue_depth`, `--per_pass_accounting`, `--backfill_interval`, `--dispatch_interval`,
 `--dispatch_queue_depth`, `--dispatch_on_events`, `--planning_time_resolution`, and `--planning_horizon` command-line options
 described in [Command-Line Options](../user-guide/command-line.md). A positive
 `backfill_interval` keeps FCFS dispatch event-driven and runs backfill only at
@@ -213,7 +214,8 @@ contains `time` and `nodes_released`.
 `max(1, turnaround / max(run_time, 10 seconds))` over completed jobs.
 
 For simulations constructed with Custom-FCFS callbacks, `resource_area` is
-accumulated as `nodes_in_use * interval` between settled scheduling times.
+accumulated as `nodes_in_use * interval` between scheduling timestamps, using
+occupancy after all events and scheduling decisions at each timestamp.
 `utilization` divides that area by integrated effective capacity over the
 accounting horizon (the snapshot time while work is running, or the last
 resource event after it becomes idle). During non-preemptive draining,

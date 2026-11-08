@@ -1,0 +1,68 @@
+{
+  "case": "lassen-756-01_jobs_2000",
+  "jobs": 2000,
+  "capacity": 756,
+  "per_pass_accounting": true,
+  "queue_depth": 64,
+  "window_seconds": [
+    0.0,
+    146492.061
+  ],
+  "waiting_seconds": {
+    "dr_evt": {
+      "min": 0.0,
+      "mean": 36592.961993,
+      "median": 46766.629,
+      "p95": 56412.098000000005,
+      "max": 65227.189
+    },
+    "fiction": {
+      "min": 0.0,
+      "mean": 37965.6240515,
+      "median": 48108.1895,
+      "p95": 58157.163799999995,
+      "max": 66265.719
+    }
+  },
+  "utilization_percent": {
+    "dr_evt": 74.14893409732022,
+    "fiction": 73.41506181343209
+  },
+  "utilization_window": "first arrival to each scheduler own last completion",
+  "shared_window_utilization_percent": {
+    "dr_evt": 73.41506181343209,
+    "fiction": 73.41506181343209
+  },
+  "makespan_seconds": {
+    "dr_evt": 145042.189,
+    "fiction": 146492.061
+  },
+  "resource_area_node_seconds": {
+    "dr_evt": 81305711.274,
+    "fiction": 81305711.274
+  },
+  "area_between_curves_node_seconds": 2947190.111999999,
+  "normalized_area_between_curves": 0.02661167842431828,
+  "absolute_wait_difference_seconds": {
+    "min": 0.0,
+    "mean": 1546.3189345,
+    "median": 1128.0310000000018,
+    "p95": 4945.130999999994,
+    "max": 13698.82699999999
+  },
+  "waiting_time_difference_definition": "fiction waiting time minus dr_evt waiting time",
+  "signed_wait_difference_seconds": {
+    "min": -7033.928,
+    "mean": 1372.6620584999998,
+    "median": 1089.8735000000015,
+    "p95": 4913.852550000002,
+    "max": 13698.82699999999
+  },
+  "waiting_time_difference_job_counts": {
+    "negative_fiction_waits_less": 296,
+    "zero_equal_waiting": 154,
+    "positive_fiction_waits_more": 1550
+  },
+  "native_duplicate_owners": 0,
+  "reference_replay_differing_jobs": []
+}

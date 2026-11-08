@@ -16,6 +16,7 @@
 #include "sim/scheduler_fcfs_easy_multimap.hpp"
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
 #include "sim/scheduler_fcfs_hybrid_deque.hpp"
+#include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
 #include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
 #include "sim/scheduler_periodic_fcfs_hybrid_circular.hpp"
 #include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
@@ -206,7 +207,28 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  CircularOverflowPolicy wait_queue_overflow,
                  size_t reservation_depth, size_t backfill_queue_depth,
                  tdiff_t backfill_interval, tdiff_t dispatch_interval,
-                 size_t dispatch_queue_depth, bool dispatch_on_events) {
+                 size_t dispatch_queue_depth, bool dispatch_on_events,
+                 bool per_pass_accounting) {
+  if (per_pass_accounting) {
+    if (dispatch_interval != 0.0 || backfill_interval != 0.0 ||
+        dispatch_queue_depth != 0 || dispatch_on_events) {
+      throw std::invalid_argument(
+          "per_pass_accounting requires event-driven scheduling");
+    }
+    if ((priority_policy != PriorityPolicy::FCFS &&
+         priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) ||
+        queue_impl != QueueImplementation::CIRCULAR) {
+      throw std::invalid_argument(
+          "per_pass_accounting requires FCFS ordering and queue_impl=circular");
+    }
+    if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
+      throw std::invalid_argument(
+          "hybrid backfilling requires reservation_depth > 0");
+    }
+    return std::make_unique<FCFSPassHybridCircularScheduler>(
+        total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
+        wait_queue_overflow, reservation_depth, backfill_queue_depth);
+  }
   if (dispatch_on_events && dispatch_interval <= 0.0) {
     throw std::invalid_argument("dispatch_on_events requires dispatch_interval > 0");
   }

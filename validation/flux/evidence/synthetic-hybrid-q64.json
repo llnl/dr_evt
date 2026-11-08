@@ -1,0 +1,172 @@
+{
+  "provenance": {
+    "reference_sources": {
+      "revisions": {
+        "flux-core": "d0309fcf0e672d90e65b0797168e56a430b9fb57",
+        "flux-sched": "9eba598b4e0940d597695e65f20f5357fc513427",
+        "flux-fiction": "346cbd65bf7da3798e2a351b44e0f57a5b20da96"
+      },
+      "core_version": "0.91.0-35-gd0309fcf0",
+      "extension_sha256": "6b50c751bab0b31e455c9efe7f18f26c1bae98735d1b284d07db2f61b17388fe",
+      "overlay_sha256": "f928db15af2a45bbe87bb843c0a54996ed244c41668076122ff95d32bd008834"
+    },
+    "simulator_sources": {
+      "revision": "57c3267aaf722e86474766c3b29e4d6d119f8896",
+      "tree": "cceb5a0bab7b9c02c51fc67d131b308ceb1a5045",
+      "configure_flags": [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DDR_EVT_WITH_SER20=OFF",
+        "-DDR_EVT_WITH_UNIT_TESTING=OFF",
+        "-DDR_EVT_BUILD_PYTHON=OFF",
+        "-DDR_EVT_ENABLE_PROTOBUF=OFF",
+        "-DDR_EVT_ENABLE_GRPC=OFF",
+        "-DDR_EVT_LEGACY_RESERVATION_BARRIER=OFF"
+      ],
+      "binary": "/workspace/dr_evt-builds/57c3267aaf722e86474766c3b29e4d6d119f8896/simulator",
+      "binary_sha256": "286a94c101a3f2118af3e88b34c84f0f7e78fad23b90122ecb920faaad22ea9c"
+    },
+    "harness_sha256": {
+      "test_paired.py": "c530cd11e3b076ebba6c8d80b4ccd5be692e7f3dac6047b61c621729c21ec2fa",
+      "fiction_runner.py": "044e3c7ff5b9cbe9f1c6654d1595ca0fd22fd7bfabe623149e1442de9d1130de",
+      "build_dr_evt.py": "953145465c0a9afbd9ea0fc38dd685b9d8b2cf10f7844a3bcffa85148789907d"
+    }
+  },
+  "cases": [
+    {
+      "case": "burst_24_jobs_2000",
+      "jobs": 2000,
+      "capacity": 4,
+      "per_pass_accounting": true,
+      "queue_depth": 64,
+      "window_seconds": [
+        0,
+        332240.0
+      ],
+      "waiting_seconds": {
+        "dr_evt": {
+          "min": 0.0,
+          "mean": 287.96,
+          "median": 250.0,
+          "p95": 680.0,
+          "max": 1010.0
+        },
+        "fiction": {
+          "min": 0.0,
+          "mean": 288.955,
+          "median": 250.0,
+          "p95": 680.0,
+          "max": 1010.0
+        }
+      },
+      "utilization_percent": {
+        "dr_evt": 16.53398145918613,
+        "fiction": 16.53398145918613
+      },
+      "utilization_window": "first arrival to each scheduler own last completion",
+      "shared_window_utilization_percent": {
+        "dr_evt": 16.53398145918613,
+        "fiction": 16.53398145918613
+      },
+      "makespan_seconds": {
+        "dr_evt": 332240.0,
+        "fiction": 332240.0
+      },
+      "resource_area_node_seconds": {
+        "dr_evt": 219730.0,
+        "fiction": 219730.0
+      },
+      "area_between_curves_node_seconds": 1420.0,
+      "normalized_area_between_curves": 0.001068504695400915,
+      "absolute_wait_difference_seconds": {
+        "min": 0.0,
+        "mean": 1.505,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 500.0
+      },
+      "waiting_time_difference_definition": "fiction waiting time minus dr_evt waiting time",
+      "signed_wait_difference_seconds": {
+        "min": -210.0,
+        "mean": 0.995,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 500.0
+      },
+      "waiting_time_difference_job_counts": {
+        "negative_fiction_waits_less": 8,
+        "zero_equal_waiting": 1952,
+        "positive_fiction_waits_more": 40
+      },
+      "native_duplicate_owners": 0,
+      "reference_replay_differing_jobs": []
+    },
+    {
+      "case": "burst_48_jobs_2000",
+      "jobs": 2000,
+      "capacity": 4,
+      "per_pass_accounting": true,
+      "queue_depth": 64,
+      "window_seconds": [
+        0,
+        164940.0
+      ],
+      "waiting_seconds": {
+        "dr_evt": {
+          "min": 0.0,
+          "mean": 608.29,
+          "median": 550.0,
+          "p95": 1370.0,
+          "max": 1730.0
+        },
+        "fiction": {
+          "min": 0.0,
+          "mean": 608.08,
+          "median": 550.0,
+          "p95": 1360.4999999999995,
+          "max": 1730.0
+        }
+      },
+      "utilization_percent": {
+        "dr_evt": 34.615617800412274,
+        "fiction": 34.615617800412274
+      },
+      "utilization_window": "first arrival to each scheduler own last completion",
+      "shared_window_utilization_percent": {
+        "dr_evt": 34.615617800412274,
+        "fiction": 34.615617800412274
+      },
+      "makespan_seconds": {
+        "dr_evt": 164940.0,
+        "fiction": 164940.0
+      },
+      "resource_area_node_seconds": {
+        "dr_evt": 228380.0,
+        "fiction": 228380.0
+      },
+      "area_between_curves_node_seconds": 1940.0,
+      "normalized_area_between_curves": 0.0029404631987389354,
+      "absolute_wait_difference_seconds": {
+        "min": 0.0,
+        "mean": 5.34,
+        "median": 0.0,
+        "p95": 20.0,
+        "max": 510.0
+      },
+      "waiting_time_difference_definition": "fiction waiting time minus dr_evt waiting time",
+      "signed_wait_difference_seconds": {
+        "min": -460.0,
+        "mean": -0.21,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 510.0
+      },
+      "waiting_time_difference_job_counts": {
+        "negative_fiction_waits_less": 41,
+        "zero_equal_waiting": 1881,
+        "positive_fiction_waits_more": 78
+      },
+      "native_duplicate_owners": 0,
+      "reference_replay_differing_jobs": []
+    }
+  ]
+}

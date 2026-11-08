@@ -107,6 +107,7 @@ private:
     visit("dispatch_interval", self.m_dispatch_interval);
     visit("dispatch_queue_depth", self.m_dispatch_queue_depth);
     visit("dispatch_on_events", self.m_dispatch_on_events);
+    visit("per_pass_accounting", self.m_per_pass_accounting);
     visit("planning_time_resolution", self.m_planning_time_resolution);
     visit("planning_horizon", self.m_planning_horizon);
     visit("priority_policy", self.m_priority_policy);
@@ -229,6 +230,8 @@ public:
   size_t m_dispatch_queue_depth;
   /// Also run the FCFS/backfill pass on job arrival batches.
   bool m_dispatch_on_events;
+  /// Event-driven placement passes with Q/R reset per pass and guarded retries.
+  bool m_per_pass_accounting;
 
   tdiff_t scheduling_interval() const {
     return m_dispatch_interval > 0.0 ? m_dispatch_interval : m_backfill_interval;

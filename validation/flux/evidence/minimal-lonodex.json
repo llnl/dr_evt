@@ -1,0 +1,1799 @@
+{
+  "capacity": 4,
+  "cores_per_node": 1,
+  "cases": [
+    {
+      "name": "diverges",
+      "policy": "easy",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 80.0,
+          "finish": 130.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": true
+    },
+    {
+      "name": "diverges",
+      "policy": "hybrid",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "reservation_depth": 32,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 80.0,
+          "finish": 130.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": true
+    },
+    {
+      "name": "diverges",
+      "policy": "conservative",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 80.0,
+          "finish": 130.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": true
+    },
+    {
+      "name": "matches",
+      "policy": "easy",
+      "jobs": [
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "B",
+        "A",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "matches",
+      "policy": "hybrid",
+      "jobs": [
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "B",
+        "A",
+        "C",
+        "D"
+      ],
+      "reservation_depth": 32,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "matches",
+      "policy": "conservative",
+      "jobs": [
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "B",
+        "A",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 3,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_0",
+      "policy": "easy",
+      "jobs": [
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "B",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_0",
+      "policy": "hybrid",
+      "jobs": [
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "B",
+        "C",
+        "D"
+      ],
+      "reservation_depth": 32,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_0",
+      "policy": "conservative",
+      "jobs": [
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "B",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 1,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_1",
+      "policy": "easy",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 70.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 6,
+          "nodes": 3,
+          "start": 70.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_1",
+      "policy": "hybrid",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "C",
+        "D"
+      ],
+      "reservation_depth": 32,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 70.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 6,
+          "nodes": 3,
+          "start": 70.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_1",
+      "policy": "conservative",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "C",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          2
+        ],
+        [
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 70.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 6,
+          "nodes": 3,
+          "start": 70.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 6.0,
+          "finish": 56.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_2",
+      "policy": "easy",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_2",
+      "policy": "hybrid",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "D"
+      ],
+      "reservation_depth": 32,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_2",
+      "policy": "conservative",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          1,
+          50,
+          50
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "D"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 1,
+          "start": 70.0,
+          "finish": 120.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_3",
+      "policy": "easy",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_3",
+      "policy": "hybrid",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reservation_depth": 32,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        }
+      ],
+      "different": false
+    },
+    {
+      "name": "delete_3",
+      "policy": "conservative",
+      "jobs": [
+        [
+          0,
+          2,
+          70,
+          70
+        ],
+        [
+          0,
+          2,
+          80,
+          80
+        ],
+        [
+          6,
+          3,
+          10,
+          10
+        ]
+      ],
+      "labels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reservation_depth": null,
+      "fiction_allocated_nodes": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          1,
+          2
+        ]
+      ],
+      "reference": [
+        {
+          "job": 0,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0.0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6.0,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        }
+      ],
+      "dr_evt": [
+        {
+          "job": 0,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 70.0
+        },
+        {
+          "job": 1,
+          "submit": 0,
+          "nodes": 2,
+          "start": 0.0,
+          "finish": 80.0
+        },
+        {
+          "job": 2,
+          "submit": 6,
+          "nodes": 3,
+          "start": 80.0,
+          "finish": 90.0
+        }
+      ],
+      "different": false
+    }
+  ],
+  "queue_depth": 2048,
+  "per_pass_accounting": true,
+  "match_policy": "lonodex",
+  "simulator_sha256": "286a94c101a3f2118af3e88b34c84f0f7e78fad23b90122ecb920faaad22ea9c",
+  "script_sha256": "0b7e136561eca08273db83c3560be6f1ae313e26af1c1c20374ef0f0d80dfcc2"
+}

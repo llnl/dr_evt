@@ -188,7 +188,7 @@ deployment-specific setting. Keep the reservation depth no larger than queue
 depth: jobs outside the examined prefix cannot be protected. A depth of `1`
 protects the head; a depth covering the eligible queue gives conservative
 protection. Supported policy combinations are in
-[Scheduling Loops](SCHEDULER_LOOPS.md#supported-policy-combinations).
+[Scheduling Loops](../user-guide/SCHEDULER_LOOPS.md#supported-policy-combinations).
 
 The command byte-compares the C++ deque and circular schedules, then compares
 the Python hybrid schedule with deque using a `0.001` time tolerance. It does

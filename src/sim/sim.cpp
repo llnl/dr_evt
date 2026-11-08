@@ -63,8 +63,9 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    18; // 18: arrival dispatch wakes; 17: dispatch controls; 16: periodic dirty
-        // flag; 15: periodic deadline; 14: backfill_queue_depth; 13: scalar
+    19; // 19: placement-pass accounting; 18: arrival dispatch wakes;
+        // 17: dispatch controls; 16: periodic dirty flag; 15: periodic deadline;
+        // 14: backfill_queue_depth; 13: scalar
         // event/sample times; 12: release delay; 11: reservation_depth
 
 /// Trace policy identifier stored in a checkpoint so a file written by one
@@ -374,7 +375,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
           m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
-          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events)),
+          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
+          m_params.m_per_pass_accounting)),
       m_custom_scheduler(nullptr), m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -1602,6 +1604,9 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(recorded.m_backfill_queue_depth,
                              m_params.m_backfill_queue_depth,
                              "backfill_queue_depth");
+    require_checkpoint_match(recorded.m_per_pass_accounting,
+                             m_params.m_per_pass_accounting,
+                             "per_pass_accounting");
     require_checkpoint_match(recorded.m_dispatch_on_events,
                              m_params.m_dispatch_on_events, "dispatch_on_events");
     require_checkpoint_match(recorded.m_dispatch_interval,
@@ -1985,7 +1990,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
           m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
-          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events);
+          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
+          m_params.m_per_pass_accounting);
       m_scheduler->set_planning_time_resolution(
           m_params.m_planning_time_resolution);
       m_scheduler->set_planning_horizon(m_params.m_planning_horizon);

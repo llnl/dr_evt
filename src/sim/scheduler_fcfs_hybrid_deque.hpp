@@ -30,8 +30,8 @@ namespace dr_evt {
  *   any of them
  * - HYBRID: The first reservation_depth waiting jobs get reservations and
  *   backfill cannot delay them; deeper jobs hold no reservation. Depth 1
- *   reproduces EASY. This is Slurm's bf_job_part_count_reserve behaviour and
- *   Fluxion's hybrid queue policy.
+ *   reproduces EASY protection. Per-pass placement accounting uses a
+ *   separate circular-queue subclass.
  * - NONE: No backfilling (strict FCFS order)
  *
  * This is the deque-backed implementation. The default hybrid scheduler

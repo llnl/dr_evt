@@ -6,8 +6,8 @@ depths, planning horizon and resolution, and reservation admission. This page
 explains those choices and their supported combinations. Publicly documented
 production schedulers provide examples of related approaches, not identities
 for DR_EVT configurations or claims of equivalent implementations.
-[Realism and Known Gaps](REALISM_AND_GAPS.md) records the remaining differences,
-excluded scope, and validation limits. Detailed policy definitions are in
+[Realism and Known Gaps](REALISM_AND_GAPS.md) records the remaining differences
+and excluded scope. Detailed policy definitions are in
 [Scheduling Policies](../BACKFILLING_ALGORITHMS.md).
 
 ## FCFS dispatch and backfill
@@ -29,7 +29,7 @@ strict dispatch:
 
 backfill planning and selection:
     build the resource-time plan from running jobs and known capacity changes
-    examine waiting jobs in order within the backfill evaluation budget
+    examine waiting jobs in order within the backfill examination limit
     start a job now if it fits without delaying protected reservations
     otherwise, reserve a feasible future interval when policy permits
 ```
@@ -43,14 +43,22 @@ LSF applies its configured policies within scheduling sessions.
 ## Shared terms
 
 - **Scheduling interval:** when a scheduling cycle may run.
-- **Queue depth Q:** the maximum number of waiting jobs examined in a cycle.
-  In DR_EVT, `--backfill_queue_depth` limits backfill examinations, excluding
-  ordinary FCFS starts. In fixed periodic modes, `--dispatch_queue_depth` limits the
+- **Scheduling pass:** one traversal with a defined starting cursor. Yielding
+  and resuming a traversal does not start a new pass; counter resets depend
+  on the mode described below.
+- **Scheduling cycle:** the work associated with a scheduling wake. A cycle
+  may contain several passes; counter resets depend on the implementation.
+- **Queue depth Q:** the maximum number of counted waiting-job examinations
+  before a scan stops. Its reset boundary matters as much as its value.
+  By default, `--backfill_queue_depth` limits backfill examinations, excluding
+  ordinary FCFS starts. With `--per_pass_accounting`, it counts the entire
+  event-driven placement pass, including immediate starts. In fixed periodic
+  modes, `--dispatch_queue_depth` limits the
   whole placement prefix, including immediate starts.
   Production engines can count different stages of candidate evaluation.
 - **Reservation depth R:** the maximum number of waiting jobs given protected
-  future starts. It is not added to Q. Creating a reservation can consume one
-  scan slot and one reservation slot for the same job.
+  future starts in the current plan. It is not added to Q. Creating a reservation
+  can consume one scan slot and one reservation slot for the same job.
 - **Planning horizon H:** how far ahead the planner searches or records starts.
   It does not establish when scheduling runs.
 - **Planning resolution:** the granularity of the future resource-time plan,
@@ -115,7 +123,7 @@ event-driven (backfill_interval = 0 and dispatch_interval = 0):
 periodic backfill (backfill_interval > 0):
     on a state-event batch: apply it, then run FCFS dispatch
     on a backfill tick with the scheduling-state flag set:
-        clear the flag; run backfill with a fresh evaluation budget
+        clear the flag; run backfill with a fresh examination count
         repeat scheduler calls until none starts a job
     on other ticks: advance the tick deadline without a backfill scan
 
@@ -168,7 +176,7 @@ with R=1 in this mode.
 Trigger modes are selected once per `advance_to` call (and at warm-start
 entry). The event loop uses compile-time specializations, so event-driven
 and separate periodic-backfill loops contain no arrival-notification checks;
-fixed fixed periodic dispatch also excludes them when the option is disabled.
+fixed periodic dispatch also excludes them when the option is disabled.
 
 Periodic hybrid/conservative share Q across calls at one tick and count
 out-of-horizon jobs. Periodic EASY performs one backfill scan per tick and
@@ -185,7 +193,7 @@ sampled distribution and are capped by time limits. Cleanup nodes remain
 unavailable until their release event; planning does not reveal their future
 actual release. A job's nodes become reusable when its slowest node finishes
 cleanup. Runtime and cleanup options are defined in the
-[command-line reference](../user-guide/command-line.md).
+[command-line reference](command-line.md).
 
 ## Supported policy combinations
 
@@ -331,42 +339,105 @@ entries. Main dispatch uses neither the backfill evaluation limit nor its
 reservation-depth limit. Backfill's interval and state checks are not a guarantee
 of fixed, startup-phased evaluation ticks.
 
-## Fluxion: one event-driven allocation/reservation cycle
+## Per-pass placement accounting
 
-This loop describes Fluxion's policy in `flux-sched` at the pinned commit.
+`--per_pass_accounting` selects a dedicated event-driven FCFS subclass
+with a circular queue. It supports EASY (R=1), hybrid (configured R),
+conservative (unlimited R), and strict FCFS. `--backfill_queue_depth` supplies
+Q for the entire placement pass, including ordinary starts and the blocked
+head. Use zero dispatch/backfill intervals and an unlimited planning horizon.
+
+Each pass scans from the queue head with fresh Q/R and a rebuilt reservation
+plan. An immediate start consumes Q; a future reservation consumes Q and R.
+Before R is reached, each candidate can start now or receive a future
+reservation. After R, only immediate starts are tested, and failed tests
+consume Q. A job with no feasible allocation or reservation consumes neither
+count and is skipped until a state event permits reconsideration.
+
+When Q is reached, candidates remain, and the pass allocated or reserved a
+job, another pass runs at the same simulation time. Already selected starts
+remain committed. A **tentative guard** stops retries when a pass starts no
+jobs, blocks no new jobs, and recreates the previous reservation plan. A
+finite pass ceiling also protects termination. The next arrival, completion,
+or capacity change can request scheduling again. These are synchronous
+policy passes; external callback invocation is not modeled. The guard must
+be revisited once the native restart handling is fully understood.
+
+```sh
+--priority_policy fcfs --queue_impl circular --backfill_policy hybrid \
+--reservation_depth 32 --backfill_queue_depth 64 --per_pass_accounting
+```
+
+This subclass always uses resource-time reservation protection, independently
+of `DR_EVT_LEGACY_RESERVATION_BARRIER`. It retains DR_EVT's aggregate node-count
+resource model. Other scheduler implementations keep their existing
+accounting and admission rules.
+
+## Fluxion: event-driven allocation/reservation passes
+
+This loop describes the backfill policy in `flux-sched` at the cited
+revision `9eba598b4e0940d597695e65f20f5357fc513427`. A pass starts at the queue
+head with fresh examination and reservation counters.
 
 ```text
 on a scheduling-relevant event:
     update state and reconsider blocked jobs when the event permits
-    begin a new cycle:
-        release completed allocations and cancel previous future reservations
-        merge new pending jobs; cursor = queue head
-        tested = 0; reserved = 0
+    request a scheduling pass
+
+on each requested pass:
+    cancel previous future reservations; merge new pending jobs
+    cursor = queue head; tested = 0; reserved = 0; dirty = false
     while cursor remains and tested < Q:
         job = next pending job
         try_reserve = (reserved < R)
         attempt allocation now, or a future reservation if try_reserve
-        if allocated: move to running; tested += 1
-        else if reserved: retain the future commitment; reserved += 1; tested += 1
+        if allocated:
+            move to running; tested += 1; dirty = true
+        else if reserved:
+            keep pending; reserved += 1; tested += 1; dirty = true
         else if EBUSY and try_reserve:
             move to blocked list; consume no test slot
         else if EBUSY:
             leave pending; tested += 1
-        else: reject the request; tested += 1
-        after six entries, yield and resume with the same cursor and counters
-    end the cycle when the queue or Q is exhausted
+        else:
+            reject the request; tested += 1
+        asynchronous matching resumes with the same cursor and counters
+        response/annotation processing between callbacks can clear dirty
+    end the pass
+    if tested reached Q AND cursor remains AND dirty:
+        request another pass, starting again from the queue head
 ```
 
-Yielding resumes the same cycle; it does not reset Q or R. The policy supplies
-R: zero for allocation-only behavior, one for EASY, N for hybrid, and the
-policy's effective unlimited value for conservative. Reaching R disables
-additional reservations, but allocation-only tests continue within Q.
+A successful reservation consumes both a test slot and a reservation slot;
+it does not reset either counter. Yielding within a pass preserves them.
+A new pass resets both counters and replaces the previous reservation plan.
+Thus Q limits one pass, not cumulative work over repeated passes, and R
+limits one plan rather than reservations accumulated across passes.
+
+The policy supplies R: zero for allocation-only behavior, one for EASY,
+N for hybrid, and an effective unlimited value for conservative. Reaching R
+disables further reservations but allows immediate-allocation tests within Q.
+With R=32 and Q=32, reserving 32 candidates ends that pass; with Q=64,
+another 32 candidates can still be tested for backfill. Successful reservations
+also set the dirty bit, so another pass can be requested even if no job starts.
+The bit is the current `is_scheduled()` state, not a record of every success
+in the pass: response/annotation processing can clear it before a later
+matching reply. Thus a reservation earlier in a pass does not by itself
+guarantee another pass at Q. Immediate-allocation `EBUSY` failures count toward
+Q; allocation-or-reservation `EBUSY` failures do not.
 
 The referenced matcher has no Slurm-like configurable H: it searches its
 planner's future timeline. A blocked job is one that cannot currently be
 allocated or reserved, not simply one beyond a chosen lookahead window.
 Blocked jobs are reconsidered on applicable state changes, including
 completion and priority changes. Fluxion plans in whole seconds.
+
+DR_EVT's `--per_pass_accounting` selects
+[per-pass placement accounting](#per-pass-placement-accounting), which models
+these counting and restart rules with synchronous passes. Its tentative
+termination guard does not claim to reproduce the asynchronous flag-clearing
+mechanism. The default hybrid/conservative scheduler retains its separate
+backfill examination count shared across calls at one timestamp.
 
 ## Spur: timer and submission notification triggers
 
@@ -422,7 +493,7 @@ This policy set models ordinary submission notifications and timer polling;
 it does not implement the production controller's asynchronous execution.
 Additional notification sources and asynchronous wake differences are in
 [Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope);
-regression coverage is in [Validation scope](REALISM_AND_GAPS.md#validation-scope).
+regression coverage is described in [Testing Guide](../TESTING_GUIDE.md).
 
 ## OpenPBS: event-driven dispatch and backfill
 
@@ -533,9 +604,11 @@ Accounting and policy evidence limits are in
   [`backfill_agent`](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L1238).
   Main dispatch is described in the [Scheduling Configuration Guide](https://slurm.schedmd.com/sched_config.html)
   and the supplied SchedMD scheduling tutorial, pages 8–10 and 21–22.
-- **Fluxion:** commit `3b49d1998ed53836618e54188f45b52bc1aac811`,
-  [`queue_policy_bf_base_impl.hpp`](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/queue_policy_bf_base_impl.hpp).
-  Additional pinned references: the
+- **Fluxion pass/restart rules:** source commit
+  `9eba598b4e0940d597695e65f20f5357fc513427`,
+  [`queue_policy_bf_base_impl.hpp`](https://github.com/flux-framework/flux-sched/blob/9eba598b4e0940d597695e65f20f5357fc513427/qmanager/policies/queue_policy_bf_base_impl.hpp).
+  Earlier policy inspection at `3b49d1998ed53836618e54188f45b52bc1aac811`
+  also covered the
   [matcher](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/resource/traversers/dfu.cpp#L106-L139),
   [blocked-job reconsideration](https://github.com/flux-framework/flux-sched/blob/3b49d1998ed53836618e54188f45b52bc1aac811/qmanager/policies/base/queue_policy_base.hpp#L188-L194),
   `qmanager/config/queue_system_defaults.hpp`, and the EASY, hybrid, and

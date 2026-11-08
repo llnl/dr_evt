@@ -10,10 +10,22 @@ Different defaults are configuration choices, not gaps.
 Vendor options cited here establish the presence of a related control;
 their detailed behavior must be distinguished from DR_EVT's policy semantics.
 
-Here, **backfill evaluation budget** means the number of waiting jobs a cycle
-may examine: `--backfill_queue_depth` for separate backfill, or
-`--dispatch_queue_depth` for the whole dispatch placement prefix. Reservation depth is a
-separate limit on the number of protected waiting jobs.
+**Examination depth** limits counted waiting-job evaluations:
+`--backfill_queue_depth` for backfill, or `--dispatch_queue_depth` for the
+whole fixed-periodic placement prefix. **Reservation depth** separately
+limits protected waiting jobs. A reservation can consume both counts;
+per-pass versus per-timestamp counter resets are described below.
+
+## Supported accounting policies
+
+Default event-driven hybrid/conservative scheduling counts backfill
+examinations and shares Q across calls at one simulation timestamp.
+`--per_pass_accounting` selects whole-placement accounting: immediate starts
+and successful reservations count toward Q, and each pass resets Q/R.
+Reservation-only passes can repeat, with a tentative guard against unchanged
+retries. These are supported policy choices; the
+[per-pass loop](SCHEDULER_LOOPS.md#per-pass-placement-accounting) specifies
+the failure-counting rules and the guard's assumptions.
 
 ## Remaining differences
 
@@ -52,28 +64,14 @@ control, or whether reservations persist between sessions.
 
 ### Backfill evaluation accounting
 
-In event-driven mode, hybrid and conservative share Q across all scheduling
-passes at one timestamp. The separate EASY, SJF, LJF, and custom-selector
+With default event-driven accounting, hybrid and conservative share Q across
+all scheduling passes at one timestamp. The separate EASY, SJF, LJF, and custom-selector
 paths reset Q each pass. If one pass starts a job, another pass at the same
-time can therefore receive another full backfill evaluation budget. Use hybrid with reservation
+time can therefore receive a fresh backfill examination count. Use hybrid with reservation
 depth 1 when head protection and cycle-wide accounting are both required.
 Periodic EASY runs one scan per tick; periodic hybrid shares its count across
 calls. They also differ with a finite horizon: EASY exempts an out-of-horizon
 head, while periodic hybrid counts it.
-
-Equal numeric depths also need not mean equal candidates across engines:
-Slurm charges Q after preliminary checks; Spur caps an admitted candidate
-prefix; Fluxion refunds allocation-or-reservation `EBUSY` failures. DR_EVT
-counts its backfill examinations. In particular, periodic hybrid/conservative
-charges out-of-horizon jobs, while Slurm charges them only if they reached
-placement testing. Event-driven hybrid/conservative exempts them but leaves them in the queue, rather
-than reproducing Fluxion's blocked-list lifecycle. These distinctions matter
-for finite Q when skipped jobs occur ahead of runnable candidates.
-
-These Fluxion comparisons apply to `flux-sched`. The inspected `flux-core`
-modules (`sched-simple`, `sched-fifo`, and `sched-backfill`) instead use
-`queue-depth` for outstanding allocation requests, so their depth cannot be
-substituted for Fluxion's examination cap.
 
 In the separate `--backfill_interval` mode, the scheduling-state flag is cleared by an evaluation and
 is not set just because backfill started a job. Consequently, a later tick
@@ -121,10 +119,9 @@ resource-time rule can instead allow an overlapping execution if it preserves
 the protected resource window. The build option
 `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` selects strict completion-before-start
 admission and can be combined with EASY head protection in a homogeneous pool.
-This policy set agrees with the decisions in IBM's worked example;
-it does not reproduce LSF's queue-specific backfill eligibility and reserved
-slot ownership. Agreement with that example does not
-establish that LSF uses only EASY or always protects exactly one waiting job.
+This does not model LSF's queue-specific backfill eligibility or reserved
+slot ownership. IBM's single-head illustration does not establish that LSF
+uses only EASY or always protects exactly one waiting job.
 See the [LSF loop](SCHEDULER_LOOPS.md#lsf-scheduling-sessions-with-a-minimum-interval)
 for the selected configuration. The legacy barrier applies throughout the
 homogeneous pool and build; IBM's rule concerns borrowed reserved slots.
@@ -144,53 +141,11 @@ overrides, and prime/dedicated-time eligibility windows are also outside the
 chosen global-pool mapping. Its waiting-job reservations use the existing
 hybrid protection model.
 
-The experimental [multi-system scheduler](../user-guide/multi-cluster-backfill.md)
+The experimental [multi-system scheduler](multi-cluster-backfill.md)
 shares a queue across several homogeneous systems. The external EASY selector
 ranks feasible backfill candidates; it does not control preceding FCFS
 dispatch or the whole queue. Studies requiring those excluded mechanisms
 need an extension or another tool.
-
-## Validation scope
-
-The existing tests establish agreement with independent references and
-fixtures for DR_EVT's policy sets. They do not establish production scheduler
-equivalence. Previously
-recorded validation includes:
-
-| Model behavior | Recorded evidence |
-|---|---|
-| Event-driven policies | 34 scheduler-correctness workloads match the independent Python reference |
-| Fixed periodic dispatch | Fixed ticks and timer/arrival wakes checked against hand-computed cases and independent randomized FCFS references; streaming, warm-start, and checkpoint continuation checks |
-| Fixed periodic FCFS/EASY with strict reservation admission | Head-protection, boundary and runtime cases, and 96 randomized comparisons agree with an independent fixed-session reference; the default-rule overlap control differs as expected |
-| Periodic backfill | 136 runs across those workloads, two reservation policies, and 7 s / 30 s intervals match the reference |
-| Planning horizon | Horizon workloads and explicit-unlimited runs agree with the references; accounting is also covered by C++ and Python tests |
-| Queue depth | EASY implementations agree with their reference; periodic EASY equals hybrid with depth 1 in the tested cases without a finite horizon |
-| Node release delay | 34 workloads with constant cleanup delay match the reference |
-
-The scripts are `tests/run_scheduler_correctness_tests.sh`,
-`tests/run_periodic_backfill_tests.sh`, `tests/run_planning_horizon_tests.sh`,
-`tests/run_backfill_queue_depth_tests.sh`, and
-`tests/run_node_release_delay_tests.sh`. Warm-start and option-accounting
-checks are in `tests/test_warm_start.cpp`, `tests/test_append_job_api.cpp`,
-and `tests/test_python_hybrid_options.py`. The append-job, queue-depth, and
-periodic-backfill suites were rerun after rebuilding the native targets
-during this documentation check. The planning-horizon suite also passed using
-a temporary Bash 3.2 compatibility copy with `set -u` disabled; the original
-script fails on an empty-array expansion under that shell. These checks validate DR_EVT's model;
-they are not direct comparisons with production scheduler executions.
-
-The [RAPS comparison helper](../../scripts/compare_with_raps.py) is a separate,
-manual check of legacy reservation-barrier behavior. It is not validation of
-DR_EVT's default resource-time feasibility rule.
-
-OpenPBS behavior was checked against pinned source and manuals, without a
-paired OpenPBS/DR_EVT runtime comparison. Fixed periodic FCFS/EASY with
-strict reservation admission was
-validated in Docker with
-[`run_legacy_reservation_validation.py`](../../tests/run_legacy_reservation_validation.py):
-106 legacy-rule checks and one default-rule control passed. These establish
-the selected homogeneous-pool model, not LSF's internal accounting or session
-timing. No LSF daemon was run.
 
 ## Sources
 

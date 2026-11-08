@@ -753,6 +753,15 @@ set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
 
 # Time-varying capacity schedule parser validation.
+add_executable(test_placement_pass_accounting-bin
+  tests/test_placement_pass_accounting.cpp)
+target_include_directories(test_placement_pass_accounting-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_placement_pass_accounting-bin PRIVATE dr_evt)
+set_target_properties(test_placement_pass_accounting-bin PROPERTIES
+  OUTPUT_NAME test_placement_pass_accounting)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_placement_pass_accounting-bin)
+
 add_executable(test_capacity_schedule-bin tests/test_capacity_schedule.cpp)
 target_include_directories(test_capacity_schedule-bin PUBLIC
   $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
@@ -880,6 +889,8 @@ if(DR_EVT_WITH_UNIT_TESTING)
   add_test(
     NAME test_block_queue
     COMMAND $<TARGET_FILE:test_block_queue-bin>)
+  add_test(NAME test_placement_pass_accounting
+    COMMAND $<TARGET_FILE:test_placement_pass_accounting-bin>)
   add_test(
     NAME test_capacity_schedule
     COMMAND $<TARGET_FILE:test_capacity_schedule-bin>)
@@ -920,6 +931,10 @@ if(DR_EVT_WITH_UNIT_TESTING)
       NAME test_fixed_periodic_dispatch
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_fixed_periodic_dispatch_tests.py
+        $<TARGET_FILE:sim-bin>)
+    add_test(NAME test_placement_pass_integration
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_placement_pass_tests.py
         $<TARGET_FILE:sim-bin>)
   endif()
   add_test(

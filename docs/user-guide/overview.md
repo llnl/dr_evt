@@ -65,4 +65,5 @@ C++/MPI implementation that does not use gRPC—see the
 - [Multi-Cluster Dispatch Experiment](multi-cluster-experiment.md)
 - [Maintenance, Capacity Changes, and Warm Starts](maintenance-and-warm-start.md)
 - [Testing Guide](../TESTING_GUIDE.md)
+- [Scheduling Validation](SCHEDULER_VALIDATION.md)
 - [Developer Notes](../dev/README.md)

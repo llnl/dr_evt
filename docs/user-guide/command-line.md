@@ -20,7 +20,8 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | System | `--warm_start_wait_queue MODE` | Select `inherit` (default) or legacy `drop` handling for jobs waiting at a replay warm-start boundary. |
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
-| Scheduling | `--backfill_queue_depth N` | Set the backfill evaluation budget; accounting depends on trigger mode and policy. |
+| Scheduling | `--backfill_queue_depth N` | Limit counted waiting-job examinations during backfill; accounting depends on trigger mode and policy. |
+| Scheduling | `--per_pass_accounting` | Use event-driven FCFS placement passes with per-pass Q/R counters and guarded reservation-only restarts. |
 | Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
 | Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
 | Scheduling | `--dispatch_on_events` | Also run fixed periodic dispatch on job arrival batches, preserving timer phase. |
@@ -63,8 +64,8 @@ The sections below define accepted values, defaults, and interactions.
 For how the scheduling controls (`--backfill_policy`, queue and reservation
 depths, interval, planning resolution, priority, and node-release delay) map
 to production-scheduler behavior, see [Scheduling Loops and DR_EVT
-Configurations](../dev/SCHEDULER_LOOPS.md). Remaining differences are listed
-in [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md).
+Configurations](SCHEDULER_LOOPS.md). Remaining differences are listed
+in [Realism and Known Gaps](REALISM_AND_GAPS.md).
 
 ## Basic Usage
 
@@ -255,6 +256,14 @@ This setting has no effect on the built-in `easy`, `hybrid`, or
 
 ### `--backfill_queue_depth N`
 
+With `--per_pass_accounting`, Q instead counts the entire placement
+pass: immediate starts, future reservations, and failed allocation-only
+tests. Q/R reset per pass, and reservation-only passes can repeat with a
+tentative termination guard. See
+[per-pass placement accounting](SCHEDULER_LOOPS.md#per-pass-placement-accounting)
+for the rules and supported option combinations. The following describes
+the default accounting when that option is absent.
+
 Maximum number of eligible waiting jobs, including the blocked FCFS head, that
 a scheduler examines in one scheduling pass. It applies to `easy`,
 `conservative`, and `hybrid` backfilling, to FCFS, SJF, and LJF ordering, to
@@ -270,7 +279,7 @@ With `--backfill_interval`, a tick's evaluation is one cycle. Periodic hybrid
 and conservative share their count across calls at the tick and count
 out-of-horizon jobs. Periodic EASY performs one scan at the tick and exempts
 an out-of-horizon head; other examined candidates count. FCFS head dispatch
-between ticks stays event-driven and uses none of this evaluation budget.
+between ticks stays event-driven and does not consume this examination count.
 
 Without `--backfill_interval`, the simulator repeats scheduler passes at one
 simulation timestamp until nothing more starts. Conservative and hybrid
@@ -288,7 +297,7 @@ independent of `--reservation_depth`, which limits only the earlier jobs whose
 reservations must be protected.
 
 Production counter differences are in
-[Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
+[Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
 **Default:** `0` (unlimited)
 
@@ -341,8 +350,8 @@ candidate limit; exact lookahead follows the live loop. See
 [Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md).
 
 Policy combinations and timing assumptions are in
-[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#supported-policy-combinations)
-and [Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
+[Scheduling Loops](SCHEDULER_LOOPS.md#supported-policy-combinations)
+and [Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--dispatch_on_events`
 
@@ -360,9 +369,9 @@ streaming arrival batch at the current time can request a fresh pass; appending
 future jobs does not notify until their arrival time.
 
 For combinations with conservative backfill and a candidate limit, see
-[Scheduling Loops](../dev/SCHEDULER_LOOPS.md#supported-policy-combinations).
+[Scheduling Loops](SCHEDULER_LOOPS.md#supported-policy-combinations).
 Notification and simultaneous-wake differences are in
-[Trigger and evaluation scope](../dev/REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
+[Trigger and evaluation scope](REALISM_AND_GAPS.md#trigger-and-evaluation-scope).
 
 ### `--backfill_interval SECONDS`
 
@@ -403,7 +412,7 @@ applies to both event-driven and periodic scheduling. Whether such a job uses
 a `--backfill_queue_depth` slot depends on mode and policy. Hybrid/conservative
 count it in periodic mode and exempt it in event-driven mode. EASY exempts
 an out-of-horizon head in both modes; its other examined candidates count.
-See [Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting)
+See [Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting)
 for the remaining differences from production counters.
 
 **Default:** unlimited (the largest `tdiff_t` value)
@@ -416,7 +425,7 @@ fits now and delays none of those `N`; it holds no reservation of its own.
 `N` must be positive with `hybrid` and is ignored by the other policies.
 `1` gives head protection; a depth covering all eligible waiting jobs gives
 conservative protection. EASY and hybrid can still differ in finite-Q accounting;
-see [Backfill evaluation accounting](../dev/REALISM_AND_GAPS.md#backfill-evaluation-accounting).
+see [Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 Hybrid and conservative use the hybrid FCFS schedulers with either `fcfs` or
 `fcfs_conservative` ordering; hybrid is rejected with `sjf` or `ljf`.
 
@@ -936,8 +945,8 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 - [Protobuf Configuration](protobuf-config.md) - Full `.textproto` schema and worked examples
 - [Streaming API](../api/STREAMING_API.md) - Programmatic C++ API for online simulation
 - [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md) - EASY and CONSERVATIVE algorithm details
-- [Scheduling Loops and DR_EVT Configurations](../dev/SCHEDULER_LOOPS.md) - production-scheduler behavior and current option mappings
-- [Realism and Known Gaps](../dev/REALISM_AND_GAPS.md) - confirmed differences and excluded scope
+- [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md) - production-scheduler behavior and current option mappings
+- [Realism and Known Gaps](REALISM_AND_GAPS.md) - confirmed differences and excluded scope
 - [Quick Start](../getting-started/quickstart.md) - Quick reference
 - [Testing Guide](../TESTING_GUIDE.md) - Running tests and validation
 - [Test Suite](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#build-and-run) - example usage in test scripts

@@ -40,17 +40,18 @@ static constexpr int OPT_CHECKPOINT_FILE = 1007;
 static constexpr int OPT_CHECKPOINT_INTERVAL_JOBS = 1008;
 static constexpr int OPT_CORES_PER_NODE = 1009;
 static constexpr int OPT_RESERVATION_DEPTH = 1010;
-static constexpr int OPT_BACKFILL_QUEUE_DEPTH = 1014;
-static constexpr int OPT_BACKFILL_INTERVAL = 1015;
-static constexpr int OPT_PLANNING_TIME_RESOLUTION = 1016;
-static constexpr int OPT_PLANNING_HORIZON = 1017;
-static constexpr int OPT_WARM_START_WAIT_QUEUE = 1018;
-static constexpr int OPT_DISPATCH_INTERVAL = 1019;
-static constexpr int OPT_DISPATCH_QUEUE_DEPTH = 1020;
-static constexpr int OPT_DISPATCH_ON_EVENTS = 1021;
-static constexpr int OPT_NODE_RELEASE_DELAY = 1011;
-static constexpr int OPT_NODE_RELEASE_DELAY_MODEL = 1012;
-static constexpr int OPT_NODE_RELEASE_DELAY_SPREAD = 1013;
+static constexpr int OPT_BACKFILL_QUEUE_DEPTH = 1011;
+static constexpr int OPT_BACKFILL_INTERVAL = 1012;
+static constexpr int OPT_PLANNING_TIME_RESOLUTION = 1013;
+static constexpr int OPT_PLANNING_HORIZON = 1014;
+static constexpr int OPT_WARM_START_WAIT_QUEUE = 1015;
+static constexpr int OPT_DISPATCH_INTERVAL = 1016;
+static constexpr int OPT_DISPATCH_QUEUE_DEPTH = 1017;
+static constexpr int OPT_DISPATCH_ON_EVENTS = 1018;
+static constexpr int OPT_NODE_RELEASE_DELAY = 1019;
+static constexpr int OPT_NODE_RELEASE_DELAY_MODEL = 1020;
+static constexpr int OPT_NODE_RELEASE_DELAY_SPREAD = 1021;
+static constexpr int OPT_PER_PASS_ACCOUNTING = 1022;
 
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
@@ -76,6 +77,7 @@ static const struct option sim_longopts[] = {
     {"dispatch_interval", required_argument, 0, OPT_DISPATCH_INTERVAL},
     {"dispatch_queue_depth", required_argument, 0, OPT_DISPATCH_QUEUE_DEPTH},
     {"dispatch_on_events", no_argument, 0, OPT_DISPATCH_ON_EVENTS},
+    {"per_pass_accounting", no_argument, 0, OPT_PER_PASS_ACCOUNTING},
     {"planning_time_resolution", required_argument, 0,
      OPT_PLANNING_TIME_RESOLUTION},
     {"planning_horizon", required_argument, 0, OPT_PLANNING_HORIZON},
@@ -122,7 +124,7 @@ Sim_Params::Sim_Params()
       m_num_max_candidates(1), m_reservation_depth(0),
       m_backfill_queue_depth(0), m_backfill_interval(0.0),
       m_dispatch_interval(0.0), m_dispatch_queue_depth(0),
-      m_dispatch_on_events(false),
+      m_dispatch_on_events(false), m_per_pass_accounting(false),
       m_planning_time_resolution(0.0),
       m_planning_horizon(std::numeric_limits<tdiff_t>::max()),
       m_warm_start_wait_queue(WarmStartWaitQueuePolicy::INHERIT),
@@ -344,6 +346,9 @@ void Sim_Params::getopt(int &argc, char **&argv) {
                   << std::endl;
         print_usage(argv[0], 1);
       }
+      break;
+    case OPT_PER_PASS_ACCOUNTING:
+      m_per_pass_accounting = true;
       break;
     case OPT_DISPATCH_ON_EVENTS:
       m_dispatch_on_events = true;
@@ -911,6 +916,12 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        backfill pass by every scheduler (easy, conservative,\n"
          "        hybrid; FCFS, SJF, LJF; custom EASY); 0 means unlimited.\n"
          "\n"
+         "    --per_pass_accounting\n"
+         "        Event-driven placement passes: immediate starts and future\n"
+         "        reservations share --backfill_queue_depth; Q/R reset per pass.\n"
+         "        Reservation-only retries stop when their plan is unchanged.\n"
+         "        Requires FCFS, circular queue, and unlimited planning horizon.\n"
+         "\n"
          "    --backfill_interval SECONDS\n"
          "        Run periodic backfill evaluations while retaining "
          "event-driven\n"
@@ -1188,6 +1199,8 @@ void Sim_Params::print() const {
   msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) +
          "\n";
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
+  msg += " - per_pass_accounting: " +
+         std::string(m_per_pass_accounting ? "true" : "false") + "\n";
   msg += " - dispatch_interval: " + to_string(m_dispatch_interval) + "\n";
   msg += " - dispatch_queue_depth: " + to_string(m_dispatch_queue_depth) + "\n";
   msg += " - dispatch_on_events: " + std::string(m_dispatch_on_events ? "true" : "false") + "\n";
