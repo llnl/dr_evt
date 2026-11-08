@@ -1,79 +1,80 @@
-# Node-reservation placement discrepancy
+# Four-job start-time divergence
 
-## Four-job reproducer
+On a system with **4 nodes total**, Fluxion's specific-node reservation delays
+backfill job D until 80 seconds. DR_EVT's node-count plan starts D at 70 while
+preserving head job C's start at 80. The
+[published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md#minimal-start-time-divergence)
+includes the updated slide.
 
-The system has **4 nodes total**, with one core per node. Both cases use FCFS,
-event-driven dispatch with DR_EVT `--per_pass_accounting`, Q=2048, no horizon,
-and no simulated release delay.
-Time limits equal actual durations. The matcher is **`hinodex` (high-ID-first)**
-in both cases; only the input order of the two jobs arriving at time 0 changes.
+Both runs use FCFS, event-driven dispatch, DR_EVT `--per_pass_accounting`,
+Q=2048, unlimited horizon, and zero simulated release delay. Every node has
+one core, and durations equal submitted time limits. The workload never
+reaches Q; depth-triggered pass resets are a separate issue.
 
 | Job | Arrival | Nodes | Duration |
-|---|---|---|---|
+|---|---:|---:|---:|
 | A | 0 | 2 | 70 |
 | B | 0 | 2 | 80 |
 | C, waiting head | 6 | 3 | 10 |
 | D, backfill candidate | 6 | 1 | 50 |
 
-### Case 1: original order diverges
+## Low-ID-first case shown in the slide
 
-Submit A before B at time 0, then C before D at time 6.
-
-| Job | Fiction nodes | Fiction execution | DR_EVT execution |
-|---|---|---|---|
-| A | 2,3 | 0–70 | 0–70 |
-| B | 0,1 | 0–80 | 0–80 |
-| C | 1,2,3 | 80–90 | 80–90 |
-| D | 0 | 80–130 | 70–120 |
-
-At 70, A releases nodes **2,3**. Both belong to C's reservation for 80–90,
-so D cannot use either for its 50-second run. Node 0, outside that reservation,
-is still occupied by B until 80. Fiction starts D then. DR_EVT protects three
-nodes by count and admits D at 70; it does not emit particular node IDs.
-
-### Case 2: swapped order matches
-
-Submit B before A at time 0, keeping C before D at time 6. High-ID-first now
-puts B on nodes 2,3 and A on nodes 0,1.
+Submit A before B at time 0, and C before D at time 6. `lonodex` selects low
+node IDs first:
 
 | Job | Fiction nodes | Fiction execution | DR_EVT execution |
 |---|---|---|---|
 | A | 0,1 | 0–70 | 0–70 |
 | B | 2,3 | 0–80 | 0–80 |
-| C | 1,2,3 | 80–90 | 80–90 |
-| D | 0 | 70–120 | 70–120 |
+| C | 0,1,2 | 80–90 | 80–90 |
+| D | 3 | 80–130 | 70–120 |
 
-At 70, A releases nodes **0,1**. Node **0 is outside C's reservation**, so D
-can start there immediately without delaying C. All start and finish times
-match. D starts exactly at A's completion time: no simulated node-release or
-RPC delay is added in this case. RPC execution still takes wall-clock time.
+At 70, A releases nodes 0,1. Both are reserved for C's 80–90 window, so D's
+50-second run cannot use either. The only node outside C's reservation is
+node 3, still occupied until 80. Fluxion starts D then.
 
-Separate hybrid R=32 captures confirm C's reservation on **1,2,3** in both
-cases at time 6. In the diverging capture, A's allocation is absent at time 70,
-while C still reserves 1,2,3. In the matching capture, D is allocated node 0 at
-70. Runs with and without these diagnostic queries give identical schedules.
-These captures are in `results/high-id-four-job-assignments/` and
-`results/high-id-swapped-four-jobs/`.
+DR_EVT protects three-node capacity rather than node IDs. One feasible
+assignment gives D node 0 at 70–120 and C nodes 1,2,3 at 80–90. This keeps
+running jobs on their nodes and preserves C's start. DR_EVT does not emit
+this assignment; the slide illustrates why its count-based decision fits.
 
-### Run and verification
+Swapping A and B's equal-time input order places B on 0,1 and A on 2,3.
+Now node 3 is released at 70 and lies outside C's reservation. D starts at
+70 in both engines, and their complete schedules match.
 
-[`reproduce_divergence.py`](reproduce_divergence.py) runs both cases under EASY,
-hybrid R=32, and conservative. It checks Fiction's actual node assignments,
-the expected start times, and agreement or disagreement of complete schedules.
-Optional single-job deletions from the diverging case provide twelve three-job
-controls, all of which match. Four is the smallest verified job count from this
-reduction, rather than a claim about all possible workloads.
+## High-ID-first controls
 
-In the prepared container:
+The same two input orders are also checked with `hinodex`:
+
+| Input order | A's nodes | B's nodes | C's nodes | Fiction D start | DR_EVT D start |
+|---|---|---|---|---:|---:|
+| A,B,C,D | 2,3 | 0,1 | 1,2,3 | 80 | 70 |
+| B,A,C,D | 0,1 | 2,3 | 1,2,3 | 70 | 70 |
+
+Each matcher is verified under EASY, hybrid R=32, and conservative. There are
+three expected divergences, three matching swaps, and twelve matching
+single-job deletion controls per matcher: **36 checks total**. Four jobs is
+the smallest verified workload from this reduction, not an exhaustive minimum
+across every possible configuration.
+
+In the matching controls, D starts exactly at A's completion at 70. This
+isolates a reservation-placement explanation for this example. It does not
+explain every Lassen difference or rule out RPC ordering effects elsewhere.
+Future reservations bind particular nodes; running allocations remain fixed.
+Changing the global legacy reservation barrier is not needed for this case.
+
+## Reproduce
+
+In the prepared validation container:
 
 ```sh
-python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)" \
-  --check-deletions
+python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)"   --match-policy lonodex --check-deletions --outdir /results/minimal-divergence-low
+python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)"   --match-policy hinodex --check-deletions --outdir /results/minimal-divergence-high
 ```
 
-The six paired cases, twelve deletion controls, input files, commands,
-transitions, results, and source snapshot are recorded under
-`results/minimal-divergence/`. Each report entry includes job labels and actual
-Fiction node assignments. These cases do not reach Q and do not test truncated
-passes. A successful check of the diverging case means the documented difference
-was reproduced; it does not mean that the two schedules agree.
+The script checks actual Fiction node assignments, complete schedules, and
+expected differences under each backfill policy. Each run retains inputs,
+commands, configurations, transitions, and the simulator binary hash.
+Checked reports are in [evidence](evidence/); generated runs remain under
+ignored `results/`.

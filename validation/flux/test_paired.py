@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import random
 import subprocess
+import time
 
 from fiction_runner import CAPACITY, EPOCH, run_case
 
@@ -75,7 +76,7 @@ def large_workloads():
     return cases
 
 
-def profile(schedule):
+def profile(schedule, capacity=CAPACITY):
     """Right-continuous aggregate occupancy after all events at a timestamp."""
     events = {0.0: 0}
     for job in schedule:
@@ -85,20 +86,20 @@ def profile(schedule):
     samples = []
     for time, change in sorted(events.items()):
         allocated += change
-        if not 0 <= allocated <= CAPACITY:
+        if not 0 <= allocated <= capacity:
             raise AssertionError(('capacity violation', time, allocated))
         if not samples or samples[-1][1] != allocated:
             samples.append([time, allocated])
     return samples
 
 
-def observed_profile(path):
+def observed_profile(path, capacity=CAPACITY):
     with path.open() as stream:
         rows = list(csv.DictReader(stream))
     by_time = {}
     for row in rows:
         allocated, free = int(row['allocated_nodes']), int(row['free_nodes'])
-        if free + allocated != CAPACITY:
+        if free + allocated != capacity:
             raise AssertionError(('resource pool changed', row))
         by_time[float(row['time'])] = allocated
     samples = []
@@ -108,7 +109,7 @@ def observed_profile(path):
     return samples
 
 
-def simulator_case(case, jobs, binary, policy, depth, reservations):
+def simulator_case(case, jobs, binary, policy, depth, reservations, total_nodes=CAPACITY):
     trace, output, resources = (case / filename for filename in
                                ('dr_evt-input.csv', 'dr_evt-output.csv', 'dr_evt-resources.csv'))
     with trace.open('w', newline='') as stream:
@@ -116,20 +117,25 @@ def simulator_case(case, jobs, binary, policy, depth, reservations):
         writer.writerow(['job_submit_time', 'num_nodes', 'time_limit', 'actual_run_time'])
         writer.writerows(jobs)
     priority_option = 'fcfs_conservative' if policy == 'conservative' else 'fcfs'
-    command = [str(binary), str(trace), '--total_nodes', str(CAPACITY),
+    command = [str(binary), str(trace), '--total_nodes', str(total_nodes),
                '--priority_policy', priority_option, '--queue_impl', 'circular',
                '--per_pass_accounting',
                '--backfill_policy', policy, '--backfill_queue_depth', str(depth),
                '--backfill_interval', '0', '--dispatch_interval', '0',
                '--planning_time_resolution', '0', '--node_release_delay', '0',
                '--trace_format', 'simple', '--timestamp_format', 'epoch',
-               '--run_time_mode', 'actual', '--msec_output', '--max_jobs', '9999',
+               '--run_time_mode', 'actual', '--msec_output', '--max_jobs', str(len(jobs)),
                '--outfile', str(output), '--resource_trace', str(resources)]
     if policy == 'hybrid':
         command.extend(['--reservation_depth', str(reservations)])
     (case / 'dr_evt-command.json').write_text(json.dumps(command, indent=2) + '\n')
     with (case / 'dr_evt.log').open('w') as log:
+        started = time.perf_counter()
         subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT, timeout=30)
+        (case / 'dr_evt-process-timing.json').write_text(json.dumps({
+            'elapsed_seconds': time.perf_counter() - started,
+            'scope': 'simulator process launch through exit',
+        }, indent=2) + '\n')
     with output.open() as stream:
         rows = list(csv.DictReader(stream))
     if len(rows) != len(jobs):
@@ -143,15 +149,15 @@ def simulator_case(case, jobs, binary, policy, depth, reservations):
             raise AssertionError(('simulator row order/input changed', index, row))
         result.append({'job': index, 'submit': arrival, 'nodes': int(row['num_nodes']),
                        'start': float(row['begin_time']), 'finish': float(row['end_time'])})
-    if profile(result) != observed_profile(resources):
+    if profile(result, total_nodes) != observed_profile(resources, total_nodes):
         raise AssertionError(('simulator resource trace disagrees with its jobs',
-                              profile(result), observed_profile(resources)))
+                              profile(result, total_nodes), observed_profile(resources, total_nodes)))
     return result
 
 
-def reference_schedule(transitions, jobs):
+def reference_schedule(transitions, jobs, total_nodes=CAPACITY, time_precision=None):
     result = []
-    intervals = {node: [] for node in range(CAPACITY)}
+    intervals = {node: [] for node in range(total_nodes)}
     for index, (row, (arrival, nodes, limit, actual)) in enumerate(zip(transitions, jobs)):
         start, finish, submitted = (float(row[key]) - EPOCH
                                     for key in ('START', 'FINISH', 'SUBMIT'))
@@ -165,6 +171,8 @@ def reference_schedule(transitions, jobs):
                 if start < previous_finish and previous_start < finish:
                     raise AssertionError(('exclusive node allocated twice', node, row))
             intervals[node].append((start, finish))
+        if time_precision is not None:
+            start, finish, submitted = (round(t, time_precision) for t in (start, finish, submitted))
         result.append({'job': index, 'submit': submitted, 'nodes': len(allocated),
                        'start': start, 'finish': finish})
     return result
@@ -182,8 +190,6 @@ def main():
     parser.add_argument('--reference-timeout', type=int, default=300,
                         help='Real-time timeout per large reference run, in seconds')
     args = parser.parse_args()
-    if args.suite == 'large' and args.policy not in (None, 'none'):
-        parser.error('The large suite currently validates FCFS without backfill only')
     root = args.outdir
     root.mkdir(parents=True, exist_ok=True)
     configurations = []
@@ -194,7 +200,12 @@ def main():
                                ('hybrid', 'hybrid', 1), ('hybrid', 'hybrid', 2),
                                ('conservative', 'conservative', None)])
     if args.suite in ('large', 'all'):
-        configurations.append(('none', 'fcfs', 0, args.queue_depth,
+        # Keep the default large checks at FCFS/no-backfill. Other policies
+        # require an explicit selection so exploratory runs do not enter CI.
+        policy = args.policy or 'none'
+        reservations = {'none': 0, 'easy': 1, 'hybrid': 32, 'conservative': None}[policy]
+        configurations.append((policy, 'fcfs' if policy == 'none' else policy,
+                               reservations, args.queue_depth,
                                large_workloads(), args.reference_timeout))
     report = {'scope': 'Selected event-driven policy sets on one homogeneous four-node pool',
               'assumptions': {'equal_priority': True, 'whole_nodes': True,

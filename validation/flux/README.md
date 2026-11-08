@@ -1,11 +1,12 @@
-# Fluxion validation with Flux Fiction
+# Native scheduling validation with Fiction
 
-This harness builds Flux Core, Fluxion, Flux Fiction, and DR_EVT in a Linux
-container. It verifies the Fiction backend and time-step synchronization with
-hand-computed smoke cases, then compares explicit event-driven policy sets
-against DR_EVT using `--per_pass_accounting`.
+This container harness compares DR_EVT policy sets with native Flux schedulers
+driven by Fiction. The [published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md)
+presents the identical FCFS run using sched-simple, the hybrid-backfill
+comparison using Fluxion, and the four-job start-time divergence.
+Every DR_EVT validation invocation uses `--per_pass_accounting`.
 
-## Run
+## Build and run the checks
 
 From the repository root:
 
@@ -13,121 +14,95 @@ From the repository root:
 bash validation/flux/run.sh
 ```
 
-Sources default to `external/{flux-core,flux-sched,flux-fiction}`;
-`FLUX_SOURCES` selects another checkout directory. The checkouts and DR_EVT
-repository are mounted read-only. Only committed sources are exported into a
-reusable Docker volume, and local checkout edits are excluded.
+The default sources are committed checkouts in
+`external/{flux-core,flux-sched,flux-fiction}`. `FLUX_SOURCES` overrides that
+location. Source exports are built in a Docker volume; mounted checkouts are
+read-only. `FLUX_VALIDATION_BUILD_VOLUME` selects the reusable volume; use a
+fresh volume after changing native source revisions or synchronization overlays.
+DR_EVT is exported from its current commit and built with Release optimization
+and `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
 
-`FLUX_VALIDATION_IMAGE` selects the image name, `FLUX_VALIDATION_BUILD_VOLUME`
-selects the build volume, and `BUILD_JOBS` controls Flux build parallelism.
-Use a fresh build volume after changing external revisions or the local
-synchronization overlay. Results default to `validation/flux/results/`;
-`FLUX_VALIDATION_RESULTS` selects another directory. Generated results are ignored.
+The default run checks synchronization, Fiction smoke cases, paired small
+policies, two 2,000-job synthetic FCFS traces, sched-simple's thirty small
+comparisons, and both minimal-reproducer matchers. Backend revisions, source
+hashes, commands, and logs are retained under `results/`.
+`FLUX_VALIDATION_RESULTS` overrides the host results directory.
 
-`prepare.py` records external revisions and overlay hashes in `sources.json`
-and saves the applied patch as `fluxion-quiescence.patch`. `build_dr_evt.py`
-exports the current DR_EVT commit, builds a Release executable with the default
-resource-time reservation rule, and records its revision, configure flags, and
-binary hash in `dr_evt-sources.json`. Each Fiction run retains its input,
-configuration, log, and job transitions in a unique output directory.
+## Recorded Lassen comparisons
 
-## Checks
-
-The default runner performs:
-
-- Native synchronization checks for idle queues, allocations, pending jobs,
-  resource releases, cancellation, and safe backfill.
-- Fiction smoke cases with hand-computed start and finish times: one job, and
-  a blocked four-node head with a safely backfilled one-node job.
-- A build of the committed DR_EVT simulator.
-- Fifty small paired policy checks and two 2,000-job FCFS/no-backfill comparisons.
-
-The synchronization checks use one broker with four cores. Fiction smoke
-cases use **four nodes total, one core per node**, whole-node allocation,
-equal priorities, known time limits, and no simulated system latency.
-Reports are `quiescence.json` and `fiction/report.json`; the complete build
-log is `build-and-test.log`. Agreement is established only for the exercised
-cases, not general scheduler equivalence.
-
-## Paired policy comparisons
-
-Every DR_EVT comparison uses `--per_pass_accounting`, a circular waiting queue,
-exact planning times, no horizon, and zero dispatch, backfill, and release-delay
-intervals. Both backends receive the same examination depth Q. Immediate starts,
-successful reservations, and failed allocation-only tests consume Q; successful
-reservations also consume R. Reports identify applied policies rather than
-claiming production scheduler equivalence.
-
-Ten small workloads cover simultaneous arrivals, blocked heads, safe overlap,
-reservation depth, early completion, time-limit admission, and two seeded queues.
-Each runs under FCFS without backfill, EASY, hybrid R=1, hybrid R=2, and
-conservative backfill: **50 comparisons, 255 jobs total**, with Q=100.
-
-Two seeded large workloads have **2,000 jobs each**, arriving in bursts of 24
-or 48 jobs spaced 4,000 simulated seconds apart. Jobs use 1–4 nodes for
-10–80 seconds. These comparisons use FCFS without backfill and Q=2048.
-The caps cover the tested waiting queues; these runs do not validate truncated
-backfill passes or general equivalence.
-
-In the prepared container:
+Mount the user-provided `lassen_traces` folder read-only at `/lassen_traces` in
+the prepared container. The trace is not checked into this repository.
+Run these commands inside that container:
 
 ```sh
-python3 /validation/test_paired.py "$(cat /workspace/dr_evt-simulator)"
+python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv   "$(cat /workspace/dr_evt-simulator)" --policy none   --scheduler-backend sched-simple --queue-depth 64 --max-jobs 2000   --timeout 900 --outdir /results/sched-simple-lassen-prefix2000
+
+python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv   "$(cat /workspace/dr_evt-simulator)" --policy hybrid   --scheduler-backend fluxion --reservation-depth 32 --queue-depth 64   --max-jobs 2000 --timeout 900 --outdir /results/lassen-hybrid-prefix2000
 ```
 
-Use `--suite small` or `--suite large` to select a subset. The large suite
-currently includes FCFS without backfill only. `--policy` selects a small-suite
-policy. A mismatch or timeout returns a nonzero status and retains the artifacts.
+The runner selects the earliest jobs in stable arrival order. It preserves
+arrivals, limits, and durations on an initially empty pool of 756 whole-node
+units. It accepts subset logs with `job_submit_time,begin_time,end_time` and
+whole logs with `submit_time,duration`. `--max-jobs 0` selects the whole file.
+The published results cover 2,000 jobs, not the full source log.
 
-Each comparison checks every job's start, finish, and node count, aggregate
-occupancy over time, exclusive Fiction node ownership, and DR_EVT's resource
-trace. Distinguishing small cases also have hand-computed expected starts.
-`results/paired/report.json` records source revisions, harness and binary hashes,
-configuration, schedules, and any failures; commands and raw outputs are saved
-per case. It records `per_pass_accounting=true`, distinguishing these runs from
-earlier default-accounting experiments.
+`sched_simple.py` inherits the installed native Python sched-simple's
+allocation, scheduling, and forecast methods unchanged. It adds read-only
+synchronization and resource snapshots. `sched_simple_support.py` adapts
+Fiction's loader and records native hashes and loaded modules. Fluxion is
+unloaded for that run. Its Q bounds outstanding requests, not per-pass tests.
+The two backends are selected explicitly; backfill is rejected for sched-simple.
 
-Verified in Ubuntu 24.04 ARM64 Docker with GCC 13: all 50 small comparisons
-and both 2,000-job FCFS comparisons agree on starts, finishes, node counts,
-and occupancy. Generated reports remain ignored. These results apply to the
-listed workloads and policy settings.
+## Synthetic workloads and minimal reproducer
 
-## Node-reservation placement discrepancy
+```sh
+python3 /validation/test_paired.py "$(cat /workspace/dr_evt-simulator)"   --suite large --policy none --queue-depth 64
+python3 /validation/test_paired.py "$(cat /workspace/dr_evt-simulator)"   --suite large --policy hybrid --queue-depth 64 --reference-timeout 900
+python3 /validation/test_sched_simple.py "$(cat /workspace/dr_evt-simulator)"
+python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)"   --match-policy lonodex --check-deletions --outdir /results/minimal-divergence-low
+python3 /validation/reproduce_divergence.py "$(cat /workspace/dr_evt-simulator)"   --match-policy hinodex --check-deletions --outdir /results/minimal-divergence-high
+```
 
-The [four-job reproducer](reproduce_divergence.py) checks two cases using the
-same high-ID-first matcher and DR_EVT `--per_pass_accounting`. With A submitted
-before B, Fiction starts D at 80 while DR_EVT starts it at 70. Swapping A and B's
-equal-time input order makes every start and finish time agree, with D at 70.
-The [explanation](DIVERGENCE.md) lists the node assignments and protected window.
+The synthetic traces have 2,000 jobs each on four nodes, in bursts of 24 or 48
+spaced 4,000 simulation seconds apart. They use 1–4 nodes and 10–80-second
+limits equal to actual durations. FCFS matches; hybrid R=32/Q=64 has small
+resource-curve differences. `test_paired.py` exits nonzero for a schedule
+mismatch; this is an expected outcome for the published hybrid comparisons,
+not a claim of exact backfill agreement. Timeouts remain incomplete runs.
 
-Both cases are checked under EASY, hybrid R=32, and conservative on four nodes
-with Q=2048. Twelve single-job deletion controls also match. The default runner
-includes all 18 checks. An expected-divergence check passes only when the documented
-difference is reproduced; a matching case requires complete schedule agreement.
+The [minimal reproducer](DIVERGENCE.md) verifies the identified node-reservation
+placement difference with four jobs. Expected divergences and matching controls
+are assertions, so its checks exit successfully when the observations agree.
 
-## Time-step synchronization
+## Resource evidence and synchronization
 
-Fiction owns the time-ordered arrival/completion event queue; Fluxion owns the
-waiting-job queue. Fiction submits a job's resource requirements and time limit.
-After receiving its start notification, Fiction schedules completion at
-`start + actual duration`. Actual duration stays in Fiction.
+`resource_observer/sitecustomize.py` is opt-in through
+`DR_EVT_OBSERVE_RESOURCES=1`. Before Fiction advances time, it reads native
+allocated nodes and each running job's assignment. `resource_profiles.py`
+checks capacity, duplicate owners, stale allocations, and agreement with job
+records. DR_EVT's curve comes from `--resource_trace` at resource-accounting
+changes. Areas integrate the step curves exactly.
 
-After firing the events at one timestamp, Fiction asks its jobtap plugin to
-confirm those events and their resulting starts. Jobtap sends an empty
-`sched.quiescent` request to the local handler. The handler replies only when
-Fluxion has no active or requested scheduling pass, outstanding allocation
-responses and changed annotations have been sent, and allocation-request counts
-agree with the job manager. Its reply contains `status` and `alloc_current`,
-the number of allocated jobs. Jobtap then waits for Fiction's start
-acknowledgments before echoing the original step request. Fiction can then
-advance to the next event timestamp; waiting jobs may remain queued.
+```sh
+python3 /validation/resource_profiles.py "$(cat /workspace/dr_evt-simulator)"   --paired-report /results/paired/report.json --paired-only
+python3 -m unittest test_resource_profiles
+```
 
-The handler is applied only to the isolated Fluxion export and observes state
-without changing placement or scheduling policy. The tested setup has one
-unrestricted queue with unheld jobs, and backfill examination caps cover its
-waiting queues. Finite-depth restart behavior is outside these checks.
-Concurrent probes and error handling are supported. Real-time timeouts stop
-incomplete runs; they are not the synchronization condition.
+The snapshots and compared schedules come from the same captured run. Snapshot
+RPCs take wall-clock time; they do not add a configured simulation latency.
+Equal total resource areas alone cannot detect two jobs claiming the same node,
+which is why ownership is checked separately.
 
-Optional profiling dependencies are omitted from the image; they do not affect
-scheduling.
+The handshake waits for submissions/completions to reach Flux, no active or
+requested scheduler pass, allocation responses, and resulting starts.
+It does not issue extra scheduling passes. Tests use unheld jobs in one
+unrestricted queue. Reservation-only reset investigations are separate from
+these completed comparisons and are not published here.
+
+Published figures, plotting data, and compact evidence are checked into
+`docs/_static/scheduler-validation/` and `evidence/`. Raw logs, diagnostic runs,
+and generated results remain ignored. The plotting script is standalone:
+
+```sh
+python3 plot_comparison.py --plot-input plot-input.json
+```

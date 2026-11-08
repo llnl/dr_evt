@@ -75,7 +75,13 @@ public:
     }
   }
 
-  /** @copydoc SchedulerBase::insert_job */
+  /**
+   * @brief Insert a pending job and clear cached blocked-job decisions.
+   * @param[in] id Existing Trace job identifier.
+   * @param[in] submit Arrival time used for eligibility and ordering.
+   * @param[in] duration Time-limit estimate used for reservations.
+   * @param[in] nodes Requested node count.
+   */
   void insert_job(job_no_t id, sim_time_t submit, tdiff_t duration,
                   num_nodes_t nodes) override {
     FCFSHybridCircularScheduler::insert_job(id, submit, duration, nodes);

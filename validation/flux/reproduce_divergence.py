@@ -21,14 +21,16 @@ def main():
     parser.add_argument('--outdir', type=Path, default=Path('/results/minimal-divergence'))
     parser.add_argument('--check-deletions', action='store_true',
                         help='Also check every three-job trace made by deleting one job')
+    parser.add_argument('--match-policy', choices=('lonodex', 'hinodex'), default=MATCH_POLICY,
+                        help='Low- or high-ID-first native resource matching')
     args = parser.parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
     report = {'capacity': 4, 'cores_per_node': 1, 'cases': [], 'queue_depth': 2048,
               'per_pass_accounting': True,
-              'match_policy': MATCH_POLICY,
+              'match_policy': args.match_policy,
               'simulator_sha256': hashlib.sha256(args.simulator.read_bytes()).hexdigest(),
               'script_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
-    # Equal-time input order gives the first job nodes 2,3. Swapping A and B
+    # Equal-time input order fixes the first job's two nodes. Swapping A and B
     # changes which nodes are released at 70, without changing either job.
     traces = [('diverges', JOBS, ['A', 'B', 'C', 'D']),
               ('matches', [JOBS[1], JOBS[0], *JOBS[2:]], ['B', 'A', 'C', 'D'])]
@@ -42,7 +44,7 @@ def main():
             case.mkdir(exist_ok=True)
             reservation = 32 if policy == 'hybrid' else None
             transitions = run_case(case, jobs, policy, 2048, reservation,
-                                   match_policy=MATCH_POLICY)
+                                   match_policy=args.match_policy)
             native = reference_schedule(transitions, jobs)
             observed = simulator_case(case, jobs, args.simulator, policy, 2048, reservation)
             different = native != observed
@@ -52,7 +54,10 @@ def main():
                 candidate_start = 80 if name == 'diverges' else 70
                 assert [job['start'] for job in native] == [0, 0, 80, candidate_start], native
                 assert [job['start'] for job in observed] == [0, 0, 80, 70], observed
-                assert allocated_nodes == [[2, 3], [0, 1], [1, 2, 3], [0]], allocated_nodes
+                expected_nodes = ([[2, 3], [0, 1], [1, 2, 3], [0]] if
+                                  args.match_policy == 'hinodex' else
+                                  [[0, 1], [2, 3], [0, 1, 2], [3]])
+                assert allocated_nodes == expected_nodes, allocated_nodes
                 assert different == (name == 'diverges'), (name, native, observed)
             else:
                 assert not different, ('deletion still diverges', name, policy, native, observed)

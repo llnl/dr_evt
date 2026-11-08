@@ -1,0 +1,68 @@
+{
+  "case": "lassen-756-01_jobs_2000",
+  "jobs": 2000,
+  "capacity": 756,
+  "per_pass_accounting": true,
+  "queue_depth": 64,
+  "window_seconds": [
+    0.0,
+    148215.666
+  ],
+  "waiting_seconds": {
+    "dr_evt": {
+      "min": 0.0,
+      "mean": 41081.701677499994,
+      "median": 51338.964,
+      "p95": 65934.5843,
+      "max": 67582.439
+    },
+    "fiction": {
+      "min": 0.0,
+      "mean": 41081.701677499994,
+      "median": 51338.964,
+      "p95": 65934.5843,
+      "max": 67582.439
+    }
+  },
+  "utilization_percent": {
+    "dr_evt": 72.56131557302496,
+    "fiction": 72.56131557302496
+  },
+  "utilization_window": "first arrival to each scheduler own last completion",
+  "shared_window_utilization_percent": {
+    "dr_evt": 72.56131557302496,
+    "fiction": 72.56131557302496
+  },
+  "makespan_seconds": {
+    "dr_evt": 148215.666,
+    "fiction": 148215.666
+  },
+  "resource_area_node_seconds": {
+    "dr_evt": 81305711.274,
+    "fiction": 81305711.274
+  },
+  "area_between_curves_node_seconds": 0.0,
+  "normalized_area_between_curves": 0.0,
+  "absolute_wait_difference_seconds": {
+    "min": 0.0,
+    "mean": 0.0,
+    "median": 0.0,
+    "p95": 0.0,
+    "max": 0.0
+  },
+  "waiting_time_difference_definition": "fiction waiting time minus dr_evt waiting time",
+  "signed_wait_difference_seconds": {
+    "min": 0.0,
+    "mean": 0.0,
+    "median": 0.0,
+    "p95": 0.0,
+    "max": 0.0
+  },
+  "waiting_time_difference_job_counts": {
+    "negative_fiction_waits_less": 0,
+    "zero_equal_waiting": 2000,
+    "positive_fiction_waits_more": 0
+  },
+  "native_duplicate_owners": 0,
+  "reference_replay_differing_jobs": []
+}

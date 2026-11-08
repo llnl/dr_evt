@@ -1,0 +1,216 @@
+{
+  "per_pass_accounting": true,
+  "fiction_scheduler": "sched-simple",
+  "cases": [
+    {
+      "case": "single",
+      "queue_depth": 1,
+      "jobs": 1,
+      "resource_snapshots": 2,
+      "match": true
+    },
+    {
+      "case": "simultaneous_capacity",
+      "queue_depth": 1,
+      "jobs": 5,
+      "resource_snapshots": 6,
+      "match": true
+    },
+    {
+      "case": "head_guard",
+      "queue_depth": 1,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "safe_overlap",
+      "queue_depth": 1,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "two_reservations",
+      "queue_depth": 1,
+      "jobs": 4,
+      "resource_snapshots": 6,
+      "match": true
+    },
+    {
+      "case": "all_reservations",
+      "queue_depth": 1,
+      "jobs": 5,
+      "resource_snapshots": 7,
+      "match": true
+    },
+    {
+      "case": "early_completion",
+      "queue_depth": 1,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "limit_admission",
+      "queue_depth": 1,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "mixed_seed_17",
+      "queue_depth": 1,
+      "jobs": 12,
+      "resource_snapshots": 19,
+      "match": true
+    },
+    {
+      "case": "mixed_seed_43",
+      "queue_depth": 1,
+      "jobs": 12,
+      "resource_snapshots": 21,
+      "match": true
+    },
+    {
+      "case": "single",
+      "queue_depth": 2,
+      "jobs": 1,
+      "resource_snapshots": 2,
+      "match": true
+    },
+    {
+      "case": "simultaneous_capacity",
+      "queue_depth": 2,
+      "jobs": 5,
+      "resource_snapshots": 6,
+      "match": true
+    },
+    {
+      "case": "head_guard",
+      "queue_depth": 2,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "safe_overlap",
+      "queue_depth": 2,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "two_reservations",
+      "queue_depth": 2,
+      "jobs": 4,
+      "resource_snapshots": 6,
+      "match": true
+    },
+    {
+      "case": "all_reservations",
+      "queue_depth": 2,
+      "jobs": 5,
+      "resource_snapshots": 7,
+      "match": true
+    },
+    {
+      "case": "early_completion",
+      "queue_depth": 2,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "limit_admission",
+      "queue_depth": 2,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "mixed_seed_17",
+      "queue_depth": 2,
+      "jobs": 12,
+      "resource_snapshots": 19,
+      "match": true
+    },
+    {
+      "case": "mixed_seed_43",
+      "queue_depth": 2,
+      "jobs": 12,
+      "resource_snapshots": 21,
+      "match": true
+    },
+    {
+      "case": "single",
+      "queue_depth": 64,
+      "jobs": 1,
+      "resource_snapshots": 2,
+      "match": true
+    },
+    {
+      "case": "simultaneous_capacity",
+      "queue_depth": 64,
+      "jobs": 5,
+      "resource_snapshots": 6,
+      "match": true
+    },
+    {
+      "case": "head_guard",
+      "queue_depth": 64,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "safe_overlap",
+      "queue_depth": 64,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "two_reservations",
+      "queue_depth": 64,
+      "jobs": 4,
+      "resource_snapshots": 6,
+      "match": true
+    },
+    {
+      "case": "all_reservations",
+      "queue_depth": 64,
+      "jobs": 5,
+      "resource_snapshots": 7,
+      "match": true
+    },
+    {
+      "case": "early_completion",
+      "queue_depth": 64,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "limit_admission",
+      "queue_depth": 64,
+      "jobs": 3,
+      "resource_snapshots": 5,
+      "match": true
+    },
+    {
+      "case": "mixed_seed_17",
+      "queue_depth": 64,
+      "jobs": 12,
+      "resource_snapshots": 19,
+      "match": true
+    },
+    {
+      "case": "mixed_seed_43",
+      "queue_depth": 64,
+      "jobs": 12,
+      "resource_snapshots": 21,
+      "match": true
+    }
+  ]
+}
