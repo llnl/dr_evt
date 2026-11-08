@@ -378,6 +378,11 @@ measurements have different execution environments and timing scopes.
 
 ## Evidence and reproduction
 
+The figures and tables report DR_EVT validation experiments. Scheduler names
+identify the tested software; they do not imply upstream endorsement of the
+results. Source attribution and upstream license links are listed in
+[Scheduling Loops](SCHEDULER_LOOPS.md#sources).
+
 The [Fiction container harness](https://github.com/LLNL/dr_evt/blob/main/validation/flux/README.md)
 contains commands for both native schedulers, the recorded trace, resource
 audits, and the minimal reproducer. Raw Lassen source logs

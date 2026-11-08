@@ -3,16 +3,15 @@
 [Scheduling Loops and DR_EVT Configurations](SCHEDULER_LOOPS.md) explains the
 supported policy combinations. This page records the model's scope and the
 limits of relating those combinations to publicly documented production
-approaches. A production scheduler may use a related method while differing
-in triggers, accounting, admission, and placement. These comparisons do not
-establish equivalent decisions or reproduce a production implementation.
-Different defaults are configuration choices, not gaps.
-Vendor options cited here establish the presence of a related control;
-their detailed behavior must be distinguished from DR_EVT's policy semantics.
+approaches. Production schedulers can differ in triggers, accounting,
+admission, and placement. Similar controls do not guarantee identical decisions.
+Different defaults
+alone are configuration choices, not model gaps. Workload-specific evidence is
+in [Scheduling Validation](SCHEDULER_VALIDATION.md).
 
-**Examination depth** limits counted waiting-job evaluations:
+**Examination depth Q** limits counted waiting-job evaluations:
 `--backfill_queue_depth` for backfill, or `--dispatch_queue_depth` for the
-whole fixed-periodic placement prefix. **Reservation depth** separately
+whole fixed-periodic placement prefix. **Reservation depth R** separately
 limits protected waiting jobs. A reservation can consume both counts;
 per-pass versus per-timestamp counter resets are described below.
 
@@ -22,10 +21,9 @@ Default event-driven hybrid/conservative scheduling counts backfill
 examinations and shares Q across calls at one simulation timestamp.
 `--per_pass_accounting` selects whole-placement accounting: immediate starts
 and successful reservations count toward Q, and each pass resets Q/R.
-Reservation-only passes can repeat, with a tentative guard against unchanged
-retries. These are supported policy choices; the
-[per-pass loop](SCHEDULER_LOOPS.md#per-pass-placement-accounting) specifies
-the failure-counting rules and the guard's assumptions.
+Reservation-only passes can repeat; a tentative guard stops unchanged retries.
+The [per-pass loop](SCHEDULER_LOOPS.md#per-pass-placement-accounting) defines
+failure counting and the guard's assumptions.
 
 ## Remaining differences
 
@@ -34,33 +32,28 @@ the failure-counting rules and the guard's assumptions.
 `--backfill_interval` delays backfill only. Fitting queue-head jobs still
 start after state events and do not consume `--backfill_queue_depth`.
 
-That split belongs to the trigger category illustrated by Slurm's
-main-dispatch/backfill structure. Fixed periodic dispatch is available
-separately through `--dispatch_interval`
-and `--dispatch_queue_depth`: immediate starts and waiting candidates share
-one examined prefix per tick. With four idle nodes and four admitted one-node
-jobs, depth 2 starts at most two at one tick. The next tick can start the rest
-without a new arrival or completion.
+This split represents Slurm's main-dispatch/backfill structure. Fixed periodic
+dispatch instead uses `--dispatch_interval` and `--dispatch_queue_depth`:
+immediate starts and waiting candidates share one examined prefix per tick.
+With four idle nodes and four runnable one-node jobs, Q=2 starts at most two
+per tick; the next tick can start the rest without a state event.
 
-`--dispatch_on_events` adds immediate arrival-batch notifications to that
-FCFS/backfill loop without changing the aligned timer phase. This policy set
-shares the timer-plus-submission category illustrated by Spur, with these
-DR_EVT rules: completions, releases, and
-capacity changes update state but do not request a pass between ticks.
+`--dispatch_on_events` adds arrival-batch wakes without changing the timer phase,
+representing Spur's timer-plus-submission loop. Completions, releases, and
+capacity changes update DR_EVT state but do not request passes between ticks.
 Administrative requeue, health-check recovery/submission, and burst-buffer
 readiness notifications are outside the model. DR_EVT coalesces simultaneous
 arrival/timer wakes into one pass, whereas Spur can consume them separately;
-its timer also has an immediate initial tick. These wake details are simulation
-abstractions, not claims of identical asynchronous execution.
+its timer also has an immediate initial tick. DR_EVT does not reproduce this
+asynchronous wake ordering.
 
-Relating fixed periodic dispatch to LSF requires the assumption that
-sessions occur at every aligned interval boundary while jobs wait, without
-additional delay. LSF's minimum interval alone does not guarantee that cadence;
-variable session timing remains unimplemented. The available IBM evidence does
-not establish that LSF's job-decision limit equals DR_EVT's candidate count,
-what failed checks or reservation attempts charge, or whether a separate scan
-limit exists. It also does not establish a general reservation-depth or horizon
-control, or whether reservations persist between sessions.
+Representing LSF with fixed periodic dispatch assumes sessions occur at every
+aligned interval boundary while jobs wait. LSF's minimum interval does not
+guarantee that cadence; variable session timing is unimplemented. The IBM
+evidence does not establish how its job-decision limit counts failed checks or
+reservations, whether a separate scan limit exists, or whether reservations
+persist between sessions. General reservation-depth and horizon controls are
+also unverified.
 
 ### Backfill evaluation accounting
 
@@ -73,13 +66,17 @@ Periodic EASY runs one scan per tick; periodic hybrid shares its count across
 calls. They also differ with a finite horizon: EASY exempts an out-of-horizon
 head, while periodic hybrid counts it.
 
-In the separate `--backfill_interval` mode, the scheduling-state flag is cleared by an evaluation and
-is not set just because backfill started a job. Consequently, a later tick
-without an intervening state event does not necessarily examine candidates
-exposed by that start. This is a limitation for reproducing a controller
-that evaluates its new queue prefix every cycle. The fixed periodic
-`--dispatch_interval` mode retries every tick and does not use this flag to
-suppress evaluations.
+Separate periodic backfill evaluates a tick only when scheduling state has
+changed. Arrivals, releases, capacity changes, and job starts set that flag;
+starts can expose new candidates in the bounded prefix. Fixed periodic
+dispatch retries every tick while jobs wait, regardless of the flag.
+
+Periodic hybrid/conservative backfill also checks capacity at each candidate's
+end timestamp, representing Slurm's endpoint rule. Event-driven and fixed
+periodic placement retain half-open fits, as needed for Fluxion and Spur.
+The [endpoint explanation](SCHEDULER_LOOPS.md#shared-terms) defines both rules;
+the [Slurm validation](SCHEDULER_VALIDATION.md#sources-of-divergence-and-corrections)
+measures their effect.
 
 ### PBS timing and cycle limits
 
@@ -90,41 +87,36 @@ count cap, but the time limit can still truncate a cycle.
 DR_EVT can approximate `sched_cycle_length` with queue depth Q equal to an
 assumed evaluation throughput (candidates/second) times the cycle limit,
 rounded down to at least one and capped by any explicit `max_job_check`.
-This approximates candidate effort, including starts, failed checks, and future
-planning, without modeling scheduler CPU time.
+This estimates candidate effort, including starts, failed checks, and future
+planning, without simulating scheduler CPU time.
 
 The [event-driven policy set related to OpenPBS](SCHEDULER_LOOPS.md#openpbs-event-driven-dispatch-and-backfill)
-omits `scheduler_iteration` fallback cycles, assuming studied cycles are not
-truncated by Q and time alone does not change eligibility. Modeling the fallback
-is meaningful when a count cap or timeout leaves runnable candidates unexamined,
-or when time alone changes eligibility: another cycle can change starts without
-an arrival, resource release, failure, or inconsistent state. For example, with
-four idle nodes, four runnable jobs, and Q=1, a fallback cycle can start a second
-job before the first completes. If examination is effectively unlimited and
-time alone changes nothing, the fallback repeats the same decisions.
+omits `scheduler_iteration` fallback cycles. This assumes cycles are not
+truncated by Q and time alone does not change eligibility. Otherwise a fallback
+can change starts without a state event: with four idle nodes, four runnable
+jobs, and Q=1, it can start another job before the first completes. With
+unlimited examination and unchanged eligibility, it repeats the same decisions.
 
-Fixed periodic dispatch already retries with a fresh candidate count,
-but PBS also schedules on arrivals and resource releases and resets its relative
+PBS schedules on arrivals and resource releases and resets its relative
 fallback deadline when the server attempts scheduling requests. DR_EVT's
-event-driven Q limits backfill examinations; fixed periodic dispatch counts all
-candidates with aligned ticks and optional arrival wakes. Combining PBS's
-event triggers, relative fallback, and full-candidate cap remains future work
-for studies where these differences affect starts.
+event-driven Q limits backfill examinations; fixed periodic dispatch counts
+all candidates but uses aligned ticks and optional arrival wakes. Combining
+PBS's event triggers, relative fallback, and full-candidate cap remains future
+work.
 
 ### LSF admission on reserved slots
 
-The supplied IBM backfill documentation requires a job borrowing reserved
+The cited IBM backfill guide requires a job borrowing reserved
 slots to finish before the protected job's predicted start. DR_EVT's default
 resource-time rule can instead allow an overlapping execution if it preserves
 the protected resource window. The build option
 `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` selects strict completion-before-start
 admission and can be combined with EASY head protection in a homogeneous pool.
-This does not model LSF's queue-specific backfill eligibility or reserved
-slot ownership. IBM's single-head illustration does not establish that LSF
-uses only EASY or always protects exactly one waiting job.
+Queue-specific eligibility and reserved-slot ownership remain unmodeled.
+The guide does not establish a universal EASY policy.
 See the [LSF loop](SCHEDULER_LOOPS.md#lsf-scheduling-sessions-with-a-minimum-interval)
-for the selected configuration. The legacy barrier applies throughout the
-homogeneous pool and build; IBM's rule concerns borrowed reserved slots.
+for the configuration. The legacy barrier applies throughout the homogeneous
+pool; IBM's rule concerns borrowed reserved slots.
 
 ## Out of scope
 
@@ -157,7 +149,7 @@ The following references support the differences and evidence limits above:
   [initial horizon check](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3201),
   [test counter](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3359),
   and [post-test horizon check](https://github.com/SchedMD/slurm/blob/17abb848e20054009d136a2c504a23e5462f26c8/src/plugins/sched/backfill/backfill.c#L3836).
-- **Flux core:** copied commit `d0309fcf0e672d90e65b0797168e56a430b9fb57`,
+- **Flux core:** inspected source revision `d0309fcf0e672d90e65b0797168e56a430b9fb57`,
   [job-manager allocation requests](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/modules/job-manager/alloc.c#L457),
   [Python scheduler request handling and queue-depth definition](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/bindings/python/flux/scheduler.py#L237),
   and its separate [EASY backfill module](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e65b0797168e56a430b9fb57/src/modules/sched-backfill.py).
