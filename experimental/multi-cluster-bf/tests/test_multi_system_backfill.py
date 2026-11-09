@@ -155,7 +155,8 @@ def reference_outputs(trace, outdir):
 # Candidate job 3 (5 nodes) fits B now.
 HAND_CASES = [
     ("long_candidate_on_non_target",
-     # Limit 1000: only target_only (window inf on B) lets it start now.
+     # Limit 1000: target_only and every_system admit it using spare
+     # capacity on B; global_shadow enforces completion by T* and refuses.
      [("A", 10), ("B", 20)],
      [(0, 10, 100, 100), (0, 15, 200, 200), (1, 10, 50, 50),
       (1, 5, 1000, 1000)],
@@ -164,7 +165,7 @@ HAND_CASES = [
       "every_system": {0: (0, 100, "A"), 1: (0, 200, "B"),
                        2: (100, 150, "A"), 3: (1, 1001, "B")},
       "global_shadow": {0: (0, 100, "A"), 1: (0, 200, "B"),
-                        2: (100, 150, "A"), 3: (1, 1001, "B")}}),
+                        2: (100, 150, "A"), 3: (100, 1100, "B")}}),
     ("medium_candidate_on_non_target",
      # Limit 150: ends at 151, before S_B = 200 but after T* = 100, so
      # every_system admits it and global_shadow does not.
@@ -176,7 +177,7 @@ HAND_CASES = [
       "every_system": {0: (0, 100, "A"), 1: (0, 200, "B"),
                        2: (100, 150, "A"), 3: (1, 151, "B")},
       "global_shadow": {0: (0, 100, "A"), 1: (0, 200, "B"),
-                        2: (100, 150, "A"), 3: (1, 151, "B")}}),
+                        2: (100, 150, "A"), 3: (100, 250, "B")}}),
     ("inadmissible_system_is_free",
      # B:4 can never hold the 10-node head, so S_B = inf and every rule,
      # including global_shadow, lets a long 4-node candidate use B now.
@@ -204,7 +205,27 @@ HAND_CASES = [
       "every_system": {0: (0, 100, "A"), 1: (0, 50, "B"),
                        2: (50, 70, "B"), 3: (70, 1070, "B")},
       "global_shadow": {0: (0, 100, "A"), 1: (0, 50, "B"),
-                        2: (100, 120, "A"), 3: (1, 1001, "B")}}),
+                        2: (50, 70, "B"), 3: (70, 1070, "B")}}),
+    ("half_open_deadline",
+     [("one", 4)],
+     [(0, 3, 10, 10), (1, 4, 5, 5), (1, 1, 9, 9)],
+     {policy: {0: (0, 10, "one"), 1: (10, 15, "one"),
+               2: (1, 10, "one")} for policy in SPATIAL}),
+    ("reservation_slack",
+     [("one", 4)],
+     [(0, 3, 10, 10), (1, 3, 5, 5), (1, 1, 20, 20)],
+     {"target_only": {0: (0, 10, "one"), 1: (10, 15, "one"),
+                      2: (1, 21, "one")},
+      "every_system": {0: (0, 10, "one"), 1: (10, 15, "one"),
+                       2: (1, 21, "one")},
+      "global_shadow": {0: (0, 10, "one"), 1: (10, 15, "one"),
+                        2: (10, 30, "one")}}),
+    ("reservation_conflict",
+     [("one", 4)],
+     [(0, 3, 10, 10), (1, 4, 5, 5), (1, 1, 20, 20)],
+     {policy: {0: (0, 10, "one"), 1: (10, 15, "one"),
+               2: (15, 35, "one")} for policy in SPATIAL}),
+
 ]
 
 
@@ -357,6 +378,35 @@ def main():
                       "--trace_format", "simple", "--systems", "a:128",
                       "--total_nodes", "64"], expect_failure=True)
         assert "must equal the sum" in result.stderr
+
+        # These controls configure native scheduler families or resource state
+        # that the spatial scheduler does not implement. Refuse them rather
+        # than silently ignoring them or failing halfway through a run.
+        unsupported = [
+            ["--dispatch_interval", "5"],
+            ["--backfill_interval", "5"],
+            ["--dispatch_on_events"],
+            ["--dispatch_queue_depth", "2"],
+            ["--per_pass_accounting"],
+            ["--diagnostic_no_reservations"],
+            ["--backfill_queue_depth", "2"],
+            ["--planning_horizon", "0"],
+            ["--planning_horizon", "300"],
+            ["--planning_time_resolution", "1"],
+            ["--node_release_delay", "5"],
+            ["--node_release_delay_model", "uniform",
+             "--node_release_delay_spread", "5"],
+            ["--backfill_policy", "hybrid", "--reservation_depth", "2"],
+            ["--priority_policy", "fcfs_1s_evt_group"],
+        ]
+        for index, options in enumerate(unsupported):
+            output = tmp / f"unsupported_{index}.csv"
+            result = run([msbf, str(trace), "--trace_format", "simple",
+                          "--systems", "a:128", "--outfile", str(output),
+                          *options], expect_failure=True)
+            assert "not supported" in result.stderr or "only --priority_policy" in result.stderr
+            assert not output.exists(), (options, result.stderr)
+
 
     print(f"PASS: {hand_checks} hand-derived policy checks, {comparisons} "
           f"policy comparisons, one-system equivalence, rejections")

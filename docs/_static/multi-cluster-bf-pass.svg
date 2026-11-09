@@ -57,9 +57,9 @@
   <rect x="40" y="556" width="500" height="100" class="step"/>
   <text x="52" y="576" class="title">4. Backfill in FCFS order</text>
   <text x="52" y="596" class="small">for each later eligible job j:</text>
-  <text x="66" y="614" class="mono">cands = { k : j.nodes &lt;= free(k) and t + j.limit &lt; W_k }</text>
-  <text x="66" y="631" class="small">if any: k = place(j, cands); record; charge; mark removed</text>
-  <text x="52" y="645" class="small">windows are not recomputed, as in single-system EASY</text>
+  <text x="66" y="614" class="small">cands: fit now and preserve reserved resource-time capacity</text>
+  <text x="66" y="631" class="small">global_shadow also requires t + j.limit &lt;= W_k</text>
+  <text x="52" y="645" class="small">place; record; charge; add candidate to timeline; mark removed</text>
 
   <!-- flow arrows -->
   <path d="M290,140 L290,160" class="arrow"/>
@@ -80,7 +80,7 @@
   <rect x="600" y="312" width="480" height="128" class="box"/>
   <text x="612" y="332" class="title">earliest_fit(k, job, releases, now)</text>
   <text x="612" y="352" class="small">the per-system shadow time: the core's reservation</text>
-  <text x="612" y="366" class="small">accumulation, but an impossible fit returns +inf, not now.</text>
+  <text x="612" y="366" class="small">accumulation; an impossible fit returns +inf.</text>
   <text x="612" y="380" class="small">Jobs started in step 1 are already in releases.</text>
   <text x="612" y="402" class="mono">avail = free(k); if need &lt;= avail: return now</text>
   <text x="612" y="418" class="mono">for (end, d) in sorted(releases):</text>

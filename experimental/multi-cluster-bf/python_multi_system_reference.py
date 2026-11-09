@@ -291,6 +291,8 @@ class MultiSystemScheduler:
         for job in self.wait_queue[1:]:
             candidates = [k for k in range(num_systems)
                           if model.fits_now(k, job) and
+                          (self.spatial_backfill != "global_shadow" or
+                           self.current_time + job.duration <= windows[k]) and
                           (windows[k] == math.inf or self.plan_fits(
                               plans[k], self.current_time, job.nodes,
                               job.duration))]

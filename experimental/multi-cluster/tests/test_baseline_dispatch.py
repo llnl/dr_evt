@@ -11,7 +11,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from grpc_baseline_dispatch import (ApplicationType, PlatformType,
-                                    choose_system, read_arrivals)
+                                    choose_system, estimate_wait, read_arrivals)
 
 
 def system(index, platform_type, rank, capacity=100):
@@ -43,6 +43,12 @@ def window(wait, nodes=8):
 
 
 class BaselineDispatchTests(unittest.TestCase):
+    def test_backfill_can_end_exactly_at_shadow_time(self):
+        snapshot = SimpleNamespace(current_time=10, available_nodes=2,
+                                   shadow_time=30, releases=[])
+        self.assertEqual(estimate_wait(snapshot, 2, 20, 40), 0)
+        self.assertEqual(estimate_wait(snapshot, 2, 20.001, 40), 60)
+
     def test_gpu_and_cpu_only_require_matching_platform(self):
         systems = [
             system(0, PlatformType.CPU_ONLY, 1),

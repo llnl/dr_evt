@@ -282,7 +282,7 @@ def estimate_wait(window, required_nodes, runtime, prediction_horizon):
     has_waiting_head = window.shadow_time > window.current_time
     can_start_now = window.available_nodes >= required_nodes
     can_backfill_now = can_start_now and (
-        not has_waiting_head or window.current_time + runtime < window.shadow_time
+        not has_waiting_head or window.current_time + runtime <= window.shadow_time
     )
     if can_backfill_now:
         return 0.0

@@ -513,6 +513,8 @@ MultiSystemBackfillScheduler::schedule(num_nodes_t free_nodes,
     candidates.clear();
     for (system_id_t k = 0; k < num_systems; ++k) {
       if (m_model.fits_now(k, job.nodes_requested) &&
+          (m_spatial_policy != SpatialBackfillPolicy::GLOBAL_SHADOW ||
+           current_time + job.run_time_estimate <= windows[k]) &&
           (!std::isfinite(windows[k]) ||
            plans[k].can_fit(current_time, job.nodes_requested,
                             job.run_time_estimate))) {

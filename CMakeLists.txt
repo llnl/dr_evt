@@ -1007,6 +1007,28 @@ if(DR_EVT_WITH_UNIT_TESTING)
       LABELS "unit;scripts;multi-cluster"
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(
+      NAME test_python_baseline_dispatch
+      COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
+        ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/experimental/multi-cluster/tests/test_baseline_dispatch.py)
+    add_test(
+      NAME test_python_turnaround_estimation
+      COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
+        ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/experimental/multi-cluster/tests/test_turnaround_estimation.py)
+    set_tests_properties(test_python_baseline_dispatch test_python_turnaround_estimation PROPERTIES
+      LABELS "unit;scripts;multi-cluster"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(
+      NAME test_fugaku_power_reference
+      COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
+        DR_EVT_SIMULATOR=$<TARGET_FILE:sim-bin>
+        ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/experimental/fugaku-power/tests/test_reference_scheduler.py)
+    set_tests_properties(test_fugaku_power_reference PROPERTIES
+      LABELS "unit;scripts;fugaku-power"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(
       NAME test_multi_system_backfill
       COMMAND ${CMAKE_COMMAND} -E env PYTHONDONTWRITEBYTECODE=1
         DR_EVT_MSBF_SIM=$<TARGET_FILE:multi_system_backfill_sim-bin>
