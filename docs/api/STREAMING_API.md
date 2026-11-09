@@ -146,6 +146,33 @@ queue prefix; zero, the default, considers the complete waiting queue. It does
 not change scheduler configuration or policy.
 An empty `job_idxs` list returns that waiting-queue prefix in scheduler order.
 
+### `get_planned_job_starts()`
+
+Reads the start predictions saved by the latest live planning pass, following
+Slurm's `squeue --start` reporting model. It does not compute another forecast.
+
+```cpp
+auto plan = sim.get_planned_job_starts();
+// plan.planned_at: optional simulation timestamp of the live planning pass
+for (const auto &job : plan.jobs) {
+    // job.job_idx, job.expected_start_time, job.start_time_kind
+}
+```
+
+The result lists currently eligible pending jobs sorted by expected start,
+with unknown starts last. Unexamined jobs have no estimate. A projection
+beyond the planning horizon can remain an estimate without protection.
+`planned_at` is absent before planning and after checkpoint restore; with
+periodic backfill it may precede current simulation time. Neither new arrivals
+nor a status query refresh the cache on their own.
+
+Unlike `get_job_statuses()`, this interface reports the live planner's saved
+work rather than making a fresh serial forecast for the requested queue.
+The gRPC equivalents are `GetPlannedJobStartsRequest` and
+`GetPlannedJobStartsResponse`. See
+[Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md#slurm-comparison)
+for the comparison with Slurm `squeue --start` and `sbatch --test-only`.
+
 ### `advance_to(target_time)`
 
 Advances simulation to `target_time` and processes all events at that time.

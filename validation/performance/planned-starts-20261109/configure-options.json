@@ -1,0 +1,12 @@
+[
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DDR_EVT_BUILD_PYTHON=OFF",
+  "-DDR_EVT_WITH_UNIT_TESTING=ON",
+  "-DCMAKE_DISABLE_FIND_PACKAGE_MPI=TRUE",
+  "-DCMAKE_PREFIX_PATH=/Users/yeom2/local/homebrew;/Users/yeom2/local;/Users/yeom2/work/dr_evt/install",
+  "-DFETCHCONTENT_SOURCE_DIR_CATCH2=/Users/yeom2/work/dr_evt/build/_deps/catch2-src",
+  "-Dser20_DIR=/Users/yeom2/work/dr_evt/install/lib/cmake/ser20",
+  "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+  "-DDR_EVT_ENABLE_GRPC=ON",
+  "-DDR_EVT_ENABLE_PROTOBUF=ON"
+]

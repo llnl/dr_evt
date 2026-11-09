@@ -50,6 +50,7 @@ message ClientMessage {
         SaveCheckpointRequest save_checkpoint = 20;
         LoadCheckpointRequest load_checkpoint = 21;
         GetJobStatusesRequest get_job_statuses = 22;
+        GetPlannedJobStartsRequest get_planned_job_starts = 23;
     }
 }
 
@@ -301,6 +302,7 @@ message ServerMessage {
         SaveCheckpointResponse save_checkpoint = 21;
         LoadCheckpointResponse load_checkpoint = 22;
         GetJobStatusesResponse get_job_statuses = 23;
+        GetPlannedJobStartsResponse get_planned_job_starts = 24;
     }
 }
 
@@ -388,6 +390,26 @@ message JobStatus {
 
 message GetJobStatusesResponse {
     repeated JobStatus jobs = 1;
+}
+
+// Read predictions saved by the latest live scheduling pass, like squeue
+// --start. This request never computes a new forecast or advances simulation.
+message GetPlannedJobStartsRequest {}
+
+message PlannedJobStart {
+    uint32 job_idx = 1;
+    // Absent when the live planner did not produce a prediction for this job.
+    optional double expected_start_time = 2;
+    StartTimeKind start_time_kind = 3;
+}
+
+message GetPlannedJobStartsResponse {
+    // Absent before any planning pass or immediately after checkpoint restore.
+    // With periodic backfill this can precede the current simulation time.
+    optional double planned_at = 1;
+    // Eligible pending jobs, sorted by predicted start, with unknowns last.
+    // An out-of-horizon prediction may be ESTIMATED, without a reservation.
+    repeated PlannedJobStart jobs = 2;
 }
 
 message AdvanceToResponse {}

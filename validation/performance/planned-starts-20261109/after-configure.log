@@ -1,0 +1,53 @@
+fatal: not a git repository (or any of the parent directories): .git
+-- Found Threads: TRUE
+-- Found ZLIB: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libz.tbd (found version "1.2.12")
+-- Found OpenSSL: /Users/yeom2/local/homebrew/lib/libcrypto.dylib (found version "3.6.4")
+-- Found c-ares: /Users/yeom2/local/homebrew/lib/cmake/c-ares/c-ares-config.cmake (found version "1.34.8")
+-- Found RE2 via CMake.
+-- Found gRPC: 1.83.1 (gRPC_DIR: /Users/yeom2/local/lib/cmake/grpc)
+-- Abseil has the full log_sink API - src/proto/utils.cpp uses it to format Protobuf's own internal parse diagnostics
+-- Found Boost: 1.92.0
+-- Boost include dirs: /Users/yeom2/local/homebrew/include
+-- Boost imported targets: Boost::program_options;Boost::serialization
+-- Boost_INCLUDE_DIRS: /Users/yeom2/local/homebrew/include
+-- Boost_LIBRARY_DIRS:
+-- Python bindings disabled (use -DDR_EVT_BUILD_PYTHON=ON to enable)
+-- Found Ser20: 1.4.0 (ser20_DIR: /Users/yeom2/work/dr_evt/install/lib/cmake/ser20)
+-- Found Catch2 v2 headers: /Users/yeom2/work/dr_evt/build/_deps/catch2-src/single_include
+-- The C compiler identification is AppleClang 21.0.0.21000101
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- DR_EVT_SOURCES: ;/private/tmp/dr_evt-plan-profile-20261109/after/src/params/sim_params.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/params/trace_params.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/params/dr_evt_params.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/proto/utils.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/proto/dr_evt_params.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/capacity_schedule.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/schedule_windows.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_base.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_easy_deque.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_easy_custom.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_easy_multimap.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_hybrid_deque.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_hybrid_circular.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_pass_hybrid_circular.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_periodic_easy_circular.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_easy_block.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_easy_block_depth.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_fcfs_easy_circular.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_sjf_easy.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/scheduler_ljf_easy.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/block_wait_queue.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/sim/sim.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/data_columns.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/dr_event.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/epoch.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/job_io.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/job_record.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/job_stat_submit.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/node_release_delay.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/parse_utils.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/trace.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/trace/trace_policy.cpp;;/private/tmp/dr_evt-plan-profile-20261109/after/src/utils/exception.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/utils/file.cpp;/private/tmp/dr_evt-plan-profile-20261109/after/src/utils/system_memory.cpp;
+-- CMAKE_INSTALL_RPATH = /usr/local/lib
+-- MPI not found - skipping test_grpc_multi_client_server (gRPC client/server themselves are unaffected)
+
+== DR_EVT Configuration Summary ==
+
+  PROJECT_SOURCE_DIR:   /private/tmp/dr_evt-plan-profile-20261109/after
+  PROJECT_BINARY_DIR:   /private/tmp/dr_evt-plan-profile-20261109/after-build
+
+  CMAKE_INSTALL_PREFIX: /usr/local
+  CMAKE_BUILD_TYPE:     Release
+
+  CXX FLAGS:             -fPIC -g -Wall -Wextra -Wno-unused-parameter -Wnon-virtual-dtor -Wno-deprecated-declarations -fno-omit-frame-pointer -O3 -DNDEBUG
+
+  DR_EVT_GNU_LINUX:                   FALSE
+  DR_EVT_HAS_SER20:                   TRUE
+  DR_EVT_HAS_REDIS_PLUS_PLUS:         FALSE
+  DR_EVT_HAS_CATCH2:                  TRUE
+  DR_EVT_HAS_DOXYGEN:                 FALSE
+  DR_EVT_HAS_OPENMP:                  FALSE
+  DR_EVT_HAS_NUMA:                    FALSE
+  DR_EVT_HAS_PROTOBUF:                TRUE
+  DR_EVT_INSTALL_FETCHED_GRPC:        FALSE
+  DR_EVT_LEGACY_RESERVATION_BARRIER:  FALSE
+  DR_EVT_GPROF:                       FALSE
+
+== End DR_EVT Configuration Summary ==
+
+-- Configuring done (97.1s)
+-- Generating done (0.2s)
+-- Build files have been written to: /private/tmp/dr_evt-plan-profile-20261109/after-build

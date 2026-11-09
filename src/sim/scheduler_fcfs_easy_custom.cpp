@@ -409,6 +409,9 @@ FCFSEasyCustomScheduler::schedule(num_nodes_t free_nodes,
       m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
       current_time, projected_starts);
 
+  record_planned_start(m_wait_queue.front().job_id, m_fcfs_reservation_time,
+                       reservation_within_horizon(m_fcfs_reservation_time, current_time));
+
   // Scanning only new arrivals is unsafe with a queue depth: a start moves
   // older, never-examined jobs into the window. The depth bounds the full
   // scan, so it stays cheap.

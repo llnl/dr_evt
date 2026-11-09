@@ -353,6 +353,33 @@ public:
     Start_Time_Kind start_time_kind;
   };
 
+  /** A pending job's prediction retained from a live scheduling pass. */
+  struct Planned_Job_Start {
+    job_no_t job_idx;
+    std::optional<sim_time_t> expected_start_time;
+    Start_Time_Kind start_time_kind = Start_Time_Kind::NONE;
+  };
+
+  /** Latest live planning timestamp and currently eligible pending jobs. */
+  struct Planned_Job_Starts {
+    std::optional<sim_time_t> planned_at;
+    std::vector<Planned_Job_Start> jobs;
+  };
+
+  /**
+   * @brief Read cached live-planner predictions, like Slurm squeue --start.
+   * @details Does not run a forecast or advance simulation. Only projections
+   * already computed by the scheduler are returned; unexamined jobs have no
+   * time. Out-of-horizon estimates can be present without protection. Jobs
+   * are sorted by expected start, with unknown starts last in queue order.
+   * Future arrivals and started jobs are excluded. planned_at identifies the
+   * last planning pass, which may precede current_time with periodic backfill.
+   * A restored checkpoint has no cached plan until scheduling runs again.
+   * Query cost is O(Q + P + Q log Q), for Q eligible pending jobs and P cached
+   * projections. No prediction fields are added to waiting-queue entries.
+   */
+  Planned_Job_Starts get_planned_job_starts() const;
+
   /** Completion state of one synchronous exact-lookahead request. */
   enum class Exact_Start_Outcome {
     STARTED,

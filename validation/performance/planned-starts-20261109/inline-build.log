@@ -1,0 +1,22 @@
+[  2%] Built target dr_evt_proto_genSrc
+[  7%] Built target dr_evt_proto
+[  9%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_base.cpp.o
+[ 11%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_easy_deque.cpp.o
+[ 14%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_easy_multimap.cpp.o
+[ 16%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_hybrid_circular.cpp.o
+[ 19%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_hybrid_deque.cpp.o
+[ 21%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_easy_custom.cpp.o
+[ 23%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_pass_hybrid_circular.cpp.o
+[ 26%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_periodic_easy_circular.cpp.o
+[ 28%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp.o
+[ 30%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_easy_block.cpp.o
+[ 33%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_easy_block_depth.cpp.o
+[ 35%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_fcfs_easy_circular.cpp.o
+[ 38%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_sjf_easy.cpp.o
+[ 40%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/scheduler_ljf_easy.cpp.o
+[ 42%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/sim.cpp.o
+[ 45%] Linking CXX shared library libdr_evt.dylib
+[ 95%] Built target dr_evt
+[ 97%] Building CXX object CMakeFiles/sim-bin.dir/src/sim.cpp.o
+[100%] Linking CXX executable simulator
+[100%] Built target sim-bin

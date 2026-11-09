@@ -5,11 +5,12 @@
 This document records the design for exposing scheduler timing information to
 streaming clients and experiments. It separates a scheduler reservation from a
 start-time estimate and from an aggregate queue-drain estimate. The common
-cheap per-job query, resource-area per-job approximation, and synchronous
-in-memory exact lookahead are implemented.
+cached live-planner query, on-demand per-job query, resource-area per-job
+approximation, and synchronous in-memory exact lookahead are implemented.
 
-The design must not add persistent prediction state or work to the normal
-scheduling path. Prediction work is performed only when a caller asks for it.
+The on-demand queries perform prediction work only when called. The separate
+cached interface retains values that normal scheduling already computes; it
+does not add a forecast scan or prediction fields to waiting-queue entries.
 
 ## Terms
 
@@ -25,7 +26,117 @@ there is no reason to replace it with a weaker estimate. Jobs without a
 reservation may still receive an estimate, but that estimate must respect the
 capacity claimed by protected reservations.
 
-## Current behavior
+## Cached planning results: `get_planned_job_starts()`
+
+This interface follows the reporting model of Slurm `squeue --start`: read
+predictions produced during the latest live scheduling pass. It returns
+`Planned_Job_Starts` with:
+
+- `planned_at`: the simulation timestamp of that pass, or no value before
+  any planning pass and immediately after checkpoint restore.
+- `jobs`: currently eligible pending jobs, sorted by predicted start time.
+  Jobs without a prediction follow in scheduler queue order. Future arrivals,
+  running jobs, and completed jobs are excluded.
+- Each job has `job_idx`, optional `expected_start_time`, and
+  `start_time_kind` (`NONE`, `RESERVED`, or `ESTIMATED`).
+
+The query never runs a forecast, clones state, advances simulation, or changes
+the live plan. A finite start computed beyond the planning horizon may be
+reported as `ESTIMATED`, without a protected reservation. The query does not
+extend the scheduler's examination budget to fill missing predictions.
+Predictions can be stale between periodic backfill ticks; `planned_at` makes
+their age visible. Appended jobs have no cached prediction until a live pass
+computes one. Estimates are not clamped to the current time.
+
+Coverage follows the actual implementation's planning work. EASY generally
+projects only the blocked head; its later candidates are tested for admission
+now rather than assigned future starts. Hybrid and conservative planners save
+the future fits they compute within their scan. A pass that returns early,
+for example because no nodes are free, may produce only a head estimate.
+When one wake makes several internal passes, the latest recorded prediction
+for each job wins; starting jobs are omitted from the query result.
+Schedulers that do not calculate future fits report unknown start times.
+
+Storage is a reusable sparse vector of predicted job IDs, timestamps, and
+protection flags, plus one timestamp for the pass. On a typical 64-bit build,
+each cached record occupies 24 bytes; vector capacity follows the largest
+recorded pass. The live path adds writes for computed predictions but no
+extra resource searches. Query enumeration, lookup, and sorting still cost
+work proportional to the pending population; the query is not constant time.
+The cache is transient and is not serialized into checkpoints.
+
+The interface is exposed in C++ and Python as `get_planned_job_starts()` and
+over gRPC as `GetPlannedJobStartsRequest` / `GetPlannedJobStartsResponse`.
+
+## Slurm comparison
+
+These observations come from the local Slurm 26.11.0 release-candidate source
+under `external/slurm`.
+
+### `squeue --start`
+
+The command displays pending jobs' expected starts and planned nodes. It reads
+job information; it does not initiate a new forecasting run. The backfill
+scheduler computes estimates during its normal passes and stores them in
+`job_record_t.start_time`, an existing field shared by expected and actual
+start times. Waiting-queue entries point to job records rather than carrying
+another prediction timestamp.
+
+At the beginning of a backfill cycle, Slurm clears pending-job estimates.
+Once `bf_max_job_test` is reached, it stops testing more queue entries; it
+does not perform another scan to predict their starts for `squeue`. A tested
+job can retain a start beyond `bf_window`, but Slurm creates no backfill
+reservation for that out-of-window start. Thus an estimate and a protected
+reservation are different results.
+
+Source paths: `src/squeue/opts.c`, `src/squeue/squeue.c`,
+`src/common/job_record.h`, and `src/plugins/sched/backfill/backfill.c` within
+the Slurm checkout. Its `_clear_job_estimates()` resets pending starts, and
+the `StartTime set to time after current backfill window` branch explicitly
+keeps an estimate without creating a reservation.
+
+### `sbatch --test-only`
+
+This command asks for a fresh estimate for a hypothetical submission. It calls
+`slurm_job_will_run()`, which sends `REQUEST_JOB_WILL_RUN`. The controller
+constructs a temporary job, invokes `job_start_data()`, and removes the job.
+With `select/cons_tres`, the resource plugin copies partition/node usage,
+projects termination of running jobs, and tests when the requested job fits.
+It uses requested time limits for projected completions, and considers
+applicable partition, reservation, and preemption constraints.
+
+This is a resource-release projection, not a replay of every queued job's
+future scheduling decisions. `job_scheduler.c` explicitly states that its
+fresh test considers currently running jobs, whereas the stored backfill
+start considers higher-priority pending jobs. For an existing pending job,
+the returned start is no earlier than its stored backfill prediction. A new
+hypothetical job lacks that cached queue-aware prediction, so its estimate
+can be optimistic about waiting-job contention.
+
+Source paths: `src/sbatch/sbatch.c`, `src/api/allocate.c`,
+`src/slurmctld/proc_req.c`, `src/slurmctld/job_mgr.c`,
+`src/slurmctld/job_scheduler.c`, and
+`src/plugins/select/cons_tres/job_test.c`. The latter's `_future_run_test()`
+copies resource state and removes running jobs from the copies as they are
+projected to complete.
+
+### Choosing an interface
+
+| Interface | When predictions are computed | Coverage and limits | What the query changes |
+| --- | --- | --- | --- |
+| Slurm `squeue --start` | During prior backfill planning | Tested jobs; out-of-window estimates may exist; jobs beyond the test limit can be unknown | Reads stored job information |
+| Slurm `sbatch --test-only` | During the request | One hypothetical job, using projected running-job releases and applicable constraints; does not replay queued starts | Performs a temporary allocation test; submits no lasting job |
+| DR_EVT `get_planned_job_starts()` | During prior live scheduling | Predictions actually computed; queue limits and early exits leave unknowns; out-of-horizon estimates may exist | Reads cached predictions and current pending membership |
+| DR_EVT `get_job_statuses(ids, estimation_depth)` | During the request | Fresh serial placement forecast; query depth is independent of live scheduler depth and horizon | Builds a temporary plan; live scheduler is unchanged |
+| DR_EVT `get_exact_job_start_times(ids, estimation_depth)` | During the request | Replays the configured scheduler, including its ticks, depth, horizon, and known arrivals | Advances an isolated simulation clone |
+
+Use the cached API to observe what the live planner last calculated. Use
+`get_job_statuses()` for lifecycle information and broader fresh forecasts.
+These two interfaces can report different expected starts because they answer
+different questions. Exact lookahead supplies a simulated continuation when
+future scheduler decisions must be reproduced.
+
+## On-demand status behavior
 
 `Simulation::get_job_statuses(job_ids, estimation_depth)` builds a temporary
 reservation-aware capacity projection. A pending result carries a start time
@@ -198,6 +309,7 @@ The APIs have distinct cost and purpose:
 | --- | --- | --- |
 | `get_fcfs_head_shadow_time()` | Core scheduler head-reservation state | Existing scheduler state |
 | `get_backfill_window()` | Core FCFS/EASY capacity and release snapshot | On-demand snapshot |
+| `get_planned_job_starts()` | Cached live-planner starts, following the squeue reporting model | Pending-job enumeration and cached lookup/sort; no forecasting |
 | `get_job_statuses()` | Common cheap per-job start-time reporting for EASY, hybrid, and conservative | Profile sweep over selected queue prefix |
 | `get_queue_drain_start_times(utilization, estimation_depth)` | Fast per-job resource-area start approximation | Resource-area sweep over selected queue prefix |
 | `get_prediction_horizon(utilization)` | Aggregate experimental queue-drain horizon | Resource-area event sweep |
@@ -243,6 +355,7 @@ Tests should cover the following independently:
    to running releases and capacity changes.
 7. No prediction query mutates live scheduling state or creates output.
 
-Status, queue-drain, and EASY prediction-horizon tests cover the implemented
-APIs. Exact-lookahead and generalized queue-drain extensions remain design
-work and require their own tests before implementation.
+Status, cached-start, queue-drain, EASY prediction-horizon, and exact-lookahead
+tests cover the implemented APIs. Cached-start tests distinguish an unknown
+prediction from an on-demand forecast, and cover queue-depth suppression,
+out-of-horizon estimates, periodic freshness, and checkpoint invalidation.

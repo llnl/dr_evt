@@ -128,6 +128,7 @@ Their scheduling semantics are documented in
 | `append_job(submit_time, num_nodes, queue, limit_time, actual_run_time=None)` | Append and enqueue one live job; return its ID. Jobs must be appended in non-decreasing `submit_time` order; the limit must be a positive whole number of seconds; a known runtime must be positive and no greater than the limit. |
 | `append_jobs(requests)` | Atomically append and enqueue ordered `JobAppendRequest` values; return their IDs. |
 | `get_job_statuses(job_idxs)` | Return lifecycle and timing snapshots for appended job IDs. |
+| `get_planned_job_starts()` | Read the latest live-planner predictions and their planning timestamp, without running a forecast. |
 | `advance_to(target_time)` | Process events at or before the target. |
 | `run_until_exclusive(target_time)` | Process events strictly before the target. |
 | `save_checkpoint(filename)` | Save complete simulation state to a same-build binary checkpoint. |
@@ -156,6 +157,25 @@ requirements, matching `SimParams`, callback compatibility, supported trace
 modes, progressive loading, and output recovery.
 
 ## Supporting types
+
+`get_planned_job_starts()` returns `PlannedJobStarts` with optional `planned_at`
+and a list of `PlannedJobStart` values. Each contains `job_idx`, optional
+`expected_start_time`, and `start_time_kind`. Eligible pending jobs are sorted
+by expected start, with unknowns last. Predictions are saved during live
+scheduling, so queue limits and early exits can leave jobs without estimates.
+Out-of-horizon estimates can be present without protection. A periodic plan
+can be older than the current time; no cached plan survives checkpoint restore.
+
+```python
+plan = sim.get_planned_job_starts()
+for job in plan.jobs:
+    print(plan.planned_at, job.job_idx, job.expected_start_time)
+```
+
+This follows Slurm's `squeue --start` reporting model. `get_job_statuses()`
+instead calculates fresh pending forecasts when called. See
+[Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md#slurm-comparison)
+for the comparison with Slurm `sbatch --test-only` and exact lookahead.
 
 `JobAppendRequest(submit_time, num_nodes, queue, limit_time,
 actual_run_time=None)` represents one entry passed to `append_jobs()`. A known
