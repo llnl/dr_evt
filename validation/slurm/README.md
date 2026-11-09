@@ -21,9 +21,9 @@ the recorded clock/gating hooks to that exported copy. The host checkout is
 unchanged. No host Slurm installation, database, or compute-node daemons are
 needed.
 
-Place `lassen-756-01.csv` from [LLNL's LAST data](https://github.com/LLNL/LAST)
-under `lassen_traces/` in the repository root. The raw trace is not distributed
-with this repository. Run:
+Prepare the local extraction using the exact submission-time interval in the
+[parent page's workload description](../../docs/user-guide/SCHEDULER_VALIDATION.md#lassen-workload),
+and save it as `lassen_traces/lassen-756-01.csv` in the repository root. Run:
 
 ```sh
 bash validation/slurm/run.sh
@@ -161,8 +161,8 @@ Both exact matches are recorded outcomes under uncontrolled scheduler order.
 
 The protected comparison uses reservation depth 32, backfill examination depth 64,
 planning resolution one second, and a 72-hour planning horizon. The Lassen
-prefix uses [LLNL's LAST Lassen trace](https://github.com/LLNL/LAST) and starts
-with an empty `pbatch` capacity pool. Recorded runtimes are
+prefix uses the [common Lassen workload](../../docs/user-guide/SCHEDULER_VALIDATION.md#lassen-workload).
+Recorded runtimes are
 rounded up to whole seconds in both inputs; arrivals and whole-minute time
 limits are preserved. `workload.json` records the input hash and selected rows.
 

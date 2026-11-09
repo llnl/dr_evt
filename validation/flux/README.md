@@ -58,9 +58,10 @@ hashes, commands, and logs are retained under `results/`.
 
 ## Recorded Lassen comparisons
 
-Mount the user-provided `lassen_traces` folder read-only at `/lassen_traces` in
-the prepared container. Obtain the source trace from [LLNL's LAST data](https://github.com/LLNL/LAST)
-and place `lassen-756-01.csv` in that folder. The trace is not checked into this repository.
+Prepare the local extraction using the exact submission-time interval in the
+[parent page's workload description](../../docs/user-guide/SCHEDULER_VALIDATION.md#lassen-workload),
+and save it as `lassen_traces/lassen-756-01.csv`. Mount `lassen_traces`
+read-only at `/lassen_traces` in the prepared container.
 Run these commands inside that container:
 
 ```sh
@@ -69,11 +70,9 @@ python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv   "$(cat
 python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv   "$(cat /workspace/dr_evt-simulator)" --policy hybrid   --scheduler-backend fluxion --reservation-depth 32 --queue-depth 64   --max-jobs 2000 --timeout 900 --outdir /results/lassen-hybrid-prefix2000
 ```
 
-The runner selects the earliest jobs in stable arrival order. It preserves
-arrivals, limits, and durations on an initially empty pool of 756 whole-node
-units. It accepts subset logs with `job_submit_time,begin_time,end_time` and
-whole logs with `submit_time,duration`. `--max-jobs 0` selects the whole file.
-The published results cover 2,000 jobs, not the full source log.
+The runner accepts extracted logs with `job_submit_time,begin_time,end_time`
+and logs with `submit_time,duration`. The commands above select the
+2,000-job workload described on the parent page.
 
 `sched_simple.py` inherits the installed native Python sched-simple's
 allocation, scheduling, and forecast methods unchanged. It adds read-only

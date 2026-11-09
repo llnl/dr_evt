@@ -12,13 +12,11 @@ of reservations tied to specific nodes.
 | FCFS without backfill | `sched-simple`; Fluxion is unloaded |
 | Hybrid backfill | Fluxion |
 
-Both recorded-workload comparisons with Fiction use **2,000 jobs** from
-[Lassen's job trace](https://github.com/LLNL/LAST), submitted from
-**2020-08-19 04:29:39 PDT** through **2020-08-19 15:38:34 PDT**, starting
-with an empty cluster partition (`pbatch`) of **756 nodes**.
+Both recorded-workload comparisons with Fiction use the
+[common 2,000-job Lassen workload](SCHEDULER_VALIDATION.md#lassen-workload).
 Each node has one core and jobs allocate whole nodes. Arrivals, time limits,
-and actual durations come from the trace. The latest recorded completion is
-**2020-08-20 21:06:09.138 PDT**; simulated schedules can finish at different times.
+and actual durations are unchanged; arrival times are measured relative to
+the first submission.
 
 Both schedulers use equal priorities, FCFS order, no system latency or node
 release delay, and an unlimited planning horizon. Fair share, usage accounting,
