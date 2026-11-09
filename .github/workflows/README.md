@@ -105,8 +105,9 @@ The OpenPBS audits check the harness's capacity accounting, arrival and
 duration validation, trace conversion, and forecast-fit calculation. They do
 not build or run OpenPBS. The full native replay requires the pinned external
 source and the supplied Lassen trace and runs separately; see the
-[OpenPBS harness](../../validation/openpbs/README.md). Its original 2,000-job
-replay differs, while the replay with every time multiplied by two matches.
+[OpenPBS harness](../../validation/openpbs/README.md). On the original converted 2,000-job input, `fcfs_1s_evt_group` matches all
+starts and completions; default `fcfs` has 1,433 differing schedules. No time
+scaling is used in these comparisons.
 
 ## Status Badges
 

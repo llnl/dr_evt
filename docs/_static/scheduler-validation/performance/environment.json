@@ -6,7 +6,8 @@
   "docker_cpu_limit": 0,
   "docker_memory_limit_bytes": 0,
   "docker_version": "29.7.2",
-  "source_revision": "348e70aad8e20c774c82f10b0203ddc12bbac4c6",
+  "source_revision": "d7005dd919a72b6cc1bda2c36fcd1ef4f7201b04",
   "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
-  "measured_at_utc": "2026-11-09T00:48:06.288434+00:00"
+  "working_tree_snapshot": true,
+  "measurement_date_local": "2026-11-08"
 }

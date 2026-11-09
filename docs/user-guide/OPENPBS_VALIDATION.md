@@ -16,9 +16,8 @@ completions, and virtual time; no database or MOM daemons are used.
 The comparison uses FCFS order, strict ordering, R=32, unlimited candidate
 examination, and `opt_backfill_fuzzy=off`. It runs a native scheduling cycle
 after each equal-time batch of arrivals and completions. DR_EVT uses
-event-driven hybrid backfill with `--per_pass_accounting`. Computation-time
-cycle limits, relative fallback triggers, deployment latency, and ordinary
-node-bound placement are outside this experiment.
+event-driven hybrid backfill with `--per_pass_accounting`. The replay omits
+computation-time cycle limits, relative fallback triggers, and deployment latency.
 
 OpenPBS calendars use integer seconds. Relative arrivals, actual runtimes,
 and requested walltimes are rounded upward; duration is at least one second,
@@ -50,7 +49,7 @@ and the [default-policy evidence](https://github.com/LLNL/dr_evt/blob/main/valid
 | Makespan | 143,232 s | 143,232 s |
 | Area under resource curve | 81,309,892 capacity-unit seconds | 81,309,892 capacity-unit seconds |
 | Utilization | 75.0899% | 75.0899% |
-| Process runtime | 7.257180 s (median of 5 runs) | 325.310732 s |
+| Process runtime | 0.190654 s (median of 5 runs) | 325.310732 s |
 
 ::::{figure} ../_static/scheduler-validation/openpbs/grouped/resource-curves.svg
 :alt: Native OpenPBS and DR_EVT fcfs_1s_evt_group have identical allocated-capacity curves for all 2,000 jobs
@@ -81,7 +80,7 @@ do not imply matching job starts.
 | Makespan | 143,569 s | 143,232 s |
 | Area under resource curve | 81,309,892 capacity-unit seconds | 81,309,892 capacity-unit seconds |
 | Utilization | 74.9136% | 75.0899% |
-| Process runtime | 0.182249 s (median of 5 runs) | 315.908234 s |
+| Process runtime | 0.059443 s (median of 5 runs) | 315.908234 s |
 
 ::::{figure} ../_static/scheduler-validation/openpbs/default-fcfs/resource-curves.svg
 :alt: Native OpenPBS and default DR_EVT fcfs resource-use curves for the original converted 2,000-job input
@@ -112,6 +111,14 @@ on an Apple M3 Max; the native adapter also writes event streams for auditing.
 Timing covers process launch, input, simulation, output, and exit. Builds,
 Python result parsing, audits, and plotting are excluded. These are execution
 times, not simulated makespans.
+
+The optimized grouped replay takes **0.190654 s**, down from **7.257180 s**
+in the previous common-environment measurement (about **38.1×** faster).
+Fixed-time admission no longer searches for unused future starts, and the
+queue scan stops searching for future reservations after R is filled. All
+2,000 job schedules are unchanged. The
+[previous timing record](../_static/scheduler-validation/performance/before-optimization.json)
+is retained for comparison.
 
 [Common DR_EVT timing record](../_static/scheduler-validation/performance/performance.json)
 · [Current Release build](../_static/scheduler-validation/performance/build.json)
@@ -308,11 +315,15 @@ The existing FCFS scheduling engine uses a separate forecast planner for this
 policy. The planner applies the grouping rule above to reservations,
 pending-job status predictions, and queue-drain forecasts.
 
+Fixed-time checks inspect only the requested interval. Once the protected-job
+limit is reached, later backfill candidates are checked only for starting now;
+unused future starts are not calculated. These optimizations retain the grouping
+rule and all recorded job schedules.
+
 Use event-driven dispatch, a circular queue, and unlimited planning horizon.
 The native comparison uses integer-second converted inputs, a fixed shared
-capacity pool, and unlimited candidate examination. Node placement, fairshare,
-server/MOM execution, computation-time limits, and other OpenPBS policies are
-outside this compatibility model. Python uses `PriorityPolicy.FCFS_1S_EVT_GROUP`;
+capacity pool, and unlimited candidate examination. Python uses
+`PriorityPolicy.FCFS_1S_EVT_GROUP`;
 Protobuf configuration and gRPC requests accept `priority_policy: "fcfs_1s_evt_group"`.
 
 ### Native validation replay

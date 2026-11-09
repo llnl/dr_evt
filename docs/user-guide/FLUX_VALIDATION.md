@@ -12,9 +12,6 @@ of reservations tied to specific nodes.
 | FCFS without backfill | `sched-simple`; Fluxion is unloaded |
 | Hybrid backfill | Fluxion |
 
-DR_EVT models interchangeable capacity counts. It does not model Fluxion's
-resource graph, node matching, or reservations tied to particular nodes.
-
 Both recorded-workload comparisons with Fiction use **2,000 jobs** from
 [Lassen's job trace](https://github.com/LLNL/LAST), submitted from
 **2020-08-19 04:29:39 PDT** through **2020-08-19 15:38:34 PDT**, starting
@@ -46,9 +43,8 @@ Both engines use FCFS without backfill, with Q=64. For `sched-simple`, Q bounds
 outstanding allocation requests, rather than jobs examined per pass. It stops
 at the first blocked queue head; jobs behind that head cannot start early.
 It uses a simple node/core pool and assigns concrete resources at job start.
-Fluxion is not used in this run. `sched-simple` has no backfill: its forecast
-estimates starts in a copied pool without protecting future nodes in
-scheduling state.
+`sched-simple` estimates future starts in a copied pool without protecting
+future nodes in scheduling state.
 
 All **2,000 start and completion times match at millisecond output precision**,
 as do the resource curves and waiting metrics. All **2,925 native snapshots**
@@ -60,7 +56,7 @@ pass capacity and node-ownership checks.
 | Makespan | 41.1710 h | 41.1710 h |
 | Area under resource curve | 81,305,711.274 node-seconds | 81,305,711.274 node-seconds |
 | Utilization | 72.5613% | 72.5613% |
-| Process runtime | 0.020736 s (median of 5 runs) | 145.849 s |
+| Process runtime | 0.020419 s (median of 5 runs) | 145.849 s |
 
 DR_EVT times are medians of five runs in the common Linux Docker environment
 on an Apple M3 Max. Timing includes process launch, input, simulation, output,
@@ -105,7 +101,7 @@ every trace difference has not been isolated.
 | Makespan | 40.2895 h | 40.6922 h |
 | Area under resource curve | 81,305,711.274 node-seconds | 81,305,711.274 node-seconds |
 | Utilization | 74.1489% | 73.4151% |
-| Process runtime | 0.075825 s (median of 5 runs) | 376.8174 s |
+| Process runtime | 0.061328 s (median of 5 runs) | 376.8174 s |
 
 The fresh native hybrid timing run reproduced the published schedule and
 passed all 2,920 snapshot audits. Its [timing record](../_static/scheduler-validation/performance/native-hybrid.json)

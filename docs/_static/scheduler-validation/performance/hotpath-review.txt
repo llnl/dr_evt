@@ -1,0 +1,46 @@
+Hot-path review, 2026-11-08
+
+Retained changes:
+- Reservation_Timeline::can_fit checks only the requested interval. It no
+  longer searches future starts only to reject them.
+- The per-pass queue scan uses can_fit(now) after its reservation quota is
+  filled. It no longer calculates a future start it cannot use.
+The published six-case benchmark uses these changes.
+
+Existing compile-time selection:
+- schedule_with_forecast<Timeline> selects exact or grouped forecast code.
+- Pending-job status and queue-drain helpers use GroupEvents template
+  parameters and if constexpr lambdas; grouping is not checked per job.
+- earliest_fit<IncludeEndpoint> selects interval-boundary semantics.
+- The main simulation loop already specializes resource accounting, event
+  dispatch, periodic backfill, fixed periodic dispatch, and warm-stage behavior.
+
+Remaining runtime choices include backfill policy, queue depth, and planning
+resolution. Reservation counts and available capacity change during a scan;
+these decisions cannot simply become constants. Backfill policy and fixed
+options could be specialized, but each new template dimension adds code.
+
+Measured experiments, not retained:
+1. Add RoundRelease to schedule_with_forecast<Timeline, RoundRelease>, choose
+   it once at scheduler entry using planning_time_resolution != 0, and use an
+   if constexpr lambda for job release calculations. The unrounded path keeps
+   (start + estimate) - start to preserve floating-point behavior.
+2. Construct baseline m_events with emplace_hint(m_events.end(), time, true)
+   instead of emplace(time, true), because baseline event times are ordered.
+
+Both experiments used the same Release flags and Docker environment as the
+production benchmark. For each case, one warmup pair preceded 15 measured
+pairs, alternating which binary ran first. Schedule and resource hashes match.
+constexpr-experiment.json and ordered-insert-experiment.json retain individual
+runs and medians. Rounding specialization made grouped replay about 2.8% slower;
+other cases changed by roughly 0.3-1.3%. Ordered insertion made grouped replay
+about 1.2% slower. These short runs do not prove either change is universally
+slower, but provide no consistent benefit for retaining them.
+
+An independent -pg build of the optimized source ran each of grouped OpenPBS,
+default OpenPBS, and Fiction hybrid ten times. gprof attributed 85.54% of
+sampled grouped CPU and 70.83% of default OpenPBS CPU to the corresponding
+schedule_with_forecast instantiation. Helpers are inlined, so this profile
+cannot isolate the cost of individual checks inside that function. Profiling
+builds and outputs remain in validation/flux/results/timing-20261108; the
+instrumented binary was not used for published processing times.

@@ -1,8 +1,13 @@
 {
-  "revision": "348e70aad8e20c774c82f10b0203ddc12bbac4c6",
-  "tree": "e7f6ddd799a172feeb29b58d697778dbc5c40243",
-  "working_tree_snapshot": false,
-  "source_sha256": {},
+  "revision": "d7005dd919a72b6cc1bda2c36fcd1ef4f7201b04",
+  "tree": "ae96046b4b64e4692d234cd771cb66a1f4ab7728",
+  "working_tree_snapshot": true,
+  "source_sha256": {
+    "src/sim/scheduler_base.hpp": "9ae0e193b4a5ce094c6329685b048571ff52cfc988ac101a803fd178b15e460c",
+    "src/sim/forecast_1s_evt_group_timeline.hpp": "52ba5f069021883194a16d1a73f7e17282d48952d7e1df03cc87a58d21bd98c9",
+    "src/sim/scheduler_fcfs_pass_hybrid_circular.cpp": "a63482b34deefaeabf65387180c0fefcc6f32ce7dc0da71c193712e2fa89ba0a",
+    "tests/test_openpbs_forecast.cpp": "d192017512fb76f5f4a123d77dfea0100c2262f3bbe4bd53fc46d6757d44d8ac"
+  },
   "configure_flags": [
     "-DCMAKE_BUILD_TYPE=Release",
     "-DDR_EVT_WITH_SER20=OFF",
@@ -12,6 +17,7 @@
     "-DDR_EVT_ENABLE_GRPC=OFF",
     "-DDR_EVT_LEGACY_RESERVATION_BARRIER=OFF"
   ],
-  "binary": "/workspace/dr_evt-builds/348e70aad8e20c774c82f10b0203ddc12bbac4c6/simulator",
-  "binary_sha256": "e742c739829896a7a86d08e6552e48fd11c58aaa8f183dd55a3444df27e3341b"
+  "binary": "/workspace/dr_evt-builds/d22b94ae1e578087026913f52e59b0804d88dc32305a2e2def1a3ccfb1247418/simulator",
+  "binary_sha256": "0d2db46a36791b973f2382d5a68517433aa5a5e7449274e1028caf7759780c00",
+  "source_hash_scope": "Changed source/test files relative to revision; other compiled sources match the base revision. Documentation changes are excluded."
 }
