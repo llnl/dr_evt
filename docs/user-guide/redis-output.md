@@ -263,27 +263,9 @@ checkpoint even when the corresponding trace record has been reclaimed.
 
 ## Checkpoint/restart and output rollback
 
-Checkpoint output remains external to the binary snapshot. File-backed restart
-renames the existing file as an immutable
-`.pre-restart.N` segment, writes resumed output to a fresh file, and provides
-`dr_evt_stitch_checkpoint_output` to join the segments at their saved byte
-boundaries. Redis restart similarly renames the canonical namespace to
-`PREFIX:pre-restart:N` and starts a fresh canonical namespace. Rebuild its CSV
-values, hashes, sets, and sorted indexes after the resumed run with:
-
-```bash
-dr_evt_stitch_checkpoint_output --redis-uri URI --redis-prefix PREFIX
-```
-
-The Redis operation rebuilds the canonical namespace in place and removes the
-consumed archived namespaces after it succeeds.
-
-In both modes, rows written after the saved checkpoint remain in the archive
-for auditability but are excluded by the recorded boundary during stitching.
-
-These output limitations are unrelated to job-status queries.
-`get_job_statuses()` works with Redis off or on, and its retained status
-metadata is checkpoint-safe whenever checkpointing itself is available.
+See [Checkpoint/Restart](checkpoint-restart.md#output-rollback-and-recovery)
+for file and Redis archive handling, output rollback boundaries, and the
+commands that reconstruct output after a resumed run.
 
 ## Connection URIs
 

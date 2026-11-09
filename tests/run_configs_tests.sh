@@ -1,11 +1,11 @@
 #!/bin/bash
 # Test that configuration files produce same results as command-line options
 #
-# Verifies that all CLI options are supported via config files and behave identically
+# Verifies that configurable CLI settings behave identically in Protobuf files
 # NOTE: Requires Protobuf support (cmake -DDR_EVT_ENABLE_PROTOBUF=ON)
 #
-# This test uses --run_time_mode limit throughout (test traces lack actual_run_time column).
-# Both CLI and config-file invocations use the same run_time_mode for meaningful comparison.
+# Most cases use --run_time_mode limit because their traces lack actual durations.
+# CLI and config invocations use matching runtime modes; precision cases use actual.
 
 set -e
 
@@ -503,6 +503,77 @@ else
     echo "  ✗ expected jobs.out; found: $(ls "$NAME_DIR")"
     FAIL=$((FAIL + 1))
 fi
+# Fractional event times expose differences in both output timestamp formats.
+echo "Test 15: millisecond output config and default"
+PRECISION_TRACE="$TEST_WORK_DIR/precision.csv"
+cat > "$PRECISION_TRACE" <<'EOF'
+job_submit_time,num_nodes,time_limit,actual_run_time
+0.125,1,2,1.375
+0.625,1,2,1.125
+EOF
+printf 'msec_output: true\n' > "$TEST_WORK_DIR/msec_true.pb"
+printf 'msec_output: false\n' > "$TEST_WORK_DIR/msec_false.pb"
+printf 'verbose: false\n' > "$TEST_WORK_DIR/msec_omitted.pb"
+run_precision_case() {
+    local case_name="$1"
+    shift
+    "$SIMULATOR" "$PRECISION_TRACE" \
+        --total_nodes 2 --trace_format simple --timestamp_format epoch \
+        --run_time_mode actual \
+        --outfile "$TEST_WORK_DIR/$case_name.csv" \
+        --resource_trace "$TEST_WORK_DIR/${case_name}_resources.csv" \
+        "$@" > "$TEST_WORK_DIR/$case_name.log" 2>&1
+}
+run_precision_case integer
+run_precision_case millisecond --msec_output
+run_precision_case config_true --config "$TEST_WORK_DIR/msec_true.pb"
+run_precision_case config_false --config "$TEST_WORK_DIR/msec_false.pb"
+run_precision_case config_omitted --config "$TEST_WORK_DIR/msec_omitted.pb"
+PRECISION_OK=1
+for SUFFIX in .csv _resources.csv; do
+    if cmp -s "$TEST_WORK_DIR/integer$SUFFIX" "$TEST_WORK_DIR/millisecond$SUFFIX"; then
+        PRECISION_OK=0
+    fi
+    for CASE in config_false config_omitted; do
+        if ! cmp -s "$TEST_WORK_DIR/integer$SUFFIX" "$TEST_WORK_DIR/$CASE$SUFFIX"; then
+            PRECISION_OK=0
+        fi
+    done
+    if ! cmp -s "$TEST_WORK_DIR/millisecond$SUFFIX" "$TEST_WORK_DIR/config_true$SUFFIX"; then
+        PRECISION_OK=0
+    fi
+done
+if [ "$PRECISION_OK" -eq 1 ]; then
+    echo "  ✓ config true matches CLI precision; false and omitted keep integer output"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ config timestamp precision differs from CLI or default"
+    FAIL=$((FAIL + 1))
+fi
+
+echo "Test 16: millisecond output left-to-right precedence"
+run_precision_case config_resets_cli --msec_output --config "$TEST_WORK_DIR/msec_false.pb"
+run_precision_case omitted_resets_cli --msec_output --config "$TEST_WORK_DIR/msec_omitted.pb"
+run_precision_case cli_overrides_config --config "$TEST_WORK_DIR/msec_false.pb" --msec_output
+PRECEDENCE_OK=1
+for SUFFIX in .csv _resources.csv; do
+    for CASE in config_resets_cli omitted_resets_cli; do
+        if ! cmp -s "$TEST_WORK_DIR/integer$SUFFIX" "$TEST_WORK_DIR/$CASE$SUFFIX"; then
+            PRECEDENCE_OK=0
+        fi
+    done
+    if ! cmp -s "$TEST_WORK_DIR/millisecond$SUFFIX" "$TEST_WORK_DIR/cli_overrides_config$SUFFIX"; then
+        PRECEDENCE_OK=0
+    fi
+done
+if [ "$PRECEDENCE_OK" -eq 1 ]; then
+    echo "  ✓ config resets earlier CLI precision and a later CLI flag overrides config"
+    PASS=$((PASS + 1))
+else
+    echo "  ✗ millisecond output precedence differs"
+    FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "=========================================="
 echo "Results: $PASS passed, $FAIL failed"

@@ -109,8 +109,9 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
     sp.set_resource_trace(cfg.resource_trace());
   }
 
-  // Verbose flag (always set in proto3, use the value directly)
+  // Boolean output controls (proto3 defaults to false).
   sp.m_verbose = cfg.verbose();
+  sp.m_msec_output = cfg.msec_output();
 
   // Scheduling parameters (0 means use default from Sim_Params constructor)
   if (cfg.total_nodes() > 0) {

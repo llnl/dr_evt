@@ -199,60 +199,9 @@ the simulation itself must resume later.
 
 ### `save_checkpoint()` / `load_checkpoint()`
 
-Save all logical state after `advance_to()` returns, outside scheduler callbacks,
-and restore it into a newly constructed simulation with matching `Sim_Params`:
-
-```cpp
-sim.advance_to(500.0);
-sim.save_checkpoint("simulation.ckpt");
-
-Simulation resumed(params);
-resumed.load_checkpoint("simulation.ckpt");
-resumed.advance_to(1000.0);
-```
-
-Checkpoints record the scheduling controls, including
-`per_pass_accounting`, `diagnostic_no_reservations`, `dispatch_on_events`,
-and the next tick deadline.
-This build uses checkpoint format 20; older checkpoints must be regenerated.
-Restart preserves the selected reservation and accounting policies, arrival notification
-behavior, and timer phase.
-
-The checkpoint includes resident job records, appended-job status history,
-scheduler queue state, running jobs, pending events, capacity and statistics
-accounting, resource history, and the random-number generator. If incremental
-output files were open, they are flushed when saved and reopened in append mode
-when loaded. For file output, the checkpoint stores each flushed byte boundary.
-Loading it renames the current file to `<path>.pre-restart.N`, records the
-boundary in an adjacent `.checkpoint-bytes` sidecar, and starts a fresh segment
-at the original path.
-
-After the resumed run, reconstruct either output with:
-
-```bash
-dr_evt_stitch_checkpoint_output output.csv output.stitched.csv
-```
-
-The tool discovers all numbered archives, retains each only through its saved
-checkpoint boundary, removes repeated CSV headers, and atomically writes the
-combined result. For Redis, rebuild the canonical namespace in place with
-`dr_evt_stitch_checkpoint_output --redis-uri URI --redis-prefix PREFIX`.
-
-Checkpoint/restart is compiled when `DR_EVT_WITH_SER20=ON`. Checkpoints are
-Ser20 binary, same-build artifacts rather than a portable exchange format. A
-checkpoint records the complete `Sim_Params` of the run that wrote it; the
-destination must use matching scheduling, runtime, capacity, and output
-configuration, which is validated field by field on restore, and the recorded
-configuration is available afterwards through `Simulation::restored_params()`. Callback-based Custom FCFS is supported when the destination
-simulation is constructed with equivalent cost and selection callbacks. The
-checkpoint restores its queue entries, previously computed costs, candidate
-state, and accounting without invoking the cost callback during load; callback
-objects and their externally owned state are not serialized. Custom scheduler
-subclasses remain unsupported because they may add unknown state. Standard,
-Pcon, and SWF traces and progressive file loading are supported; replay/warm-start
-execution remains unsupported. Redis namespaces are archived as numbered
-`PREFIX:pre-restart:N` generations and rebuilt by the same stitch tool.
-`get_job_statuses()` remains independent of Redis.
+Save and restore simulation state with matching configuration. See
+[Checkpoint/Restart](../user-guide/checkpoint-restart.md) for compatibility,
+save/load examples, automatic checkpoints, and output recovery.
 
 ### `run_until_exclusive(target_time)`
 
