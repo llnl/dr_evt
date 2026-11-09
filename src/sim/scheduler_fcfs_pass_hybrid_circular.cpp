@@ -98,8 +98,14 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
       const tdiff_t duration =
           release_estimate(current_time, job.run_time_estimate);
       const bool try_reserve = reservations.size() < reservation_limit;
+      // Once R reservations exist, later candidates only need admission now.
+      // A future fit cannot be used and need not be calculated.
       const auto at =
-          plan.earliest_fit(job.nodes_requested, duration, current_time);
+          try_reserve
+              ? plan.earliest_fit(job.nodes_requested, duration, current_time)
+              : (plan.can_fit(current_time, job.nodes_requested, duration)
+                     ? std::optional<sim_time_t>(current_time)
+                     : std::nullopt);
       if (at && *at == current_time) {
         starts.push_back(job.job_id);
         free_nodes -= job.nodes_requested;

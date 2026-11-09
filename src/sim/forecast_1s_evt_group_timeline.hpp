@@ -58,6 +58,17 @@ public:
   }
 
   /**
+   * @brief Check an exact interval without forecasting a later start.
+   * @param[in] start Time at which the interval must begin.
+   * @param[in] nodes Requested capacity.
+   * @param[in] duration Requested interval duration; zero queries a point.
+   * @return Whether capacity is sufficient throughout the half-open interval.
+   */
+  bool can_fit(sim_time_t start, num_nodes_t nodes, tdiff_t duration) const {
+    return m_plan.can_fit(start, nodes, duration);
+  }
+
+  /**
    * @brief Find a fit at now or at the end of a simulated event group.
    * @param[in] nodes Requested capacity.
    * @param[in] duration Requested interval duration; zero queries a point.

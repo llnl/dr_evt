@@ -35,6 +35,10 @@ the policy name through both CLI arguments and a Protobuf configuration.
 Its focused C++ test covers inclusive groups, separated/lone releases without
 an artificial delay, current fits, full-interval protection, retained calendar
 events, actual streaming starts, and checkpoint continuation when enabled.
+Direct-admission regressions check that a later fit does not justify starting
+now, an end-boundary shortage is excluded from a half-open interval, and an
+interior shortage blocks it. Point queries and grouped current-time checks
+are covered too.
 Placement-pass integration tests also exercise the command-line selector.
 Quick CI runs its native test binary; full CI runs it and the integration
 runner through CTest. The native OpenPBS comparison remains a separate replay.

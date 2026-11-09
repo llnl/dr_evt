@@ -177,6 +177,8 @@ public:
 
   /**
    * @brief Check whether an interval fits without changing the plan.
+   * @details Inspect only the requested half-open interval and stop at the
+   * first capacity shortage. Do not search for a later fitting start.
    * @param[in] start Interval start time.
    * @param[in] nodes Number of nodes required by the interval.
    * @param[in] duration Interval duration.
@@ -184,8 +186,28 @@ public:
    *         otherwise false.
    */
   bool can_fit(sim_time_t start, num_nodes_t nodes, tdiff_t duration) const {
-    const auto fit = earliest_fit(nodes, duration, start);
-    return fit && *fit == start;
+    if (m_free_nodes.empty()) {
+      return false;
+    }
+    auto segment = std::prev(
+        std::upper_bound(m_free_nodes.begin(), m_free_nodes.end(), start,
+                         [](sim_time_t value, const segment_t &entry) {
+                           return value < entry.first;
+                         }));
+    if (segment->second < nodes) {
+      return false;
+    }
+    if (duration <= 0) {
+      return true;
+    }
+    const sim_time_t end = start + duration;
+    for (++segment; segment != m_free_nodes.end() && segment->first < end;
+         ++segment) {
+      if (segment->second < nodes) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
