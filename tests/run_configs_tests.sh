@@ -358,7 +358,7 @@ else
     fi
 fi
 
-# Test 10: capacity_schedule is available through protobuf field 30, and a
+# Test 10: capacity_schedule is available through protobuf configuration, and a
 # later CLI option overrides the config value just like the other options.
 echo "Test 10: capacity schedule config and CLI precedence"
 CAPACITY_TRACE="tests/test_traces/feature/capacity_schedule.csv"
@@ -410,7 +410,7 @@ else
     FAIL=$((FAIL + 1))
 fi
 
-# Test 11: sim_start_time is available through protobuf field 31 and produces the
+# Test 11: sim_start_time is available through protobuf configuration and produces the
 # same replay-based warm-start schedule as the CLI.
 echo "Test 11: warm-start time config"
 WARM_TRACE="tests/test_traces/feature/warm_start_native.csv"
