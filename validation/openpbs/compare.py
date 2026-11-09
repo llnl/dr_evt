@@ -86,7 +86,7 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
         writer.writerows(jobs)
     dr_command = [str(args.simulator), str(dr_input), '--total_nodes', str(capacity),
                   '--trace_format', 'simple', '--timestamp_format', 'epoch',
-                  '--run_time_mode', 'actual', '--priority_policy', args.dr_priority,
+                  '--run_time_mode', 'actual', '--priority_policy', args.priority_policy,
                   '--queue_impl', 'circular', '--backfill_policy', 'hybrid',
                   '--reservation_depth', str(reservations), '--per_pass_accounting',
                   '--backfill_queue_depth', str(len(jobs)), '--backfill_interval', '0',
@@ -146,7 +146,7 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
     differences = [{'job_id': i + 1, 'openpbs': n, 'dr_evt': d}
                    for i, (n, d) in enumerate(zip(native, dr_evt)) if n != d]
     report = {'name': name, 'jobs': len(jobs), 'capacity': capacity,
-              'dr_priority': args.dr_priority,
+              'priority_policy': args.priority_policy,
               'reservation_depth': reservations, 'exact_match': not differences,
               'different_jobs': len(differences), 'differences': differences,
               'openpbs_schedule': native, 'dr_evt_schedule': dr_evt,
@@ -181,7 +181,7 @@ def main():
     parser.add_argument('--simulator', type=Path, required=True)
     parser.add_argument('--trace', type=Path)
     parser.add_argument('--max-jobs', type=int, default=2000)
-    parser.add_argument('--dr-priority', choices=('fcfs', 'fcfs_1s_evt_group'), default='fcfs',
+    parser.add_argument('--priority_policy', choices=('fcfs', 'fcfs_1s_evt_group'), default='fcfs_1s_evt_group',
                         help='Original FCFS or the opt-in OpenPBS forecast policy')
     parser.add_argument('--outdir', type=Path, required=True)
     args = parser.parse_args()
@@ -208,14 +208,14 @@ def main():
     assert all(r['exact_match'] for r in reports), 'A matching control changed'
     adjacent = [(0, 1, 10, 10), (0, 1, 11, 11), (0, 2, 2, 2), (0, 1, 11, 11)]
     diagnostic = experiment(args, 'adjacent-release-calendar', adjacent, 3, 1, [0, 0, 11, 0])
-    mimic = args.dr_priority == 'fcfs_1s_evt_group'
+    mimic = args.priority_policy == 'fcfs_1s_evt_group'
     assert [s[0] for s in diagnostic['dr_evt_schedule']] == (
         [0, 0, 11, 0] if mimic else [0, 0, 10, 11])
     diagnostic['expected_difference'] = not mimic
     dump(args.outdir / diagnostic['name'] / 'report.json', diagnostic)
     reports.append(diagnostic)
-    spaced = [(a * 2, n, limit * 2, duration * 2) for a, n, limit, duration in adjacent]
-    spacing = experiment(args, 'separated-release-calendar', spaced, 3, 1, [0, 0, 20, 22])
+    separated = [(0, 1, 10, 10), (0, 1, 12, 12), (0, 2, 2, 2), (0, 1, 12, 12)]
+    spacing = experiment(args, 'separated-release-calendar', separated, 3, 1, [0, 0, 10, 12])
     assert spacing['exact_match']
     reports.append(spacing)
     if args.trace is not None:
@@ -234,12 +234,6 @@ def main():
         from diagnose import diagnose
         if not reports[-1]['exact_match']:
             diagnose(args.outdir / name / 'report.json')
-        spaced_jobs = [(a * 2, n, limit * 2, duration * 2) for a, n, limit, duration in jobs]
-        name += '-spacing2'
-        spacing = experiment(args, name, spaced_jobs, 756, 32)
-        assert spacing['exact_match'], 'Two-second spacing control differs'
-        reports.append(spacing)
-        plot(args.outdir / name / 'report.json')
     summary = [{k: r[k] for k in ('name', 'jobs', 'exact_match', 'different_jobs',
                                 'capacity_and_ownership_audit_passed', 'openpbs_metrics', 'dr_evt_metrics')}
                for r in reports]

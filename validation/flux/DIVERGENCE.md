@@ -3,7 +3,7 @@
 On a system with **4 nodes total**, Fiction's specific-node reservation delays
 backfill job D until 80 seconds. DR_EVT's node-count plan starts D at 70 while
 preserving head job C's start at 80. The
-[published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences)
+[published validation page](../../docs/user-guide/FLUX_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences)
 includes the node-assignment diagram.
 
 Fiction uses Fluxion for scheduling, resource matching, and node-specific

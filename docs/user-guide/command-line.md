@@ -466,7 +466,7 @@ Job priority/ordering policy.
   Requires a circular queue, zero dispatch/backfill intervals, and unlimited
   planning horizon. It checks predicted capacity after an inclusive one-second
   group of future events while preserving actual event timestamps. See the
-  [forecast rule and worked example](SCHEDULER_VALIDATION.md#the-rule-inside-openpbss-future-start-calculation).
+  [forecast rule and worked example](OPENPBS_VALIDATION.md#the-rule-inside-openpbss-future-start-calculation).
 - `sjf` - Shortest Job First (by run time estimate)
 - `ljf` - Longest Job First (by run time estimate)
 

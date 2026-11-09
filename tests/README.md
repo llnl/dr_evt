@@ -265,14 +265,13 @@ The default resource-time build (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) is
 required for the fixed-periodic reference suite. Full CI uses that build and
 runs all configured CTest tests; quick CI runs these three suites directly.
 Native scheduling comparisons and saved evidence are documented in
-[Scheduling Validation](../docs/user-guide/SCHEDULER_VALIDATION.md).
+[Simulation Validation](../docs/user-guide/SCHEDULER_VALIDATION.md).
 The [OpenPBS harness](../validation/openpbs/README.md) separately runs 21 small
-native comparisons and two versions of the Lassen prefix. Twenty small cases
-must match; one must reproduce the specified one-second forecast difference.
-The original Lassen replay records differences. The replay with every arrival,
-runtime, and requested limit multiplied by two must match exactly. These native
-runs require external OpenPBS sources and the Lassen trace and are not part of
-ordinary CI.
+native comparisons and the original converted Lassen prefix. The default
+validation policy `fcfs_1s_evt_group` must match every case exactly. Selecting
+`fcfs` records the original Lassen divergence and requires the expected
+four-job adjacent-release difference. These native runs require external
+OpenPBS sources and the Lassen trace and are not part of ordinary CI.
 
 ### Fixed periodic dispatch benchmark
 

@@ -75,7 +75,7 @@ Periodic hybrid/conservative backfill also checks capacity at each candidate's
 end timestamp, representing Slurm's endpoint rule. Event-driven and fixed
 periodic placement retain half-open fits, as needed for Fluxion and Spur.
 The [endpoint explanation](SCHEDULER_LOOPS.md#shared-terms) defines both rules;
-the [Slurm validation](SCHEDULER_VALIDATION.md#sources-of-divergence-and-corrections)
+the [Slurm validation](SLURM_VALIDATION.md#sources-of-divergence-and-corrections)
 measures their effect.
 
 ### PBS timing and cycle limits
@@ -116,9 +116,10 @@ release at 10 does not add a one-second delay. Default DR_EVT checks each distin
 predicted release time; the separate `fcfs_1s_evt_group` policy reproduces OpenPBS's
 forecast grouping. A later predicted start can allow a different job to
 run ahead of the waiting job. The
-[native OpenPBS validation](SCHEDULER_VALIDATION.md#openpbs-with-server-wide-capacity)
+[native OpenPBS validation](OPENPBS_VALIDATION.md)
 identifies this source difference, reproduces it with four jobs, and shows
-exact agreement when every time in the Lassen replay is multiplied by two.
+exact agreement for all 2,000 jobs with `fcfs_1s_evt_group` on the original
+converted input.
 
 ### LSF admission on reserved slots
 

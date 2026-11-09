@@ -14,9 +14,8 @@ forecast query paths at compile time.
 |---|---:|---:|
 | All 21 small cases, including the four-job adjacent-release case | 392 | 0 |
 | Original converted Lassen prefix, R=32, capacity=756 | 2,000 | 0 |
-| Same prefix with every arrival, runtime, and requested limit multiplied by two | 2,000 | 0 |
 
-All 23 comparisons passed capacity, private-vnode ownership, duration, and
+These 22 comparisons passed capacity, private-vnode ownership, duration, and
 resource-area audits. The original prefix uses exactly the same converted
 input as the earlier comparison. No additional delay or time multiplication
 is needed for its match. Both schedulers have mean wait 23,620.5925 seconds,
@@ -50,13 +49,15 @@ cycle time limits, and other OpenPBS policies are outside its scope.
 From the repository root, with the pinned OpenPBS checkout and Lassen trace:
 
 ```sh
-OPENPBS_VALIDATION_DR_PRIORITY=fcfs_1s_evt_group bash validation/openpbs/run.sh
+bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group
 ```
 
-The comparator requires exact agreement for all small cases and both large
-inputs when this policy is selected. [summary.json](summary.json) contains
-the results. Each case has its native configuration, commands, and report.
-The two large directories also contain their converted inputs and complete
+The comparator requires exact agreement for all small cases and the original
+large input when this policy is selected. [summary.json](summary.json) contains
+the historical results, including an additional time-doubled diagnostic that
+is excluded from the published comparison and current runner. That diagnostic
+changes the workload and is not a fix. Each case has its native configuration,
+commands, and report. The large replay directories contain their converted inputs and complete
 schedules inside the reports. Full event streams and logs remain under the
 ignored `results/development/openpbs-policy/` directory.
 

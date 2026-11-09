@@ -10,6 +10,5 @@ docker run --rm \
     --mount "type=bind,src=$results,dst=/results" \
     --mount "type=volume,src=${OPENPBS_VALIDATION_BUILD_VOLUME:-dr-evt-openpbs-build},dst=/workspace" \
     -e "OPENPBS_VALIDATION_MAX_JOBS=${OPENPBS_VALIDATION_MAX_JOBS:-2000}" \
-    -e "OPENPBS_VALIDATION_DR_PRIORITY=${OPENPBS_VALIDATION_DR_PRIORITY:-fcfs}" \
     -e DR_EVT_VALIDATION_WORKING_TREE=1 \
-    dr-evt-openpbs-validation bash /dr_evt_source/validation/openpbs/build-and-test.sh
+    dr-evt-openpbs-validation bash /dr_evt_source/validation/openpbs/build-and-test.sh "$@"
