@@ -17,8 +17,9 @@ git clone https://github.com/openpbs/openpbs.git external/openpbs
 git -C external/openpbs checkout --detach cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a
 ```
 
-Put the user-provided `lassen-756-01.csv` from
-[LLNL LAST](https://github.com/LLNL/LAST) in `lassen_traces/`, then run:
+Prepare the local extraction using the exact submission-time interval in the
+[parent page's workload description](../../docs/user-guide/SCHEDULER_VALIDATION.md#lassen-workload),
+and save it as `lassen_traces/lassen-756-01.csv`, then run:
 
 ```sh
 bash validation/openpbs/run.sh

@@ -8,10 +8,8 @@ exposed a difference caused by that order.
 
 This comparison uses native **Slurm 26.11.0-0rc2** from `external/slurm` and
 DR_EVT's `FCFSPeriodicHybridCircularScheduler`, implemented in
-`scheduler_fcfs_periodic_hybrid_circular.cpp`. It uses **2,000 jobs** from
-[Lassen's job trace](https://github.com/LLNL/LAST), submitted from
-**2020-08-19 04:29:39 PDT** through **2020-08-19 15:38:34 PDT**,
-starting with an empty `pbatch` partition capacity of **756 nodes**.
+`scheduler_fcfs_periodic_hybrid_circular.cpp`. It uses the
+[common 2,000-job Lassen workload](SCHEDULER_VALIDATION.md#lassen-workload).
 **1,731 recorded runtimes are rounded up to whole seconds in both inputs**;
 arrivals and whole-minute time limits are unchanged.
 

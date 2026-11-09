@@ -21,9 +21,9 @@ computation-time cycle limits, relative fallback triggers, and deployment latenc
 
 OpenPBS calendars use integer seconds. Relative arrivals, actual runtimes,
 and requested walltimes are rounded upward; duration is at least one second,
-and shorter limits are extended to duration. Both schedulers receive the same
-2,000 Lassen jobs submitted from **2020-08-19 04:29:39 PDT** through
-**2020-08-19 15:38:34 PDT**, converted as above, on an initially empty pool.
+and shorter limits are extended to duration. Both schedulers receive the
+[common 2,000-job Lassen workload](SCHEDULER_VALIDATION.md#lassen-workload),
+converted as above.
 
 ## Results
 
