@@ -66,17 +66,17 @@
   <text x="905" y="400" class="ok">start</text>
 
   <text x="40" y="430" class="mono">every_system</text>
-  <text x="130" y="420" class="small">W_B = S_B = 200</text>
+  <text x="130" y="420" class="small">head reservation: 10 nodes over [200, 250)</text>
   <line x1="123.2" y1="426" x2="760" y2="426" class="win"/>
-  <text x="766" y="430" class="small">151 &lt; 200</text>
+  <text x="766" y="430" class="small">fits timeline</text>
   <text x="905" y="430" class="ok">start</text>
 
   <text x="40" y="460" class="mono">global_shadow</text>
   <text x="130" y="450" class="small">W_B = T* = 100</text>
   <line x1="123.2" y1="456" x2="440" y2="456" class="win"/>
-  <text x="446" y="460" class="small">151 is not &lt; 100</text>
+  <text x="446" y="460" class="small">151 &gt; 100</text>
   <text x="905" y="460" class="no">hold</text>
 
   <text x="40" y="496" class="small">Expected schedules (from the test): job 3 starts at 1 under target_only and every_system, at 100 under global_shadow;</text>
-  <text x="40" y="510" class="small">job 2 starts on A at 100 under all three. A limit of 1000 instead of 150 would be held by every_system too (1001 is not &lt; 200).</text>
+  <text x="40" y="510" class="small">job 2 starts on A at 100 under all three. A limit of 1000 is also allowed by every_system: 5 + 10 nodes fit within B's 20.</text>
 </svg>

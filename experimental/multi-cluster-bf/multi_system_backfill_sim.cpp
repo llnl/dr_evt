@@ -18,6 +18,7 @@
 #include "params/sim_params.hpp"
 #include "sim/sim.hpp"
 #include "trace/epoch.hpp"
+#include "trace/node_release_delay.hpp"
 #include "utils/timer.hpp"
 
 #include <algorithm>
@@ -177,6 +178,43 @@ void check_supported(const dr_evt::Sim_Params &cfg,
   if (cfg.m_priority_policy != dr_evt::PriorityPolicy::FCFS) {
     throw std::invalid_argument(
         "only --priority_policy fcfs is supported with multiple systems");
+  }
+  if (cfg.m_dispatch_interval != 0.0 || cfg.m_backfill_interval != 0.0) {
+    throw std::invalid_argument(
+        "--dispatch_interval and --backfill_interval are not supported with "
+        "multiple systems; scheduling is event driven");
+  }
+  if (cfg.m_dispatch_on_events || cfg.m_dispatch_queue_depth != 0) {
+    throw std::invalid_argument(
+        "--dispatch_on_events and --dispatch_queue_depth are not supported "
+        "with multiple systems");
+  }
+  if (cfg.m_per_pass_accounting || cfg.m_diagnostic_no_reservations) {
+    throw std::invalid_argument(
+        "--per_pass_accounting and --diagnostic_no_reservations are not "
+        "supported with multiple systems");
+  }
+  if (cfg.m_backfill_queue_depth != 0) {
+    throw std::invalid_argument(
+        "--backfill_queue_depth is not supported with multiple systems");
+  }
+  if (cfg.m_planning_time_resolution != 0.0 ||
+      cfg.m_planning_horizon != std::numeric_limits<dr_evt::tdiff_t>::max()) {
+    throw std::invalid_argument(
+        "--planning_time_resolution and --planning_horizon are not supported "
+        "with multiple systems");
+  }
+  if (dr_evt::node_release_delay_requested(cfg.m_node_release_delay,
+                                          cfg.m_node_release_delay_model,
+                                          cfg.m_node_release_delay_spread)) {
+    throw std::invalid_argument(
+        "--node_release_delay and uniform --node_release_delay_spread are not "
+        "supported with multiple systems");
+  }
+  if (cfg.m_backfill_policy == dr_evt::BackfillPolicy::HYBRID) {
+    throw std::invalid_argument(
+        "--backfill_policy hybrid is not supported with multiple systems; "
+        "use easy with --spatial_backfill to select spatial protection");
   }
   if (cfg.m_backfill_policy == dr_evt::BackfillPolicy::CONSERVATIVE) {
     throw std::invalid_argument(

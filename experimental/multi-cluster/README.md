@@ -296,6 +296,14 @@ actual_time_limit    = time_limit      / ground_truth_relative_performance
 predicted_turnaround = estimated_wait  + estimated_duration
 ```
 
+The Python gRPC and native MPI estimators accept an immediate backfill when
+it fits now and its estimated finish is at or before the head's shadow time.
+This half-open cutoff is a sufficient, conservative check. The worker
+snapshot does not expose the head's node demand or reservation duration, so
+the estimator cannot recognize every overlap allowed by spare capacity during
+the reservation. Worker simulations use the current native resource-time
+reservation checks when actually scheduling jobs.
+
 The experiment assumes that the submitting user can correct an underestimated
 wall-time request using the known ground-truth runtime before the successful
 submission. Starting from `predicted_time_limit`, it doubles the request until
@@ -657,8 +665,7 @@ followed by uniform workload sampling.
 Run the Python policy tests directly:
 
 ```bash
-source docs/venv/bin/activate
-python3 experimental/multi-cluster/tests/test_performance_dispatch.py
+python3 -m unittest discover -s experimental/multi-cluster/tests -p 'test_*.py'
 ```
 
 The native dispatcher's end-to-end regression is registered separately with

@@ -67,156 +67,156 @@ message DR_EVT_Params {
 
         // Preserve millisecond precision in job and resource output timestamps.
         // CLI: --msec_output (default: false).
-        bool msec_output = 51;
+        bool msec_output = 9;
 
         // Scheduling parameters
         // CLI: --total_nodes.
-        uint32 total_nodes = 9;         // System node count (default: 795)
+        uint32 total_nodes = 10;         // System node count (default: 795)
         // CLI: --backfill_policy.
-        string backfill_policy = 10;     // "easy", "conservative", "hybrid", or "none" (default: "easy")
+        string backfill_policy = 11;     // "easy", "conservative", "hybrid", or "none" (default: "easy")
         // CLI: --priority_policy.
-        string priority_policy = 11;    // "fcfs", "fcfs_alt", "fcfs_conservative", "fcfs_1s_evt_group", "sjf", or "ljf" (default: "fcfs")
+        string priority_policy = 12;    // "fcfs", "fcfs_alt", "fcfs_conservative", "fcfs_1s_evt_group", "sjf", or "ljf" (default: "fcfs")
 
         // Trace format parameters
-        string trace_type = 12;         // "standard", "pcon", or "swf" (default: "standard")
-        string trace_format = 13;       // "simple", "lassen", or "swf" (default: "simple")
-        string timestamp_format = 14;   // retained "epoch"/"iso" compatibility value (default: "epoch")
-        string timezone = 15;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
+        string trace_type = 13;         // "standard", "pcon", or "swf" (default: "standard")
+        string trace_format = 14;       // "simple", "lassen", or "swf" (default: "simple")
+        string timestamp_format = 15;   // retained "epoch"/"iso" compatibility value (default: "epoch")
+        string timezone = 16;           // e.g., "UTC", "America/Los_Angeles" (default: "America/Los_Angeles")
 
         // Run time determination parameters
         // Scheduler uses time_limit as the best estimator for planning
-        string run_time_mode = 16;      // "actual", "distribution", or "limit" (default: "actual")
-        string run_time_distribution = 17; // "normal", "lognormal", or "uniform" (default: "normal")
-        double run_time_scale = 18;     // Scale factor (default: 1.0)
-        double run_time_stddev = 19;    // Standard deviation factor (default: 0.0)
+        string run_time_mode = 17;      // "actual", "distribution", or "limit" (default: "actual")
+        string run_time_distribution = 18; // "normal", "lognormal", or "uniform" (default: "normal")
+        double run_time_scale = 19;     // Scale factor (default: 1.0)
+        double run_time_stddev = 20;    // Standard deviation factor (default: 0.0)
 
         // Queue implementation (FCFS scheduler only)
         // CLI: --queue_impl.
-        string queue_impl = 20;         // "circular", "deque", "multimap", or "block" (default: "circular")
+        string queue_impl = 21;         // "circular", "deque", "multimap", or "block" (default: "circular")
 
         // Block size for block queue implementation (must be power of 2)
         // CLI: --block_size.
-        uint32 block_size = 21;         // 4, 8, 16, 32, 64, 128, or 256 (default: 128)
+        uint32 block_size = 22;         // 4, 8, 16, 32, 64, 128, or 256 (default: 128)
 
         // Initial capacity for circular queue implementation. 0 means
         // the size of the job trace (large enough it can never overflow).
         // CLI: --wait_queue_capacity.
-        uint64 wait_queue_capacity = 22;  // (default: 0)
+        uint64 wait_queue_capacity = 23;  // (default: 0)
 
         // What to do if a circular queue insert would exceed wait_queue_capacity
         // CLI: --wait_queue_overflow.
-        string wait_queue_overflow = 23;  // "abort" or "grow" (default: "grow")
+        string wait_queue_overflow = 24;  // "abort" or "grow" (default: "grow")
 
         // Initial capacity for the job-record store (Trace::m_data, a
         // boost::circular_buffer). 0 means the size of the job trace
         // (large enough it can never overflow).
-        uint64 job_store_capacity = 24; // (default: 0)
+        uint64 job_store_capacity = 25; // (default: 0)
 
         // What to do if a job-store insert would exceed job_store_capacity
-        string job_store_overflow = 25; // "abort" or "grow" (default: "grow")
+        string job_store_overflow = 26; // "abort" or "grow" (default: "grow")
         // Before growing the job-record store for a new batch, refuse
         // if doing so would push projected peak usage past this
         // fraction of actual available system memory (Linux only; a
         // no-op elsewhere). Must be > 0.0 and <= 1.0 (e.g. 0.8 for
         // 80%); 0.0 (the default) disables the check entirely.
         // Independent of job_store_overflow.
-        double memory_pressure_fraction = 26;
+        double memory_pressure_fraction = 27;
 
         // Initial capacity for the resource-history circular buffer. 0
         // auto-sizes to twice the number of loaded jobs, with a minimum
         // capacity of 4096 entries. No overflow-policy field: unlike
         // job_store, every entry here is always immediately safe to reclaim,
         // so reclaiming when full never needs an abort/grow fallback.
-        uint64 resource_history_capacity = 27; // (default: 0)
+        uint64 resource_history_capacity = 28; // (default: 0)
 
         // Number of processed job departures between opportunistic writes and
         // reclamation of the completed front prefix. 0 follows the current
         // job-store capacity. Capacity pressure and explicit/final flushes
         // remain independent triggers.
-        uint64 job_flush_interval = 28; // (default: 0)
+        uint64 job_flush_interval = 29; // (default: 0)
 
         // Maximum feasible jobs passed to an experimental external backfill
         // selector in one decision. 0 keeps Sim_Params' default (1).
-        uint64 num_max_candidates = 29;
+        uint64 num_max_candidates = 30;
 
         // Optional CSV with time,total_nodes change points. Values may not
         // exceed total_nodes; reductions do not preempt running jobs.
-        string capacity_schedule = 30;
+        string capacity_schedule = 31;
 
         // Global simulation start time. A positive value enables replay-based
         // warm start; replay jobs already running at the boundary seed resources.
-        double sim_start_time = 31;
+        double sim_start_time = 32;
 
         // "inherit" (default) reconstructs jobs waiting at a replay warm
         // boundary; "drop" preserves the legacy omission behavior.
-        string warm_start_wait_queue = 45;
+        string warm_start_wait_queue = 33;
 
         // When both are nonempty, write simulated-job and resource-history
         // output to Redis instead of outfile/resource_trace. Requires
         // DR_EVT_WITH_REDIS=ON.
-        string redis_uri = 32;
-        string redis_key_prefix = 33;
+        string redis_uri = 34;
+        string redis_key_prefix = 35;
 
         // Automatic checkpoint destination and completed-job cadence.
         // Progressive loading also checkpoints at each input-file boundary.
-        string checkpoint_file = 34;
-        uint64 checkpoint_interval_jobs = 35;
+        string checkpoint_file = 36;
+        uint64 checkpoint_interval_jobs = 37;
         // SWF input only: processors per node used to convert allocated
         // processors to nodes. 0 derives it from the file header.
-        uint32 cores_per_node = 36;
+        uint32 cores_per_node = 38;
 
         // Waiting jobs that hold reservations under backfill_policy
         // "hybrid"; must be positive with hybrid and is ignored otherwise.
         // CLI: --reservation_depth.
-        uint64 reservation_depth = 37;
+        uint64 reservation_depth = 39;
 
         // Eligible waiting jobs, head included, examined per backfill pass
         // by every scheduler. Zero leaves the scan unlimited.
         // CLI: --backfill_queue_depth.
-        uint64 backfill_queue_depth = 41;
+        uint64 backfill_queue_depth = 40;
 
         // Seconds between periodic backfill evaluations; FCFS dispatch
         // remains event driven. Zero keeps event-driven backfill behavior.
         // CLI: --backfill_interval.
-        double backfill_interval = 42;
+        double backfill_interval = 41;
 
         // Fixed periodic dispatch: aligned FCFS/backfill ticks; optional arrival wakes.
         // Zero disables; mutually exclusive with positive backfill_interval.
         // CLI: --dispatch_interval.
-        double dispatch_interval = 46;
+        double dispatch_interval = 42;
         // Entire candidate prefix per dispatch wake, including immediate starts.
         // Zero means unlimited; requires dispatch_interval > 0.
         // CLI: --dispatch_queue_depth.
-        uint64 dispatch_queue_depth = 47;
+        uint64 dispatch_queue_depth = 43;
         // Also wake fixed periodic dispatch on job arrival batches, keeping the tick phase.
         // CLI: --dispatch_on_events.
-        bool dispatch_on_events = 48;
+        bool dispatch_on_events = 44;
         // Event-driven placement passes with per-pass Q/R and guarded retries.
         // CLI: --per_pass_accounting.
-        bool per_pass_accounting = 49;
+        bool per_pass_accounting = 45;
         // Diagnostic periodic model: no future capacity reservations.
         // CLI: --diagnostic_no_reservations.
-        bool diagnostic_no_reservations = 50;
+        bool diagnostic_no_reservations = 46;
 
         // Planning time-limit grid for scheduler projections; zero is exact.
         // CLI: --planning_time_resolution.
-        double planning_time_resolution = 43;
+        double planning_time_resolution = 47;
 
         // Maximum reservation look-ahead for backfill planning, event-driven
         // or periodic (Slurm bf_window). Presence is explicit so zero is a
         // valid immediate horizon.
         // CLI: --planning_horizon.
-        optional double planning_horizon = 44;
+        optional double planning_horizon = 48;
 
         // Seconds a job's nodes stay unavailable after it ends before another
         // job can start on them (default 0: reusable at the job's end). Not
         // applied to replayed history.
-        double node_release_delay = 38;
+        double node_release_delay = 49;
         // "constant" (default), "exponential", or "uniform": per-node cleanup
         // time whose maximum over the job's nodes is the job's delay.
-        string node_release_delay_model = 39;
+        string node_release_delay_model = 50;
         // Half-width of the uniform per-node cleanup time; ignored otherwise.
-        double node_release_delay_spread = 40;
+        double node_release_delay_spread = 51;
     }
 
     message Tracing_Params {

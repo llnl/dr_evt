@@ -9,7 +9,7 @@ to `src/sim` is one virtual with a default, `SchedulerBase::can_ever_run()`,
 consulted by `Simulation::submit_job()` so that a partitioning scheduler can
 decline requests no partition can hold.
 
-Status (2026-10-27): implemented for homogeneous node types and unequal
+Status (2026-11-09): implemented for homogeneous node types and unequal
 capacities, verified against the Python reference in this directory and,
 with one system, against the stock simulator and the stock Python oracle.
 Heterogeneous resource types are the next step; see "Toward heterogeneous
@@ -48,48 +48,45 @@ single-system schedulers do with `effective_running_jobs`.
 ### Step 2: head blocked on every system
 
 Compute `S_k` for every k, hence `T*` and `k*`. Scan the remaining eligible
-jobs in FCFS order. Candidate j may start on k if `n_j <= free_k` and
-`t + e_j < W_k` (strict, as in the single-system code). The window `W_k`
-is the policy:
+jobs in FCFS order. A candidate must fit in the system's current free nodes
+and preserve its protected resource-time reservation, if any. Each head
+reservation occupies `n_h` nodes over the half-open interval
+`[W_k, W_k + e_h)`. Candidates may finish exactly at `W_k`, or run beyond
+it when enough spare capacity remains throughout the reserved interval.
+Accepted candidates are added to the per-system timeline before checking
+the next candidate.
 
-| `--spatial_backfill` | `W_k` | What it protects | Cost per pass |
+| `--spatial_backfill` | Protected reservation | Additional cutoff | Cost per pass |
 |---|---|---|---|
-| `target_only` (spatial EASY, default) | `T*` on `k*`, `+inf` elsewhere | `T*` on `k*` is not moved by backfilling; other systems' `S_k` may be pushed later | K projections |
-| `every_system` (spatial conservative) | `S_k` | no `S_k` on any system is moved later by backfilling | K projections |
-| `global_shadow` | `T*` on every admissible system | same as `every_system` | K projections |
+| `target_only` (spatial EASY, default) | head at `T*` on `k*`; none elsewhere | none | K projections |
+| `every_system` (spatial conservative) | head at `S_k` on every admissible system | none | K projections |
+| `global_shadow` | global completion cutoff protects every `S_k` | candidate end `<= T*` on every admissible system | K projections |
 
 - `target_only` is the faithful spatial analogue of EASY: exactly one
   reservation is protected, and anything that cannot move it is allowed. A
   backfill on `k != k*` cannot move `T*`, because it can only push `S_k`
   later and `S_k >= T*` already. Backfill on those systems is fit-only.
-- `every_system` is the spatial conservative rule: on each system the
-  window is that system's own head projection, so backfilling never pushes
-  any `S_k` later. The projections are built from time limits and real jobs
-  finish early, so keeping every `S_k` in place keeps every early-drain
-  opportunity open for the head. Example with two systems:
-  `S_A = t+100` (so `k* = A`), `S_B = t+200`, and a candidate with limit
-  1000 fits on B now. `target_only` starts it on B and `S_B` becomes about
-  `t+1000`; if B's big job then ends at `t+50`, the head can no longer take
-  B and waits for A. `every_system` refuses that candidate on B
-  (`t+1000` is not before `t+200`) but would accept one with limit 150.
-  Neither rule promises an earlier start; `every_system` promises that
-  backfilling never worsens any system's projection for the head.
-  It is cheap compared with temporal conservative backfilling, which costs
-  one projection per earlier waiting job per candidate; this costs K
-  projections once per pass.
-- `global_shadow` is dominated by `every_system`: both preserve every `S_k`
-  (a job that ends before `T* <= S_k` returns its nodes before `S_k`), but
-  `global_shadow` forbids strictly more backfills. It is kept as a sanity
-  baseline that should never beat `every_system`.
+- `every_system` protects each system's projected head start. A candidate
+  may run beyond `S_k` if it leaves sufficient capacity for the head.
+  For example, on a 20-node system a five-node candidate may overlap a
+  ten-node head reservation after the existing jobs release their nodes.
+  With a fifteen-node head, an eight-node candidate cannot overlap it.
+  Protecting each projection can preserve an opportunity to start the head
+  on a non-target system when a running job finishes early. It does not
+  guarantee an earlier actual start. It costs K projections once per pass,
+  unlike temporal conservative backfilling's reservations for multiple
+  waiting jobs.
+- `global_shadow` deliberately uses the more conservative finish cutoff
+  `candidate_end <= T*`. In the same scheduling state it accepts a subset
+  of the candidates accepted by `every_system`. This does not establish
+  an ordering of overall makespan, since subsequent queue states differ.
 - Under every rule a system where the head is not admissible has
   `S_k = +inf` and is freely backfillable. A system too small for the head
   must never sit idle because of the head.
 
-Rules carried over unchanged from the single-system schedulers: the
-completion test is strict; there is no "leftover nodes after the head
-starts" clause; an early completion triggers a new pass but does not
-revise earlier decisions. `--backfill_policy none` gives strict FCFS over
-all systems; `--backfill_policy conservative` (temporal) is refused.
+Early completions trigger a new pass without undoing previous starts.
+`--backfill_policy none` gives strict FCFS over all systems;
+`conservative` and `hybrid` are refused.
 
 The figure below shows the three windows on the non-target system for the
 "medium candidate" case of the test: the candidate ends at 151, after the
@@ -100,8 +97,8 @@ target's projection of 100 but before B's own projection of 200.
 ## Placement
 
 When a job is admitted on more than one system, one is chosen
-deterministically. For a backfill candidate the candidate set is
-`{k : n_j <= free_k and t + e_j < W_k}`.
+deterministically. For a backfill candidate the candidate set contains the
+systems on which the job fits now and passes the protection checks above.
 
 | `--placement_policy` | Choice | Ties |
 |---|---|---|
@@ -114,11 +111,9 @@ identical placements from the two implementations.
 
 ## Edge cases
 
-- **Infeasible projection.** The core helper
-  `SchedulerBase::calculate_fcfs_reservation` returns `current_time` when
-  running jobs can never free enough nodes. That would make `T* = now` on a
-  system too small for the head. The resource model here returns `+inf` in
-  that case; the core helper is not touched.
+- **Infeasible projection.** The experimental resource model returns
+  `+inf` when the head cannot fit on a system. The current core reservation
+  helper likewise signals an impossible fit with its maximum-time sentinel.
 - **Jobs larger than every system.** The core `Simulation` rejects jobs
   larger than `total_nodes`, which here is the sum of all systems. For a
   job larger than the largest system but within that sum, the scheduler
@@ -128,10 +123,14 @@ identical placements from the two implementations.
   one addition to `src/sim` made for this experiment.
 - **Same-instant events.** The core processes every END at a timestamp
   before it schedules. Nothing changes here.
-- **Capacity schedule, warm start, checkpoints, progressive loading,
-  replay.** Not supported. The driver refuses `--capacity_schedule`,
-  `--sim_start_time`, `--infile_list`, `--checkpoint_file`, and priority
-  policies other than `fcfs`.
+- **Unsupported core controls.** The driver refuses capacity schedules,
+  warm starts, checkpoints, progressive loading and non-FCFS priority.
+  It also refuses nonzero dispatch/backfill intervals, event-driven dispatch
+  controls, dispatch/backfill queue depths, per-pass accounting, the
+  no-reservations diagnostic, planning resolution or finite horizon, and
+  active node-release delays (including a uniform spread with zero mean).
+  Its custom loop does not implement these native scheduler modes;
+  rejecting them before simulation prevents silently ignoring configuration.
 - **Heterogeneity.** Node speed is identical on every system; only
   capacities differ.
 
@@ -227,14 +226,13 @@ timeline).
 `tests/test_multi_system_backfill.py` (CTest `test_multi_system_backfill`,
 needs `DR_EVT_MSBF_SIM`; uses `DR_EVT_SIMULATOR` when set):
 
-- Four hand-derived cases with expected schedules worked out from the
-  rules, independent of both implementations, each run under all three
-  window rules: a long candidate on a non-target system (only
-  `target_only` admits it), a medium one (`every_system` admits it,
-  `global_shadow` does not), a system too small for the head (every rule
-  backfills it, including `global_shadow`), and a non-target system that
-  drains early (`every_system` starts the head there at 50, `target_only`
-  has filled it and waits for the target at 100).
+- Seven hand-derived cases, each under all three spatial policies (21
+  checks): long and medium non-target candidates, a system too small for
+  the head, an early-draining non-target system, exact endpoint equality,
+  reservation slack, and reservation conflict. Expected schedules are
+  independent of both implementations. In particular, the long candidate
+  can overlap the head under `every_system` using spare capacity, while
+  `global_shadow` delays it until the head starts.
 - Three generated traces (240 to 400 jobs, three or two systems of unequal
   size, one bursty with same-instant arrivals, early completions via
   `actual_run_time`) under every `spatial_backfill` x `placement_policy`
@@ -248,10 +246,11 @@ needs `DR_EVT_MSBF_SIM`; uses `DR_EVT_SIMULATOR` when set):
 - Rejections: a job larger than the largest system but smaller than the sum
   is rejected at submission by both implementations and the run continues
   with the remaining jobs scheduled identically; `--backfill_policy
-  conservative` and a conflicting `--total_nodes` are refused by the driver.
+  conservative`, a conflicting `--total_nodes`, and 14 unsupported-control
+  configurations are refused before creating output.
 
-The test passes under the release build and under the AddressSanitizer
-build.
+The updated suite passes against the current native build. Earlier
+versions were also exercised under AddressSanitizer.
 
 ## Toward heterogeneous systems
 

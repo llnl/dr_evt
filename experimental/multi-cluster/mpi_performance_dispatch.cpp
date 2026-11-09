@@ -739,7 +739,7 @@ double estimate_wait(const WindowMessage &window, std::uint32_t required_nodes,
   const bool can_start_now = window.available_nodes >= required_nodes;
   const bool can_backfill_now =
       can_start_now &&
-      (!has_waiting_head || window.current_time + runtime < window.shadow_time);
+      (!has_waiting_head || window.current_time + runtime <= window.shadow_time);
   if (can_backfill_now)
     return 0.0;
   if (!has_waiting_head)

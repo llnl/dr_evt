@@ -5,7 +5,7 @@ otherwise.
 
 ## Requirements
 
-Use Python 3.7 or newer. The trace splitter and copied reference scheduler use
+Use Python 3.7 or newer. The trace splitter and reference scheduler use
 only the Python standard library. Plotting and Parquet analysis require:
 
 ```bash
@@ -16,10 +16,13 @@ python3 -m pip install pandas pyarrow numpy matplotlib
 
 ### `python_reference_scheduler.py`
 
-This is an experiment-specific copy of DR_EVT's Python EASY reference
-scheduler. It leaves `scripts/python_reference_scheduler.py` unchanged.
+This script loads the shared Python EASY scheduler from
+`scripts/python_reference_scheduler.py` in the repository checkout. It uses
+the current resource-time reservation checks, including half-open endpoints
+and spare capacity during the head reservation. The Python algorithm remains
+independent of the native C++ implementation.
 
-The copy adds two Fugaku behaviors:
+The Fugaku adapter adds two behaviors:
 
 - when both fields exist, `time_limit` is used for scheduling reservations
   and `duration` is used as the actual runtime;
@@ -34,6 +37,15 @@ python3 experimental/fugaku-power/scripts/python_reference_scheduler.py \
 The implementation is intended as a readable reference. See the
 [implementation-scaling results](../../../docs/user-guide/fugaku-power-experiment.md#simulator-implementation-scaling)
 for measured Python and C++ performance.
+
+The regression suite checks six hand-derived schedules and compares both
+schedules and aggregate power output with the native simulator:
+
+```bash
+DR_EVT_SIMULATOR=./build/simulator python3 experimental/fugaku-power/tests/test_reference_scheduler.py
+```
+
+It is registered with CTest as `test_fugaku_power_reference`.
 
 ### `analysis/plot_resource_trace.py`
 

@@ -366,6 +366,11 @@ class PerformanceDispatchTests(unittest.TestCase):
         immediately_backfillable = window(10, 8, shadow=30)
         self.assertEqual(estimate_wait(immediately_backfillable, 8, 5, 40), 0)
 
+    def test_backfill_can_end_exactly_at_shadow_time(self):
+        snapshot = window(10, 2, shadow=30)
+        self.assertEqual(estimate_wait(snapshot, 2, 20, 40), 0)
+        self.assertEqual(estimate_wait(snapshot, 2, 20.001, 40), 60)
+
     def test_gpu_only_uses_gpu_enabled_machine(self):
         workload = self.workloads["gpu-trainer"][0]
         job = {
