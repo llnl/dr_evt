@@ -320,6 +320,16 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readonly("start_time_kind",
                     &Simulation::Queue_Drain_Start_Estimate::start_time_kind);
 
+  py::class_<Simulation::Planned_Job_Start>(m, "PlannedJobStart")
+      .def_readonly("job_idx", &Simulation::Planned_Job_Start::job_idx)
+      .def_readonly("expected_start_time",
+                    &Simulation::Planned_Job_Start::expected_start_time)
+      .def_readonly("start_time_kind",
+                    &Simulation::Planned_Job_Start::start_time_kind);
+  py::class_<Simulation::Planned_Job_Starts>(m, "PlannedJobStarts")
+      .def_readonly("planned_at", &Simulation::Planned_Job_Starts::planned_at)
+      .def_readonly("jobs", &Simulation::Planned_Job_Starts::jobs);
+
   // Main Simulation class
   py::class_<Simulation>(m, "Simulation")
       .def(py::init<const Sim_Params &>(), py::arg("params"),
@@ -365,6 +375,13 @@ PYBIND11_MODULE(dr_evt, m) {
            "    RuntimeError: If validation or capacity handling rejects the "
            "batch; "
            "no request is appended.")
+
+      .def("get_planned_job_starts", &Simulation::get_planned_job_starts,
+           "Read the latest live-planner predictions, like squeue --start. "
+           "Returns planned_at and eligible pending jobs sorted by expected "
+           "start; unknown starts are last. Does not run a forecast. "
+           "Out-of-horizon estimates can be present without reservations; "
+           "unexamined jobs have no prediction.")
 
       .def("get_job_statuses", &Simulation::get_job_statuses,
            py::arg("job_idxs"), py::arg("estimation_depth") = 0,

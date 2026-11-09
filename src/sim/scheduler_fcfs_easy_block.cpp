@@ -148,6 +148,8 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(m_fcfs_reservation_time, current_time)
           ? m_fcfs_reservation_time
           : std::numeric_limits<sim_time_t>::max();
+  record_planned_start(fcfs_head, m_fcfs_reservation_time,
+                       planned_reservation != std::numeric_limits<sim_time_t>::max());
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
   if (planned_reservation != std::numeric_limits<sim_time_t>::max()) {
     reservation_plan.reserve(

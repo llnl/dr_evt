@@ -410,6 +410,25 @@ public:
           }
           break;
         }
+        case ClientMessage::kGetPlannedJobStarts: {
+          require_init(sim);
+          const auto predictions = sim->get_planned_job_starts();
+          auto *out = resp.mutable_get_planned_job_starts();
+          if (predictions.planned_at) {
+            out->set_planned_at(*predictions.planned_at);
+          }
+          for (const auto &prediction : predictions.jobs) {
+            auto *job = out->add_jobs();
+            job->set_job_idx(prediction.job_idx);
+            if (prediction.expected_start_time) {
+              job->set_expected_start_time(*prediction.expected_start_time);
+              job->set_start_time_kind(
+                  prediction.start_time_kind == dr_evt::Simulation::Start_Time_Kind::RESERVED
+                      ? START_TIME_KIND_RESERVED : START_TIME_KIND_ESTIMATED);
+            }
+          }
+          break;
+        }
         case ClientMessage::kGetJobStatuses: {
           require_init(sim);
           std::vector<dr_evt::job_no_t> job_idxs;

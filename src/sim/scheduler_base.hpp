@@ -278,6 +278,36 @@ protected:
   /// and still be planned (Slurm bf_window); unlimited by default.
   tdiff_t m_planning_horizon = std::numeric_limits<tdiff_t>::max();
 
+  struct Planned_Start {
+    sim_time_t start;
+    job_no_t job_id;
+    bool reserved;
+  };
+  // Sparse, reusable storage for values the live planner already computes.
+  // Queue entries carry no prediction fields. This is not checkpoint state.
+  std::vector<Planned_Start> m_planned_starts;
+  std::optional<sim_time_t> m_planned_at;
+
+  void begin_start_time_plan(sim_time_t current_time) {
+    m_planned_starts.clear();
+    m_planned_at = current_time;
+  }
+
+  // Keep recording inline even when the vector-growth path is present.
+  [[gnu::always_inline]] inline void
+  record_planned_start(job_no_t job_id, sim_time_t start, bool reserved) {
+    if (!std::isfinite(start) ||
+        start == std::numeric_limits<sim_time_t>::max()) {
+      return;
+    }
+    if (!m_planned_starts.empty() &&
+        m_planned_starts.back().job_id == job_id) {
+      m_planned_starts.back() = {start, job_id, reserved};
+    } else {
+      m_planned_starts.push_back({start, job_id, reserved});
+    }
+  }
+
 public:
   /**
    * @brief Construct a scheduler for the supplied cluster capacity.

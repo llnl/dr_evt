@@ -1,0 +1,223 @@
+{
+  "scope": "50 complete 10,000-job simulations per process; trace parsing and scheduling included; final CSV export and CLI startup excluded",
+  "policy": "Circular queue, R=32, Q=64, total nodes=795, requested-limit runtime",
+  "execution": "One warmup per binary and policy, then five alternating AB/BA paired runs",
+  "cases": [
+    {
+      "policy": "easy",
+      "repetitions": 50,
+      "runs": [
+        {
+          "version": "after",
+          "repetition": 1,
+          "wall_seconds": 1.526241791,
+          "user_seconds": 1.463609,
+          "system_seconds": 0.048577999999999996,
+          "peak_rss_bytes": 16433152
+        },
+        {
+          "version": "before",
+          "repetition": 1,
+          "wall_seconds": 1.5212062909999995,
+          "user_seconds": 1.458796,
+          "system_seconds": 0.04734,
+          "peak_rss_bytes": 16269312
+        },
+        {
+          "version": "before",
+          "repetition": 2,
+          "wall_seconds": 1.5363935,
+          "user_seconds": 1.473229,
+          "system_seconds": 0.047597,
+          "peak_rss_bytes": 16498688
+        },
+        {
+          "version": "after",
+          "repetition": 2,
+          "wall_seconds": 1.5235683340000001,
+          "user_seconds": 1.459746,
+          "system_seconds": 0.048978999999999995,
+          "peak_rss_bytes": 16416768
+        },
+        {
+          "version": "after",
+          "repetition": 3,
+          "wall_seconds": 1.5254770419999986,
+          "user_seconds": 1.461191,
+          "system_seconds": 0.049215999999999996,
+          "peak_rss_bytes": 16416768
+        },
+        {
+          "version": "before",
+          "repetition": 3,
+          "wall_seconds": 1.5218475829999996,
+          "user_seconds": 1.457772,
+          "system_seconds": 0.048533,
+          "peak_rss_bytes": 20381696
+        },
+        {
+          "version": "before",
+          "repetition": 4,
+          "wall_seconds": 1.5399384170000001,
+          "user_seconds": 1.475439,
+          "system_seconds": 0.050654,
+          "peak_rss_bytes": 19447808
+        },
+        {
+          "version": "after",
+          "repetition": 4,
+          "wall_seconds": 1.5190419580000007,
+          "user_seconds": 1.460369,
+          "system_seconds": 0.048339,
+          "peak_rss_bytes": 16433152
+        },
+        {
+          "version": "after",
+          "repetition": 5,
+          "wall_seconds": 1.5256549999999987,
+          "user_seconds": 1.463633,
+          "system_seconds": 0.047173,
+          "peak_rss_bytes": 16416768
+        },
+        {
+          "version": "before",
+          "repetition": 5,
+          "wall_seconds": 1.525052917,
+          "user_seconds": 1.462806,
+          "system_seconds": 0.047438999999999995,
+          "peak_rss_bytes": 16269312
+        }
+      ],
+      "summary": {
+        "before": {
+          "wall_seconds": 1.525052917,
+          "user_seconds": 1.462806,
+          "system_seconds": 0.047597,
+          "peak_rss_bytes": 16498688,
+          "wall_range": [
+            1.5212062909999995,
+            1.5399384170000001
+          ]
+        },
+        "after": {
+          "wall_seconds": 1.5254770419999986,
+          "user_seconds": 1.461191,
+          "system_seconds": 0.048577999999999996,
+          "peak_rss_bytes": 16416768,
+          "wall_range": [
+            1.5190419580000007,
+            1.526241791
+          ]
+        }
+      }
+    },
+    {
+      "policy": "hybrid",
+      "repetitions": 50,
+      "runs": [
+        {
+          "version": "after",
+          "repetition": 1,
+          "wall_seconds": 4.398647582999999,
+          "user_seconds": 4.329371,
+          "system_seconds": 0.052818,
+          "peak_rss_bytes": 17743872
+        },
+        {
+          "version": "before",
+          "repetition": 1,
+          "wall_seconds": 4.214150167000003,
+          "user_seconds": 4.148625,
+          "system_seconds": 0.050374999999999996,
+          "peak_rss_bytes": 17661952
+        },
+        {
+          "version": "before",
+          "repetition": 2,
+          "wall_seconds": 4.205983499999995,
+          "user_seconds": 4.139554,
+          "system_seconds": 0.051637999999999996,
+          "peak_rss_bytes": 16351232
+        },
+        {
+          "version": "after",
+          "repetition": 2,
+          "wall_seconds": 4.428075999999997,
+          "user_seconds": 4.355593,
+          "system_seconds": 0.054639999999999994,
+          "peak_rss_bytes": 16662528
+        },
+        {
+          "version": "after",
+          "repetition": 3,
+          "wall_seconds": 4.424579791999996,
+          "user_seconds": 4.355052,
+          "system_seconds": 0.053706,
+          "peak_rss_bytes": 18628608
+        },
+        {
+          "version": "before",
+          "repetition": 3,
+          "wall_seconds": 4.231861541999997,
+          "user_seconds": 4.150851,
+          "system_seconds": 0.057047,
+          "peak_rss_bytes": 16449536
+        },
+        {
+          "version": "before",
+          "repetition": 4,
+          "wall_seconds": 4.211314709,
+          "user_seconds": 4.14393,
+          "system_seconds": 0.054188,
+          "peak_rss_bytes": 18841600
+        },
+        {
+          "version": "after",
+          "repetition": 4,
+          "wall_seconds": 4.437189832999998,
+          "user_seconds": 4.368921,
+          "system_seconds": 0.054838,
+          "peak_rss_bytes": 16760832
+        },
+        {
+          "version": "after",
+          "repetition": 5,
+          "wall_seconds": 4.407128500000006,
+          "user_seconds": 4.332737,
+          "system_seconds": 0.049665,
+          "peak_rss_bytes": 16547840
+        },
+        {
+          "version": "before",
+          "repetition": 5,
+          "wall_seconds": 4.208292208000003,
+          "user_seconds": 4.147228,
+          "system_seconds": 0.049092,
+          "peak_rss_bytes": 16580608
+        }
+      ],
+      "summary": {
+        "before": {
+          "wall_seconds": 4.211314709,
+          "user_seconds": 4.147228,
+          "system_seconds": 0.051637999999999996,
+          "peak_rss_bytes": 16580608,
+          "wall_range": [
+            4.205983499999995,
+            4.231861541999997
+          ]
+        },
+        "after": {
+          "wall_seconds": 4.424579791999996,
+          "user_seconds": 4.355052,
+          "system_seconds": 0.053706,
+          "peak_rss_bytes": 16760832,
+          "wall_range": [
+            4.398647582999999,
+            4.437189832999998
+          ]
+        }
+      }
+    }
+  ]
+}

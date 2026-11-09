@@ -605,6 +605,14 @@ set_target_properties(test_append_job_api-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_append_job_api-bin)
 
+add_executable(test_planned_job_starts-bin tests/test_planned_job_starts.cpp)
+set_target_properties(test_planned_job_starts-bin PROPERTIES
+  OUTPUT_NAME test_planned_job_starts)
+target_include_directories(test_planned_job_starts-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_planned_job_starts-bin PRIVATE dr_evt)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_planned_job_starts-bin)
+
 if(DR_EVT_HAS_SER20)
   # Exact continuation across queued/running jobs, output append, and
   # incompatible-state rejection.
@@ -920,6 +928,10 @@ if(DR_EVT_WITH_UNIT_TESTING)
     COMMAND /bin/bash
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_node_release_delay_tests.sh
       $<TARGET_FILE:sim-bin>)
+  add_test(NAME test_planned_job_starts COMMAND test_planned_job_starts-bin)
+  set_tests_properties(test_planned_job_starts PROPERTIES
+    LABELS "unit;native" RUN_SERIAL TRUE
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   if(Python3_Interpreter_FOUND)
     add_test(
       NAME test_python_periodic_reference
@@ -1457,6 +1469,15 @@ if(DR_EVT_HAS_PYBIND11)
   unset(DR_EVT_PYTHON_IPO_ERROR)
 
   target_link_libraries(dr_evt_python PRIVATE dr_evt)
+
+  if(DR_EVT_WITH_UNIT_TESTING)
+    add_test(NAME test_python_planned_job_starts
+      COMMAND ${CMAKE_COMMAND} -E env
+        PYTHONPATH=$<TARGET_FILE_DIR:dr_evt_python>
+        ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_planned_job_starts.py)
+    set_tests_properties(test_python_planned_job_starts PROPERTIES
+      LABELS "unit;python" WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  endif()
 
   target_include_directories(dr_evt_python PRIVATE
     ${PROJECT_SOURCE_DIR}/src

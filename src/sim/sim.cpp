@@ -36,6 +36,7 @@
 #include <queue>
 #include <type_traits>
 #include <typeinfo>
+#include <unordered_map>
 
 namespace dr_evt {
 
@@ -2013,6 +2014,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
       m_scheduler->sync_to(m_current_time);
     }
     m_scheduler->m_fcfs_reservation_time = reservation_time;
+    m_scheduler->m_planned_starts.clear();
+    m_scheduler->m_planned_at.reset();
 
     if (restore_outputs && redis_output) {
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)
@@ -2271,6 +2274,38 @@ void BasicSimulation<TraceType>::record_appended_job_start(job_no_t job_idx) {
   query.start_time = convert_epoch<sim_time_t>(job.get_begin_time());
   query.end_time = convert_epoch<sim_time_t>(job.get_end_time());
   query.scheduled = true;
+}
+
+template <typename TraceType>
+typename BasicSimulation<TraceType>::Planned_Job_Starts
+BasicSimulation<TraceType>::get_planned_job_starts() const {
+  Planned_Job_Starts result{m_scheduler->m_planned_at, {}};
+  std::unordered_map<job_no_t, SchedulerBase::Planned_Start> predictions;
+  predictions.reserve(m_scheduler->m_planned_starts.size());
+  for (const auto &prediction : m_scheduler->m_planned_starts) {
+    predictions.insert_or_assign(prediction.job_id, prediction);
+  }
+  for (const auto job_idx : m_scheduler->pending_job_ids()) {
+    const auto &record = m_trace.job_at(job_idx);
+    if (record.is_scheduled() ||
+        convert_epoch<sim_time_t>(record.get_submit_time()) > m_current_time) {
+      continue;
+    }
+    Planned_Job_Start job{job_idx, std::nullopt, Start_Time_Kind::NONE};
+    if (const auto found = predictions.find(job_idx); found != predictions.end()) {
+      job.expected_start_time = found->second.start;
+      job.start_time_kind = found->second.reserved ? Start_Time_Kind::RESERVED
+                                                 : Start_Time_Kind::ESTIMATED;
+    }
+    result.jobs.push_back(job);
+  }
+  std::stable_sort(result.jobs.begin(), result.jobs.end(),
+                   [](const auto &a, const auto &b) {
+    if (!a.expected_start_time) return false;
+    if (!b.expected_start_time) return true;
+    return *a.expected_start_time < *b.expected_start_time;
+  });
+  return result;
 }
 
 template <typename TraceType>
@@ -3057,6 +3092,9 @@ void BasicSimulation<TraceType>::advance_to_impl(
     }
   }
   if (schedule_initial && m_scheduler->has_eligible_jobs()) {
+    if constexpr (!PeriodicBackfill || FixedPeriodicDispatch) {
+      m_scheduler->begin_start_time_plan(m_current_time);
+    }
     // Call scheduler to evaluate newly arriving jobs
     while (true) {
       num_nodes_t free_nodes = get_available_nodes();
@@ -3393,6 +3431,13 @@ void BasicSimulation<TraceType>::advance_to_impl(
     // events
     bool started_at_tick = false;
     if (should_schedule) {
+      if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
+        if (periodic_evaluation) {
+          m_scheduler->begin_start_time_plan(m_current_time);
+        }
+      } else {
+        m_scheduler->begin_start_time_plan(m_current_time);
+      }
       // Keep calling scheduler until it can't start any more jobs
       while (true) {
         num_nodes_t free_nodes = get_available_nodes();
