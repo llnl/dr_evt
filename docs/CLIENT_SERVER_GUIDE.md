@@ -64,14 +64,8 @@ Unknown or non-appended IDs produce `ErrorResponse`. The request reads the
 server's simulation state and works regardless of whether Redis output support
 is compiled or configured.
 
-Checkpoint requests use Ser20 and require a server built with
-`DR_EVT_WITH_SER20=ON`; otherwise the server returns an error response. Save
-and load archive configured file or Redis output independently of whether
-status queries are used. File output is archived into numbered pre-restart
-segments on load; use
-`dr_evt_stitch_checkpoint_output` after the resumed run to reconstruct output
-at the checkpoint boundary. For Redis, pass `--redis-uri` and `--redis-prefix`
-to rebuild the canonical namespace.
+See [Checkpoint/Restart](user-guide/checkpoint-restart.md) for checkpoint
+request requirements, compatibility, and file or Redis output recovery.
 
 For a replay-based warm start, set `InitRequest.sim_start_time` to a positive
 global simulation boundary, provide a replay-format `infile`, and send

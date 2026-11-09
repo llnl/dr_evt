@@ -90,7 +90,7 @@ The production-loop descriptions and pseudocode are DR_EVT's explanatory
 summaries of the cited sources. Product and project names identify the systems
 being discussed; they do not imply affiliation or endorsement.
 
-| Category | Trigger behavior | Publicly documented example | Academic background |
+| Category | Trigger behavior | Publicly documented example | Background |
 |---|---|---|---|
 | Event-driven dispatch and backfill | A relevant state event requests an allocation/reservation cycle | Fluxion; OpenPBS | [Henderson (1995)](https://doi.org/10.1007/3-540-60153-8_34), PBS wake events; [Ahn et al. (2014)](https://doi.org/10.1109/ICPPW.2014.15), Flux architecture |
 | Separate dispatch and backfill triggers | Events request main dispatch; a separate interval governs backfill; main dispatch also has a periodic pass | Slurm | [Simakov et al. (2018)](https://doi.org/10.1007/978-3-319-72971-8_10), separate scheduler threads |
@@ -100,7 +100,7 @@ being discussed; they do not imply affiliation or endorsement.
 These categories organize this guide. The papers provide historical examples
 and architecture background; they do not define this four-way classification.
 Current loop details use the source and vendor references below. The
-[academic reference notes](#academic-references) distinguish those scopes.
+[reference notes](#references) distinguish those scopes.
 
 Suppose a fitting job arrives at 2.3 s before a timer wake at 3 s. Fluxion,
 Slurm's main scheduler, Spur's submission notification, and OpenPBS can request
@@ -168,10 +168,12 @@ queue and FCFS or `fcfs_conservative` ordering; custom selectors are unsupported
 | `--dispatch_interval` | Aligned ticks run both FCFS and backfill; 0 disables fixed periodic dispatch |
 | `--dispatch_on_events` | Also run the combined FCFS/backfill pass on job arrival batches without resetting ticks; requires positive dispatch interval |
 | `--dispatch_queue_depth` | Entire examined prefix per dispatch wake, including immediate starts and out-of-horizon jobs; 0 is unlimited |
-| `--priority_policy` | FCFS, SJF, or LJF orders the waiting queue |
+| `--priority_policy` | FCFS, SJF, or LJF queue ordering; `fcfs_1s_evt_group` selects OpenPBS one-second forecast event grouping |
 | `--backfill_policy` | EASY protects the head; hybrid protects up to R waiting jobs; conservative protects all planned earlier waiting jobs; none disables backfill |
 | `--reservation_depth` | R for hybrid; a job beyond the planning horizon gets no reservation slot |
-| `--backfill_queue_depth` | Q includes the waiting head and bounds backfill examinations; ordinary FCFS dispatch uses none of it; 0 is unlimited |
+| `--backfill_queue_depth` | Q bounds backfill examinations in default loops, or the entire placement pass with `--per_pass_accounting` and `fcfs_1s_evt_group`; 0 is unlimited |
+| `--per_pass_accounting` | Event-driven circular FCFS placement passes with fresh Q/R per pass; immediate starts count toward Q; requires zero intervals and unlimited H |
+| `--backfill_interval` | Separate periodic backfill ticks while FCFS dispatch remains event-driven; 0 uses event-driven backfill |
 | `--planning_horizon` | Reservations must start within H seconds of now; jobs beyond H remain pending in queue order; omitted means unlimited |
 | `--planning_time_resolution` | Round projected releases up to a grid; actual events remain exact; 0 disables rounding |
 | `--total_nodes`, `--capacity_schedule` | One homogeneous node pool, optionally changing capacity over time |
@@ -200,22 +202,42 @@ reusable when its slowest node finishes cleanup. Options are defined in the
 
 ## Supported policy combinations
 
-These examples use one homogeneous pool and a fixed queue-order policy.
-Values are illustrative; production mappings and their limits follow the table.
+These examples cover the built-in production loop configurations for one
+homogeneous pool. Unless a row overrides them, use `--priority_policy fcfs`
+and `--queue_impl circular`, zero dispatch/backfill intervals and queue depths,
+an unlimited planning horizon (omit `--planning_horizon`), and the default
+resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`). Values are
+illustrative except the recorded Slurm license-on validation settings.
 
-| Policy set | DR_EVT option choices |
+Each row lists options to add to those shared settings. Choose one row;
+`--dispatch_interval` and positive `--backfill_interval` are mutually exclusive.
+Fixed dispatch uses `--dispatch_queue_depth`; leave `--backfill_queue_depth`
+at zero. `--per_pass_accounting` requires both intervals to be zero and H to
+be unlimited. For additional ordering and queue implementation choices, see
+[Scheduling Policies](../BACKFILLING_ALGORITHMS.md).
+
+| Policy set | DR_EVT options and behavior |
 |---|---|
-| Fixed periodic FCFS with a total candidate limit | `--dispatch_interval 5 --dispatch_queue_depth 3 --backfill_policy none` |
-| Fixed periodic FCFS and backfill with head protection | `--dispatch_interval 5 --dispatch_queue_depth 3 --backfill_policy hybrid --reservation_depth 1`; optionally set H and resolution |
-| Event-driven FCFS with separate periodic backfill; protect one waiting job | `--queue_impl circular --backfill_interval 5 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_horizon 300 --planning_time_resolution 1` |
-| Event-driven FCFS with separate periodic backfill; protect N waiting jobs | Same settings with `--reservation_depth N` |
-| Event-driven FCFS with separate periodic conservative backfill | Same interval, Q, H, and resolution with `--backfill_policy conservative` |
-| Event-driven head protection with cycle-wide backfill Q | `--backfill_interval 0 --backfill_policy hybrid --reservation_depth 1 --backfill_queue_depth 3 --planning_time_resolution 1`; omit H |
-| Event-driven conservative backfill | Same event-driven settings with `--backfill_policy conservative`; omit H |
-| Fixed periodic conservative backfill with arrival notifications | `--dispatch_interval 1 --dispatch_on_events --dispatch_queue_depth 3 --backfill_policy conservative`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
-| Event-driven hybrid with backfill examination cap Q | `--priority_policy fcfs --backfill_policy hybrid --reservation_depth N --backfill_interval 0 --dispatch_interval 0 --backfill_queue_depth Q`; omit H; use the default resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) |
-| Fixed periodic hybrid with total-candidate cap Q | `--dispatch_interval I --dispatch_queue_depth Q --backfill_policy hybrid --reservation_depth N`; omit H; use the default resource-time rule |
-| Fixed periodic EASY with strict completion-before-start admission | `--dispatch_interval 5 --backfill_policy easy --dispatch_queue_depth 0`; omit H; build with `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` |
+| Event-driven strict FCFS | `--backfill_policy none`. No job bypasses a blocked head. |
+| Event-driven EASY | `--backfill_policy easy` `--backfill_queue_depth 3`. Protect the head; Q resets per backfill pass. |
+| Event-driven hybrid | `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 64`. Protect up to R=32 jobs; backfill Q is shared at one timestamp. |
+| Event-driven conservative | `--priority_policy fcfs_conservative` `--backfill_policy conservative` `--backfill_queue_depth 64`. Protect all planned earlier waiting jobs; backfill Q is shared at one timestamp. |
+| Flux-style per-pass strict FCFS | `--per_pass_accounting` `--backfill_policy none` `--backfill_queue_depth 64`. Q counts immediate starts; no bypass of a blocked head. |
+| Flux-style per-pass EASY | `--per_pass_accounting` `--backfill_policy easy` `--backfill_queue_depth 64` `--planning_time_resolution 1`. R=1; immediate starts and reservation tests share per-pass Q. |
+| Flux-style per-pass hybrid | `--per_pass_accounting` `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 64` `--planning_time_resolution 1`. Fluxion queue-depth=64 and reservation-depth=32; Q/R reset each pass. |
+| Flux-style per-pass conservative | `--per_pass_accounting` `--backfill_policy conservative` `--backfill_queue_depth 64` `--planning_time_resolution 1`. Unlimited R within each examined pass; fresh Q per pass. |
+| Event-driven FCFS + periodic EASY backfill | `--backfill_interval 5` `--backfill_policy easy` `--backfill_queue_depth 3` `--planning_horizon 300` `--planning_time_resolution 1`. One backfill scan per tick; head protection. |
+| Event-driven FCFS + periodic hybrid backfill | `--backfill_interval 5` `--backfill_policy hybrid` `--reservation_depth 1` `--backfill_queue_depth 3` `--planning_horizon 300` `--planning_time_resolution 1`. R=1 for head protection; use any positive R for deeper protection. |
+| Event-driven FCFS + periodic conservative backfill | `--backfill_interval 5` `--backfill_policy conservative` `--backfill_queue_depth 3` `--planning_horizon 300` `--planning_time_resolution 1`. Protect all feasible earlier reservations in the examined prefix. |
+| Slurm license planning on: protected periodic backfill | `--dispatch_interval 0` `--backfill_interval 30` `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 64` `--planning_horizon 259200` `--planning_time_resolution 1`. Recorded license-on validation settings: 72-hour H, R=32, Q=64. Keep the diagnostic off. |
+| Slurm license planning off: no-reservation diagnostic | `--diagnostic_no_reservations` `--dispatch_interval 0` `--backfill_interval 30` `--backfill_policy hybrid` `--reservation_depth 32`. Scan all eligible jobs on events and ticks; R, Q, H, and resolution do not constrain this diagnostic. |
+| OpenPBS one-second forecast event grouping | `--priority_policy fcfs_1s_evt_group` `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 0`. Event-driven placement passes; group future releases over one second. No per_pass_accounting flag is needed. Omit H. |
+| Fixed periodic strict FCFS | `--dispatch_interval 5` `--dispatch_queue_depth 3` `--backfill_policy none`. One total-candidate prefix per tick. |
+| Fixed periodic EASY | `--dispatch_interval 5` `--dispatch_queue_depth 3` `--backfill_policy easy`. Head protection, equivalent to hybrid with R=1. |
+| Fixed periodic hybrid | `--dispatch_interval 5` `--dispatch_queue_depth 3` `--backfill_policy hybrid` `--reservation_depth 32`. Total-candidate Q=3 per tick; protect up to R=32 examined waiting jobs. |
+| Fixed periodic conservative | `--dispatch_interval 5` `--dispatch_queue_depth 3` `--backfill_policy conservative`. Protect all feasible earlier reservations in the tick prefix. |
+| Spur-style periodic conservative + arrival notifications | `--dispatch_interval 1` `--dispatch_on_events` `--dispatch_queue_depth 3` `--backfill_policy conservative`. One fresh candidate prefix per arrival batch or tick; omit H and use the default resource-time rule. |
+| LSF illustration: aligned sessions with strict admission | `--dispatch_interval 5` `--backfill_policy easy` `--dispatch_queue_depth 0`. Assume sessions at aligned five-second boundaries and one protected head. Omit H; build with DR_EVT_LEGACY_RESERVATION_BARRIER=ON. LSF job-decision limits do not establish a candidate Q. |
 
 Related controls in Slurm include `bf_interval` for backfill cadence,
 `bf_max_job_test` for Q, `bf_job_part_count_reserve=N` for protection depth,
@@ -226,6 +248,7 @@ becomes `--planning_horizon 300`. Its zero reservation-count setting removes
 that limit, so use conservative rather than interpreting it as R=0.
 
 Fluxion hybrid exposes `queue-depth` and `reservation-depth` for Q and R.
+The Flux-style rows include immediate starts in Q and reset Q/R each pass.
 For the Slurm license-off diagnostic, `--diagnostic_no_reservations` selects
 a separate template specialization of the periodic hybrid implementation.
 Event wakes and ticks scan every eligible job in FCFS order, skipping those
@@ -236,14 +259,25 @@ the adapter's abstract resource pool with future license planning disabled;
 it does not represent ordinary Slurm scheduling on shared physical nodes.
 The protected periodic model and other scheduler loops are unchanged.
 
+For Slurm with `bf_licenses` on, use the protected periodic-backfill row;
+DR_EVT has no separate license-on switch. Its future resource-time reservations
+supply the protection. The recorded adapter uses 756 aggregate resources;
+see [Slurm Validation](SLURM_VALIDATION.md) for the workload and native controls.
+Use `--backfill_policy conservative` when the native reservation-count limit
+is removed. The license-off diagnostic is described in
+[Slurm License-Off Diagnostics](SLURM_LICENSE_OFF_DIAGNOSTICS.md).
+
 Use DR_EVT's `--per_pass_accounting` to select its Flux-style placement loop;
 default hybrid instead shares backfill Q across calls at one timestamp.
 
 OpenPBS with `strict_ordering=true` and global protection depth N > 0
 provides another example of event-driven hybrid protection.
-The event-driven row excludes ordinary FCFS starts from Q; the fixed-cadence
-row includes them but uses aligned ticks rather than its event and fallback
-timing. See
+The `fcfs_1s_evt_group` row selects its one-second future-event grouping and
+counts immediate starts in the placement-pass Q. It also supports `easy`,
+`conservative`, and `none`; use `--reservation_depth` only for hybrid protection.
+The default event-driven hybrid row excludes ordinary FCFS starts from Q;
+fixed dispatch counts them but uses aligned ticks rather than OpenPBS event
+and fallback timing. See [OpenPBS Validation](OPENPBS_VALIDATION.md) and
 [PBS timing and cycle limits](REALISM_AND_GAPS.md#pbs-timing-and-cycle-limits).
 
 Spur shares one placement/reservation prefix between timer and notification
@@ -579,7 +613,7 @@ Reserved-slot ownership and admission differences are in
 Accounting and policy evidence limits are in
 [LSF evidence limits](REALISM_AND_GAPS.md#sources).
 
-## Academic references
+## References
 
 - Robert L. Henderson (1995),
   [*Job scheduling under the Portable Batch System*](https://doi.org/10.1007/3-540-60153-8_34),

@@ -27,10 +27,10 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
 | Scheduling | `--dispatch_on_events` | Also run fixed periodic dispatch on job arrival batches, preserving timer phase. |
 | Scheduling | `--backfill_interval SECONDS` | Run built-in backfill at periodic ticks instead of every event. |
-| Scheduling | `--planning_time_resolution SECONDS` | Round planning durations up to a grid. |
+| Scheduling | `--planning_time_resolution SECONDS` | Round projected releases up to a planning grid; actual events remain exact. |
 | Scheduling | `--planning_horizon SECONDS` | Limit reservation planning in event-driven and periodic backfill. |
 | Scheduling | `--reservation_depth N` | Number of reserved waiting jobs under `hybrid` backfilling. |
-| Scheduling | `-p, --priority_policy POLICY` | Select the job-ordering policy. |
+| Scheduling | `-p, --priority_policy POLICY` | Select `fcfs`, `fcfs_alt`, `fcfs_conservative`, `fcfs_1s_evt_group`, `sjf`, or `ljf`. |
 | Scheduling | `-q, --queue_impl IMPLEMENTATION` | Select the FCFS wait-queue implementation. |
 | Scheduling | `-Q, --block_size SIZE` | Set the `block` queue's block size. |
 | Storage | `-A, --wait_queue_capacity SIZE` | Set initial wait-queue capacity. |
@@ -67,6 +67,10 @@ depths, interval, planning resolution, priority, and node-release delay) map
 to production-scheduler behavior, see [Scheduling Loops and DR_EVT
 Configurations](SCHEDULER_LOOPS.md). Remaining differences are listed
 in [Realism and Known Gaps](REALISM_AND_GAPS.md).
+
+`DR_EVT_LEGACY_RESERVATION_BARRIER` is a CMake build option used by the
+[LSF strict-admission illustration](SCHEDULER_LOOPS.md#lsf-scheduling-sessions-with-a-minimum-interval).
+It is not a CLI option or Protobuf field.
 
 ## Basic Usage
 
@@ -228,7 +232,9 @@ retains the legacy behavior of omitting those jobs.
 Backfilling algorithm to use.
 
 **Options:**
-- `easy` - EASY backfilling (default): backfill jobs that complete before FCFS head reservation
+- `easy` - EASY backfilling (default): protect the queue head's projected start.
+- `hybrid` - Protect up to `--reservation_depth N` waiting jobs; N must be
+  positive. Requires `fcfs` or `fcfs_conservative` ordering.
 - `conservative` - Conservative backfilling. Pair with
   `--priority_policy fcfs_conservative` for the full FCFS
   conservative-reservation implementation.
@@ -257,13 +263,14 @@ This setting has no effect on the built-in `easy`, `hybrid`, or
 
 ### `--backfill_queue_depth N`
 
-With `--per_pass_accounting`, Q instead counts the entire placement
-pass: immediate starts, future reservations, and failed allocation-only
+With `--per_pass_accounting` or `--priority_policy fcfs_1s_evt_group`, Q
+counts the entire placement pass: immediate starts, future reservations, and failed allocation-only
 tests. Q/R reset per pass, and reservation-only passes can repeat with a
 tentative termination guard. See
 [per-pass placement accounting](SCHEDULER_LOOPS.md#per-pass-placement-accounting)
 for the rules and supported option combinations. The following describes
-the default accounting when that option is absent.
+the default accounting when neither placement-pass mode is selected. The
+Slurm license-off diagnostic ignores Q entirely.
 
 Maximum number of eligible waiting jobs, including the blocked FCFS head, that
 a scheduler examines in one scheduling pass. It applies to `easy`,
@@ -301,6 +308,35 @@ Production counter differences are in
 [Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
 **Default:** `0` (unlimited)
+
+### `--per_pass_accounting`
+
+Select the Flux-style event-driven circular FCFS placement loop. Each pass
+starts at the queue head with fresh examination and reservation counts Q/R.
+Immediate starts, successful reservations, and failed start-only tests after
+R is filled count toward `--backfill_queue_depth`. Jobs with no feasible
+start or reservation are skipped without consuming Q or R until a state
+event permits reconsideration. Guarded retries can run at the same simulation
+timestamp; see [Per-pass Placement Accounting](SCHEDULER_LOOPS.md#per-pass-placement-accounting).
+
+Requires `--queue_impl circular`, `fcfs` or `fcfs_conservative` ordering,
+both intervals and `--dispatch_queue_depth` at zero, no `--dispatch_on_events`
+or `--diagnostic_no_reservations`, and an unlimited planning horizon (omit
+`--planning_horizon`). Supports `none`, `easy`, `hybrid`, and `conservative`;
+hybrid requires positive `--reservation_depth`. Use `--backfill_queue_depth`
+for the entire placement-pass limit, including ordinary starts.
+
+```bash
+simulator jobs.csv --queue_impl circular --priority_policy fcfs \
+  --backfill_policy hybrid --reservation_depth 32 \
+  --backfill_queue_depth 64 --per_pass_accounting \
+  --planning_time_resolution 1
+```
+
+This loop uses resource-time protection independently of the
+`DR_EVT_LEGACY_RESERVATION_BARRIER` build option.
+
+**Default:** off
 
 ### `--dispatch_interval SECONDS` and `--dispatch_queue_depth COUNT`
 
@@ -390,6 +426,16 @@ and time resolution do not constrain the diagnostic scan because it builds
 no future plan. Existing scheduler loops retain their behavior and gain no
 per-job mode check.
 
+For Slurm with license planning enabled, leave this diagnostic off and use
+protected periodic backfill. The recorded validation uses
+`--backfill_interval 30`, `--backfill_policy hybrid`,
+`--reservation_depth 32`, `--backfill_queue_depth 64`,
+`--planning_horizon 259200`, and `--planning_time_resolution 1`, with circular
+FCFS ordering and `--dispatch_interval 0`. DR_EVT has no separate license-on
+switch; see [Slurm Validation](SLURM_VALIDATION.md).
+
+**Default:** off
+
 ### `--backfill_interval SECONDS`
 
 Uses periodic EASY, conservative, or hybrid backfill while retaining
@@ -432,6 +478,9 @@ an out-of-horizon head in both modes; its other examined candidates count.
 See [Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting)
 for the remaining differences from production counters.
 
+`--per_pass_accounting` and `fcfs_1s_evt_group` require an unlimited horizon;
+omit this option for those modes. The license-off diagnostic ignores it.
+
 **Default:** unlimited (the largest `tdiff_t` value)
 
 ### `--reservation_depth N`
@@ -459,14 +508,20 @@ Job priority/ordering policy.
 **Options:**
 - `fcfs` - First Come First Served (default)
 - `fcfs_alt` - Alternative FCFS implementation for differential testing
-- `fcfs_conservative` - FCFS implementation that maintains conservative
-  reservations; currently uses the `deque` wait queue
+- `fcfs_conservative` - FCFS ordering with the hybrid/conservative scheduler
+  when those protection policies are selected; supports circular and deque
+  queues. Protection is selected by `--backfill_policy`.
 - `fcfs_1s_evt_group` - Event-driven FCFS with one-second forecast event grouping,
   reproducing the tested OpenPBS 23.06 rule.
   Requires a circular queue, zero dispatch/backfill intervals, and unlimited
   planning horizon. It checks predicted capacity after an inclusive one-second
   group of future events while preserving actual event timestamps. See the
   [forecast rule and worked example](OPENPBS_VALIDATION.md#the-rule-inside-openpbss-future-start-calculation).
+  Supports `easy`, `hybrid`, `conservative`, and `none`; hybrid needs positive
+  `--reservation_depth`. `--backfill_queue_depth` counts the whole placement
+  pass, including immediate starts. No `--per_pass_accounting` flag is needed.
+  Dispatch queue depth must be zero, and arrival-dispatch notifications and
+  the license-off diagnostic cannot be enabled.
 - `sjf` - Shortest Job First (by run time estimate)
 - `ljf` - Longest Job First (by run time estimate)
 
@@ -475,6 +530,13 @@ Job priority/ordering policy.
 **Example:**
 ```bash
 ${CMAKE_INSTALL_PREFIX}/bin/simulator traces/jobs.csv --priority_policy sjf
+```
+
+For the OpenPBS forecast configuration:
+
+```bash
+simulator jobs.csv --queue_impl circular --priority_policy fcfs_1s_evt_group \
+  --backfill_policy hybrid --reservation_depth 32 --backfill_queue_depth 0
 ```
 
 ### `-q, --queue_impl IMPLEMENTATION`
@@ -733,6 +795,11 @@ offset-bearing input.
 
 Write timestamps in the simulated-job and resource traces with millisecond
 precision instead of truncating them to integer seconds.
+
+The Protobuf configuration field is `msec_output: true` (default `false`).
+Loading a configuration with `msec_output: false`, or with that field omitted,
+disables an earlier CLI `--msec_output`; placing `--msec_output` after
+`--config` enables it again.
 
 **Default:** Disabled
 

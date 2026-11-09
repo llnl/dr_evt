@@ -31,18 +31,16 @@ getting-started/tutorial
 
 user-guide/overview
 user-guide/command-line
-user-guide/SCHEDULER_LOOPS
-user-guide/REALISM_AND_GAPS
-user-guide/SCHEDULER_VALIDATION
 user-guide/protobuf-config
 user-guide/trace-formats
 user-guide/output-traces
 user-guide/redis-output
+user-guide/maintenance-and-warm-start
+user-guide/checkpoint-restart
 user-guide/grpc-setup
 user-guide/client-server-use-cases
 user-guide/multi-cluster-experiment
 user-guide/multi-cluster-backfill
-user-guide/maintenance-and-warm-start
 user-guide/fugaku-power-experiment
 ```
 
@@ -52,6 +50,7 @@ user-guide/fugaku-power-experiment
 
 BACKFILLING_ALGORITHMS
 TESTING_GUIDE
+user-guide/production-scheduler-behaviors
 ```
 
 ```{toctree}

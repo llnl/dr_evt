@@ -71,3 +71,38 @@
 .api-search-hidden {
     display: none !important;
 }
+
+/* Wrap scheduler and option reference tables, including long CLI/field names. */
+#scheduling-loops-and-dr-evt-configurations table,
+#command-line-options table,
+#protocol-buffer-configuration table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#scheduling-loops-and-dr-evt-configurations th,
+#scheduling-loops-and-dr-evt-configurations td,
+#command-line-options th,
+#command-line-options td,
+#protocol-buffer-configuration th,
+#protocol-buffer-configuration td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+}
+
+#scheduling-loops-and-dr-evt-configurations table code,
+#command-line-options table code,
+#protocol-buffer-configuration table code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#supported-policy-combinations th:first-child {
+    width: 30%;
+}
+
+/* Give every design-decision document the same emphasis in its single list. */
+#design-decisions .toctree-l1 > a {
+    font-weight: 700;
+}

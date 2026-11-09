@@ -65,6 +65,10 @@ message DR_EVT_Params {
         // (default: false for production runs)
         bool verbose = 8;
 
+        // Preserve millisecond precision in job and resource output timestamps.
+        // CLI: --msec_output (default: false).
+        bool msec_output = 51;
+
         // Scheduling parameters
         // CLI: --total_nodes.
         uint32 total_nodes = 9;         // System node count (default: 795)
