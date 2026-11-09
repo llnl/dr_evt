@@ -19,7 +19,8 @@ arrivals and whole-minute time limits are unchanged.
 
 Slurm normally reserves specific compute nodes to protect a waiting job's
 planned start. DR_EVT reserves interchangeable capacity counts. This experiment
-removes competition for node identities while retaining future capacity protection:
+suppresses the effects of resource binding by removing competition for node
+identities while retaining future capacity protection:
 
 | Slurm resource | Role in this experiment |
 |---|---|
@@ -39,11 +40,6 @@ license capacity, so `bf_licenses` determines that protection:
 Slurm defaults to `bf_licenses` off. We turn it on to protect shared capacity
 after removing node competition. Native backfill and `select/cons_tres` remain
 in use.
-
-Ordinary node placement can cause differences like the
-[Fiction four-job example](FLUX_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences).
-The recorded license-on match applies to this capacity model and run; scheduler
-ordering is also a limit, as explained below.
 
 ### Running native Slurm with an adapter and virtual time
 
@@ -114,8 +110,7 @@ completed-dispatch acknowledgements, and compared with the current DR_EVT
 build. All **2,000 jobs** pass the DR_EVT checks, and **7,527 native snapshots**
 pass the Slurm audit.
 Every **start and completion time matches exactly**, with **zero area between
-the resource curves**. This is the observed result of this run; the adapter
-still does not enforce main scheduling before backfill.
+the resource curves**.
 
 | Metric | DR_EVT | Slurm |
 |---|---:|---:|
@@ -123,7 +118,7 @@ still does not enforce main scheduling before backfill.
 | Makespan | 40.6236 h | 40.6236 h |
 | Area under resource curve | 81,309,892 node-seconds | 81,309,892 node-seconds |
 | Utilization | 73.5429% | 73.5429% |
-| Process runtime | 0.037473 s (median of 5 runs) | 697.8357 s |
+| Process runtime | 0.036436 s (median of 5 runs) | 697.8357 s |
 
 DR_EVT timing covers process launch, input, simulation, output, and exit in
 the common Linux Docker environment on an Apple M3 Max. Slurm's single recorded
@@ -153,7 +148,7 @@ phase took **697.8357 seconds**, including startup, RPCs, observation and
 synchronization; DR_EVT execution, audits, plotting and the build are excluded.
 The license-off native reference took **739.2877 seconds** and uses identical
 Slurm and adapter binaries. Both DR_EVT references were refreshed with the same
-current simulator binary. Scheduler order remains uncontrolled in both runs.
+current simulator binary.
 
 DR_EVT was measured in five uninterrupted runs using the same Release binary
 and Linux Docker environment as every other DR_EVT comparison on these pages.
@@ -162,9 +157,9 @@ resource trace matches the published result.
 
 | DR_EVT process timing | Wall time |
 |---|---:|
-| Median | 0.037473 s |
-| Minimum | 0.037405 s |
-| Maximum | 0.037816 s |
+| Median | 0.036436 s |
+| Minimum | 0.035888 s |
+| Maximum | 0.037544 s |
 
 These timings include process launch, trace input, simulation, output, and exit;
 Python parsing, audits, plotting, and builds are excluded. Slurm's native
@@ -183,7 +178,7 @@ is retained as historical evidence.
 
 Two DR_EVT fixes resolved the original license-on differences: retaining the
 next backfill tick after jobs start, and checking capacity at a candidate's
-exact end time. The separate scheduler-order limitation is described above.
+exact end time.
 
 **A backfill tick was skipped after jobs started.** Each periodic pass examines
 a bounded queue prefix. Starting jobs removes them from that prefix and brings

@@ -30,7 +30,7 @@ or **11.0889%** of the shared capacity-time window.
 | Area under resource curve | 81,309,892 node-seconds | 81,309,892 node-seconds |
 | Utilization | 73.5429% | 89.4812% |
 | Maximum waiting time | 18.4183 h | 30.8072 h |
-| Process runtime | 0.037473 s (median of 5 runs) | 739.2877 s |
+| Process runtime | 0.036436 s (median of 5 runs) | 739.2877 s |
 
 Disabling reservation of future shared capacity lets more jobs start early, reducing
 aggregate waiting and makespan in this workload. It also permits later jobs
@@ -113,7 +113,7 @@ separate control and differs in **1,943 starts**.
 | Makespan | 33.3878 h | 33.3878 h |
 | Resource area | 81,309,892 node-seconds | 81,309,892 node-seconds |
 | Utilization | 89.4812% | 89.4812% |
-| Process runtime | 0.012943 s (median of 5 runs) | 739.2877 s |
+| Process runtime | 0.012205 s (median of 5 runs) | 739.2877 s |
 
 :::{figure} ../_static/scheduler-validation/slurm/bf-licenses-off/comparison-metrics.svg
 :alt: Six-panel comparison shows identical waits, utilization, makespan, resource area and start times for diagnostic DR_EVT and acknowledged license-off Slurm.

@@ -28,6 +28,19 @@ static void require(bool condition, const char *message) {
 }
 
 int main() {
+  // A later fit must not make a fixed-time admission succeed. Capacity
+  // shortages inside the interval matter; shortages at its end do not.
+  Reservation_Timeline exact(
+      std::map<sim_time_t, num_nodes_t>{{0, 1}, {10, 3}, {12, 1}, {20, 3}});
+  require(!exact.can_fit(0, 2, 2),
+          "a future fit must not satisfy admission at the requested start");
+  require(exact.can_fit(10, 2, 2),
+          "a shortage exactly at the half-open end must not block admission");
+  require(!exact.can_fit(10, 2, 2.5),
+          "a shortage inside the requested interval must block admission");
+  require(exact.can_fit(10, 2, 0) && !exact.can_fit(12, 2, 0),
+          "point queries must use capacity at the requested instant");
+
   // Two releases at distinct seconds belong to the same inclusive group.
   OneSecondEventGroupTimeline adjacent(Reservation_Timeline(
       std::map<sim_time_t, num_nodes_t>{{0, 1}, {10, 2}, {11, 3}, {100, 4}}));
@@ -35,6 +48,8 @@ int main() {
           "adjacent releases must be checked after the entire group");
   require(adjacent.earliest_fit(1, 2, 0) == 0,
           "a current fit must not be delayed by future grouping");
+  require(adjacent.can_fit(10, 2, 2),
+          "exact admission must not group or shift the requested start");
   OneSecondEventGroupTimeline separated(Reservation_Timeline(
       std::map<sim_time_t, num_nodes_t>{{0, 1}, {10, 2}, {12, 3}, {100, 4}}));
   require(separated.earliest_fit(2, 2, 0) == 10,

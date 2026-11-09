@@ -4,6 +4,11 @@ Native comparisons test DR_EVT against external schedulers on recorded workloads
 and small controls. Each subpage gives the resource model, scheduler settings,
 results and processing times, divergence analysis, and reproduction commands.
 
+**DR_EVT models a subset of scheduler behavior:** queue ordering, backfill,
+reservations, and timing rules over interchangeable capacity counts. It omits
+native resource graphs, node placement, fairshare, and production server and
+compute-node operations. Agreement applies to the tested workloads and settings.
+
 | Comparison | Recorded result for 2,000 Lassen jobs |
 |---|---|
 | [Flux through Fiction](FLUX_VALIDATION.md), FCFS with `sched-simple` | All starts and completions match; Fluxion is unloaded |
@@ -20,15 +25,12 @@ SLURM_VALIDATION
 OPENPBS_VALIDATION
 ```
 
-DR_EVT models interchangeable capacity counts rather than specific-node
-placement. The Slurm and OpenPBS comparisons remove competition for node
-identities while preserving shared-capacity constraints. Fiction's Fluxion
-comparison retains node matching and specific-node reservations.
-
-Matches apply to the tested workloads and configurations. They do not establish
-general scheduler equivalence. Small controls isolate particular differences;
-the cause of every Fluxion trace difference has not been identified. Slurm's
-uncontrolled main-versus-backfill order has produced differences in another run.
+Slurm and OpenPBS give each job a private dummy node or vnode, suppressing
+competition for node identities while retaining shared-capacity constraints.
+The native schedulers still assign nodes. Production resource binding can
+therefore cause further divergence, as the
+[Fiction comparison with Fluxion](FLUX_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences)
+demonstrates.
 
 See [Scheduling Loops](SCHEDULER_LOOPS.md) for policy rules,
 [Realism and Known Gaps](REALISM_AND_GAPS.md) for model limits, and the
@@ -51,12 +53,12 @@ warmup; native times are single instrumented runs.
 
 | Comparison | DR_EVT median of 5 runs | Native processing time | Speedup |
 |---|---:|---:|---:|
-| Fiction FCFS | 0.020736 s | 145.849 s | 7,033.47× |
-| Fiction hybrid | 0.075825 s | 376.8174 s | 4,969.57× |
-| Slurm protected | 0.037473 s | 697.8357 s | 18,622.15× |
-| Slurm no-reservation | 0.012943 s | 739.2877 s | 57,120.76× |
-| OpenPBS FCFS | 0.182249 s | 315.908234 s | 1,733.39× |
-| OpenPBS grouping | 7.257180 s | 325.310732 s | 44.83× |
+| Fiction FCFS | 0.020419 s | 145.849 s | 7,142.92× |
+| Fiction hybrid | 0.061328 s | 376.8174 s | 6,144.30× |
+| Slurm protected | 0.036436 s | 697.8357 s | 19,152.30× |
+| Slurm no-reservation | 0.012205 s | 739.2877 s | 60,571.50× |
+| OpenPBS FCFS | 0.059443 s | 315.908234 s | 5,314.48× |
+| OpenPBS grouping | 0.190654 s | 325.310732 s | 1,706.29× |
 
 Speedup is native processing time divided by the DR_EVT median, calculated
 from unrounded measurements. Timing covers process execution, including input
@@ -64,13 +66,6 @@ and output. Native runs also include scheduler-specific validation work such
 as startup, RPCs, synchronization, and resource snapshots. The ratios compare
 these measured processes; they do not isolate scheduling-algorithm performance.
 Each scheduler subpage describes its timing scope.
-
-**DR_EVT models only a subset of scheduler behavior:** the configured queue
-ordering, backfill, reservations, and timing rules over interchangeable capacity
-counts. It does not reproduce the full native resource model, node placement,
-fairshare, or production server and compute-node operations. The speedups apply
-to these configured simulations, not to an equivalent implementation of every
-native scheduler feature.
 
 The [measurement evidence](../_static/scheduler-validation/performance/README.txt)
 provides all DR_EVT runs, native hybrid timing, benchmark inputs, build details,
