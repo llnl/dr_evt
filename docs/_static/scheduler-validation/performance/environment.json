@@ -1,0 +1,12 @@
+{
+  "hardware": "Apple M3 Max",
+  "execution_environment": "Linux Docker container on Apple M3 Max",
+  "image_id": "sha256:1982c8a529172ec453249ee0b35c4f333f8d95bd9f73f364bdf7fd234476b1aa",
+  "image_name": "dr-evt-flux-validation",
+  "docker_cpu_limit": 0,
+  "docker_memory_limit_bytes": 0,
+  "docker_version": "29.7.2",
+  "source_revision": "348e70aad8e20c774c82f10b0203ddc12bbac4c6",
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "measured_at_utc": "2026-11-09T00:48:06.288434+00:00"
+}

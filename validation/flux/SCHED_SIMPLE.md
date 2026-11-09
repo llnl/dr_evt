@@ -1,6 +1,6 @@
 # FCFS comparison using sched-simple
 
-The [Simulation Validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md#fcfs-without-backfill-identical-sched-simple-run)
+The [Simulation Validation page](../../docs/user-guide/FLUX_VALIDATION.md#fcfs-without-backfill-identical-sched-simple-run)
 contains the completed 2,000-job Lassen comparison, resource curves, metrics,
 and downloadable plotting data. The [harness README](README.md) gives the
 container setup and reproduction commands.

@@ -1,7 +1,7 @@
 # Native scheduling validation with Fiction
 
 This container harness compares DR_EVT policy sets with native Flux schedulers
-driven by Fiction. The [published validation page](../../docs/user-guide/SCHEDULER_VALIDATION.md)
+driven by Fiction. The [published validation page](../../docs/user-guide/FLUX_VALIDATION.md)
 presents the identical FCFS run, the hybrid-backfill comparison, and the
 four-job start-time divergence with Fiction. The FCFS run uses `sched-simple`,
 with Fluxion unloaded. The hybrid-backfill run and four-job reproducer use

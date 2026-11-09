@@ -1,0 +1,22 @@
+{
+  "revisions": {
+    "flux-core": "d0309fcf0e672d90e65b0797168e56a430b9fb57",
+    "flux-sched": "9eba598b4e0940d597695e65f20f5357fc513427",
+    "flux-fiction": "346cbd65bf7da3798e2a351b44e0f57a5b20da96"
+  },
+  "core_version": "0.91.0-35-gd0309fcf0",
+  "extension_sha256": "35063957278e62927ee63306c14637f18ae93ade05ca54698b6420970cd788f3",
+  "overlay_sha256": "a8656872b3492119ed9b4773bea89f154600bc2c7d6f5aeafd1db87cd92dc203",
+  "timing_harness": {
+    "fiction_runner.py": "000d7332085ca5fd2bf71f7d8f962368fa21b03307c51b9536f7e92dad7bfb93",
+    "validate_lassen.py": "8d7fd19bc82f5612e5a803d520cd9b769b434b3ce5dd5adf6f0aebba27e79e75",
+    "test_paired.py": "580f23d488ef64d440966b20a34d4f993ff1436be4c0401d6072666b4bbcedee",
+    "resource_profiles.py": "eeee36ced230cab519b0bd86b5093d1740bc4fd01943fae70f52fdb90948852b"
+  },
+  "installed_files": {
+    "/workspace/install/bin/flux": "8abe0482ef1bddd60ce96b04d06eeb6bed44d2a810ad74fc0670897401ccc355",
+    "/workspace/install/lib/flux/modules/sched-fluxion-qmanager.so": "076557be3830095d3b8dc9fd9537e39b5b7f8ead97bcecef363866ad983972c7",
+    "/workspace/install/lib/flux/modules/sched-fluxion-resource.so": "4c9467efd2b601847039a8b7cc7ac810958c3719d7684cf0b62b2665ad74779a",
+    "/workspace/fiction-build/src/emu-jobtap.so": "dad0c3c1b9a377b09132bc3d6d777f595da5c549ddc2ae0a3c2278741f3f2d90"
+  }
+}

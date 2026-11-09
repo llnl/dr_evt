@@ -19,13 +19,13 @@ DR_EVT uses four complementary forms of validation:
   uncontrolled, so these matches do not establish general scheduler equivalence.
 
 The native OpenPBS scheduler-library comparison uses private vnodes and shared
-server capacity. Its original 2,000-job Lassen replay has 1,433 differing
-schedules. The first difference comes from OpenPBS skipping a capacity check
-between predicted releases one second apart. Replaying the same jobs with
-every arrival time, actual runtime, and requested time limit multiplied by two
-produces exact agreement. See the
-[OpenPBS explanation](user-guide/SCHEDULER_VALIDATION.md#openpbs-with-server-wide-capacity)
-and [harness commands](https://github.com/LLNL/dr_evt/blob/main/validation/openpbs/README.md).
+server capacity. The `fcfs_1s_evt_group` policy matches every start and
+completion in the original converted 2,000-job Lassen input. Default `fcfs`
+has 1,433 differing schedules because it checks capacity between predicted
+releases that OpenPBS groups together. Both policies are shown separately in
+[OpenPBS validation](user-guide/OPENPBS_VALIDATION.md).
+The [harness README](https://github.com/LLNL/dr_evt/blob/main/validation/openpbs/README.md)
+gives setup and commands.
 
 The separate `fcfs_1s_evt_group` policy reproduces that native forecast grouping.
 Its native regression also checks pending-status and queue-drain queries

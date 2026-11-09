@@ -1,0 +1,21 @@
+{
+  "jobs": 2000,
+  "capacity": 756,
+  "reservation_depth": 32,
+  "queue_depth": 64,
+  "match_policy": "lonodex",
+  "scheduler_backend": "fluxion",
+  "timing": {
+    "elapsed_seconds": 376.81737187999533,
+    "scope": "flux-fiction-run process launch through exit",
+    "scheduler_backend": "fluxion"
+  },
+  "native_schedule_matches_published": true,
+  "dr_evt_schedule_matches_published": true,
+  "resource_snapshot_count": 2920,
+  "native_duplicate_owners": 0,
+  "capacity_resource_area_and_ownership_audits_passed": true,
+  "workload_source_sha256": "463379d4f61ba1fb75e2ec32380538bb3e44f00b9210ff67db3327aa8715dd04",
+  "paired_report_sha256": "73855352c2ea68b2b40ebe2c50ca1e8e54a5b2ddda15c617baa31c8d7d2196e8",
+  "reproduction_command": "python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv \"$(cat /workspace/dr_evt-simulator)\" --policy hybrid --scheduler-backend fluxion --reservation-depth 32 --queue-depth 64 --max-jobs 2000 --timeout 900 --outdir /results/native-hybrid"
+}

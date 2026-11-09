@@ -24,16 +24,18 @@ Put the user-provided `lassen-756-01.csv` from
 bash validation/openpbs/run.sh
 ```
 
-To compare the separate DR_EVT policy that reproduces OpenPBS's forecast
-grouping, run:
+The validation defaults to `fcfs_1s_evt_group`, which reproduces the tested
+OpenPBS forecast rule. Every small case and the original converted Lassen
+input must match exactly and pass all capacity audits. Select either policy
+using DR_EVT's existing option:
 
 ```sh
-OPENPBS_VALIDATION_DR_PRIORITY=fcfs_1s_evt_group bash validation/openpbs/run.sh
+bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group
+bash validation/openpbs/run.sh --priority_policy fcfs
 ```
 
-The default comparison still uses the original `fcfs` policy and records its
-timing differences. With `fcfs_1s_evt_group`, every small case and both Lassen
-replays require exact native agreement as well as passing capacity audits.
+The second command compares ordinary `fcfs` and records its timing differences.
+The wrapper passes `--priority_policy` through to the DR_EVT invocation.
 
 The image downloads build dependencies. Native source is exported from its
 commit into a Docker volume; the source checkout is mounted read-only.
@@ -44,16 +46,10 @@ committed OpenPBS source without scheduling patches.
 `OPENPBS_VALIDATION_RESULTS` sets the results directory;
 `OPENPBS_VALIDATION_BUILD_VOLUME` selects the reusable build volume;
 `OPENPBS_VALIDATION_MAX_JOBS` sets the Lassen prefix size (default 2,000;
-0 selects the complete file). The trace is compared both at its converted
-timing and after multiplying every arrival time, actual runtime, and requested
-time limit by two. Job order and capacity requests stay the same. This second
-replay tests whether OpenPBS's treatment of releases one second apart explains
-the differences in the first replay. Each native
-replay has a 30-minute timeout.
+0 selects the complete file). Both schedulers receive the same original
+converted input. Each native replay has a 30-minute timeout.
 Small controls can be run directly in the prepared container by omitting
-`--trace` from `compare.py`.
-`OPENPBS_VALIDATION_DR_PRIORITY` selects `fcfs` (default) or `fcfs_1s_evt_group`;
-direct comparisons use `compare.py --dr-priority fcfs_1s_evt_group`.
+`--trace` from `compare.py`. The comparator also accepts `--priority_policy`.
 
 ## Resource and policy model
 
@@ -141,7 +137,7 @@ setting has value zero, but `simulate_events()` replaces zero with one before
 calculating the inclusive group endpoint. `calc_run_time()` checks whether the
 waiting job fits after the group returns. This explains the remaining grouping
 with `off`. See the
-[complete capacity example and native source references](https://github.com/LLNL/dr_evt/blob/main/docs/user-guide/SCHEDULER_VALIDATION.md#openpbs-with-server-wide-capacity).
+[complete capacity example and native source references](https://github.com/LLNL/dr_evt/blob/main/docs/user-guide/OPENPBS_VALIDATION.md).
 
 ## Adapter boundary
 
@@ -168,16 +164,24 @@ the original fractional-second trace.
 
 ## Evidence
 
-The recorded 2,000-job primary Lassen replay has **1,433 differing schedules**,
-with utilization **75.09%** for OpenPBS and **74.91%** for DR_EVT. The first
-divergence comes from different predictions for waiting job 229's earliest
-start: DR_EVT predicts 13,006 seconds; OpenPBS predicts 13,007 because it skips
-the capacity check between releases at those times. That changes which job
-may run ahead of job 229. **All 2,000 schedules match when every time is
-multiplied by two**, putting distinct releases at least two seconds apart.
-Both replays pass the capacity and ownership audits. The
-[recorded evidence](evidence/whole-seconds-20261108/README.md) includes both
-results and the four-job reproducer.
+With `fcfs_1s_evt_group`, **all 2,000 starts and completions match native
+OpenPBS on the original converted Lassen input**. Both schedulers have mean
+wait 23,620.5925 seconds, makespan 143,232 seconds, and utilization 75.0899%.
+All 21 small cases match and all capacity/ownership audits pass. See the
+[grouped-policy evidence](evidence/openpbs-policy-20261108/README.md).
+
+With ordinary `fcfs`, the same input has **1,433 differing schedules**. The
+first divergence comes from different predictions for waiting job 229:
+DR_EVT predicts 13,006 seconds; OpenPBS predicts 13,007 because it groups
+predicted releases at those times before checking capacity. This changes
+which later job may run ahead of job 229. The
+[default-policy evidence](evidence/whole-seconds-20261108/README.md) preserves
+that run and the four-job reproducer.
+
+The [OpenPBS validation page](../../docs/user-guide/OPENPBS_VALIDATION.md)
+shows separate six-panel comparisons and resource-use curves for both policies.
+The normal runner uses the original converted input; it does not scale its
+arrival times, runtimes, or limits to obtain a match.
 
 The runner saves native and DR_EVT build manifests and hashes, adapter sources,
 exact commands and configurations, converted inputs, schedules, native
@@ -186,12 +190,10 @@ are ignored. Compact recorded evidence is stored under `evidence/`.
 
 Seven hand-derived controls cover allowed/blocked backfill, early completion,
 simultaneous events, half-open endpoints, and protection depth. Twelve seeded
-30-job workloads broaden coverage. Two additional four-job controls assert
-the adjacent-release divergence and the match when times are doubled. The
-Lassen comparisons use R=32. The primary replay records measured differences;
-the replay with every time multiplied by two requires an exact match. The
-runner also requires all capacity/ownership audits and the expected small-case
-outcomes to pass.
+30-job workloads broaden coverage. Two additional four-job cases compare
+adjacent predicted releases with releases farther apart. The Lassen replay
+uses R=32. With `fcfs_1s_evt_group` all cases must match; with `fcfs`, the
+adjacent-release difference is expected and the Lassen differences are recorded.
 
 `fcfs_1s_evt_group` selects a distinct DR_EVT scheduler with the grouping rule
 explained above. It reuses FCFS placement passes while keeping its forecast
@@ -201,8 +203,8 @@ queue, event-driven dispatch, and unlimited planning horizon. Its native
 agreement claims apply to integer-second shared-capacity inputs, not all
 OpenPBS scheduling policies or production node placement.
 Its [recorded native replay](evidence/openpbs-policy-20261108/README.md)
-matches all 21 small cases and every start and completion in both 2,000-job
-inputs. All capacity and ownership audits pass. The original input needs no
+matches all 21 small cases and every start and completion in the original
+converted 2,000-job input. All capacity and ownership audits pass. The original input needs no
 extra time transformation when this policy is selected.
 
 Historical replay evidence records the earlier name `fcfs_openpbs`. The
@@ -230,8 +232,8 @@ Quick CI and both compiler jobs in full CI run this command. These tests check
 the harness; they do not execute the native scheduler.
 
 `bash validation/openpbs/run.sh` builds and executes the native scheduler,
-runs all 21 small comparisons, and runs both versions of the selected Lassen
-prefix. For a shorter build-and-replay check, run:
+runs all 21 small comparisons, and runs the original converted Lassen
+prefix with the selected policy. For a shorter build-and-replay check, run:
 
 ```sh
 OPENPBS_VALIDATION_MAX_JOBS=50 bash validation/openpbs/run.sh
@@ -239,12 +241,10 @@ OPENPBS_VALIDATION_MAX_JOBS=50 bash validation/openpbs/run.sh
 
 Native replays run separately from ordinary GitHub CI because they require
 the pinned external OpenPBS checkout and the supplied Lassen trace. A passing
-native run with the default `fcfs` policy requires all audits, exact matches in 20 small cases, the specified
-four-job difference, and exact agreement for the Lassen input with all times
-multiplied by two. The original Lassen replay records differences rather than
-requiring equality.
-With `OPENPBS_VALIDATION_DR_PRIORITY=fcfs_1s_evt_group`, all 21 small cases and
-both Lassen inputs must match exactly.
+native run with `fcfs_1s_evt_group` requires exact agreement in all 21 small
+cases and the original converted Lassen input. Selecting `fcfs` requires all
+audits, exact matches in 20 small cases, and the specified adjacent-release
+difference; it records the Lassen divergence without requiring equality.
 
 The adapter uses clang-format 18's LLVM style. Format or check it with:
 

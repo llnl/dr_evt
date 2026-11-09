@@ -602,7 +602,7 @@ Accounting and policy evidence limits are in
   and Simulation*, pp. 197–217. Section 3 describes separate controller
   threads executing the main and backfill schedulers periodically, and how
   simulation accounts for their execution times. This supplies loop background;
-  [our native Slurm validation](SCHEDULER_VALIDATION.md#periodic-backfill-with-native-slurm)
+  [our native Slurm validation](SLURM_VALIDATION.md)
   uses the adapter described there.
 - Songnian Zhou, Xiaohu Zheng, Jingwen Wang, and Pierre Delisle (1993),
   [*Utopia: A load sharing facility for large, heterogeneous distributed computer systems*](https://doi.org/10.1002/spe.4380231203),

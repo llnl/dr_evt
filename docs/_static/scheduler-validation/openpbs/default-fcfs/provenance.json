@@ -1,0 +1,11 @@
+{
+  "displayed_priority_policy": "fcfs",
+  "recorded_priority_policy": "fcfs",
+  "native_revision": "cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a",
+  "evidence_directory": "validation/openpbs/evidence/whole-seconds-20261108",
+  "note": "Figures use the recorded original converted input, without time scaling. The grouped replay predates the policy rename; saved source snapshots and build hashes identify that replay.",
+  "data_sha256": {
+    "report.json": "894d241b638a7fe6c596c9f8e05ef6a4805abff2d3f718ae039a690fbb38b255",
+    "workload.json": "9b6f75e478fce42c9b0ea5f81d4e44074d2ab8ee76a5f9bdbe0a778cc8c2de55"
+  }
+}

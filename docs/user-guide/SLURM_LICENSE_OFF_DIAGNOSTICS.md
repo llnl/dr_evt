@@ -1,6 +1,6 @@
 # Slurm license-off diagnostics
 
-These experiments supplement the [license-on validation](SCHEDULER_VALIDATION.md).
+These experiments supplement the [license-on validation](SLURM_VALIDATION.md).
 Each job has a private dummy physical node and consumes a share of the same
 756-resource license pool. With `bf_licenses=off`, Slurm enforces current
 capacity but does not reserve future capacity in that pool. The private nodes
@@ -30,6 +30,7 @@ or **11.0889%** of the shared capacity-time window.
 | Area under resource curve | 81,309,892 node-seconds | 81,309,892 node-seconds |
 | Utilization | 73.5429% | 89.4812% |
 | Maximum waiting time | 18.4183 h | 30.8072 h |
+| Process runtime | 0.037473 s (median of 5 runs) | 739.2877 s |
 
 Disabling reservation of future shared capacity lets more jobs start early, reducing
 aggregate waiting and makespan in this workload. It also permits later jobs
@@ -83,7 +84,7 @@ Changing C's size isolates the protection supplied by future license reservation
 :::
 
 These Slurm scenarios illustrate **protection of an earlier job's planned start**;
-the [Fiction four-job example](SCHEDULER_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences) illustrates **binding reservations to specific
+the [Fiction four-job example](FLUX_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences) illustrates **binding reservations to specific
 nodes**. The Slurm node rows are drawn feasible assignments to interchangeable
 capacity slots, not recorded node bindings. Workload tables, scripts, and
 plotting data accompany both figures.
@@ -112,6 +113,7 @@ separate control and differs in **1,943 starts**.
 | Makespan | 33.3878 h | 33.3878 h |
 | Resource area | 81,309,892 node-seconds | 81,309,892 node-seconds |
 | Utilization | 89.4812% | 89.4812% |
+| Process runtime | 0.012943 s (median of 5 runs) | 739.2877 s |
 
 :::{figure} ../_static/scheduler-validation/slurm/bf-licenses-off/comparison-metrics.svg
 :alt: Six-panel comparison shows identical waits, utilization, makespan, resource area and start times for diagnostic DR_EVT and acknowledged license-off Slurm.
@@ -124,12 +126,14 @@ Current-capacity dispatch without future reservations matches the gated native l
 · [Resource curves](../_static/scheduler-validation/slurm/bf-licenses-off/comparison.pdf)
 · [Combined metrics](../_static/scheduler-validation/slurm/license-planning-metrics.csv).
 
-The uninterrupted native controller/adapter run took **739.2877 seconds** in
-the Linux container, including RPCs, observation, acknowledgements, and snapshot
-writes. Five subsequent local macOS diagnostic runs had a median of
-**0.055111 seconds** (range **0.050730–0.063799**), including process launch,
-input, simulation, output and exit. These are different timing scopes and
-environments; the recorded native duration is not scheduler computation alone.
+DR_EVT timings are medians of five runs using the common Release binary and
+Linux Docker environment on an Apple M3 Max. Every repeated schedule and resource
+trace matches the published result. The native controller/adapter's single
+recorded timing includes RPCs, observation, acknowledgements, and snapshot writes;
+DR_EVT timing covers process launch, input, simulation, output, and exit.
+Both exclude builds, audits, and plotting. The
+[common timing record](../_static/scheduler-validation/performance/performance.json)
+contains both protected and no-reservation DR_EVT measurements.
 
 This exact match is an observation for the recorded run. Main scheduling and
 backfill were released together; their relative order was not enforced, and
@@ -189,7 +193,7 @@ off, verifies that no fitting eligible job remains waiting.
 
 The current license-on rerun uses the corrected clock and completed-dispatch
 acknowledgements and matches all 2,000 starts and completions. Its results are
-on the [validation page](SCHEDULER_VALIDATION.md). The order of main scheduling
+on the [validation page](SLURM_VALIDATION.md). The order of main scheduling
 and backfill remains uncontrolled; an exact match in this run does not show
 that DR_EVT reproduces every order Slurm can use.
 

@@ -29,5 +29,4 @@ python3 /dr_evt_source/validation/openpbs/compare.py \
     --native /workspace/openpbs-reference \
     --simulator "$(cat /workspace/dr_evt-simulator)" \
     --trace /dr_evt_source/lassen_traces/lassen-756-01.csv \
-    --dr-priority "${OPENPBS_VALIDATION_DR_PRIORITY:-fcfs}" \
-    --max-jobs "${OPENPBS_VALIDATION_MAX_JOBS:-2000}" --outdir /results
+    --max-jobs "${OPENPBS_VALIDATION_MAX_JOBS:-2000}" --outdir /results "$@"
