@@ -49,6 +49,9 @@ in-process via the streaming API:
 one `JobStatus` per ID in the same order. A pending job carries
 `expected_start_time`; a running or completed job carries `scheduled` with
 `start_time` and `end_time`; and a rejected job carries no timing value.
+The request reuses cached live start predictions by default and forecasts
+missing starts. Set the optional `use_cached_predictions` field to `false`
+for an entirely fresh conservative forecast; absent or `true` enables reuse.
 `expected_start_time` is paired with a `start_time_kind`: `reserved` is a
 protected scheduler reservation, while `estimated` is a non-binding earliest
 fit that respects protected reservations. A short job behind a blocked head

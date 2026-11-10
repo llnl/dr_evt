@@ -125,7 +125,10 @@ auto job_nos = sim.append_jobs(batch);
 
 Returns a status snapshot for each ID returned by `append_job()` or
 `append_jobs()`, preserving request order and duplicate IDs. Pending jobs
-include an on-demand `expected_start_time` projection. Once scheduled, a job
+include an `expected_start_time` from the live cache where available, with
+on-demand forecasting for missing starts. Cache-only requests avoid forecasting;
+set the third C++ argument, `use_cached_predictions`, to `false` to request
+the original entirely fresh forecast. Once scheduled, a job
 instead includes its simulated `start_time` and `end_time` and is reported as
 running or completed according to the current simulation time. Rejected jobs
 have no timing. Status remains queryable after completed trace records are
@@ -146,14 +149,14 @@ queue prefix; zero, the default, considers the complete waiting queue. It does
 not change scheduler configuration or policy.
 An empty `job_idxs` list returns that waiting-queue prefix in scheduler order.
 
-### `get_planned_job_starts()`
+### `get_estimated_job_starts()`
 
 Reads the start predictions saved by the latest live planning pass, following
 Slurm's `squeue --start` reporting model. It does not compute another forecast.
 
 ```cpp
-auto plan = sim.get_planned_job_starts();
-// plan.planned_at: optional simulation timestamp of the live planning pass
+auto plan = sim.get_estimated_job_starts();
+// plan.estimated_at: optional simulation timestamp of the live planning pass
 for (const auto &job : plan.jobs) {
     // job.job_idx, job.expected_start_time, job.start_time_kind
 }
@@ -162,14 +165,14 @@ for (const auto &job : plan.jobs) {
 The result lists currently eligible pending jobs sorted by expected start,
 with unknown starts last. Unexamined jobs have no estimate. A projection
 beyond the planning horizon can remain an estimate without protection.
-`planned_at` is absent before planning and after checkpoint restore; with
+`estimated_at` is absent before planning and after checkpoint restore; with
 periodic backfill it may precede current simulation time. Neither new arrivals
 nor a status query refresh the cache on their own.
 
-Unlike `get_job_statuses()`, this interface reports the live planner's saved
-work rather than making a fresh serial forecast for the requested queue.
-The gRPC equivalents are `GetPlannedJobStartsRequest` and
-`GetPlannedJobStartsResponse`. See
+Unlike `get_job_statuses()`, this interface reports only the live planner's
+saved work and leaves missing starts unknown rather than forecasting them.
+The gRPC equivalents are `GetEstimatedJobStartsRequest` and
+`GetEstimatedJobStartsResponse`. See
 [Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md#slurm-comparison)
 for the comparison with Slurm `squeue --start` and `sbatch --test-only`.
 

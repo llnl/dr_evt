@@ -2014,8 +2014,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
       m_scheduler->sync_to(m_current_time);
     }
     m_scheduler->m_fcfs_reservation_time = reservation_time;
-    m_scheduler->m_planned_starts.clear();
-    m_scheduler->m_planned_at.reset();
+    m_scheduler->m_estimated_starts.clear();
+    m_scheduler->m_estimated_at.reset();
 
     if (restore_outputs && redis_output) {
 #if defined(DR_EVT_HAS_REDIS_PLUS_PLUS)
@@ -2277,34 +2277,45 @@ void BasicSimulation<TraceType>::record_appended_job_start(job_no_t job_idx) {
 }
 
 template <typename TraceType>
-typename BasicSimulation<TraceType>::Planned_Job_Starts
-BasicSimulation<TraceType>::get_planned_job_starts() const {
-  Planned_Job_Starts result{m_scheduler->m_planned_at, {}};
-  std::unordered_map<job_no_t, SchedulerBase::Planned_Start> predictions;
-  predictions.reserve(m_scheduler->m_planned_starts.size());
-  for (const auto &prediction : m_scheduler->m_planned_starts) {
+typename BasicSimulation<TraceType>::Estimated_Job_Starts
+BasicSimulation<TraceType>::get_estimated_job_starts() const {
+  Estimated_Job_Starts result{m_scheduler->m_estimated_at, {}};
+  std::unordered_map<job_no_t, SchedulerBase::Estimated_Start> predictions;
+  predictions.reserve(m_scheduler->m_estimated_starts.size());
+  for (const auto &prediction : m_scheduler->m_estimated_starts) {
     predictions.insert_or_assign(prediction.job_id, prediction);
   }
+  size_t known_starts = 0;
   for (const auto job_idx : m_scheduler->pending_job_ids()) {
     const auto &record = m_trace.job_at(job_idx);
     if (record.is_scheduled() ||
         convert_epoch<sim_time_t>(record.get_submit_time()) > m_current_time) {
       continue;
     }
-    Planned_Job_Start job{job_idx, std::nullopt, Start_Time_Kind::NONE};
+    Estimated_Job_Start job{job_idx, std::nullopt, Start_Time_Kind::NONE};
     if (const auto found = predictions.find(job_idx); found != predictions.end()) {
       job.expected_start_time = found->second.start;
       job.start_time_kind = found->second.reserved ? Start_Time_Kind::RESERVED
                                                  : Start_Time_Kind::ESTIMATED;
+      ++known_starts;
     }
     result.jobs.push_back(job);
   }
-  std::stable_sort(result.jobs.begin(), result.jobs.end(),
-                   [](const auto &a, const auto &b) {
-    if (!a.expected_start_time) return false;
-    if (!b.expected_start_time) return true;
-    return *a.expected_start_time < *b.expected_start_time;
-  });
+  if (known_starts != 0) {
+    // Preserve queue order for unknown starts and equal-time predictions.
+    // Do not sort the unknown tail when only a shallow prefix was planned.
+    const auto known_end =
+        known_starts == result.jobs.size()
+            ? result.jobs.end()
+            : std::stable_partition(result.jobs.begin(), result.jobs.end(),
+                                    [](const auto &job) {
+                                      return job.expected_start_time.has_value();
+                                    });
+    std::stable_sort(result.jobs.begin(), known_end,
+                     [](const auto &a, const auto &b) {
+      return *a.expected_start_time < *b.expected_start_time;
+    });
+  }
   return result;
 }
 
@@ -2312,17 +2323,28 @@ template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+  return get_job_statuses(job_idxs, estimation_depth, true);
+}
+
+template <typename TraceType>
+std::vector<typename BasicSimulation<TraceType>::Job_Status>
+BasicSimulation<TraceType>::get_job_statuses(
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth,
+    bool use_cached_predictions) const {
   if (m_params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
-    return get_job_statuses_impl<true>(job_idxs, estimation_depth);
+    return get_job_statuses_impl<true>(job_idxs, estimation_depth,
+                                       use_cached_predictions);
   }
-  return get_job_statuses_impl<false>(job_idxs, estimation_depth);
+  return get_job_statuses_impl<false>(job_idxs, estimation_depth,
+                                      use_cached_predictions);
 }
 
 template <typename TraceType>
 template <bool GroupEvents>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses_impl(
-    const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth,
+    bool use_cached_predictions) const {
   const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::vector<Job_Status> result;
   std::multimap<job_no_t, size_t> requested_pending_statuses;
@@ -2369,6 +2391,48 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
   }
   if (requested_pending_statuses.empty()) {
     return result;
+  }
+
+  std::unordered_map<job_no_t, SchedulerBase::Estimated_Start> predictions;
+  size_t forecast_depth = estimation_depth;
+  if (use_cached_predictions && !m_scheduler->m_estimated_starts.empty()) {
+    predictions.reserve(m_scheduler->m_estimated_starts.size());
+    for (const auto &prediction : m_scheduler->m_estimated_starts) {
+      // A pending job cannot start in the past. Periodic plans may retain
+      // such values until their next tick, so forecast those jobs afresh.
+      if (prediction.start >= m_current_time) {
+        predictions.insert_or_assign(prediction.job_id, prediction);
+      } else {
+        predictions.erase(prediction.job_id);
+      }
+    }
+    const size_t count = estimation_depth == 0
+                             ? pending_job_ids.size()
+                             : std::min(estimation_depth, pending_job_ids.size());
+    size_t last_missing = 0;
+    for (size_t i = 0; i < count; ++i) {
+      const auto id = pending_job_ids[i];
+      const auto [first, last] = requested_pending_statuses.equal_range(id);
+      if (first == last) continue;
+      const auto cached = predictions.find(id);
+      if (cached != predictions.end() &&
+          convert_epoch<sim_time_t>(m_trace.job_at(id).get_submit_time()) <= m_current_time) {
+        for (auto request = first; request != last; ++request) {
+          auto &status = result[request->second];
+          status.expected_start_time = cached->second.start;
+          status.start_time_kind = cached->second.reserved
+                                       ? Start_Time_Kind::RESERVED
+                                       : Start_Time_Kind::ESTIMATED;
+        }
+        requested_pending_statuses.erase(first, last);
+      } else {
+        last_missing = i + 1;
+      }
+    }
+    if (last_missing == 0) return result;
+    // The remaining requested starts depend on the jobs ahead of them,
+    // but no forecast is needed beyond the last missing requested start.
+    forecast_depth = last_missing;
   }
 
   // Free-node profile: each key starts a segment that keeps its value until
@@ -2433,7 +2497,7 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
   size_t projected_count = 0;
 
   for (const job_no_t pending_id : pending_job_ids) {
-    if (estimation_depth != 0 && projected_count >= estimation_depth) {
+    if (forecast_depth != 0 && projected_count >= forecast_depth) {
       break;
     }
     ++projected_count;
@@ -2442,7 +2506,15 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
     const tdiff_t limit = record.get_limit_time();
     const sim_time_t earliest = std::max(
         m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
-    const auto start = reservation_profile.earliest_fit(nodes, limit, earliest);
+    std::optional<sim_time_t> start;
+    if (const auto cached = predictions.find(pending_id);
+        cached != predictions.end() && cached->second.reserved &&
+        cached->second.start >= earliest &&
+        reservation_profile.can_fit(cached->second.start, nodes, limit)) {
+      start = cached->second.start;
+    } else {
+      start = reservation_profile.earliest_fit(nodes, limit, earliest);
+    }
     if (!start) {
       continue;
     }

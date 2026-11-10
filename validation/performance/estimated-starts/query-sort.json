@@ -1,0 +1,463 @@
+{
+  "scope": "Cached query loop only, setup excluded",
+  "runs": 9,
+  "libraries": {
+    "original": "e1333398ca22f07991225afb71243fd59607d785965dd98d31e64a8429d74ad4",
+    "optimized": "0ff5308c1dc1a881f8e6af81004b61fd3e5ba076b15771cdbbbd3269e488a82f"
+  },
+  "cases": [
+    {
+      "jobs": 1000,
+      "repetitions": 10000,
+      "coverage": 64,
+      "runs": [
+        {
+          "version": "optimized",
+          "run": 1,
+          "seconds": 0.0904885
+        },
+        {
+          "version": "original",
+          "run": 1,
+          "seconds": 0.107947
+        },
+        {
+          "version": "original",
+          "run": 2,
+          "seconds": 0.108648
+        },
+        {
+          "version": "optimized",
+          "run": 2,
+          "seconds": 0.0918861
+        },
+        {
+          "version": "optimized",
+          "run": 3,
+          "seconds": 0.0921445
+        },
+        {
+          "version": "original",
+          "run": 3,
+          "seconds": 0.108496
+        },
+        {
+          "version": "original",
+          "run": 4,
+          "seconds": 0.108002
+        },
+        {
+          "version": "optimized",
+          "run": 4,
+          "seconds": 0.0903094
+        },
+        {
+          "version": "optimized",
+          "run": 5,
+          "seconds": 0.0899492
+        },
+        {
+          "version": "original",
+          "run": 5,
+          "seconds": 0.11049
+        },
+        {
+          "version": "original",
+          "run": 6,
+          "seconds": 0.107773
+        },
+        {
+          "version": "optimized",
+          "run": 6,
+          "seconds": 0.09045
+        },
+        {
+          "version": "optimized",
+          "run": 7,
+          "seconds": 0.0900684
+        },
+        {
+          "version": "original",
+          "run": 7,
+          "seconds": 0.108776
+        },
+        {
+          "version": "original",
+          "run": 8,
+          "seconds": 0.107411
+        },
+        {
+          "version": "optimized",
+          "run": 8,
+          "seconds": 0.0902315
+        },
+        {
+          "version": "optimized",
+          "run": 9,
+          "seconds": 0.090905
+        },
+        {
+          "version": "original",
+          "run": 9,
+          "seconds": 0.108753
+        }
+      ],
+      "summary": {
+        "original": {
+          "microseconds_per_query": 10.8496,
+          "range_seconds": [
+            0.107411,
+            0.11049
+          ]
+        },
+        "optimized": {
+          "microseconds_per_query": 9.045,
+          "range_seconds": [
+            0.0899492,
+            0.0921445
+          ]
+        }
+      }
+    },
+    {
+      "jobs": 10000,
+      "repetitions": 5000,
+      "coverage": 64,
+      "runs": [
+        {
+          "version": "optimized",
+          "run": 1,
+          "seconds": 0.363901
+        },
+        {
+          "version": "original",
+          "run": 1,
+          "seconds": 0.57806
+        },
+        {
+          "version": "original",
+          "run": 2,
+          "seconds": 0.578301
+        },
+        {
+          "version": "optimized",
+          "run": 2,
+          "seconds": 0.375954
+        },
+        {
+          "version": "optimized",
+          "run": 3,
+          "seconds": 0.364488
+        },
+        {
+          "version": "original",
+          "run": 3,
+          "seconds": 0.576745
+        },
+        {
+          "version": "original",
+          "run": 4,
+          "seconds": 0.576638
+        },
+        {
+          "version": "optimized",
+          "run": 4,
+          "seconds": 0.363602
+        },
+        {
+          "version": "optimized",
+          "run": 5,
+          "seconds": 0.375457
+        },
+        {
+          "version": "original",
+          "run": 5,
+          "seconds": 0.577619
+        },
+        {
+          "version": "original",
+          "run": 6,
+          "seconds": 0.578065
+        },
+        {
+          "version": "optimized",
+          "run": 6,
+          "seconds": 0.364656
+        },
+        {
+          "version": "optimized",
+          "run": 7,
+          "seconds": 0.367247
+        },
+        {
+          "version": "original",
+          "run": 7,
+          "seconds": 0.586045
+        },
+        {
+          "version": "original",
+          "run": 8,
+          "seconds": 0.578288
+        },
+        {
+          "version": "optimized",
+          "run": 8,
+          "seconds": 0.364604
+        },
+        {
+          "version": "optimized",
+          "run": 9,
+          "seconds": 0.366466
+        },
+        {
+          "version": "original",
+          "run": 9,
+          "seconds": 0.577692
+        }
+      ],
+      "summary": {
+        "original": {
+          "microseconds_per_query": 115.612,
+          "range_seconds": [
+            0.576638,
+            0.586045
+          ]
+        },
+        "optimized": {
+          "microseconds_per_query": 72.9312,
+          "range_seconds": [
+            0.363602,
+            0.375954
+          ]
+        }
+      }
+    },
+    {
+      "jobs": 10000,
+      "repetitions": 5000,
+      "coverage": 0,
+      "runs": [
+        {
+          "version": "optimized",
+          "run": 1,
+          "seconds": 0.227921
+        },
+        {
+          "version": "original",
+          "run": 1,
+          "seconds": 0.456821
+        },
+        {
+          "version": "original",
+          "run": 2,
+          "seconds": 0.458465
+        },
+        {
+          "version": "optimized",
+          "run": 2,
+          "seconds": 0.228858
+        },
+        {
+          "version": "optimized",
+          "run": 3,
+          "seconds": 0.230278
+        },
+        {
+          "version": "original",
+          "run": 3,
+          "seconds": 0.458388
+        },
+        {
+          "version": "original",
+          "run": 4,
+          "seconds": 0.45841
+        },
+        {
+          "version": "optimized",
+          "run": 4,
+          "seconds": 0.228324
+        },
+        {
+          "version": "optimized",
+          "run": 5,
+          "seconds": 0.228058
+        },
+        {
+          "version": "original",
+          "run": 5,
+          "seconds": 0.460891
+        },
+        {
+          "version": "original",
+          "run": 6,
+          "seconds": 0.456573
+        },
+        {
+          "version": "optimized",
+          "run": 6,
+          "seconds": 0.229555
+        },
+        {
+          "version": "optimized",
+          "run": 7,
+          "seconds": 0.231408
+        },
+        {
+          "version": "original",
+          "run": 7,
+          "seconds": 0.469564
+        },
+        {
+          "version": "original",
+          "run": 8,
+          "seconds": 0.457294
+        },
+        {
+          "version": "optimized",
+          "run": 8,
+          "seconds": 0.227991
+        },
+        {
+          "version": "optimized",
+          "run": 9,
+          "seconds": 0.228604
+        },
+        {
+          "version": "original",
+          "run": 9,
+          "seconds": 0.458236
+        }
+      ],
+      "summary": {
+        "original": {
+          "microseconds_per_query": 91.6776,
+          "range_seconds": [
+            0.456573,
+            0.469564
+          ]
+        },
+        "optimized": {
+          "microseconds_per_query": 45.7208,
+          "range_seconds": [
+            0.227921,
+            0.231408
+          ]
+        }
+      }
+    },
+    {
+      "jobs": 10000,
+      "repetitions": 1000,
+      "coverage": 10000,
+      "runs": [
+        {
+          "version": "optimized",
+          "run": 1,
+          "seconds": 0.312631
+        },
+        {
+          "version": "original",
+          "run": 1,
+          "seconds": 0.317551
+        },
+        {
+          "version": "original",
+          "run": 2,
+          "seconds": 0.317085
+        },
+        {
+          "version": "optimized",
+          "run": 2,
+          "seconds": 0.310605
+        },
+        {
+          "version": "optimized",
+          "run": 3,
+          "seconds": 0.305856
+        },
+        {
+          "version": "original",
+          "run": 3,
+          "seconds": 0.32224
+        },
+        {
+          "version": "original",
+          "run": 4,
+          "seconds": 0.316975
+        },
+        {
+          "version": "optimized",
+          "run": 4,
+          "seconds": 0.307153
+        },
+        {
+          "version": "optimized",
+          "run": 5,
+          "seconds": 0.306449
+        },
+        {
+          "version": "original",
+          "run": 5,
+          "seconds": 0.315677
+        },
+        {
+          "version": "original",
+          "run": 6,
+          "seconds": 0.315555
+        },
+        {
+          "version": "optimized",
+          "run": 6,
+          "seconds": 0.311754
+        },
+        {
+          "version": "optimized",
+          "run": 7,
+          "seconds": 0.31037
+        },
+        {
+          "version": "original",
+          "run": 7,
+          "seconds": 0.318034
+        },
+        {
+          "version": "original",
+          "run": 8,
+          "seconds": 0.317327
+        },
+        {
+          "version": "optimized",
+          "run": 8,
+          "seconds": 0.312357
+        },
+        {
+          "version": "optimized",
+          "run": 9,
+          "seconds": 0.305969
+        },
+        {
+          "version": "original",
+          "run": 9,
+          "seconds": 0.315946
+        }
+      ],
+      "summary": {
+        "original": {
+          "microseconds_per_query": 317.085,
+          "range_seconds": [
+            0.315555,
+            0.32224
+          ]
+        },
+        "optimized": {
+          "microseconds_per_query": 310.37,
+          "range_seconds": [
+            0.305856,
+            0.312631
+          ]
+        }
+      }
+    }
+  ],
+  "base_revision": "db5edc48047c0725b4c9466676c233a1161580be"
+}

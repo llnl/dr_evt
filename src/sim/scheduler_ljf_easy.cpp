@@ -132,7 +132,7 @@ LJFEasyScheduler::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(reservation_time, current_time);
   const bool head_has_projection =
       reservation_time != std::numeric_limits<sim_time_t>::max();
-  record_planned_start(head_job_id, m_fcfs_reservation_time,
+  record_estimated_start(head_job_id, m_fcfs_reservation_time,
                        head_within_horizon);
   if (head_within_horizon) {
     reservation_plan.reserve(

@@ -78,8 +78,8 @@ EXCLUDE_SYMBOLS        = seed_hashable
 # In particular, whole-project call and caller graphs can exceed the hosted
 # documentation build timeout.
 HAVE_DOT               = NO
-# CLASS_DIAGRAMS is obsolete; TEXT is what Doxygen substituted for it.
-CLASS_GRAPH            = TEXT
+# Use a boolean value for compatibility with older Doxygen versions.
+CLASS_GRAPH            = NO
 COLLABORATION_GRAPH    = NO
 CALL_GRAPH             = NO
 CALLER_GRAPH           = NO

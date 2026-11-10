@@ -320,15 +320,15 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readonly("start_time_kind",
                     &Simulation::Queue_Drain_Start_Estimate::start_time_kind);
 
-  py::class_<Simulation::Planned_Job_Start>(m, "PlannedJobStart")
-      .def_readonly("job_idx", &Simulation::Planned_Job_Start::job_idx)
+  py::class_<Simulation::Estimated_Job_Start>(m, "EstimatedJobStart")
+      .def_readonly("job_idx", &Simulation::Estimated_Job_Start::job_idx)
       .def_readonly("expected_start_time",
-                    &Simulation::Planned_Job_Start::expected_start_time)
+                    &Simulation::Estimated_Job_Start::expected_start_time)
       .def_readonly("start_time_kind",
-                    &Simulation::Planned_Job_Start::start_time_kind);
-  py::class_<Simulation::Planned_Job_Starts>(m, "PlannedJobStarts")
-      .def_readonly("planned_at", &Simulation::Planned_Job_Starts::planned_at)
-      .def_readonly("jobs", &Simulation::Planned_Job_Starts::jobs);
+                    &Simulation::Estimated_Job_Start::start_time_kind);
+  py::class_<Simulation::Estimated_Job_Starts>(m, "EstimatedJobStarts")
+      .def_readonly("estimated_at", &Simulation::Estimated_Job_Starts::estimated_at)
+      .def_readonly("jobs", &Simulation::Estimated_Job_Starts::jobs);
 
   // Main Simulation class
   py::class_<Simulation>(m, "Simulation")
@@ -376,15 +376,18 @@ PYBIND11_MODULE(dr_evt, m) {
            "batch; "
            "no request is appended.")
 
-      .def("get_planned_job_starts", &Simulation::get_planned_job_starts,
+      .def("get_estimated_job_starts", &Simulation::get_estimated_job_starts,
            "Read the latest live-planner predictions, like squeue --start. "
-           "Returns planned_at and eligible pending jobs sorted by expected "
+           "Returns estimated_at and eligible pending jobs sorted by expected "
            "start; unknown starts are last. Does not run a forecast. "
            "Out-of-horizon estimates can be present without reservations; "
            "unexamined jobs have no prediction.")
 
-      .def("get_job_statuses", &Simulation::get_job_statuses,
+      .def("get_job_statuses",
+           py::overload_cast<const std::vector<job_no_t> &, size_t, bool>(
+               &Simulation::get_job_statuses, py::const_),
            py::arg("job_idxs"), py::arg("estimation_depth") = 0,
+           py::arg("use_cached_predictions") = true,
            "Return status snapshots for appended job IDs in request order; "
            "pass an empty job_idxs list to enumerate a waiting-queue prefix. "
            "Pending jobs have expected_start_time and start_time_kind; a "
@@ -393,6 +396,8 @@ PYBIND11_MODULE(dr_evt, m) {
            "Set estimation_depth to limit temporary planning and pending "
            "start-time results to a queue prefix; zero considers the "
            "complete waiting queue. "
+           "Use cached live starts by default and forecast missing starts; "
+           "set use_cached_predictions=False for a wholly fresh forecast. "
            "Scheduled jobs have start_time and end_time.")
 
 #if defined(DR_EVT_HAS_SER20)

@@ -1,0 +1,7 @@
+[  2%] Built target dr_evt_proto_genSrc
+[  7%] Built target dr_evt_proto
+[  9%] Building CXX object CMakeFiles/dr_evt.dir/src/sim/sim.cpp.o
+[ 11%] Linking CXX shared library libdr_evt.dylib
+[ 95%] Built target dr_evt
+[ 97%] Linking CXX executable simulator
+[100%] Built target sim-bin
