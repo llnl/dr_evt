@@ -184,12 +184,17 @@ wall-time limit without any external per-job bookkeeping.
 
 `get_job_statuses()` preserves the requested ID order (including duplicates).
 It first uses live cached starts within the requested queue depth, retaining
-their `RESERVED` or `ESTIMATED` kind. A cache-only request skips forecasting.
+their `RESERVED` or `ESTIMATED` kind. With default reuse, a cache-only request skips forecasting.
 Cached starts before the current time are recomputed; other cached starts may
 remain stale between periodic passes. Use
 `get_job_statuses(job_idxs, use_cached_predictions=False)` for the
-forecast without backfill described below (cache reuse disabled). This
-recomputes all pending starts, including protected reservations.
+forecast without backfill described below (cache reuse disabled).
+Set `use_cached_unprotected_predictions=False` with cache reuse enabled to
+preserve compatible cached reservation windows and forecast unprotected jobs.
+The default reuses both protected and unprotected cached starts. Setting
+`use_cached_predictions=False` recomputes all pending starts, including
+reservations, and ignores the second cache flag. Recomputed reservations may
+match saved reservations: future backfill can fill gaps without delaying them.
 A pending `JobStatus` has `state == JobState.PENDING` and an
 `expected_start_time` projected from current capacity, running-job limit-time
 releases, and the scheduler's current queue order. Each pending job is placed

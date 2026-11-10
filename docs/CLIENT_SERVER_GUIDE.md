@@ -53,6 +53,10 @@ The request reuses cached live start predictions by default and forecasts
 missing starts. Set the optional `use_cached_predictions` field to `false`
 for a forecast without backfill that recomputes all pending starts, including
 reservations; absent or `true` enables reuse.
+The optional `use_cached_unprotected_predictions` field defaults to `true`.
+With cache reuse enabled, set it to `false` to retain compatible protected
+reservation windows and forecast unprotected jobs. It is ignored when
+`use_cached_predictions=false`.
 `expected_start_time` is paired with a `start_time_kind`: `reserved` is a
 protected scheduler reservation, while `estimated` is a non-binding earliest
 fit that respects protected reservations. A short job behind a blocked head

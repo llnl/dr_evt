@@ -400,7 +400,9 @@ public:
    * @details Pending jobs reuse cached live-planner starts by default. Missing
    * starts receive an on-demand reservation-aware forecast. Cached predictions
    * before current_time are not reused; other predictions can be stale between
-   * periodic passes. Cache-only requests skip resource forecasting entirely.
+   * periodic passes. With default reuse, cache-only requests skip resource
+   * forecasting entirely. Protected-only reuse checks and installs compatible
+   * reservation windows before projecting unprotected jobs.
    * The temporary capacity profile begins with current capacity and
    * running-job releases. It then retains the in-horizon reservations selected
    * by the configured EASY, HYBRID, or CONSERVATIVE policy. A protected job is
@@ -440,13 +442,32 @@ public:
    * @param[in] estimation_depth Waiting-queue prefix to forecast; zero is
    * unlimited.
    * @param[in] use_cached_predictions Reuse live starts and forecast gaps when
-   * true. False requests the original entirely fresh serial forecast.
+   * true, including unprotected estimates. False recomputes all pending starts,
+   * including reservations, without replaying future backfill admissions.
    * @return Job statuses in request order, or waiting-queue order for empty
    * IDs.
    */
   std::vector<Job_Status>
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth, bool use_cached_predictions) const;
+
+  /**
+   * @brief Query with protected-only or full cache reuse.
+   * @param[in] job_idxs Appended job identifiers; empty enumerates waiting
+   * jobs.
+   * @param[in] estimation_depth Waiting-queue prefix; zero is unlimited.
+   * @param[in] use_cached_predictions Enable reuse of compatible live starts.
+   * False recomputes all pending starts, including protected reservations.
+   * @param[in] use_cached_unprotected_predictions When cache reuse is enabled,
+   * true also reuses unprotected estimates. False preserves compatible cached
+   * reservation windows and forecasts all unprotected jobs against them.
+   * Ignored when use_cached_predictions is false.
+   * @return Job statuses in request order, or queue order for empty IDs.
+   */
+  std::vector<Job_Status>
+  get_job_statuses(const std::vector<job_no_t> &job_idxs,
+                   size_t estimation_depth, bool use_cached_predictions,
+                   bool use_cached_unprotected_predictions) const;
 
 #if defined(DR_EVT_HAS_SER20)
   /**
@@ -496,13 +517,15 @@ protected:
    * @param[in] job_idxs Requested job identifiers, or empty to enumerate.
    * @param[in] estimation_depth Maximum pending-job prefix; zero is unlimited.
    * @param[in] use_cached_predictions Reuse live start predictions first.
+   * @param[in] use_cached_unprotected_predictions Also reuse unprotected
+   * starts.
    * @return Job statuses following the selected forecast rule.
    */
   template <bool GroupEvents>
   std::vector<Job_Status>
   get_job_statuses_impl(const std::vector<job_no_t> &job_idxs,
-                        size_t estimation_depth,
-                        bool use_cached_predictions) const;
+                        size_t estimation_depth, bool use_cached_predictions,
+                        bool use_cached_unprotected_predictions) const;
 
   /**
    * @brief Estimate queue drain with a compile-time-selected forecast rule.

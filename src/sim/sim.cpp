@@ -2332,12 +2332,24 @@ std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth,
     bool use_cached_predictions) const {
+  return get_job_statuses(job_idxs, estimation_depth, use_cached_predictions,
+                          true);
+}
+
+template <typename TraceType>
+std::vector<typename BasicSimulation<TraceType>::Job_Status>
+BasicSimulation<TraceType>::get_job_statuses(
+    const std::vector<job_no_t> &job_idxs, size_t estimation_depth,
+    bool use_cached_predictions,
+    bool use_cached_unprotected_predictions) const {
   if (m_params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
     return get_job_statuses_impl<true>(job_idxs, estimation_depth,
-                                       use_cached_predictions);
+                                       use_cached_predictions,
+                                       use_cached_unprotected_predictions);
   }
   return get_job_statuses_impl<false>(job_idxs, estimation_depth,
-                                      use_cached_predictions);
+                                      use_cached_predictions,
+                                      use_cached_unprotected_predictions);
 }
 
 template <typename TraceType>
@@ -2345,7 +2357,8 @@ template <bool GroupEvents>
 std::vector<typename BasicSimulation<TraceType>::Job_Status>
 BasicSimulation<TraceType>::get_job_statuses_impl(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth,
-    bool use_cached_predictions) const {
+    bool use_cached_predictions,
+    bool use_cached_unprotected_predictions) const {
   const auto pending_job_ids = m_scheduler->pending_job_ids();
   std::vector<Job_Status> result;
   std::multimap<job_no_t, size_t> requested_pending_statuses;
@@ -2401,43 +2414,66 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
     for (const auto &prediction : m_scheduler->m_estimated_starts) {
       // A pending job cannot start in the past. Periodic plans may retain
       // such values until their next tick, so forecast those jobs afresh.
+      if (!use_cached_unprotected_predictions && !prediction.reserved) {
+        continue;
+      }
       if (prediction.start >= m_current_time) {
         predictions.insert_or_assign(prediction.job_id, prediction);
       } else {
         predictions.erase(prediction.job_id);
       }
     }
-    const size_t count =
-        estimation_depth == 0
-            ? pending_job_ids.size()
-            : std::min(estimation_depth, pending_job_ids.size());
-    size_t last_missing = 0;
-    for (size_t i = 0; i < count; ++i) {
-      const auto id = pending_job_ids[i];
-      const auto [first, last] = requested_pending_statuses.equal_range(id);
-      if (first == last)
-        continue;
-      const auto cached = predictions.find(id);
-      if (cached != predictions.end() &&
-          convert_epoch<sim_time_t>(m_trace.job_at(id).get_submit_time()) <=
-              m_current_time) {
-        for (auto request = first; request != last; ++request) {
-          auto &status = result[request->second];
-          status.expected_start_time = cached->second.start;
-          status.start_time_kind = cached->second.reserved
-                                       ? Start_Time_Kind::RESERVED
-                                       : Start_Time_Kind::ESTIMATED;
+    if (use_cached_unprotected_predictions) {
+      const size_t count =
+          estimation_depth == 0
+              ? pending_job_ids.size()
+              : std::min(estimation_depth, pending_job_ids.size());
+      size_t last_missing = 0;
+      for (size_t i = 0; i < count; ++i) {
+        const auto id = pending_job_ids[i];
+        const auto [first, last] = requested_pending_statuses.equal_range(id);
+        if (first == last)
+          continue;
+        const auto cached = predictions.find(id);
+        if (cached != predictions.end() &&
+            convert_epoch<sim_time_t>(m_trace.job_at(id).get_submit_time()) <=
+                m_current_time) {
+          for (auto request = first; request != last; ++request) {
+            auto &status = result[request->second];
+            status.expected_start_time = cached->second.start;
+            status.start_time_kind = cached->second.reserved
+                                         ? Start_Time_Kind::RESERVED
+                                         : Start_Time_Kind::ESTIMATED;
+          }
+          requested_pending_statuses.erase(first, last);
+        } else {
+          last_missing = i + 1;
         }
-        requested_pending_statuses.erase(first, last);
-      } else {
-        last_missing = i + 1;
+      }
+      if (last_missing == 0)
+        return result;
+      // The remaining requested starts depend on the jobs ahead of them,
+      // but no forecast is needed beyond the last missing requested start.
+      forecast_depth = last_missing;
+    }
+  }
+
+  // Later queue entries cannot change an earlier query-local placement.
+  // Bound small explicit requests even when no cached start was reusable.
+  const size_t report_count =
+      forecast_depth == 0 ? pending_job_ids.size()
+                          : std::min(forecast_depth, pending_job_ids.size());
+  if (requested_pending_statuses.size() < report_count) {
+    size_t last_requested = 0;
+    for (size_t i = 0; i < report_count; ++i) {
+      if (requested_pending_statuses.find(pending_job_ids[i]) !=
+          requested_pending_statuses.end()) {
+        last_requested = i + 1;
       }
     }
-    if (last_missing == 0)
+    if (last_requested == 0)
       return result;
-    // The remaining requested starts depend on the jobs ahead of them,
-    // but no forecast is needed beyond the last missing requested start.
-    forecast_depth = last_missing;
+    forecast_depth = last_requested;
   }
 
   // Free-node profile: each key starts a segment that keeps its value until
@@ -2501,6 +2537,27 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
   size_t hybrid_reserved = 0;
   size_t projected_count = 0;
 
+  // Install protected commitments before projecting missing jobs, so an
+  // earlier unprotected placement cannot displace a cached reservation.
+  if (use_cached_predictions && !use_cached_unprotected_predictions) {
+    for (const auto id : pending_job_ids) {
+      const auto cached = predictions.find(id);
+      if (cached == predictions.end())
+        continue;
+      const auto &job = m_trace.job_at(id);
+      if (!reservation_profile.can_fit(cached->second.start,
+                                       job.get_num_nodes(),
+                                       job.get_limit_time())) {
+        predictions.erase(cached);
+        continue;
+      }
+      reservation_profile.reserve(cached->second.start, job.get_num_nodes(),
+                                  job.get_limit_time());
+      easy_blocked_head_seen = true;
+      ++hybrid_reserved;
+    }
+  }
+
   for (const job_no_t pending_id : pending_job_ids) {
     if (forecast_depth != 0 && projected_count >= forecast_depth) {
       break;
@@ -2512,11 +2569,18 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
     const sim_time_t earliest = std::max(
         m_current_time, convert_epoch<sim_time_t>(record.get_submit_time()));
     std::optional<sim_time_t> start;
-    if (const auto cached = predictions.find(pending_id);
-        cached != predictions.end() && cached->second.reserved &&
-        cached->second.start >= earliest &&
-        reservation_profile.can_fit(cached->second.start, nodes, limit)) {
-      start = cached->second.start;
+    const auto cached_start = predictions.find(pending_id);
+    const bool reused_reservation = use_cached_predictions &&
+                                    !use_cached_unprotected_predictions &&
+                                    cached_start != predictions.end();
+    if (reused_reservation) {
+      start = cached_start->second.start;
+    } else if (cached_start != predictions.end() &&
+               cached_start->second.reserved &&
+               cached_start->second.start >= earliest &&
+               reservation_profile.can_fit(cached_start->second.start, nodes,
+                                           limit)) {
+      start = cached_start->second.start;
     } else {
       start = reservation_profile.earliest_fit(nodes, limit, earliest);
     }
@@ -2527,26 +2591,28 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
     const bool starts_now = *start <= m_current_time;
     const bool within_horizon =
         *start - m_current_time <= m_params.m_planning_horizon;
-    bool reserved = false;
-    switch (forecast_policy) {
-    case BackfillPolicy::EASY:
-      if (!starts_now && !easy_blocked_head_seen) {
-        easy_blocked_head_seen = true;
-        reserved = within_horizon;
+    bool reserved = reused_reservation;
+    if (!reused_reservation) {
+      switch (forecast_policy) {
+      case BackfillPolicy::EASY:
+        if (!starts_now && !easy_blocked_head_seen) {
+          easy_blocked_head_seen = true;
+          reserved = within_horizon;
+        }
+        break;
+      case BackfillPolicy::HYBRID:
+        reserved = !starts_now && within_horizon &&
+                   hybrid_reserved < m_params.m_reservation_depth;
+        if (reserved) {
+          ++hybrid_reserved;
+        }
+        break;
+      case BackfillPolicy::CONSERVATIVE:
+        reserved = !starts_now && within_horizon;
+        break;
+      case BackfillPolicy::NONE:
+        break;
       }
-      break;
-    case BackfillPolicy::HYBRID:
-      reserved = !starts_now && within_horizon &&
-                 hybrid_reserved < m_params.m_reservation_depth;
-      if (reserved) {
-        ++hybrid_reserved;
-      }
-      break;
-    case BackfillPolicy::CONSERVATIVE:
-      reserved = !starts_now && within_horizon;
-      break;
-    case BackfillPolicy::NONE:
-      break;
     }
 
     const auto [first, last] =
@@ -2562,7 +2628,8 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
     // next queue job is considered. RESERVED identifies a policy-protected
     // placement; ESTIMATED remains a non-binding forecast, but still keeps
     // this query's queue-order projection serial.
-    reservation_profile.reserve(*start, nodes, limit);
+    if (!reused_reservation)
+      reservation_profile.reserve(*start, nodes, limit);
   }
 
   return result;

@@ -21,12 +21,24 @@ class EstimatedStartsTests(unittest.TestCase):
             sim.initialize_trace(0)
             queue = "pbatch" if dr_evt.legacy_queue_input else "1"
             sim.append_job(0, 3, queue, 100)
-            sim.append_job(0, 4, queue, 10)
+            head = sim.append_job(0, 4, queue, 10)
             later = sim.append_job(0, 4, queue, 10)
             sim.advance_to(0)
             self.assertEqual(sim.get_job_statuses([later])[0].expected_start_time, 100)
             self.assertEqual(sim.get_job_statuses(
                 [later], use_cached_predictions=False)[0].expected_start_time, 110)
+            protected = sim.get_job_statuses(
+                [later, head, later], use_cached_unprotected_predictions=False)
+            self.assertEqual([job.expected_start_time for job in protected],
+                             [110, 100, 110])
+            self.assertEqual(protected[1].start_time_kind,
+                             dr_evt.StartTimeKind.RESERVED)
+            self.assertEqual(protected[0].start_time_kind,
+                             dr_evt.StartTimeKind.ESTIMATED)
+            self.assertEqual(sim.get_job_statuses(
+                [later], use_cached_predictions=False,
+                use_cached_unprotected_predictions=False)[0].expected_start_time, 110)
+            self.assertEqual(sim.get_job_statuses([later])[0].expected_start_time, 100)
 
     def test_cached_predictions_do_not_trigger_planning(self):
         with tempfile.TemporaryDirectory() as directory:

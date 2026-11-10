@@ -173,7 +173,9 @@ def write_normalized_report(output, report):
     if any('extended' in r['apis'] for r in report['results']):
         lines += ['**Cache-first** = `get_job_statuses(ids)`: reuse cached '
                   'starts and forecast missing starts, including reuse of unprotected '
-                  'cached estimates.', '']
+                  'cached estimates. `get_job_statuses(ids, 0, true, false)` instead '
+                  'preserves compatible protected windows and forecasts unprotected '
+                  'jobs; that option is not measured in these tables.', '']
     names = {
         'fiction-fcfs': 'Flux FCFS / no backfill',
         'fiction-hybrid': 'Flux-style pass accounting',
@@ -245,7 +247,8 @@ def write_normalized_report(output, report):
             'It refreshes cached starts before the query time, reducing error from '
             'the cache-only result of {:.2f} minutes, but retains other optimistic '
             'estimates. Accurate reservations therefore do not make the entire '
-            'cache accurate.'.format(
+            'cache accurate. These tables measure default cache-first reuse of both '
+            'protected and unprotected starts, not the protected-only option.'.format(
                 control['apis']['extended']['common_across_methods']['mae_seconds']/60,
                 common['mae_seconds']/60,
                 cached['common_across_methods']['mae_seconds']/60)

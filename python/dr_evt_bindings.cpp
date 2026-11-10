@@ -385,22 +385,27 @@ PYBIND11_MODULE(dr_evt, m) {
            "Out-of-horizon estimates can be present without reservations; "
            "unexamined jobs have no prediction.")
 
-      .def("get_job_statuses",
-           py::overload_cast<const std::vector<job_no_t> &, size_t, bool>(
-               &Simulation::get_job_statuses, py::const_),
-           py::arg("job_idxs"), py::arg("estimation_depth") = 0,
-           py::arg("use_cached_predictions") = true,
-           "Return status snapshots for appended job IDs in request order; "
-           "pass an empty job_idxs list to enumerate a waiting-queue prefix. "
-           "Pending jobs have expected_start_time and start_time_kind; a "
-           "protected scheduler reservation is RESERVED, otherwise the value "
-           "is an ESTIMATED reservation-respecting fit. "
-           "Set estimation_depth to limit temporary planning and pending "
-           "start-time results to a queue prefix; zero considers the "
-           "complete waiting queue. "
-           "Use cached live starts by default and forecast missing starts; "
-           "set use_cached_predictions=False for a wholly fresh forecast. "
-           "Scheduled jobs have start_time and end_time.")
+      .def(
+          "get_job_statuses",
+          py::overload_cast<const std::vector<job_no_t> &, size_t, bool, bool>(
+              &Simulation::get_job_statuses, py::const_),
+          py::arg("job_idxs"), py::arg("estimation_depth") = 0,
+          py::arg("use_cached_predictions") = true,
+          py::arg("use_cached_unprotected_predictions") = true,
+          "Return status snapshots for appended job IDs in request order; "
+          "pass an empty job_idxs list to enumerate a waiting-queue prefix. "
+          "Pending jobs have expected_start_time and start_time_kind; a "
+          "protected scheduler reservation is RESERVED, otherwise the value "
+          "is an ESTIMATED reservation-respecting fit. "
+          "Set estimation_depth to limit temporary planning and pending "
+          "start-time results to a queue prefix; zero considers the "
+          "complete waiting queue. "
+          "Use cached live starts by default and forecast missing starts; "
+          "set use_cached_predictions=False to recompute all starts, including "
+          "reservations. Set use_cached_unprotected_predictions=False to reuse "
+          "only compatible protected reservations and forecast unprotected "
+          "jobs. "
+          "Scheduled jobs have start_time and end_time.")
 
 #if defined(DR_EVT_HAS_SER20)
       .def("get_start_times_by_lookahead",

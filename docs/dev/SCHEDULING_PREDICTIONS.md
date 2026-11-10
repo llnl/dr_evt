@@ -158,7 +158,9 @@ The gRPC messages are `GetStartTimesByEstCachesRequest` and
 
 This temporary forecast model is used by `get_job_statuses()` when it needs
 missing starts, and by `get_start_times_by_queue_drain()`. Both account for
-running-job releases, capacity changes, and protected windows. Cached lookup
+running-job releases, capacity changes, and protected windows. Cached protected
+windows are reused only when the selected cache mode allows it; otherwise the
+status forecast recomputes policy reservations. Cached lookup
 reads live planning results instead; lookahead executes the scheduler itself.
 
 Protection follows the selected backfill policy: EASY's blocked head, hybrid's
@@ -171,20 +173,32 @@ backfill examination depth; it does not change scheduling.
 
 C++ parameters and return type: {cpp:func}`dr_evt::BasicSimulation::get_job_statuses`.
 
-`get_job_statuses(job_ids, estimation_depth, use_cached_predictions)` reports
+`get_job_statuses()` reports
 lifecycle state and start/end timing. It reuses cached starts by default,
-refreshes starts before current time, and forecasts missing starts. Cache-only
-requests skip forecasting; mixed requests stop after the last requested job
-needing a forecast while accounting for earlier queue entries.
+refreshes starts before current time, and forecasts missing starts. With default
+cache reuse, cache-only requests skip forecasting. Small requests stop after
+the last requested job needing a forecast while accounting for earlier queue
+entries. Protected-only reuse first checks and installs cached reservation
+windows, including those beyond the reporting prefix.
 
 The fallback builds a temporary capacity profile from running-job releases,
 scheduled capacity changes, and protected reservation windows. It places each
 queued job's full time-limit window before placing the next. Compatible cached
 reservations reuse their full windows; unprotected point-fit opportunities are
 not blindly carved from the timeline because their full windows can overlap.
-Set `use_cached_predictions=false` for a forecast without backfill, with cache reuse disabled.
-“Without backfill” means it does not simulate future backfill admissions;
-with cache reuse disabled, policy reservations are recomputed.
+Cache reuse has three modes:
+
+| Parameters | Protected reservations | Unprotected estimates |
+| --- | --- | --- |
+| Defaults: both cache flags `true` | Reuse cached starts | Reuse cached starts where available; forecast gaps |
+| `use_cached_predictions=true`, `use_cached_unprotected_predictions=false` | Preserve compatible cached windows | Recompute against those windows |
+| `use_cached_predictions=false` | Recompute | Recompute |
+
+The second flag is ignored when cache reuse is disabled. The default reuses
+unprotected estimates as well as reservations; an unprotected cached start is
+not a full queue-aware forecast. In protected-only mode, past or incompatible
+reservation windows are recomputed. Reused windows are installed before any
+unprotected job is placed, so those jobs cannot displace the reservations.
 
 Disabling cache reuse recomputes reserved starts too. Recomputing can change
 those values because it builds a new plan from current state. However, a cached
@@ -366,7 +380,9 @@ estimates. In this control, the latter account for its 44.04-minute common-set
 MAE, versus 0.28 minutes when cache reuse is disabled. It refreshes cached starts
 before the query time, reducing error from the cache-only result of 49.34 minutes,
 but retains other optimistic estimates. Accurate reservations therefore do not
-make the entire cache accurate.
+make the entire cache accurate. The protected-only cache option avoids reusing
+those unprotected estimates; the tables above measure the original default
+cache-first mode, not this option.
 
 The forecast without backfill assumes jobs occupy resources for their full time
 limits. When jobs finish earlier, it holds resources too long in its temporary

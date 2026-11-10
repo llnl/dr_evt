@@ -354,6 +354,10 @@ message GetJobStatusesRequest {
     uint64 estimation_depth = 2;
     // Defaults to true when absent: reuse live predictions and forecast gaps.
     optional bool use_cached_predictions = 3;
+    // Defaults to true when absent. With cache reuse enabled, false reuses
+    // only compatible protected reservations and forecasts unprotected jobs.
+    // Ignored when use_cached_predictions is false.
+    optional bool use_cached_unprotected_predictions = 4;
 }
 
 enum JobState {

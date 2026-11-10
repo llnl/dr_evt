@@ -126,10 +126,14 @@ auto job_nos = sim.append_jobs(batch);
 Returns a status snapshot for each ID returned by `append_job()` or
 `append_jobs()`, preserving request order and duplicate IDs. Pending jobs
 include an `expected_start_time` from the live cache where available, with
-on-demand forecasting for missing starts. Cache-only requests avoid forecasting;
+on-demand forecasting for missing starts. With default reuse, cache-only
+requests avoid forecasting;
 set the third C++ argument, `use_cached_predictions`, to `false` to request
 a forecast without backfill that recomputes all pending starts, including
-reservations. Once scheduled, a job
+reservations. Set `use_cached_unprotected_predictions=false` (the fourth C++ argument)
+with cache reuse enabled to retain compatible protected windows and forecast
+unprotected jobs. Both cache flags default to `true`; disabling cache reuse
+ignores the second flag. Once scheduled, a job
 instead includes its simulated `start_time` and `end_time` and is reported as
 running or completed according to the current simulation time. Rejected jobs
 have no timing. Status remains queryable after completed trace records are

@@ -8,7 +8,7 @@ All methods query the full eligible pending queue.
 
 **Cached** = `get_start_times_by_est_caches()`; **Forecast without backfill** = `get_job_statuses(ids, 0, false)`; **Side simulation** = `get_start_times_by_lookahead(ids)`. The forecast uses full time-limit windows and respects existing protected reservations, but does not simulate future backfill admissions.
 
-**Cache-first** = `get_job_statuses(ids)`: reuse cached starts and forecast missing starts, including reuse of unprotected cached estimates.
+**Cache-first** = `get_job_statuses(ids)`: reuse cached starts and forecast missing starts, including reuse of unprotected cached estimates. `get_job_statuses(ids, 0, true, false)` instead preserves compatible protected windows and forecasts unprotected jobs; that option is not measured in these tables.
 
 ## Actual execution durations
 
@@ -108,7 +108,7 @@ Event hybrid: 202 common job/checkpoint observations; 202 cached predictions and
 
 For the event-hybrid time-limit control, the 0.28 versus 49.34 minutes common-set MAE compares the same 202 job/checkpoint observations. The cached results comprise 96 protected reservations with 0.00 minutes MAE and 106 unprotected estimates with 94.02 minutes MAE. Unprotected cached estimates record when enough nodes become available, without placing every earlier waiting job’s full execution window; they can predict starts too early. That behavior is consistent with Slurm’s `squeue --start`. The forecast without backfill places those windows in queue order, which closely matches execution for this common set when durations equal time limits. Cached lookup does not provide a complete forecast of future backfill decisions.
 
-Cache-first reuses accurate protected reservations and unprotected cached estimates. In this control, the latter account for its 44.04-minute common-set MAE, versus 0.28 minutes when cache reuse is disabled. It refreshes cached starts before the query time, reducing error from the cache-only result of 49.34 minutes, but retains other optimistic estimates. Accurate reservations therefore do not make the entire cache accurate.
+Cache-first reuses accurate protected reservations and unprotected cached estimates. In this control, the latter account for its 44.04-minute common-set MAE, versus 0.28 minutes when cache reuse is disabled. It refreshes cached starts before the query time, reducing error from the cache-only result of 49.34 minutes, but retains other optimistic estimates. Accurate reservations therefore do not make the entire cache accurate. These tables measure default cache-first reuse of both protected and unprotected starts, not the protected-only option.
 
 The forecast holds resources for full time limits. Early completions therefore create accumulating timing error. When execution durations equal those limits, its duration assumptions match the reference, but omitted future backfill and dispatch rules still cause error. The two conditions use different observation sets.
 

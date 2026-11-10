@@ -84,13 +84,15 @@ private:
 // Sends Init (with infile only used for its header - no
 // InitializeTraceRequest is ever sent, so the server never loads any
 // job data of its own) on an already-constructed client.
-void connect_and_init(SimulationClient &client, const std::string &trace_file) {
+void connect_and_init(SimulationClient &client, const std::string &trace_file,
+                      const char *backfill_policy = "easy") {
   ClientMessage init_req;
   auto *init = init_req.mutable_init();
   init->set_total_nodes(100);
   init->set_trace_format("simple");
   init->set_timestamp_format("epoch");
-  init->set_backfill_policy("easy");
+  init->set_backfill_policy(backfill_policy);
+  init->set_reservation_depth(1);
   init->set_priority_policy("fcfs");
   init->set_run_time_mode("limit");
   init->set_infile(trace_file);
@@ -521,7 +523,7 @@ bool test_estimated_job_starts(const std::string &server_address,
   SimulationClient client(
       grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
   try {
-    connect_and_init(client, trace_file);
+    connect_and_init(client, trace_file, "hybrid");
     ClientMessage batch;
     for (const auto nodes : {90u, 100u, 100u}) {
       auto *job = batch.mutable_append_jobs()->add_requests();
@@ -549,16 +551,30 @@ bool test_estimated_job_starts(const std::string &server_address,
     assert(cached.jobs(0).start_time_kind() ==
            dr_evt_grpc::START_TIME_KIND_RESERVED);
     assert(cached.jobs(1).job_idx() == ids.job_idx(2));
-    assert(!cached.jobs(1).has_expected_start_time());
+    assert(cached.jobs(1).expected_start_time() == 100);
+    assert(cached.jobs(1).start_time_kind() ==
+           dr_evt_grpc::START_TIME_KIND_ESTIMATED);
     ClientMessage fresh;
     fresh.mutable_get_job_statuses()->add_job_idx(ids.job_idx(2));
     assert(
         client.call(fresh).get_job_statuses().jobs(0).expected_start_time() ==
-        110);
-    assert(!client.call(query)
-                .get_start_times_by_est_caches()
-                .jobs(1)
-                .has_expected_start_time());
+        100);
+    fresh.mutable_get_job_statuses()->set_use_cached_unprotected_predictions(
+        false);
+    fresh.mutable_get_job_statuses()->add_job_idx(ids.job_idx(1));
+    const auto protected_only = client.call(fresh).get_job_statuses();
+    assert(protected_only.jobs(0).expected_start_time() == 110);
+    assert(protected_only.jobs(1).expected_start_time() == 100);
+    assert(protected_only.jobs(1).start_time_kind() ==
+           dr_evt_grpc::START_TIME_KIND_RESERVED);
+    fresh.mutable_get_job_statuses()->set_use_cached_predictions(false);
+    const auto no_cache = client.call(fresh).get_job_statuses();
+    assert(no_cache.jobs(0).expected_start_time() == 110);
+    assert(no_cache.jobs(1).expected_start_time() == 100);
+    assert(client.call(query)
+               .get_start_times_by_est_caches()
+               .jobs(1)
+               .expected_start_time() == 100);
     assert(client.finish().ok());
     return true;
   } catch (const std::exception &error) {

@@ -442,7 +442,11 @@ public:
           for (const auto &status : sim->get_job_statuses(
                    job_idxs, req.get_job_statuses().estimation_depth(),
                    !req.get_job_statuses().has_use_cached_predictions() ||
-                       req.get_job_statuses().use_cached_predictions())) {
+                       req.get_job_statuses().use_cached_predictions(),
+                   !req.get_job_statuses()
+                           .has_use_cached_unprotected_predictions() ||
+                       req.get_job_statuses()
+                           .use_cached_unprotected_predictions())) {
             auto *job = out->add_jobs();
             job->set_job_idx(status.job_idx);
             using State = dr_evt::Simulation::Job_State;
