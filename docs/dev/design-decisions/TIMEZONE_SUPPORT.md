@@ -18,7 +18,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv \
 ```
 
 The same setting is available as `timezone` in Protobuf configuration and in
-the gRPC simulation request. Internally, `Data_Columns` temporarily sets the
+the gRPC simulation request. Internally, [`Data_Columns`][cpp-data-columns] temporarily sets the
 process `TZ` value while parsing a trace and restores the previous value when
 the mapping is destroyed.
 
@@ -35,21 +35,21 @@ The supported user-facing behavior is documented in:
 
 ## Embedded Numeric Offsets
 
-`parse_time_with_timezone()` recognizes ISO timestamps ending in `Z` or a
+[`parse_time_with_timezone()`][cpp-parse-time-with-timezone] recognizes ISO timestamps ending in `Z` or a
 numeric offset such as `-08:00`. It returns an epoch value and the extracted
-offset. `to_local_time_string()` performs the inverse fixed-offset formatting
+offset. [`to_local_time_string()`][cpp-to-local-time-string] performs the inverse fixed-offset formatting
 operation.
 
 This path is not complete:
 
-- `parse_time_with_timezone()` currently calls `std::mktime()`, which applies
+- [`parse_time_with_timezone()`][cpp-parse-time-with-timezone] currently calls `std::mktime()`, which applies
   the process timezone, and then subtracts the embedded numeric offset. When
   the configured timezone is not UTC, the conversion can apply both offsets.
-- `set_by(epoch_t&, ...)` discards the extracted offset after parsing, so the
+- [`set_by(epoch_t&, ...)`][cpp-set-by] discards the extracted offset after parsing, so the
   original offset is not retained with the job.
-- `Trace` exposes default and per-queue offset metadata, but parsing does not
+- [`Trace`][cpp-trace] exposes default and per-queue offset metadata, but parsing does not
   populate that metadata.
-- Simulation output does not use `to_local_time_string()` or the stored
+- Simulation output does not use [`to_local_time_string()`][cpp-to-local-time-string] or the stored
   timezone metadata.
 
 Consequently, embedded-offset parsing must not yet be described as complete
@@ -61,8 +61,8 @@ UTC normalization with round-trip local-time output.
 exercises three timestamps with
 different numeric offsets through the unit-test runner. Its expected result
 captures the current behavior, but there are no direct unit tests for
-`parse_time_with_timezone()`, invalid offsets, fractional seconds, or
-`to_local_time_string()`.
+[`parse_time_with_timezone()`][cpp-parse-time-with-timezone], invalid offsets, fractional seconds, or
+[`to_local_time_string()`][cpp-to-local-time-string].
 
 ## Remaining Work
 
@@ -75,3 +75,9 @@ captures the current behavior, but there are no direct unit tests for
 5. Add direct tests and correct the timezone fixture's UTC expectations.
 6. Update the user guide once the supported embedded-offset behavior is fixed
    and tested.
+
+[cpp-data-columns]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt12Data_ColumnsE
+[cpp-parse-time-with-timezone]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/trace.html#_CPPv424parse_time_with_timezoneRKNSt6stringE
+[cpp-set-by]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/trace.html#_CPPv46set_byR7epoch_tRKNSt6stringE
+[cpp-to-local-time-string]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/trace.html#_CPPv420to_local_time_stringRK7epoch_tRKNSt6stringE
+[cpp-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4I0EN6dr_evt10BasicTraceE

@@ -62,9 +62,13 @@ it to agree with their difference.
 
 ## Implementation
 
-Mode detection is implemented by `Data_Columns`. Duration selection and
-scheduler dispatch are implemented by `Simulation`, while replay event
-processing is owned by `Trace`.
+Mode detection is implemented by [`Data_Columns`][cpp-data-columns]. Duration selection and
+scheduler dispatch are implemented by [`Simulation`][cpp-simulation], while replay event
+processing is owned by [`Trace`][cpp-trace].
 
 Tests and fixtures are listed in the
 [replay tests section](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#replay-tests).
+
+[cpp-data-columns]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt12Data_ColumnsE
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE
+[cpp-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4I0EN6dr_evt10BasicTraceE

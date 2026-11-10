@@ -26,7 +26,7 @@ configuration
   -> scheduled-job and resource traces
 ```
 
-A `Simulation` owns a `Trace` and a scheduler. The `Trace` owns job records,
+A [`Simulation`][cpp-simulation] owns a [`Trace`][cpp-trace] and a scheduler. The [`Trace`][cpp-trace] owns job records,
 the running-job event queue, resource history, and output writers. The
 scheduler owns the wait queue and decides which eligible jobs start; it does
 not own the full job records.
@@ -60,20 +60,20 @@ This distinction is important when porting the implementation.
 All simulation inputs converge on the same submission and event-processing
 pipeline:
 
-- **Single-file batch:** `Simulation::run()` calls `initialize_trace()`, which
+- **Single-file batch:** [`Simulation::run()`][cpp-simulation-run] calls [`initialize_trace()`][cpp-simulation-initialize-trace], which
   loads the file, stably sorts records by submission time, and determines each
   actual runtime. It then submits the loaded records and advances until no
   waiting or running jobs remain.
-- **Progressive files:** `run_progressive()` loads one already-sorted file at
+- **Progressive files:** [`run_progressive()`][cpp-simulation-run-progressive] loads one already-sorted file at
   a time, submits that file's records, advances through its last submission
   time, and then loads the next file. This permits completed front records to
   be reclaimed between batches.
-- **Live streaming:** `append_job()` or `append_jobs()` creates new records in
+- **Live streaming:** [`append_job()`][cpp-simulation-append-job] or [`append_jobs()`][cpp-simulation-append-jobs] creates new records in
   the job store and immediately submits them. The caller controls progress
-  with `advance_to()` or `run_until_exclusive()`.
+  with [`advance_to()`][cpp-simulation-advance-to] or [`run_until_exclusive()`][cpp-simulation-run-until-exclusive].
 
 Replay-format input follows a different execution path. Its recorded
-`begin_time` and `end_time` values are authoritative, so `Trace::run_job_trace()`
+`begin_time` and `end_time` values are authoritative, so [`Trace::run_job_trace()`][cpp-trace-run-job-trace]
 bypasses the scheduler and reconstructs resource use directly. See
 [Simulation vs. Replay Modes](design-decisions/SIMULATION_VS_REPLAY_MODES.md).
 
@@ -95,15 +95,15 @@ Simulation::append_job()
      -> SchedulerBase::insert_job()  add scheduling data to the wait queue
 ```
 
-`submit_job()` records resource occupancy as observed at arrival, rejects jobs
+[`submit_job()`][cpp-simulation-submit-job] records resource occupancy as observed at arrival, rejects jobs
 that request more than the system's total nodes, and inserts accepted jobs into
 the scheduler. Queue-length statistics count the earlier jobs already waiting
 when each accepted job arrives.
 
-`SchedulerBase::insert_job()` and `Trace::insert_job()` deliberately operate
+[`SchedulerBase::insert_job()`][cpp-schedulerbase-insert-job] and [`Trace::insert_job()`][cpp-trace-insert-job] deliberately operate
 on different structures despite their shared name. The former is wait-queue
 insertion; the latter records that a selected job has started. Neither creates
-a new `Job_Record`; only `Trace::append_job()` does that for live arrivals.
+a new [`Job_Record`][cpp-job-record]; only [`Trace::append_job()`][cpp-trace-append-job] does that for live arrivals.
 
 Appending a batch is atomic with respect to validation and capacity: validate
 ordering and all submission times, reserve or reclaim enough storage for the
@@ -123,7 +123,7 @@ output and completed-job statistics.
 
 ## Event loop and scheduling
 
-`advance_to(target_time)` repeatedly chooses the next scheduler arrival or
+[`advance_to(target_time)`][cpp-simulation-advance-to] repeatedly chooses the next scheduler arrival or
 pending trace event at or before the target. At each timestamp it:
 
 1. synchronizes the scheduler to the current simulation time;
@@ -132,7 +132,7 @@ pending trace event at or before the target. At each timestamp it:
    completed jobs;
 4. asks the scheduler for jobs that can start with the newly available nodes;
    and
-5. calls `Trace::insert_job()` for each selected job, creating its start and
+5. calls [`Trace::insert_job()`][cpp-trace-insert-job] for each selected job, creating its start and
    end events and updating the running-job map.
 
 The scheduling step repeats at the same timestamp until no additional job can
@@ -140,7 +140,7 @@ start. FCFS, EASY, and CONSERVATIVE decisions are described in
 [Backfilling Algorithms](../BACKFILLING_ALGORITHMS.md).
 
 The following pseudocode captures the orchestration contract. Policy-specific
-selection belongs inside `scheduler.schedule()`.
+selection belongs inside [`scheduler.schedule()`][cpp-schedulerbase-schedule].
 
 ```text
 advance_to(target):
@@ -209,7 +209,7 @@ stays until the release with its projected release updated to the sampled time, 
 are observably in cleanup. Replayed history is never delayed; in a warm start
 the delay applies to departures at or after the simulation start time.
 
-`advance_to(t)` is inclusive. A strict-boundary API must stop before events at
+[`advance_to(t)`][cpp-simulation-advance-to] is inclusive. A strict-boundary API must stop before events at
 `t`; it can find the latest event earlier than `t` and invoke the same inclusive
 engine at that earlier timestamp. Callers must never later submit a job whose
 submission time is earlier than the simulation clock.
@@ -289,3 +289,20 @@ sections of the Test Suite README.
 - [`src/trace/trace.cpp`](https://github.com/LLNL/dr_evt/blob/main/src/trace/trace.cpp): event processing, resource accounting, output, and
   reclamation.
 - [`src/trace/job_record.hpp`](https://github.com/LLNL/dr_evt/blob/main/src/trace/job_record.hpp): persistent job input and scheduling results.
+
+[cpp-job-record]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/job-store.html#_CPPv4N6dr_evt10Job_RecordE
+[cpp-schedulerbase-insert-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt13SchedulerBase10insert_jobE8job_no_t10sim_time_t7tdiff_t11num_nodes_t
+[cpp-schedulerbase-schedule]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt13SchedulerBase8scheduleE11num_nodes_tRK14running_jobs_t10sim_time_t
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE
+[cpp-simulation-advance-to]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10advance_toE10sim_time_t
+[cpp-simulation-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10append_jobE10sim_time_t11num_nodes_tRKNSt6stringE7tdiff_tNSt8optionalI7tdiff_tEE
+[cpp-simulation-append-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation11append_jobsERKNSt6vectorI18Job_Append_RequestEE
+[cpp-simulation-initialize-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation16initialize_traceE10num_jobs_t
+[cpp-simulation-run]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation3runEv
+[cpp-simulation-run-progressive]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation15run_progressiveEv
+[cpp-simulation-run-until-exclusive]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation19run_until_exclusiveE10sim_time_t
+[cpp-simulation-submit-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10submit_jobE8job_no_t10sim_time_t10sim_time_t
+[cpp-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4I0EN6dr_evt10BasicTraceE
+[cpp-trace-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace10append_jobE10sim_time_tRK7epoch_t11num_nodes_t11job_queue_t9timeout_tNSt8optionalI7tdiff_tEE
+[cpp-trace-insert-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace10insert_jobE8job_no_t10sim_time_t
+[cpp-trace-run-job-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace13run_job_traceERKNSt6stringE11num_nodes_t10sim_time_t

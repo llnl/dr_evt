@@ -21,6 +21,8 @@ The latter two provide the minimum runtime and node request in each block.
 Empty blocks and blocks whose minima cannot fit the current backfill window
 are skipped.
 
+The search method is [`find_and_remove_backfill_candidate()`][cpp-find-and-remove-backfill-candidate]:
+
 ```cpp
 std::optional<job_no_t> find_and_remove_backfill_candidate(
     num_nodes_t available_nodes,
@@ -61,3 +63,5 @@ Test commands and fixtures are maintained in the
 - [Boost Multi-Index](https://www.boost.org/doc/libs/release/libs/multi_index/)
 - Lifka (1995), “The ANL/IBM SP Scheduling System”
 - Feitelson and Weil (1998), conservative backfilling
+
+[cpp-find-and-remove-backfill-candidate]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv434find_and_remove_backfill_candidate11num_nodes_t10sim_time_t10sim_time_tP7tdiff_tP11num_nodes_t

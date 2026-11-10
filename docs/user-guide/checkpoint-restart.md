@@ -10,10 +10,10 @@ schedule, see
 
 Checkpoint/restart is compiled when `DR_EVT_WITH_SER20=ON`. Checkpoints are
 Ser20 binary, same-build artifacts rather than a portable exchange format. A
-checkpoint records the complete `Sim_Params` of the run that wrote it; the
+checkpoint records the complete [`Sim_Params`][cpp-sim-params] of the run that wrote it; the
 destination must use matching scheduling, runtime, capacity, and output
 configuration, which is validated field by field on restore, and the recorded
-configuration is available afterwards through `Simulation::restored_params()`.
+configuration is available afterwards through [`Simulation::restored_params()`][cpp-simulation-restored-params].
 Callback-based Custom FCFS is supported when the destination
 simulation is constructed with equivalent cost and selection callbacks. The
 checkpoint restores its queue entries, previously computed costs, candidate
@@ -26,8 +26,8 @@ fully admitted input file.
 
 ## Save and restore simulation state
 
-Save all logical state after `advance_to()` returns, outside scheduler callbacks,
-and restore it into a newly constructed simulation with matching `Sim_Params`:
+Save all logical state after [`advance_to()`][cpp-simulation-advance-to] returns, outside scheduler callbacks,
+and restore it into a newly constructed simulation with matching [`Sim_Params`][cpp-sim-params]:
 
 ```cpp
 sim.advance_to(500.0);
@@ -50,7 +50,7 @@ scheduler queue state, running jobs, pending events, capacity and statistics
 accounting, resource history, and the random-number generator.
 
 The [Python API](../api/PYTHON_API.md) exposes the same
-`save_checkpoint(filename)` and `load_checkpoint(filename)` methods.
+[`save_checkpoint(filename)`][cpp-simulation-save-checkpoint] and [`load_checkpoint(filename)`][cpp-simulation-load-checkpoint] methods.
 
 ## Automatic checkpoints
 
@@ -103,5 +103,12 @@ In both modes, rows written after the saved checkpoint remain in the archive
 for auditability but are excluded by the recorded boundary during stitching.
 
 These output limitations are unrelated to job-status queries.
-`get_job_statuses()` works with Redis off or on, and its retained status
+[`get_job_statuses()`][cpp-simulation-get-job-statuses] works with Redis off or on, and its retained status
 metadata is checkpoint-safe whenever checkpointing itself is available.
+
+[cpp-sim-params]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/configuration.html#_CPPv4N6dr_evt10Sim_ParamsE
+[cpp-simulation-advance-to]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10advance_toE10sim_time_t
+[cpp-simulation-get-job-statuses]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb
+[cpp-simulation-load-checkpoint]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15load_checkpointERKNSt6stringE
+[cpp-simulation-restored-params]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation15restored_paramsEv
+[cpp-simulation-save-checkpoint]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15save_checkpointERKNSt6stringE

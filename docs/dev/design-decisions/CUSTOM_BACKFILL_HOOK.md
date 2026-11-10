@@ -8,7 +8,7 @@ power demand, rather than queue order alone.
 
 ## Decision: separate feasibility from experimental selection
 
-The callback-based `FCFSEasyCustomScheduler` keeps ordinary FCFS dispatch and
+The callback-based [`FCFSEasyCustomScheduler`][cpp-fcfseasycustomscheduler] keeps ordinary FCFS dispatch and
 EASY head protection in the simulator. When the head cannot start, it finds
 later jobs that fit the current resource pool without delaying the protected
 reservation, then lets a caller choose one of those feasible candidates.
@@ -26,7 +26,7 @@ The scan and candidate limits control different work:
 - `num_max_candidates` caps feasible jobs offered to the selector. It must be
   positive and does not limit the preceding queue scan.
 
-The hook is installed through the C++ or Python simulation constructor;
+The hook is installed through the [C++ simulation constructor][cpp-simulation-simulation] or Python constructor;
 setting `num_max_candidates` in a CLI or Protobuf configuration does not
 activate it. The callback implementation supports EASY or no backfill with
 event-driven scheduling. See the [Python API](../../api/PYTHON_API.md) for
@@ -58,8 +58,8 @@ control for those starts as well.
 Callbacks and experimental state add work only when the custom scheduler is
 selected. Candidate caps bound the number of choices exposed to the selector,
 but a small cap can hide a better power-management choice deeper in the queue.
-More general scheduler subclasses can be injected through the C++ simulation
-constructor, at the cost of owning and validating their additional behavior.
+More general scheduler subclasses can be injected through the
+[C++ subclass constructor][cpp-simulation-subclass-constructor], at the cost of owning and validating their additional behavior.
 
 This existing scheduler hook changes scheduling policy; it does not replace
 the aggregate resource model. The [resource-model hook](RESOURCE_MODEL.md)
@@ -68,3 +68,7 @@ still needs to be designed and implemented.
 The implementation is in `src/sim/scheduler_fcfs_easy_custom.{hpp,cpp}` and
 `src/sim/sim.hpp`. Tests in `tests/test_custom_scheduler.cpp` check candidate
 validation, FCFS-head behavior, resource accounting, and callback selection.
+
+[cpp-fcfseasycustomscheduler]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt23FCFSEasyCustomSchedulerE
+[cpp-simulation-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15BasicSimulationE10Sim_Params19job_cost_function_t19backfill_selector_t
+[cpp-simulation-subclass-constructor]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15BasicSimulationE10Sim_ParamsNSt10unique_ptrI23FCFSEasyCustomSchedulerEE

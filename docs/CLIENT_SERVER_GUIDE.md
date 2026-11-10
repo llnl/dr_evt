@@ -2,13 +2,13 @@
 
 ## Overview
 
-DR_EVT's [streaming API](api/STREAMING_API.md) (`append_job()`/`append_jobs()`,
-`advance_to()`, and the monitoring/statistics methods) lets
+DR_EVT's [streaming API](api/STREAMING_API.md) ([`append_job()`][cpp-simulation-append-job]/[`append_jobs()`][cpp-simulation-append-jobs],
+[`advance_to()`][cpp-simulation-advance-to], and the monitoring/statistics methods) lets
 external code feed genuinely new jobs incrementally and control simulation
 time advancement, rather than loading a full trace and running it
 start-to-finish in one call. The gRPC client/server exposes that same
 streaming API over the network: a `dr_evt_server` process holds one
-`Simulation` instance per connected session, and any number of
+[`Simulation`][cpp-simulation] instance per connected session, and any number of
 `dr_evt_client` processes (or your own gRPC client, in any language gRPC
 supports) can drive it remotely.
 
@@ -31,15 +31,15 @@ in-process via the streaming API:
 
 | Request | Corresponds to |
 |---|---|
-| `InitRequest` | Constructing a `Simulation` from a `Sim_Params`-equivalent config |
-| `RunRequest` | Calls `Simulation::run()`; initialized input and `sim_start_time` select simulation, full replay, or replay-based warm start, and configured `max_time` supplies an inclusive stopping boundary |
-| `InitializeTraceRequest` | `Simulation::initialize_trace()` |
-| `AppendJobRequest` | `Simulation::append_job()` - a genuinely new job, optionally including its known `actual_run_time` |
-| `AppendJobsRequest` | `Simulation::append_jobs()` - the batch counterpart, with an optional known runtime per job |
+| `InitRequest` | Constructing a [`Simulation`][cpp-simulation] from a [`Sim_Params`][cpp-sim-params]-equivalent config |
+| `RunRequest` | Calls [`Simulation::run()`][cpp-simulation-run]; initialized input and `sim_start_time` select simulation, full replay, or replay-based warm start, and configured `max_time` supplies an inclusive stopping boundary |
+| `InitializeTraceRequest` | [`Simulation::initialize_trace()`][cpp-simulation-initialize-trace] |
+| `AppendJobRequest` | [`Simulation::append_job()`][cpp-simulation-append-job] - a genuinely new job, optionally including its known `actual_run_time` |
+| `AppendJobsRequest` | [`Simulation::append_jobs()`][cpp-simulation-append-jobs] - the batch counterpart, with an optional known runtime per job |
 | [GetJobStatusesRequest](#job-status-forecasts) | Query lifecycle and timing for IDs returned by the append APIs |
 | [GetStartTimesByEstCachesRequest](#cached-start-estimates) | Read cached start estimates with their planning timestamp |
-| `AdvanceToRequest` | `Simulation::advance_to()` |
-| `RunUntilExclusiveRequest` | `Simulation::run_until_exclusive()` |
+| `AdvanceToRequest` | [`Simulation::advance_to()`][cpp-simulation-advance-to] |
+| `RunUntilExclusiveRequest` | [`Simulation::run_until_exclusive()`][cpp-simulation-run-until-exclusive] |
 | [GetFCFSHeadShadowTimeRequest](#head-shadow-time) | FCFS-head shadow time only: the earliest reserved start time, or `-1` with no waiting head |
 | [GetBackfillWindowRequest](#backfill-window) | One FCFS/EASY reservation snapshot: current capacity, shadow time, and projected releases |
 | [EstimateQueueHorizonRequest](#aggregate-queue-horizon) | On-demand FCFS/EASY waiting-resource-time horizon after the shadow time |
@@ -94,7 +94,7 @@ planning estimates without forecasting or advancing the simulation.
 
 Future arrivals, running jobs, and completed jobs are excluded. Unexamined
 jobs can have no estimate; cached values can be stale between planning passes.
-This request corresponds to `get_start_times_by_est_caches()`.
+This request corresponds to [`get_start_times_by_est_caches()`][cpp-simulation-get-start-times-by-est-caches].
 
 ### Session and checkpoint operations
 
@@ -178,3 +178,13 @@ Session initialization, completion, reuse, and shutdown are documented in
   Python multi-server, MPI-launcher, and synchronized-system examples.
 - The [distributed client/server tests](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests)
   section lists the exact gRPC and MPI test commands, fixtures, and coverage.
+
+[cpp-sim-params]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/configuration.html#_CPPv4N6dr_evt10Sim_ParamsE
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE
+[cpp-simulation-advance-to]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10advance_toE10sim_time_t
+[cpp-simulation-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10append_jobE10sim_time_t11num_nodes_tRKNSt6stringE7tdiff_tNSt8optionalI7tdiff_tEE
+[cpp-simulation-append-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation11append_jobsERKNSt6vectorI18Job_Append_RequestEE
+[cpp-simulation-get-start-times-by-est-caches]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation29get_start_times_by_est_cachesEv
+[cpp-simulation-initialize-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation16initialize_traceE10num_jobs_t
+[cpp-simulation-run]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation3runEv
+[cpp-simulation-run-until-exclusive]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation19run_until_exclusiveE10sim_time_t

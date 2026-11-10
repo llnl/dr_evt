@@ -21,6 +21,9 @@ function, enum, or file name.
    :protected-members:
    :private-members:
 
+.. doxygenfile:: trace_policy.hpp
+   :project: dr_evt
+
 .. raw:: html
 
    </div>

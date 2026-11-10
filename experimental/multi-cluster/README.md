@@ -12,7 +12,7 @@ which combines that wait with predicted run time.
 The native implementation uses MPI, with Ser20 serialization for message
 packing; it does not require gRPC or Python. Rank 0 owns the input tables,
 random-number generator, and dispatch policy. Each other rank owns one
-`Simulation`, and worker-rank order matches systems-table row order. The
+[`Simulation`][cpp-simulation], and worker-rank order matches systems-table row order. The
 corresponding Python implementation uses gRPC for dispatcher-worker
 communication, while MPI starts the worker processes that host the gRPC
 servers.
@@ -680,3 +680,5 @@ focused tests are unrelated to either profile-based implementation:
 ```bash
 python3 experimental/multi-cluster/tests/test_baseline_dispatch.py
 ```
+
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE

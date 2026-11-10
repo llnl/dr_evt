@@ -57,7 +57,7 @@ the server prints one line on startup:
 DR_EVT simulation server listening on 0.0.0.0:50051
 ```
 
-and otherwise runs silently, one `Simulation` instance per connected
+and otherwise runs silently, one [`Simulation`][cpp-simulation] instance per connected
 session, until stopped (e.g. `Ctrl-C`, or however your process
 supervisor manages it). A streaming session starts with no job samples and
 does not load the input file's data rows until requested. `InitRequest`
@@ -139,7 +139,7 @@ When a client has sent its final arrival, it sends `FinishSimulationRequest`.
 The server drains all submitted work, writes the session's simulated trace,
 resource trace, and statistics report, then returns their paths and final
 statistics in `FinishSimulationResponse`. It releases that session's
-`Simulation` but does not stop `dr_evt_server`; the client may initialize a
+[`Simulation`][cpp-simulation] but does not stop `dr_evt_server`; the client may initialize a
 new independent simulation on the same stream, or close the stream and open a
 new one.
 
@@ -156,7 +156,7 @@ InitRequest(session_name="run-b")   # optional: begin a new simulation on this s
 ```
 
 Each `InitRequest` after a successful finish creates a new independent
-server-side `Simulation`. Give it a new readable `session_name`; the server
+server-side [`Simulation`][cpp-simulation]. Give it a new readable `session_name`; the server
 still adds a unique suffix, so names need not be globally unique. Do not send
 another `InitRequest` before finishing the active simulation: the server
 returns an error response for that request.
@@ -235,3 +235,5 @@ client/server specifically, but addresses the same underlying concern.
 - [Command-Line Options](command-line.md) - CLI configuration options for the plain `simulator` binary
 - [Python API](../api/PYTHON_API.md) - Python bindings (in-process, no network - not the same thing as a Python gRPC client)
 - [Distributed client/server tests](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests) - exact gRPC and MPI commands and fixtures
+
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE

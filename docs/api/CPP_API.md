@@ -13,8 +13,8 @@ applicable.
   <span class="api-search-help">Searches generated C++ declarations by symbol name.</span>
 </form>
 
-Search by the API's exact C++ name (for example, `append_job`, `insert_job`,
-or `submit_job`); `submit_to` and `insert_to` are not DR_EVT symbols. The
+Search by the API's exact C++ name (for example, [`append_job`][cpp-simulation-append-job], [`insert_job`][cpp-schedulerbase-insert-job],
+or [`submit_job`][cpp-simulation-submit-job]); `submit_to` and `insert_to` are not DR_EVT symbols. The
 symbol search uses the documentation-wide index, so results may also include
 guides that mention the symbol. Generated C++ declaration results are
 available when the build includes Doxygen XML.
@@ -74,3 +74,7 @@ cpp/files
 The generated reference is available only in builds where Doxygen XML is
 present. The topic pages remain useful as an API map even when that optional
 reference is unavailable.
+
+[cpp-schedulerbase-insert-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt13SchedulerBase10insert_jobE8job_no_t10sim_time_t7tdiff_t11num_nodes_t
+[cpp-simulation-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10append_jobE10sim_time_t11num_nodes_tRKNSt6stringE7tdiff_tNSt8optionalI7tdiff_tEE
+[cpp-simulation-submit-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10submit_jobE8job_no_t10sim_time_t10sim_time_t

@@ -7,7 +7,7 @@ exposed a difference caused by that order.
 ## Workload and configuration
 
 This comparison uses native **Slurm 26.11.0-0rc2** from `external/slurm` and
-DR_EVT's `FCFSPeriodicHybridCircularScheduler`, implemented in
+DR_EVT's [`FCFSPeriodicHybridCircularScheduler`][cpp-fcfsperiodichybridcircularscheduler], implemented in
 `scheduler_fcfs_periodic_hybrid_circular.cpp`. It uses the
 [common 2,000-job Lassen workload](SCHEDULER_VALIDATION.md#lassen-workload).
 **1,731 recorded runtimes are rounded up to whole seconds in both inputs**;
@@ -271,3 +271,5 @@ python3 plot.py plot-input.json
 For the control folder, run `python3 plot_timeline.py . --case pooled` or
 `python3 plot_timeline.py . --case protection`. For the divergence folder,
 run `python3 plot_endpoint_comparison.py endpoint-comparison.json`.
+
+[cpp-fcfsperiodichybridcircularscheduler]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt35FCFSPeriodicHybridCircularSchedulerE

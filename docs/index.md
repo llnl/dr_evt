@@ -51,6 +51,7 @@ user-guide/fugaku-power-experiment
 BACKFILLING_ALGORITHMS
 TESTING_GUIDE
 user-guide/production-scheduler-behaviors
+dev/SCHEDULING_PREDICTIONS
 ```
 
 ```{toctree}
@@ -71,7 +72,6 @@ dev/README
 dev/WAIT_QUEUES
 dev/JOB_LIFECYCLE
 dev/PERFORMANCE_ANALYSIS
-dev/SCHEDULING_PREDICTIONS
 dev/design-decisions/README
 dev/READTHEDOCS_SETUP
 ```

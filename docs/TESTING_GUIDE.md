@@ -63,7 +63,7 @@ The append-job tests also check fractional endpoints, zero-duration capacity
 queries, and unchanged reservation durations. See the
 [endpoint rule explanation](user-guide/SCHEDULER_LOOPS.md#shared-terms).
 
-The callback-driven ``FCFSEasyCustomScheduler`` has focused selector and API checks
+The callback-driven [`FCFSEasyCustomScheduler`][cpp-fcfseasycustomscheduler] has focused selector and API checks
 plus golden-output comparisons for a targeted simultaneous-backfill case and a
 2,000-job workload. The large comparison verifies that its job start and end
 times match the default circular-buffer FCFS scheduler when the callback
@@ -180,3 +180,5 @@ update the corresponding user-guide reference page.
 - [Backfilling Algorithms](BACKFILLING_ALGORITHMS.md)
 - [Client/Server Reference](CLIENT_SERVER_GUIDE.md)
 - [Output-Trace Buffers](dev/OUTPUT_TRACE_BUFFERS.md)
+
+[cpp-fcfseasycustomscheduler]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt23FCFSEasyCustomSchedulerE

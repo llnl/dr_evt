@@ -21,6 +21,15 @@ function, enum, or file name.
    :protected-members:
    :private-members:
 
+.. doxygenfile:: scheduler_fcfs_periodic_hybrid_circular.hpp
+   :project: dr_evt
+
+Experimental multi-cluster scheduling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. doxygenfile:: multi_system_backfill_scheduler.hpp
+   :project: dr_evt
+
 .. raw:: html
 
    </div>

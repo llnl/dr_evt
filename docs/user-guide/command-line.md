@@ -401,7 +401,7 @@ at 7 may start at 7 while the next 5-second tick remains at 10.
 
 Completions, cleanup releases, and capacity changes update state immediately
 but wait for the next tick unless an arrival occurs at the same time. Repeated
-`advance_to` calls without new arrivals do not request extra passes. A new
+[`advance_to`][cpp-simulation-advance-to] calls without new arrivals do not request extra passes. A new
 streaming arrival batch at the current time can request a fresh pass; appending
 future jobs does not notify until their arrival time.
 
@@ -481,7 +481,7 @@ for the remaining differences from production counters.
 `--per_pass_accounting` and `fcfs_1s_evt_group` require an unlimited horizon;
 omit this option for those modes. The license-off diagnostic ignores it.
 
-**Default:** unlimited (the largest `tdiff_t` value)
+**Default:** unlimited (the largest [`tdiff_t`][cpp-tdiff-t] value)
 
 ### `--reservation_depth N`
 
@@ -497,7 +497,7 @@ Hybrid and conservative use the hybrid FCFS schedulers with either `fcfs` or
 
 **Default:** `0`
 
-The command-line and prototext parsers store this value in `Sim_Params`. The
+The command-line and prototext parsers store this value in [`Sim_Params`][cpp-sim-params]. The
 cost and selection callbacks themselves are installed when constructing the
 custom scheduler through the C++ or Python API; they cannot be encoded
 in a command-line argument or prototext file.
@@ -641,7 +641,7 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator traces/jobs.csv \
 Write and reclaim the completed contiguous front prefix after this many
 additional departures. This batches schedule output and reclamation without
 checking and removing a record after every completion. Capacity pressure,
-`Trace::flush_completed_jobs()`, and final output are independent flush reasons
+[`Trace::flush_completed_jobs()`][cpp-trace-flush-completed-jobs], and final output are independent flush reasons
 and reset the interval.
 
 **Default:** `0`, meaning the current job-store circular-buffer capacity. Thus
@@ -888,7 +888,7 @@ cleanup and their projected release is the actual sampled release time.
 Releasing nodes are neither free nor allocated. With a delay, the resource
 trace adds a `releasing_nodes` column (see
 [Output Trace Files](output-traces.md)), `free_nodes` excludes releasing
-nodes, and cleanup time is not utilization. `get_nodes_releasing()` reports
+nodes, and cleanup time is not utilization. [`get_nodes_releasing()`][cpp-simulation-get-nodes-releasing] reports
 the count in the streaming APIs.
 
 Replayed history is never delayed: recorded start times already include the
@@ -1042,3 +1042,9 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 - [Test Suite](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#build-and-run) - example usage in test scripts
 - [Block Queue Implementation](../dev/design-decisions/BLOCK_QUEUE.md) - Performance analysis of `--queue_impl block`
 - [Circular Queue Implementation](../dev/design-decisions/CIRCULAR_QUEUE.md) - Performance analysis of `--queue_impl circular`
+
+[cpp-sim-params]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/configuration.html#_CPPv4N6dr_evt10Sim_ParamsE
+[cpp-simulation-advance-to]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10advance_toE10sim_time_t
+[cpp-simulation-get-nodes-releasing]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation19get_nodes_releasingEv
+[cpp-tdiff-t]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/src.html#_CPPv47tdiff_t
+[cpp-trace-flush-completed-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace20flush_completed_jobsE10sim_time_t
