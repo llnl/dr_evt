@@ -185,6 +185,7 @@ Side simulation uses estimated unfinished durations and completion events; its
 query cost includes preparing the input and an additional checkpoint clone.
 Future submissions remain unknown in both conditions.
 
+(choosing-how-much-computation-to-spend)=
 ### Choosing computation cost
 
 With uncertain durations, cache-first is a reasonable inexpensive default.

@@ -216,7 +216,7 @@ cost more without improving start-time accuracy. Replay became substantially
 more accurate when execution durations matched time limits. Prefer replay
 when duration estimates are reliable or future policy behavior is the focus;
 the benchmark does not establish an accuracy threshold for that choice. See
-[the measured comparison](../dev/SCHEDULING_PREDICTIONS.md#choosing-how-much-computation-to-spend).
+{ref}`the measured comparison <choosing-how-much-computation-to-spend>`.
 
 `get_queue_drain_start_times(utilization, estimation_depth=0)` is a separate
 fast resource-area approximation. It returns queue-order estimates without

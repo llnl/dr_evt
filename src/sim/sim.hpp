@@ -425,8 +425,6 @@ public:
    * queue order, to receive a pending start-time result. Zero (the default)
    * covers the complete waiting queue. This affects query work and returned
    * pending timing only; it never changes scheduler configuration or state.
-   * @param[in] use_cached_predictions Reuse live starts and forecast gaps when
-   * true (default). False requests the original entirely fresh serial forecast.
    * @return One Job_Status per requested identifier, in request order; with an
    * empty job_idxs vector, one pending status per returned queue entry.
    * @throws std::out_of_range if an ID was not returned by append_job(s).
@@ -435,7 +433,14 @@ public:
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth = 0) const;
 
-  /** Query with explicit cache reuse; false selects the fresh forecast. */
+  /**
+   * @brief Query with explicit cache reuse.
+   * @param[in] job_idxs Appended job identifiers; empty enumerates waiting jobs.
+   * @param[in] estimation_depth Waiting-queue prefix to forecast; zero is unlimited.
+   * @param[in] use_cached_predictions Reuse live starts and forecast gaps when
+   * true. False requests the original entirely fresh serial forecast.
+   * @return Job statuses in request order, or waiting-queue order for empty IDs.
+   */
   std::vector<Job_Status>
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth,
