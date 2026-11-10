@@ -126,9 +126,14 @@ auto job_nos = sim.append_jobs(batch);
 Returns a status snapshot for each ID returned by `append_job()` or
 `append_jobs()`, preserving request order and duplicate IDs. Pending jobs
 include an `expected_start_time` from the live cache where available, with
-on-demand forecasting for missing starts. Cache-only requests avoid forecasting;
+on-demand forecasting for missing starts. With default reuse, cache-only
+requests avoid forecasting;
 set the third C++ argument, `use_cached_predictions`, to `false` to request
-the original entirely fresh forecast. Once scheduled, a job
+a forecast without backfill that recomputes all pending starts, including
+reservations. Set `use_cached_unprotected_predictions=false` (the fourth C++ argument)
+with cache reuse enabled to retain compatible protected windows and forecast
+unprotected jobs. Both cache flags default to `true`; disabling cache reuse
+ignores the second flag. Once scheduled, a job
 instead includes its simulated `start_time` and `end_time` and is reported as
 running or completed according to the current simulation time. Rejected jobs
 have no timing. Status remains queryable after completed trace records are
@@ -149,13 +154,13 @@ queue prefix; zero, the default, considers the complete waiting queue. It does
 not change scheduler configuration or policy.
 An empty `job_idxs` list returns that waiting-queue prefix in scheduler order.
 
-### `get_estimated_job_starts()`
+### `get_start_times_by_est_caches()`
 
 Reads the start predictions saved by the latest live planning pass, following
 Slurm's `squeue --start` reporting model. It does not compute another forecast.
 
 ```cpp
-auto plan = sim.get_estimated_job_starts();
+auto plan = sim.get_start_times_by_est_caches();
 // plan.estimated_at: optional simulation timestamp of the live planning pass
 for (const auto &job : plan.jobs) {
     // job.job_idx, job.expected_start_time, job.start_time_kind
@@ -171,9 +176,9 @@ nor a status query refresh the cache on their own.
 
 Unlike `get_job_statuses()`, this interface reports only the live planner's
 saved work and leaves missing starts unknown rather than forecasting them.
-The gRPC equivalents are `GetEstimatedJobStartsRequest` and
-`GetEstimatedJobStartsResponse`. See
-[Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md#slurm-comparison)
+The gRPC equivalents are `GetStartTimesByEstCachesRequest` and
+`GetStartTimesByEstCachesResponse`. See
+{ref}`Public interface behavior <scheduler-public-interface-behavior>`
 for the comparison with Slurm `squeue --start` and `sbatch --test-only`.
 
 ### `advance_to(target_time)`
@@ -361,22 +366,8 @@ for (const auto& change : window.releases) {
 **Estimate the waiting-queue prediction horizon:**
 
 ```cpp
-tdiff_t horizon = sim.get_prediction_horizon(utilization);
+tdiff_t horizon = sim.estimate_queue_horizon(utilization);
 ```
-
-**Approximate each waiting job's start from queue-drain area:**
-
-```cpp
-auto estimates = sim.get_queue_drain_start_times(utilization);
-```
-
-This on-demand approximation sweeps cumulative queued node-time against the
-utilization-scaled capacity profile after protected reservations are removed.
-`estimation_depth` limits the returned queue prefix; zero covers all waiting
-jobs. `RESERVED` entries are protected scheduler reservations. Other entries
-are optimistic area estimates, not contiguous first-fit placements or start
-guarantees.
-It is a C++/Python API and is not currently exposed through the gRPC service.
 
 This method is available for the standard and Custom FCFS implementations with
 EASY backfilling. Call it after the current backfilling cycle completes. At
@@ -400,7 +391,22 @@ usable area covers `A_Q`; it does not interpolate within an intermediate
 interval. If the final currently running job completes before the threshold
 is reached, the remaining area is converted to time using
 `utilization * total_nodes`. An empty queue returns zero. The gRPC
-`GetPredictionHorizonRequest` exposes the same calculation.
+`EstimateQueueHorizonRequest` exposes the same calculation.
+
+**Approximate each waiting job's start from queue-drain area:**
+
+```cpp
+auto estimates = sim.get_start_times_by_queue_drain(utilization);
+```
+
+This on-demand approximation sweeps cumulative queued node-time against the
+utilization-scaled capacity profile after protected reservations are removed.
+`estimation_depth` limits the returned queue prefix; zero covers all waiting
+jobs. `RESERVED` entries are protected scheduler reservations. Other entries
+are optimistic area estimates, not contiguous first-fit placements or start
+guarantees.
+It is a C++/Python API and is not currently exposed through the gRPC service.
+
 
 **Get scheduling statistics** (wait times, turnaround, utilization):
 

@@ -224,9 +224,9 @@ The project adds debug information independently of the selected optimized
 build type. Use a workload long enough to collect substantially more than a
 few hundred samples.
 
-See [Performance Analysis](../dev/PERFORMANCE_ANALYSIS.md) for a worked
-`perf` profile of the circular FCFS scheduler and its identified optimization
-targets.
+See [Optimization History](../dev/performance-analysis/OPTIMIZATION_HISTORY.md)
+for the earlier circular FCFS `perf` profile, and
+[Performance Analysis](../dev/PERFORMANCE_ANALYSIS.md) for current timings.
 
 ### GNU `gprof` profiling
 
@@ -254,10 +254,10 @@ so later non-gprof configurations retain the requested shared-library mode.
 Use a separate run directory for each process or run because each writes a
 file named `gmon.out` in its current working directory.
 
-See [Performance Analysis](../dev/PERFORMANCE_ANALYSIS.md) for the project's
-recorded profiling analysis. That snapshot was collected with Linux `perf`,
-but its workload documentation and interpretation guidance also apply when
-evaluating a `gprof` capture.
+See [Performance Analysis](../dev/PERFORMANCE_ANALYSIS.md) for current timings
+and [Optimization History](../dev/performance-analysis/OPTIMIZATION_HISTORY.md)
+for the earlier Linux `perf` findings. Use the same workload and measurement
+scope when comparing a new `gprof` capture.
 
 **Complete example with all features:**
 ```bash

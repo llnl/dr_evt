@@ -145,6 +145,8 @@ def write_normalized_report(output, report):
         'All methods query the full eligible pending queue.', '',
         '**Cost** is summed mean query time divided by finite returned '
         'predictions, including query costs at zero-prediction checkpoints. '
+        '**Mean Absolute Error (MAE)** averages absolute differences between '
+        'estimated and reference start times. '
         '**Common MAE** uses the intersection of finite predictions across '
         'methods, matched by job and checkpoint; **Own MAE** uses each method\'s '
         'finite predictions. Errors compare estimates with independent '
@@ -155,20 +157,25 @@ def write_normalized_report(output, report):
         'preparation and replay. Actual durations establish observed history '
         'and reference execution; the control executes for time limits. '
         '`evaluate_observable.cpp` enforces this restriction before calling '
-        'the exact API.' if observable else
-        '**Side simulation:** `get_exact_job_start_times()` clones and replays '
+        'the lookahead API.' if observable else
+        '**Side simulation:** `get_start_times_by_lookahead()` clones and replays '
         'the configured scheduler. It knows all supplied actual durations and '
         'future arrivals in the actual-runtime experiment. Its zero error '
         'demonstrates replay fidelity with that information. The limit control '
         'changes execution durations to time limits for both the reference and '
         'the replay; it does not measure time-limit-only replay predictions '
         'against actual-runtime execution.'), '',
-        '**Cached** = `get_estimated_job_starts()`; **Fresh** = '
+        '**Cached** = `get_start_times_by_est_caches()`; **Forecast without backfill** = '
         '`get_job_statuses(ids, 0, false)`; **Side simulation** = '
-        '`get_exact_job_start_times(ids)`.', '']
+        '`get_start_times_by_lookahead(ids)`. The forecast uses full '
+        'time-limit windows and respects existing protected reservations, but does not '
+        'simulate future backfill admissions.', '']
     if any('extended' in r['apis'] for r in report['results']):
         lines += ['**Cache-first** = `get_job_statuses(ids)`: reuse cached '
-                  'starts and forecast missing starts.', '']
+                  'starts and forecast missing starts, including reuse of unprotected '
+                  'cached estimates. `get_job_statuses(ids, 0, true, false)` instead '
+                  'preserves compatible protected windows and forecasts unprotected '
+                  'jobs; that option is not measured in these tables.', '']
     names = {
         'fiction-fcfs': 'Flux FCFS / no backfill',
         'fiction-hybrid': 'Flux-style pass accounting',
@@ -189,7 +196,7 @@ def write_normalized_report(output, report):
         for result in report['results']:
             if result['execution'] != mode:
                 continue
-            apis = [('cached', 'Cached'), ('fresh', 'Fresh')]
+            apis = [('cached', 'Cached'), ('fresh', 'Forecast without backfill')]
             if 'extended' in result['apis']:
                 apis.append(('extended', 'Cache-first'))
             apis.append(('exact', 'Side simulation'))
@@ -210,7 +217,56 @@ def write_normalized_report(output, report):
                       hybrid['apis']['cached']['predictions'],
                       hybrid['apis']['fresh']['predictions']), '']
     if observable:
-        lines += ['## Interpretation', '',
+        control = next(r for r in report['results']
+                       if r['case'] == 'event-hybrid' and r['execution'] == 'limit')
+        cached = control['apis']['cached']
+        protected = cached['by_kind']['1']
+        unprotected = cached['by_kind']['2']
+        common = control['apis']['fresh']['common_across_methods']
+        cache_explanation = (
+            'For the event-hybrid time-limit control, the {:.2f} versus {:.2f} '
+            'minutes common-set MAE compares the same {} job/checkpoint observations. '
+            'The cached results comprise {} protected reservations with {:.2f} minutes '
+            'MAE and {} unprotected estimates with {:.2f} minutes MAE. '
+            'Unprotected cached estimates record when enough nodes become available, '
+            'without placing every earlier waiting job’s full execution window; '
+            'they can predict starts too early. That behavior is consistent with '
+            'Slurm’s `squeue --start`. The forecast without backfill '
+            'places those windows in queue order, which closely matches execution '
+            'for this common set when durations equal time limits. Cached lookup '
+            'does not provide a complete forecast of future backfill decisions.'.format(
+                common['mae_seconds']/60,
+                cached['common_across_methods']['mae_seconds']/60,
+                common['predictions'], protected['predictions'],
+                protected['mae_seconds']/60, unprotected['predictions'],
+                unprotected['mae_seconds']/60))
+        cache_first_explanation = (
+            'Cache-first reuses accurate protected reservations and unprotected '
+            'cached estimates. In this control, the latter account for its {:.2f}-minute '
+            'common-set MAE, versus {:.2f} minutes when cache reuse is disabled. '
+            'It refreshes cached starts before the query time, reducing error from '
+            'the cache-only result of {:.2f} minutes, but retains other optimistic '
+            'estimates. Accurate reservations therefore do not make the entire '
+            'cache accurate. These tables measure default cache-first reuse of both '
+            'protected and unprotected starts, not the protected-only option.'.format(
+                control['apis']['extended']['common_across_methods']['mae_seconds']/60,
+                common['mae_seconds']/60,
+                cached['common_across_methods']['mae_seconds']/60)
+            if 'extended' in control['apis'] else '')
+        lines += ['## Interpretation', '', cache_explanation, '',
+                  cache_first_explanation, '',
+                  'The forecast holds resources for full time limits. '
+                  'Early completions therefore create accumulating timing error. '
+                  'When execution durations equal those limits, its duration assumptions '
+                  'match the reference, but omitted future backfill and dispatch rules '
+                  'still cause error. The two conditions use different observation sets.', '',
+                  'Disabling cache reuse recomputes reserved starts too. Recomputing '
+                  'can change those values because it builds a new plan from current '
+                  'state. However, a cached reservation often reflects the earliest '
+                  'fit after running jobs finish and earlier protected jobs are '
+                  'accounted for. The forecast can find the same fit without simulating '
+                  'future backfill, so omitting backfill does not always produce a '
+                  'noticeable difference.', '',
                   'Cache-first is an inexpensive default when durations are uncertain. '
                   'Replay is useful with accurate estimates or for policy-sensitive '
                   'studies. These results establish neither a worst-case bound nor '
@@ -252,7 +308,7 @@ def main():
             'sum of finite returned predictions at those checkpoints. Includes query '
             'cost at zero-prediction checkpoints; undefined if no predictions exist.')
         report['common_error_definition'] = (
-            'Intersection of finite predictions from cached, fresh unrestricted, and '
+            'Intersection of finite predictions from cached, unrestricted forecast without backfill, and '
             'exact side replay, matched by checkpoint and job ID. Own-method error '
             'uses all finite predictions returned by that method.')
         (output/'summary.json').write_text(json.dumps(report, indent=2)+'\n')
@@ -285,7 +341,7 @@ def main():
     if args.observable:
         report['scope'] = (
             'At each checkpoint only already-submitted jobs are loaded. '
-            'Cached and fresh queries use the observed live state. Prediction '
+            'Cached and forecast without backfill queries use the observed live state. Prediction '
             'replay replaces all unfinished durations and running completion '
             'events with time-limit estimates, excludes future submissions, '
             'and is compared against an independent actual continuation. '

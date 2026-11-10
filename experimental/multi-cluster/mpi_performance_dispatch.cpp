@@ -61,10 +61,7 @@ enum class DispatchPolicy : std::uint8_t {
   RelPerfOnly,
   WaitTimeOnly
 };
-enum class WallTimePolicy : std::uint8_t {
-  AdaptedLimit,
-  ActualDuration
-};
+enum class WallTimePolicy : std::uint8_t { AdaptedLimit, ActualDuration };
 
 struct JobMessage {
   double submit_time = 0.0;
@@ -248,8 +245,7 @@ Options parse_options(int argc, char **argv) {
       else
         usage(argv[0], "--wall-time-policy must be adapted-limit or "
                        "actual-duration");
-    }
-    else if (arg == "--output")
+    } else if (arg == "--output")
       options.output = option_value(i, argc, argv, arg);
     else if (arg == "--help" || arg == "-h")
       usage(argv[0]);
@@ -257,8 +253,8 @@ Options parse_options(int argc, char **argv) {
       usage(argv[0], "unknown option: " + arg);
   }
   if (options.jobs.empty() || options.ground_truth.empty() ||
-      options.prediction.empty() ||
-      options.applications.empty() || options.systems_table.empty())
+      options.prediction.empty() || options.applications.empty() ||
+      options.systems_table.empty())
     usage(argv[0], "--jobs, --ground-truth, --prediction, --applications, "
                    "and --systems are required");
   if (!std::isfinite(options.prediction_utilization) ||
@@ -353,8 +349,8 @@ std::vector<Job> read_jobs(const std::string &path) {
   const Header header = make_header(split_csv(line));
   const std::string submit_field =
       header.contains("submit_time") ? "submit_time" : "job_submit_time";
-  for (const auto &name : {submit_field, std::string("time_limit"),
-                           std::string("num_nodes")})
+  for (const auto &name :
+       {submit_field, std::string("time_limit"), std::string("num_nodes")})
     if (!header.contains(name))
       throw std::runtime_error(path + " must contain " + name);
   const std::string duration_field =
@@ -542,22 +538,20 @@ std::optional<double> read_performance(const std::vector<std::string> &row,
  * @throws std::runtime_error if a present value is invalid.
  */
 std::optional<PerformancePair>
-read_performance_pair(const std::vector<std::string> &row,
-                      const Header &header,
+read_performance_pair(const std::vector<std::string> &row, const Header &header,
                       const std::vector<std::string> *prediction_row,
                       const Header &prediction_header,
-                      const std::string &column,
-                      const std::string &context) {
+                      const std::string &column, const std::string &context) {
   if (column.empty())
     return std::nullopt;
   const auto ground_truth = read_performance(row, header, column, context);
   if (!ground_truth)
     return std::nullopt;
-  const auto predicted = prediction_row == nullptr
-                             ? std::nullopt
-                             : read_performance(*prediction_row,
-                                                prediction_header, column,
-                                                context);
+  const auto predicted =
+      prediction_row == nullptr
+          ? std::nullopt
+          : read_performance(*prediction_row, prediction_header, column,
+                             context);
   return PerformancePair{*ground_truth, predicted};
 }
 
@@ -570,10 +564,11 @@ read_performance_pair(const std::vector<std::string> &row,
  * @return Valid runnable workloads grouped by application.
  * @throws std::runtime_error if either table is malformed or identities differ.
  */
-WorkloadCatalog read_workloads(
-    const std::string &ground_truth_path, const std::string &prediction_path,
-    const std::vector<System> &systems,
-    const std::map<std::string, SystemRequirement> &requirements) {
+WorkloadCatalog
+read_workloads(const std::string &ground_truth_path,
+               const std::string &prediction_path,
+               const std::vector<System> &systems,
+               const std::map<std::string, SystemRequirement> &requirements) {
   std::ifstream stream(ground_truth_path);
   std::ifstream prediction_stream(prediction_path);
   if (!stream || !prediction_stream)
@@ -594,15 +589,16 @@ WorkloadCatalog read_workloads(
                              upper);
   };
   const std::array<std::string, 3> identity{
-      identity_name(header, "App", "app"), identity_name(header, "Args", "args"),
+      identity_name(header, "App", "app"),
+      identity_name(header, "Args", "args"),
       identity_name(header, "Ranks", "ranks")};
   const std::array<std::string, 3> predicted_identity{
       identity_name(prediction_header, "App", "app"),
       identity_name(prediction_header, "Args", "args"),
       identity_name(prediction_header, "Ranks", "ranks")};
   for (const auto &system : systems)
-    for (const auto &column : {system.cpu_performance_column,
-                               system.gpu_performance_column}) {
+    for (const auto &column :
+         {system.cpu_performance_column, system.gpu_performance_column}) {
       if (column.empty())
         continue;
       if (!header.contains(column))
@@ -617,11 +613,10 @@ WorkloadCatalog read_workloads(
     if (prediction_line.empty())
       continue;
     auto row = split_csv(prediction_line);
-    Identity key{
-        field(row, prediction_header, predicted_identity[0]),
-        field(row, prediction_header, predicted_identity[1]),
-        static_cast<std::uint32_t>(
-            std::stoul(field(row, prediction_header, predicted_identity[2])))};
+    Identity key{field(row, prediction_header, predicted_identity[0]),
+                 field(row, prediction_header, predicted_identity[1]),
+                 static_cast<std::uint32_t>(std::stoul(
+                     field(row, prediction_header, predicted_identity[2])))};
     if (!requirements.contains(std::get<0>(key)))
       continue;
     if (!predictions.emplace(std::move(key), std::move(row)).second)
@@ -640,9 +635,9 @@ WorkloadCatalog read_workloads(
       continue;
     const auto row = split_csv(line);
     const std::string app = field(row, header, identity[0]);
-    const Identity workload_identity{
-        app, field(row, header, identity[1]),
-        static_cast<std::uint32_t>(std::stoul(field(row, header, identity[2])))};
+    const Identity workload_identity{app, field(row, header, identity[1]),
+                                     static_cast<std::uint32_t>(std::stoul(
+                                         field(row, header, identity[2])))};
     const auto requirement = requirements.find(app);
     if (requirement == requirements.end())
       continue;
@@ -651,13 +646,14 @@ WorkloadCatalog read_workloads(
                                ": duplicate workload at row " +
                                std::to_string(row_number));
     const auto prediction = predictions.find(workload_identity);
-    const auto *prediction_row = prediction == predictions.end()
-                                     ? nullptr
-                                     : &prediction->second;
+    const auto *prediction_row =
+        prediction == predictions.end() ? nullptr : &prediction->second;
     Workload workload{
-        app, field(row, header, identity[1]),
+        app,
+        field(row, header, identity[1]),
         static_cast<std::uint32_t>(std::stoul(field(row, header, identity[2]))),
-        requirement->second, {}};
+        requirement->second,
+        {}};
     if (workload.app.empty() || workload.ranks == 0)
       throw std::runtime_error(ground_truth_path +
                                ": invalid workload at row " +
@@ -670,9 +666,9 @@ WorkloadCatalog read_workloads(
           read_performance_pair(row, header, prediction_row, prediction_header,
                                 system.cpu_performance_column, context),
           system.gpu_enabled
-              ? read_performance_pair(
-                    row, header, prediction_row, prediction_header,
-                    system.gpu_performance_column, context)
+              ? read_performance_pair(row, header, prediction_row,
+                                      prediction_header,
+                                      system.gpu_performance_column, context)
               : std::nullopt};
       if (workload.requirement == SystemRequirement::CpuOnly)
         runnable = runnable || performance.cpu.has_value();
@@ -738,8 +734,8 @@ double estimate_wait(const WindowMessage &window, std::uint32_t required_nodes,
   const bool has_waiting_head = window.shadow_time > window.current_time;
   const bool can_start_now = window.available_nodes >= required_nodes;
   const bool can_backfill_now =
-      can_start_now &&
-      (!has_waiting_head || window.current_time + runtime <= window.shadow_time);
+      can_start_now && (!has_waiting_head ||
+                        window.current_time + runtime <= window.shadow_time);
   if (can_backfill_now)
     return 0.0;
   if (!has_waiting_head)
@@ -773,9 +769,9 @@ struct Choice {
  * @param[in] maximum_limit Largest permitted wall-time request.
  * @return Final capped limit and the number of doublings performed.
  */
-std::pair<double, std::uint32_t>
-adjust_time_limit(double predicted_limit, double actual_duration,
-                  double maximum_limit) {
+std::pair<double, std::uint32_t> adjust_time_limit(double predicted_limit,
+                                                   double actual_duration,
+                                                   double maximum_limit) {
   double limit = std::min(predicted_limit, maximum_limit);
   std::uint32_t doublings = 0;
   while (limit < actual_duration && limit < maximum_limit) {
@@ -800,12 +796,12 @@ adjust_time_limit(double predicted_limit, double actual_duration,
  * maximum and, when a prediction is available, whose predicted runtime is also
  * within the maximum; returns no choice if none qualifies.
  */
-std::optional<Choice>
-choose_system(const Job &job, const Workload &workload,
-              const std::vector<System> &systems,
-              const std::vector<Response> &snapshots, double max_time_limit,
-              DispatchPolicy dispatch_policy,
-              WallTimePolicy wall_time_policy) {
+std::optional<Choice> choose_system(const Job &job, const Workload &workload,
+                                    const std::vector<System> &systems,
+                                    const std::vector<Response> &snapshots,
+                                    double max_time_limit,
+                                    DispatchPolicy dispatch_policy,
+                                    WallTimePolicy wall_time_policy) {
   bool prediction_available = dispatch_policy == DispatchPolicy::WaitTimeOnly;
   for (std::size_t i = 0; !prediction_available && i < systems.size(); ++i) {
     if (job.num_nodes > systems[i].physical_nodes)
@@ -817,18 +813,17 @@ choose_system(const Job &job, const Workload &workload,
     if (workload.requirement == SystemRequirement::CpuOnly)
       prediction_available = available(workload.performance[i].cpu);
     else if (workload.requirement == SystemRequirement::GpuOnly)
-      prediction_available = systems[i].gpu_enabled &&
-                             available(workload.performance[i].gpu);
+      prediction_available =
+          systems[i].gpu_enabled && available(workload.performance[i].gpu);
     else
-      prediction_available = available(workload.performance[i].cpu) ||
-                             (systems[i].gpu_enabled &&
-                              available(workload.performance[i].gpu));
+      prediction_available =
+          available(workload.performance[i].cpu) ||
+          (systems[i].gpu_enabled && available(workload.performance[i].gpu));
   }
   const bool prediction_fallback =
       dispatch_policy != DispatchPolicy::WaitTimeOnly && !prediction_available;
-  const auto effective_policy = prediction_fallback
-                                    ? DispatchPolicy::WaitTimeOnly
-                                    : dispatch_policy;
+  const auto effective_policy =
+      prediction_fallback ? DispatchPolicy::WaitTimeOnly : dispatch_policy;
   std::optional<Choice> best;
   bool best_available_now = false;
   for (std::size_t i = 0; i < systems.size(); ++i) {
@@ -838,21 +833,21 @@ choose_system(const Job &job, const Workload &workload,
     const char *execution_mode = "CPU";
     if (workload.requirement == SystemRequirement::CpuOnly) {
       performance = workload.performance[i].cpu;
-      if (effective_policy != DispatchPolicy::WaitTimeOnly &&
-          performance && !performance->predicted)
+      if (effective_policy != DispatchPolicy::WaitTimeOnly && performance &&
+          !performance->predicted)
         performance = std::nullopt;
     } else if (workload.requirement == SystemRequirement::GpuOnly) {
       if (!systems[i].gpu_enabled)
         continue;
       performance = workload.performance[i].gpu;
-      if (effective_policy != DispatchPolicy::WaitTimeOnly &&
-          performance && !performance->predicted)
+      if (effective_policy != DispatchPolicy::WaitTimeOnly && performance &&
+          !performance->predicted)
         performance = std::nullopt;
       execution_mode = "GPU";
     } else if (!systems[i].gpu_enabled) {
       performance = workload.performance[i].cpu;
-      if (effective_policy != DispatchPolicy::WaitTimeOnly &&
-          performance && !performance->predicted)
+      if (effective_policy != DispatchPolicy::WaitTimeOnly && performance &&
+          !performance->predicted)
         performance = std::nullopt;
     } else {
       if (workload.performance[i].cpu &&
@@ -867,8 +862,7 @@ choose_system(const Job &job, const Workload &workload,
           job.duration / workload.performance[i].gpu->ground_truth <=
               max_time_limit &&
           (!performance || effective_policy == DispatchPolicy::WaitTimeOnly ||
-           *workload.performance[i].gpu->predicted >
-               *performance->predicted)) {
+           *workload.performance[i].gpu->predicted > *performance->predicted)) {
         performance = workload.performance[i].gpu;
         execution_mode = "GPU";
       }
@@ -926,14 +920,14 @@ choose_system(const Job &job, const Workload &workload,
             choice.index < best->index))));
     const bool turnaround_better =
         effective_policy == DispatchPolicy::Turnaround &&
-        (!best || std::tie(choice.predicted_turnaround, choice.estimated_wait,
-                          choice.index) <
-                     std::tie(best->predicted_turnaround,
-                              best->estimated_wait, best->index));
+        (!best ||
+         std::tie(choice.predicted_turnaround, choice.estimated_wait,
+                  choice.index) < std::tie(best->predicted_turnaround,
+                                           best->estimated_wait, best->index));
     const bool wait_better =
         effective_policy == DispatchPolicy::WaitTimeOnly &&
         (!best || std::tie(choice.estimated_wait, choice.index) <
-                     std::tie(best->estimated_wait, best->index));
+                      std::tie(best->estimated_wait, best->index));
     if (rel_perf_only_better || turnaround_better || wait_better) {
       best = choice;
       best_available_now = available_now;
@@ -956,7 +950,7 @@ Response handle_request(dr_evt::Simulation &simulation,
         response.window.releases.push_back(
             {release.time, release.nodes_released});
       response.prediction_horizon =
-          simulation.get_prediction_horizon(request.prediction_utilization);
+          simulation.estimate_queue_horizon(request.prediction_utilization);
     } else if (request.operation == Operation::Append) {
       response.job_idx = simulation.append_job(
           request.job.submit_time, request.job.num_nodes, request.job.queue,
@@ -968,8 +962,7 @@ Response handle_request(dr_evt::Simulation &simulation,
       response.statistics = {static_cast<std::uint64_t>(stats.jobs_submitted),
                              static_cast<std::uint64_t>(stats.jobs_completed),
                              stats.avg_turnaround_time,
-                             stats.avg_bounded_slowdown,
-                             stats.makespan};
+                             stats.avg_bounded_slowdown, stats.makespan};
     }
   } catch (const std::exception &error) {
     response.ok = false;
@@ -1038,8 +1031,8 @@ void controller(const Options &options, const std::vector<System> &systems,
       options.dispatch_policy == DispatchPolicy::WaitTimeOnly
           ? options.ground_truth
           : options.prediction;
-  const auto catalog = read_workloads(options.ground_truth, prediction, systems,
-                                      requirements);
+  const auto catalog =
+      read_workloads(options.ground_truth, prediction, systems, requirements);
   const auto largest_system = std::max_element(
       systems.begin(), systems.end(), [](const auto &left, const auto &right) {
         return left.physical_nodes < right.physical_nodes;
@@ -1085,10 +1078,9 @@ void controller(const Options &options, const std::vector<System> &systems,
     snapshot.prediction_utilization = options.prediction_utilization;
     const auto snapshots = call_all(snapshot, worker_count);
     const auto &workload = sample_workload(catalog, generator);
-    const auto selected =
-        choose_system(dispatch_job, workload, systems, snapshots,
-                      options.max_time_limit, options.dispatch_policy,
-                      options.wall_time_policy);
+    const auto selected = choose_system(
+        dispatch_job, workload, systems, snapshots, options.max_time_limit,
+        options.dispatch_policy, options.wall_time_policy);
     if (!selected) {
       ++dropped_jobs;
       std::cerr << "dropped: job_id=" << job.id << " app=" << workload.app
@@ -1124,9 +1116,9 @@ void controller(const Options &options, const std::vector<System> &systems,
             << choice.estimated_wait << ',' << choice.estimated_duration << ','
             << choice.actual_duration << ',' << choice.predicted_time_limit
             << ',' << choice.actual_time_limit << ','
-            << choice.submitted_time_limit << ','
-            << choice.time_limit_doublings << ','
-            << choice.predicted_turnaround << ',' << response.job_idx << '\n';
+            << choice.submitted_time_limit << ',' << choice.time_limit_doublings
+            << ',' << choice.predicted_turnaround << ',' << response.job_idx
+            << '\n';
   }
 
   Request finish;
@@ -1139,8 +1131,7 @@ void controller(const Options &options, const std::vector<System> &systems,
     const auto &stats = responses[i].statistics;
     completed_jobs += stats.jobs_completed;
     total_turnaround += stats.avg_turnaround_time * stats.jobs_completed;
-    total_bounded_slowdown +=
-        stats.avg_bounded_slowdown * stats.jobs_completed;
+    total_bounded_slowdown += stats.avg_bounded_slowdown * stats.jobs_completed;
     std::cerr << systems[i].id << ": submitted=" << stats.jobs_submitted
               << " completed=" << stats.jobs_completed
               << " makespan=" << stats.makespan << '\n';
@@ -1150,8 +1141,7 @@ void controller(const Options &options, const std::vector<System> &systems,
                              "job count");
   const double denominator = static_cast<double>(dispatched_jobs);
   std::cerr << std::setprecision(8) << "overall: jobs=" << dispatched_jobs
-            << " dropped_jobs=" << dropped_jobs
-            << " average_turnaround_time="
+            << " dropped_jobs=" << dropped_jobs << " average_turnaround_time="
             << (dispatched_jobs == 0 ? 0.0 : total_turnaround / denominator)
             << " average_bounded_slowdown="
             << (dispatched_jobs == 0 ? 0.0

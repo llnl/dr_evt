@@ -59,7 +59,7 @@ class FakeMessages:
     InitRequest = FakeMessage
     AdvanceToRequest = FakeMessage
     GetBackfillWindowRequest = FakeMessage
-    GetPredictionHorizonRequest = FakeMessage
+    EstimateQueueHorizonRequest = FakeMessage
     JobAppendData = FakeMessage
     AppendJobsRequest = FakeMessage
     FinishSimulationRequest = FakeMessage
@@ -89,9 +89,9 @@ class FakeSession:
             return SimpleNamespace(
                 get_backfill_window=window(self.current_time, self.capacity)
             )
-        if hasattr(request, "get_prediction_horizon"):
+        if hasattr(request, "estimate_queue_horizon"):
             return SimpleNamespace(
-                get_prediction_horizon=SimpleNamespace(horizon=0)
+                estimate_queue_horizon=SimpleNamespace(horizon=0)
             )
         if hasattr(request, "append_jobs"):
             job = request.append_jobs.requests[0]

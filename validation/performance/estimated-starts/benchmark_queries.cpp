@@ -26,7 +26,8 @@ int main(int argc, char **argv) {
   Simulation sim(params);
   std::vector<Simulation::Job_Append_Request> jobs;
   jobs.push_back({0, 99, "1", 1000});
-  for (size_t i = 0; i < count; ++i) jobs.push_back({0, 100, "1", 10});
+  for (size_t i = 0; i < count; ++i)
+    jobs.push_back({0, 100, "1", 10});
   auto ids = sim.append_jobs(jobs);
   ids.erase(ids.begin());
   sim.advance_to(0);
@@ -35,7 +36,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < repetitions; ++i) {
 #ifdef HAS_PLANNED_STARTS
     if (mode == "cached") {
-      const auto result = sim.get_estimated_job_starts();
+      const auto result = sim.get_start_times_by_est_caches();
       checksum += result.jobs.size();
     } else
 #endif
@@ -43,8 +44,10 @@ int main(int argc, char **argv) {
       checksum += sim.get_job_statuses(ids).size();
     }
   }
-  const auto seconds = std::chrono::duration<double>(
-      std::chrono::steady_clock::now() - begin).count();
+  const auto seconds =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - begin)
+          .count();
   std::cout << "{\"seconds\":" << seconds << ",\"checksum\":" << checksum
-            << ",\"jobs\":" << count << ",\"repetitions\":" << repetitions << "}\n";
+            << ",\"jobs\":" << count << ",\"repetitions\":" << repetitions
+            << "}\n";
 }

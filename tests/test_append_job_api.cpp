@@ -409,16 +409,16 @@ void test_exact_lookahead_replays_without_mutating_live_state() {
 
   const auto before_time = sim.get_current_time();
   const auto before = sim.get_job_statuses({running, head, candidate});
-  const auto exact = sim.get_exact_job_start_times({head, candidate});
+  const auto exact = sim.get_start_times_by_lookahead({head, candidate});
   assert(exact.size() == 2);
   assert(exact[0].start_time == 10.0);
   assert(exact[1].start_time == 0.0);
   assert(exact[0].outcome == Simulation::Exact_Start_Outcome::STARTED);
   assert(exact[1].outcome == Simulation::Exact_Start_Outcome::STARTED);
   const auto explicit_depth =
-      sim.get_exact_job_start_times({head, candidate}, 1);
+      sim.get_start_times_by_lookahead({head, candidate}, 1);
   assert(explicit_depth.size() == 2);
-  const auto never = sim.get_exact_job_start_times({impossible});
+  const auto never = sim.get_start_times_by_lookahead({impossible});
   assert(never[0].outcome == Simulation::Exact_Start_Outcome::REJECTED);
   assert(!never[0].start_time.has_value());
 
@@ -430,7 +430,7 @@ void test_exact_lookahead_replays_without_mutating_live_state() {
   assert(after[1].state == before[1].state);
   assert(after[2].state == before[2].state);
 
-  const auto enumerated = sim.get_exact_job_start_times({}, 1);
+  const auto enumerated = sim.get_start_times_by_lookahead({}, 1);
   assert(enumerated.size() == 1);
   assert(enumerated[0].job_idx == head);
   assert(enumerated[0].start_time == 10.0);
@@ -450,7 +450,7 @@ void test_exact_lookahead_replays_without_mutating_live_state() {
   reduced.get_trace().load_data(0);
   const auto constrained = reduced.append_job(0.0, 8, kTestQueueInput, 1.0);
   reduced.advance_to(0.0);
-  const auto unreachable = reduced.get_exact_job_start_times({constrained});
+  const auto unreachable = reduced.get_start_times_by_lookahead({constrained});
   assert(unreachable[0].outcome ==
          Simulation::Exact_Start_Outcome::CAPACITY_UNREACHABLE);
   assert(!unreachable[0].start_time.has_value());
@@ -1609,17 +1609,17 @@ void test_prediction_horizon() {
   //   [80,100]: 90*20 = 1800
   // Varying U therefore places the horizon at each successive event or after
   // the replay, covering every result path in the estimator.
-  assert(approx_equal(sim.get_prediction_horizon(1.0), 20.0));
-  assert(approx_equal(sim.get_prediction_horizon(0.5), 40.0));
-  assert(approx_equal(sim.get_prediction_horizon(0.25), 60.0));
+  assert(approx_equal(sim.estimate_queue_horizon(1.0), 20.0));
+  assert(approx_equal(sim.estimate_queue_horizon(0.5), 40.0));
+  assert(approx_equal(sim.estimate_queue_horizon(0.25), 60.0));
 
   // U=0 is the documented sentinel for the U=1 fallback.
-  assert(approx_equal(sim.get_prediction_horizon(0.0), 20.0));
+  assert(approx_equal(sim.estimate_queue_horizon(0.0), 20.0));
 
   // At U=0.1, the replay supplies 110+150+180=440 node-seconds. The remaining
   // 560 node-seconds use all 100 nodes at effective rate 0.1, adding 56
   // seconds after t=100: H=(100-40)+56=116 seconds.
-  assert(approx_equal(sim.get_prediction_horizon(0.1), 116.0));
+  assert(approx_equal(sim.estimate_queue_horizon(0.1), 116.0));
 
   for (double invalid_utilization :
        {-0.01, 1.01, std::numeric_limits<double>::infinity(),
@@ -1627,7 +1627,7 @@ void test_prediction_horizon() {
         std::numeric_limits<double>::quiet_NaN()}) {
     bool threw = false;
     try {
-      (void)sim.get_prediction_horizon(invalid_utilization);
+      (void)sim.estimate_queue_horizon(invalid_utilization);
     } catch (const std::invalid_argument &) {
       threw = true;
     }
@@ -1646,7 +1646,7 @@ void test_prediction_horizon() {
                    : std::optional<job_no_t>{candidates.front().first};
       });
   empty.get_trace().load_data(0);
-  assert(approx_equal(empty.get_prediction_horizon(0.5), 0.0));
+  assert(approx_equal(empty.estimate_queue_horizon(0.5), 0.0));
 
   // Every standard FCFS queue computes the same demand by scanning only its
   // existing eligible entries when this query is made.
@@ -1662,8 +1662,8 @@ void test_prediction_horizon() {
     standard.append_job(0.0, 50, kTestQueueInput, 8.0);
     standard.advance_to(0.0);
     assert(approx_equal(standard.get_fcfs_head_shadow_time(), 40.0));
-    assert(approx_equal(standard.get_prediction_horizon(0.5), 8.0));
-    const auto starts = standard.get_queue_drain_start_times(1.0, 1);
+    assert(approx_equal(standard.estimate_queue_horizon(0.5), 8.0));
+    const auto starts = standard.get_start_times_by_queue_drain(1.0, 1);
     assert(starts.size() == 1);
     assert(approx_equal(starts[0].expected_start_time, 40.0));
     assert(starts[0].start_time_kind == Simulation::Start_Time_Kind::RESERVED);
@@ -1675,7 +1675,7 @@ void test_prediction_horizon() {
   unsupported.get_trace().load_data(0);
   bool rejected_for_unsupported_scheduler = false;
   try {
-    (void)unsupported.get_prediction_horizon(0.5);
+    (void)unsupported.estimate_queue_horizon(0.5);
   } catch (const std::logic_error &) {
     rejected_for_unsupported_scheduler = true;
   }
@@ -1696,7 +1696,7 @@ void test_prediction_horizon() {
   no_backfill.get_trace().load_data(0);
   bool rejected_without_easy = false;
   try {
-    (void)no_backfill.get_prediction_horizon(0.5);
+    (void)no_backfill.estimate_queue_horizon(0.5);
   } catch (const std::logic_error &) {
     rejected_without_easy = true;
   }
@@ -2111,7 +2111,7 @@ void test_fixed_periodic_dispatch() {
     sim.advance_to(5);
     assert(sim.get_statistics().jobs_started == 2);
 #if defined(DR_EVT_HAS_SER20)
-    const auto predictions = sim.get_exact_job_start_times({ids[2], ids[3]});
+    const auto predictions = sim.get_start_times_by_lookahead({ids[2], ids[3]});
     assert(predictions[0].start_time == 10);
     assert(predictions[1].start_time == 10);
     assert(sim.get_statistics().jobs_started == 2);
@@ -2236,7 +2236,7 @@ void test_fixed_periodic_dispatch_on_arrivals() {
     sim.advance_to(0);
     assert(sim.get_statistics().jobs_started == 2);
 #if defined(DR_EVT_HAS_SER20)
-    const auto exact = sim.get_exact_job_start_times({ids[2], ids[3]});
+    const auto exact = sim.get_start_times_by_lookahead({ids[2], ids[3]});
     assert(exact[0].start_time == 5);
     assert(exact[1].start_time == 5);
     assert(sim.get_statistics().jobs_started == 2);
@@ -2329,7 +2329,7 @@ void test_fixed_periodic_cached_planner_lookahead() {
     assert(sim.get_statistics().jobs_started == 1);
     const double initial = notified ? 0 : 1;
 #if defined(DR_EVT_HAS_SER20)
-    const auto exact = sim.get_exact_job_start_times({ids[1], ids[2]});
+    const auto exact = sim.get_start_times_by_lookahead({ids[1], ids[2]});
     assert(exact[0].start_time == initial + 300);
     assert(exact[1].start_time == initial + 301);
     assert(sim.get_statistics().jobs_started == 1);
