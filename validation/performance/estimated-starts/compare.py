@@ -38,9 +38,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--repo', type=Path, required=True)
+    parser.add_argument('--before-revision', required=True,
+                        help='Git revision used for the before build')
+    parser.add_argument('--after-revision', required=True,
+                        help='Git revision used for the after build')
     parser.add_argument('--runs', type=int, default=9)
     args = parser.parse_args()
     root, repo = args.root.resolve(), args.repo.resolve()
+    before_revision, after_revision = [
+        subprocess.check_output(
+            ['git', 'rev-parse', '--verify', '--end-of-options', revision+'^{commit}'],
+            cwd=repo, text=True).strip()
+        for revision in (args.before_revision, args.after_revision)]
+    source_diff = subprocess.check_output(
+        ['git', 'diff', '--binary', '--no-ext-diff', '--no-textconv', '--no-color',
+         before_revision, after_revision, '--'], cwd=repo)
     output = root / 'measurements'
     output.mkdir(exist_ok=True)
     path = repo / 'docs/_static/scheduler-validation/performance/measure_dr_evt.py'
@@ -69,8 +81,8 @@ def main():
                               '--trace_format', 'simple', '--timestamp_format', 'epoch'],
                           audit_published=False))
     report = dict(platform=platform.platform(), machine=platform.machine(),
-                  base_revision=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip(),
-                  source_diff_sha256=digest(root / 'source.diff'),
+                  base_revision=before_revision, after_revision=after_revision,
+                  source_diff_sha256=hashlib.sha256(source_diff).hexdigest(),
                   compiler=subprocess.check_output(['/usr/bin/c++', '--version'], text=True),
                   configure_options=json.loads((root / 'configure-options.json').read_text()),
                   execution='One warmup, then alternating AB/BA paired runs; sequential, warm filesystem caches',

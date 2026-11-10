@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < repetitions; ++i) {
 #ifdef HAS_PLANNED_STARTS
     if (mode == "cached") {
-      const auto result = sim.get_planned_job_starts();
+      const auto result = sim.get_estimated_job_starts();
       checksum += result.jobs.size();
     } else
 #endif

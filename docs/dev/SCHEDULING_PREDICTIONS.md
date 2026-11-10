@@ -21,18 +21,18 @@ does not add a forecast scan or prediction fields to waiting-queue entries.
 | Lookahead | An output-free fork of the current simulation that runs the real scheduler forward. It provides the most faithful estimates. |
 | Queue-drain horizon | An aggregate estimate of when the currently known waiting work will drain. It is intended for experiments, not as a job-start guarantee. |
 
-A protected reservation is authoritative for that job's reported planned start;
+A protected reservation is authoritative for that job's reported estimated start;
 there is no reason to replace it with a weaker estimate. Jobs without a
 reservation may still receive an estimate, but that estimate must respect the
 capacity claimed by protected reservations.
 
-## Cached planning results: `get_planned_job_starts()`
+## Cached start estimates: `get_estimated_job_starts()`
 
 This interface follows the reporting model of Slurm `squeue --start`: read
 predictions produced during the latest live scheduling pass. It returns
-`Planned_Job_Starts` with:
+`Estimated_Job_Starts` with:
 
-- `planned_at`: the simulation timestamp of that pass, or no value before
+- `estimated_at`: the simulation timestamp of that pass, or no value before
   any planning pass and immediately after checkpoint restore.
 - `jobs`: currently eligible pending jobs, sorted by predicted start time.
   Jobs without a prediction follow in scheduler queue order. Future arrivals,
@@ -44,7 +44,7 @@ The query never runs a forecast, clones state, advances simulation, or changes
 the live plan. A finite start computed beyond the planning horizon may be
 reported as `ESTIMATED`, without a protected reservation. The query does not
 extend the scheduler's examination budget to fill missing predictions.
-Predictions can be stale between periodic backfill ticks; `planned_at` makes
+Predictions can be stale between periodic backfill ticks; `estimated_at` makes
 their age visible. Appended jobs have no cached prediction until a live pass
 computes one. Estimates are not clamped to the current time.
 
@@ -63,10 +63,16 @@ each cached record occupies 24 bytes; vector capacity follows the largest
 recorded pass. The live path adds writes for computed predictions but no
 extra resource searches. Query enumeration, lookup, and sorting still cost
 work proportional to the pending population; the query is not constant time.
+The query sorts only jobs with known predictions; unknown jobs retain queue
+order. With N waiting-queue entries, P cached records, and K eligible known
+starts, the query costs O(N + P + K log K). It skips sorting when all starts are
+unknown and avoids partitioning when all starts are known. This uses query-
+local bookkeeping and temporary algorithm storage, with no extra fields in
+the live scheduler or waiting queue.
 The cache is transient and is not serialized into checkpoints.
 
-The interface is exposed in C++ and Python as `get_planned_job_starts()` and
-over gRPC as `GetPlannedJobStartsRequest` / `GetPlannedJobStartsResponse`.
+The interface is exposed in C++ and Python as `get_estimated_job_starts()` and
+over gRPC as `GetEstimatedJobStartsRequest` / `GetEstimatedJobStartsResponse`.
 
 ## Slurm comparison
 
@@ -126,20 +132,87 @@ projected to complete.
 | --- | --- | --- | --- |
 | Slurm `squeue --start` | During prior backfill planning | Tested jobs; out-of-window estimates may exist; jobs beyond the test limit can be unknown | Reads stored job information |
 | Slurm `sbatch --test-only` | During the request | One hypothetical job, using projected running-job releases and applicable constraints; does not replay queued starts | Performs a temporary allocation test; submits no lasting job |
-| DR_EVT `get_planned_job_starts()` | During prior live scheduling | Predictions actually computed; queue limits and early exits leave unknowns; out-of-horizon estimates may exist | Reads cached predictions and current pending membership |
-| DR_EVT `get_job_statuses(ids, estimation_depth)` | During the request | Fresh serial placement forecast; query depth is independent of live scheduler depth and horizon | Builds a temporary plan; live scheduler is unchanged |
+| DR_EVT `get_estimated_job_starts()` | During prior live scheduling | Predictions actually computed; queue limits and early exits leave unknowns; out-of-horizon estimates may exist | Reads cached predictions and current pending membership |
+| DR_EVT `get_job_statuses(ids, estimation_depth)` | Cached starts first; gaps during the request | Reuses live predictions and extends coverage with a conservative forecast; query depth is independent of live scheduler depth and horizon | Builds a temporary plan only for missing starts; live scheduler is unchanged |
 | DR_EVT `get_exact_job_start_times(ids, estimation_depth)` | During the request | Replays the configured scheduler, including its ticks, depth, horizon, and known arrivals | Advances an isolated simulation clone |
 
 Use the cached API to observe what the live planner last calculated. Use
-`get_job_statuses()` for lifecycle information and broader fresh forecasts.
+`get_job_statuses()` for lifecycle information and broader cache-first forecasts.
 These two interfaces can report different expected starts because they answer
 different questions. Exact lookahead supplies a simulated continuation when
 future scheduler decisions must be reproduced.
 
+### Measured latency and accuracy
+
+- Cached lookup reuses live backfill start estimates, but leaves unexamined
+  jobs unknown and can retain stale or unprotected opportunities.
+- Fresh-only forecasting allocates every queued job's full time-limit window
+  in a temporary timeline. It is a conservative scenario estimate, rather
+  than a replay of future scheduling passes, and is not a worst-case bound.
+- Cache-first status reporting reuses live starts and forecasts missing starts.
+  Cache-only requests skip forecasting; starts before current time are refreshed.
+- Side simulation replays completion events and backfill decisions using
+  estimated durations. Prediction must not know future actual runtimes or
+  unsubmitted jobs; actual durations establish only observed history and the
+  reference execution.
+
+Event-driven hybrid (R=32/Q=64), 2,000 jobs, with actual runtimes having a
+median of about 29% of time limits:
+
+| Method | Coverage | µs per prediction | Common MAE (min) | Own MAE (min) |
+| --- | ---: | ---: | ---: | ---: |
+| Cached lookup | 6.13% | 0.138 | 106.73 | 106.73 |
+| Fresh-only forecast | 100% | 0.258 | 155.88 | 547.40 |
+| Cache-first extension | 100% | 0.271 | 112.36 | 544.74 |
+| Side simulation, time-limit estimates | 100% | 8.754 | 155.88 | 647.25 |
+
+When execution durations equal time limits:
+
+| Method | Coverage | µs per prediction | Common MAE (min) | Own MAE (min) |
+| --- | ---: | ---: | ---: | ---: |
+| Cached lookup | 1.58% | 0.420 | 49.34 | 49.34 |
+| Fresh-only forecast | 100% | 0.236 | 0.28 | 112.39 |
+| Cache-first extension | 100% | 0.254 | 44.04 | 113.08 |
+| Side simulation, time-limit estimates | 100% | 6.237 | 0 | 0.003 |
+
+Cost is summed mean query time divided by finite returned predictions.
+Common MAE uses jobs predicted by all four methods at the same checkpoints;
+own MAE uses each method's predicted set. Actual-duration results have 573
+common observations and 9,348 full-coverage observations; the control has 202
+and 12,768 respectively. Unknown starts are excluded from both error measures.
+
+Side simulation uses estimated unfinished durations and completion events; its
+query cost includes preparing the input and an additional checkpoint clone.
+Future submissions remain unknown in both conditions.
+
+### Choosing computation cost
+
+With uncertain durations, cache-first is a reasonable inexpensive default.
+Here, side simulation costs about 32× more per prediction and has higher
+own-set error. With accurate durations, replay is substantially more accurate.
+Use it when duration estimates are reliable or scheduler-policy fidelity matters.
+These results establish neither a worst-case bound nor an accuracy threshold
+for choosing replay.
+
+See `validation/performance/estimated-starts/prediction-evaluation/COMPARISON.md`
+for interpretation, `cache-first/NORMALIZED_RESULTS.md` for all ten
+configurations, and `README.md` in that directory for reproduction.
+
 ## On-demand status behavior
 
-`Simulation::get_job_statuses(job_ids, estimation_depth)` builds a temporary
-reservation-aware capacity projection. A pending result carries a start time
+`Simulation::get_job_statuses(job_ids, estimation_depth, use_cached_predictions)`
+reuses live cached starts by default and fills gaps with a temporary
+reservation-aware capacity projection. Cached starts before current time are
+recomputed; other cached values can remain stale between periodic ticks.
+Requests satisfied by the cache skip forecasting. For mixed requests, the
+forecast stops after the last missing requested job, while still accounting
+for earlier queue entries. Compatible cached protected placements reuse their
+full-duration windows; unprotected point-fit opportunities are not blindly
+carved from the fallback timeline because their full windows can overlap.
+Setting `use_cached_predictions=false` selects the original entirely fresh
+conservative forecast. The fallback does not replay future backfill decisions.
+
+A pending result carries a start time
 and a `reserved` or `estimated` kind: EASY's blocked in-horizon head, the
 in-horizon hybrid reservation-depth prefix, and in-horizon conservative
 blocked jobs are reported as `reserved`; other pending starts are estimates
@@ -309,7 +382,7 @@ The APIs have distinct cost and purpose:
 | --- | --- | --- |
 | `get_fcfs_head_shadow_time()` | Core scheduler head-reservation state | Existing scheduler state |
 | `get_backfill_window()` | Core FCFS/EASY capacity and release snapshot | On-demand snapshot |
-| `get_planned_job_starts()` | Cached live-planner starts, following the squeue reporting model | Pending-job enumeration and cached lookup/sort; no forecasting |
+| `get_estimated_job_starts()` | Cached live-planner starts, following the squeue reporting model | Pending-job enumeration and cached lookup/sort; no forecasting |
 | `get_job_statuses()` | Common cheap per-job start-time reporting for EASY, hybrid, and conservative | Profile sweep over selected queue prefix |
 | `get_queue_drain_start_times(utilization, estimation_depth)` | Fast per-job resource-area start approximation | Resource-area sweep over selected queue prefix |
 | `get_prediction_horizon(utilization)` | Aggregate experimental queue-drain horizon | Resource-area event sweep |

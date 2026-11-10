@@ -354,16 +354,16 @@ public:
   };
 
   /** A pending job's prediction retained from a live scheduling pass. */
-  struct Planned_Job_Start {
+  struct Estimated_Job_Start {
     job_no_t job_idx;
     std::optional<sim_time_t> expected_start_time;
     Start_Time_Kind start_time_kind = Start_Time_Kind::NONE;
   };
 
   /** Latest live planning timestamp and currently eligible pending jobs. */
-  struct Planned_Job_Starts {
-    std::optional<sim_time_t> planned_at;
-    std::vector<Planned_Job_Start> jobs;
+  struct Estimated_Job_Starts {
+    std::optional<sim_time_t> estimated_at;
+    std::vector<Estimated_Job_Start> jobs;
   };
 
   /**
@@ -372,13 +372,14 @@ public:
    * already computed by the scheduler are returned; unexamined jobs have no
    * time. Out-of-horizon estimates can be present without protection. Jobs
    * are sorted by expected start, with unknown starts last in queue order.
-   * Future arrivals and started jobs are excluded. planned_at identifies the
+   * Future arrivals and started jobs are excluded. estimated_at identifies the
    * last planning pass, which may precede current_time with periodic backfill.
    * A restored checkpoint has no cached plan until scheduling runs again.
-   * Query cost is O(Q + P + Q log Q), for Q eligible pending jobs and P cached
-   * projections. No prediction fields are added to waiting-queue entries.
+   * Query cost is O(N + P + K log K), for N waiting-queue entries, P cached
+   * projections, and K eligible known starts. Unknowns retain queue order
+   * without sorting. No prediction fields are added to waiting-queue entries.
    */
-  Planned_Job_Starts get_planned_job_starts() const;
+  Estimated_Job_Starts get_estimated_job_starts() const;
 
   /** Completion state of one synchronous exact-lookahead request. */
   enum class Exact_Start_Outcome {
@@ -396,7 +397,10 @@ public:
 
   /**
    * @brief Query selected appended jobs, or enumerate a waiting-queue prefix.
-   * @details Pending jobs receive an on-demand reservation-aware start time.
+   * @details Pending jobs reuse cached live-planner starts by default. Missing
+   * starts receive an on-demand reservation-aware forecast. Cached predictions
+   * before current_time are not reused; other predictions can be stale between
+   * periodic passes. Cache-only requests skip resource forecasting entirely.
    * The temporary capacity profile begins with current capacity and
    * running-job releases. It then retains the in-horizon reservations selected
    * by the configured EASY, HYBRID, or CONSERVATIVE policy. A protected job is
@@ -409,7 +413,7 @@ public:
    * arrivals are not considered. Scheduled jobs
    * return their actual simulated start and end timestamps. Results preserve
    * request order and duplicate IDs. Cost is linear in the number of running
-   * plus pending jobs per pending job; nothing is cached. The forecast uses
+   * plus pending jobs per forecasted pending job. The fallback uses
    * half-open resource intervals and unrounded pending limits, whereas live
    * backfill uses a strict completion-before-reservation test and may round
    * planned releases to planning_time_resolution; use exact lookahead when
@@ -421,6 +425,8 @@ public:
    * queue order, to receive a pending start-time result. Zero (the default)
    * covers the complete waiting queue. This affects query work and returned
    * pending timing only; it never changes scheduler configuration or state.
+   * @param[in] use_cached_predictions Reuse live starts and forecast gaps when
+   * true (default). False requests the original entirely fresh serial forecast.
    * @return One Job_Status per requested identifier, in request order; with an
    * empty job_idxs vector, one pending status per returned queue entry.
    * @throws std::out_of_range if an ID was not returned by append_job(s).
@@ -428,6 +434,12 @@ public:
   std::vector<Job_Status>
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
                    size_t estimation_depth = 0) const;
+
+  /** Query with explicit cache reuse; false selects the fresh forecast. */
+  std::vector<Job_Status>
+  get_job_statuses(const std::vector<job_no_t> &job_idxs,
+                   size_t estimation_depth,
+                   bool use_cached_predictions) const;
 
 #if defined(DR_EVT_HAS_SER20)
   /**
@@ -476,12 +488,14 @@ protected:
    * @tparam GroupEvents Whether to group predicted events.
    * @param[in] job_idxs Requested job identifiers, or empty to enumerate.
    * @param[in] estimation_depth Maximum pending-job prefix; zero is unlimited.
+   * @param[in] use_cached_predictions Reuse live start predictions first.
    * @return Job statuses following the selected forecast rule.
    */
   template <bool GroupEvents>
   std::vector<Job_Status>
   get_job_statuses_impl(const std::vector<job_no_t> &job_idxs,
-                        size_t estimation_depth) const;
+                        size_t estimation_depth,
+                        bool use_cached_predictions) const;
 
   /**
    * @brief Estimate queue drain with a compile-time-selected forecast rule.

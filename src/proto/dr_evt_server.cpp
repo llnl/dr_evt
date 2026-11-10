@@ -410,12 +410,12 @@ public:
           }
           break;
         }
-        case ClientMessage::kGetPlannedJobStarts: {
+        case ClientMessage::kGetEstimatedJobStarts: {
           require_init(sim);
-          const auto predictions = sim->get_planned_job_starts();
-          auto *out = resp.mutable_get_planned_job_starts();
-          if (predictions.planned_at) {
-            out->set_planned_at(*predictions.planned_at);
+          const auto predictions = sim->get_estimated_job_starts();
+          auto *out = resp.mutable_get_estimated_job_starts();
+          if (predictions.estimated_at) {
+            out->set_estimated_at(*predictions.estimated_at);
           }
           for (const auto &prediction : predictions.jobs) {
             auto *job = out->add_jobs();
@@ -438,7 +438,9 @@ public:
           }
           auto *out = resp.mutable_get_job_statuses();
           for (const auto &status : sim->get_job_statuses(
-                   job_idxs, req.get_job_statuses().estimation_depth())) {
+                   job_idxs, req.get_job_statuses().estimation_depth(),
+                   !req.get_job_statuses().has_use_cached_predictions() ||
+                       req.get_job_statuses().use_cached_predictions())) {
             auto *job = out->add_jobs();
             job->set_job_idx(status.job_idx);
             using State = dr_evt::Simulation::Job_State;

@@ -516,7 +516,7 @@ bool test_warm_start(const std::string &server_address,
   return true;
 }
 
-bool test_planned_job_starts(const std::string &server_address,
+bool test_estimated_job_starts(const std::string &server_address,
                              const std::string &trace_file) {
   SimulationClient client(
       grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
@@ -532,17 +532,17 @@ bool test_planned_job_starts(const std::string &server_address,
     }
     const auto ids = client.call(batch).append_jobs();
     ClientMessage query;
-    query.mutable_get_planned_job_starts();
-    const auto initial = client.call(query).get_planned_job_starts();
-    assert(!initial.has_planned_at() && initial.jobs_size() == 3);
+    query.mutable_get_estimated_job_starts();
+    const auto initial = client.call(query).get_estimated_job_starts();
+    assert(!initial.has_estimated_at() && initial.jobs_size() == 3);
     for (const auto &job : initial.jobs()) {
       assert(!job.has_expected_start_time());
     }
     ClientMessage advance;
     advance.mutable_advance_to()->set_target_time(0);
     client.call(advance);
-    const auto cached = client.call(query).get_planned_job_starts();
-    assert(cached.has_planned_at() && cached.planned_at() == 0);
+    const auto cached = client.call(query).get_estimated_job_starts();
+    assert(cached.has_estimated_at() && cached.estimated_at() == 0);
     assert(cached.jobs_size() == 2);
     assert(cached.jobs(0).job_idx() == ids.job_idx(1));
     assert(cached.jobs(0).expected_start_time() == 100);
@@ -553,11 +553,11 @@ bool test_planned_job_starts(const std::string &server_address,
     ClientMessage fresh;
     fresh.mutable_get_job_statuses()->add_job_idx(ids.job_idx(2));
     assert(client.call(fresh).get_job_statuses().jobs(0).expected_start_time() == 110);
-    assert(!client.call(query).get_planned_job_starts().jobs(1).has_expected_start_time());
+    assert(!client.call(query).get_estimated_job_starts().jobs(1).has_expected_start_time());
     assert(client.finish().ok());
     return true;
   } catch (const std::exception &error) {
-    std::cerr << "Cached planned-start test failed: " << error.what() << '\n';
+    std::cerr << "Cached estimated-start test failed: " << error.what() << '\n';
     client.finish();
     return false;
   }
@@ -582,7 +582,7 @@ int main(int argc, char **argv) {
   bool ok = true;
   ok &= test_single_append(server_address, trace_file);
   ok &= test_batch_append(server_address, trace_file);
-  ok &= test_planned_job_starts(server_address, trace_file);
+  ok &= test_estimated_job_starts(server_address, trace_file);
   ok &= test_backfill_window(server_address, trace_file);
   ok &= test_warm_start(server_address, warm_trace);
 

@@ -73,7 +73,7 @@ std::vector<job_no_t> FCFSHybridCircularScheduler::schedule_with_protection(
       m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
       current_time, projected_starts);
 
-  record_planned_start(m_wait_queue.front().job_id,
+  record_estimated_start(m_wait_queue.front().job_id,
                        m_fcfs_reservation_time, false);
   if (available_nodes == 0) {
     return jobs_to_run;
@@ -133,7 +133,7 @@ std::vector<job_no_t> FCFSHybridCircularScheduler::schedule_with_protection(
       return;
     }
     ++protected_count;
-    record_planned_start(protected_job.job_id, *reservation, true);
+    record_estimated_start(protected_job.job_id, *reservation, true);
     protected_plan.reserve(
         *reservation, protected_job.nodes_requested,
         release_estimate(*reservation, protected_job.run_time_estimate));
@@ -153,7 +153,7 @@ std::vector<job_no_t> FCFSHybridCircularScheduler::schedule_with_protection(
     if (!in_horizon && !horizon_job_uses_slot) {
       if (m_backfill_queue_depth == 0 ||
           m_backfill_depth_examined < m_backfill_queue_depth) {
-        record_planned_start(job.job_id, job_reservation, false);
+        record_estimated_start(job.job_id, job_reservation, false);
       }
       continue;
     }
@@ -162,7 +162,7 @@ std::vector<job_no_t> FCFSHybridCircularScheduler::schedule_with_protection(
       break;
     }
     ++m_backfill_depth_examined;
-    record_planned_start(job.job_id, job_reservation, false);
+    record_estimated_start(job.job_id, job_reservation, false);
     if (!in_horizon) {
       continue; // Counted, but it holds no reservation and cannot backfill.
     }

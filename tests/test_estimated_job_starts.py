@@ -6,7 +6,28 @@ import unittest
 import dr_evt
 
 
-class PlannedStartsTests(unittest.TestCase):
+class EstimatedStartsTests(unittest.TestCase):
+    def test_status_cache_reuse_can_be_disabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace = pathlib.Path(directory) / "empty.csv"
+            trace.write_text("job_submit_time,num_nodes,time_limit\n")
+            params = dr_evt.SimParams()
+            params.infile = str(trace)
+            params.total_nodes = 4
+            params.run_time_mode = dr_evt.RunTimeMode.LIMIT
+            params.backfill_policy = dr_evt.BackfillPolicy.HYBRID
+            params.reservation_depth = 1
+            sim = dr_evt.Simulation(params)
+            sim.initialize_trace(0)
+            queue = "pbatch" if dr_evt.legacy_queue_input else "1"
+            sim.append_job(0, 3, queue, 100)
+            sim.append_job(0, 4, queue, 10)
+            later = sim.append_job(0, 4, queue, 10)
+            sim.advance_to(0)
+            self.assertEqual(sim.get_job_statuses([later])[0].expected_start_time, 100)
+            self.assertEqual(sim.get_job_statuses(
+                [later], use_cached_predictions=False)[0].expected_start_time, 110)
+
     def test_cached_predictions_do_not_trigger_planning(self):
         with tempfile.TemporaryDirectory() as directory:
             trace = pathlib.Path(directory) / "empty.csv"
@@ -21,18 +42,18 @@ class PlannedStartsTests(unittest.TestCase):
             sim.append_job(0, 3, queue, 100)
             head = sim.append_job(0, 4, queue, 10)
             later = sim.append_job(0, 4, queue, 10)
-            initial = sim.get_planned_job_starts()
-            self.assertIsNone(initial.planned_at)
+            initial = sim.get_estimated_job_starts()
+            self.assertIsNone(initial.estimated_at)
             self.assertTrue(all(job.expected_start_time is None for job in initial.jobs))
             sim.advance_to(0)
-            cached = sim.get_planned_job_starts()
-            self.assertEqual(cached.planned_at, 0)
+            cached = sim.get_estimated_job_starts()
+            self.assertEqual(cached.estimated_at, 0)
             self.assertEqual([job.job_idx for job in cached.jobs], [head, later])
             self.assertEqual(cached.jobs[0].expected_start_time, 100)
             self.assertEqual(cached.jobs[0].start_time_kind, dr_evt.StartTimeKind.RESERVED)
             self.assertIsNone(cached.jobs[1].expected_start_time)
             self.assertEqual(sim.get_job_statuses([later])[0].expected_start_time, 110)
-            self.assertIsNone(sim.get_planned_job_starts().jobs[1].expected_start_time)
+            self.assertIsNone(sim.get_estimated_job_starts().jobs[1].expected_start_time)
             self.assertEqual(sim.get_current_time(), 0)
 
 

@@ -3,7 +3,7 @@ from pathlib import Path
 root=Path('/private/tmp/dr_evt-plan-profile-20261109')
 trace='/Users/yeom2/work/dr_evt/tests/test_traces/scale/huge_10000jobs.csv'
 versions={'baseline':root/'before-build','original':root/'after-original','inline':root/'after-build'}
-report={'change':'Force-inline record_planned_start(); no behavior or layout changes','repetitions_per_process':50,'runs_per_version':5,'cases':[],'libraries':{k:hashlib.sha256((v/'libdr_evt.dylib').read_bytes()).hexdigest() for k,v in versions.items()}}
+report={'change':'Force-inline record_estimated_start(); no behavior or layout changes','repetitions_per_process':50,'runs_per_version':5,'cases':[],'libraries':{k:hashlib.sha256((v/'libdr_evt.dylib').read_bytes()).hexdigest() for k,v in versions.items()}}
 for policy in ('easy','hybrid'):
  case={'policy':policy,'runs':[]}
  for n in range(6):

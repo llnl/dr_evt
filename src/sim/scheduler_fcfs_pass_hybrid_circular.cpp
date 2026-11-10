@@ -120,7 +120,7 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
             release_estimate(*at, job.run_time_estimate);
         plan.reserve(*at, job.nodes_requested, reserved_duration);
         reservations.emplace_back(job.job_id, *at, reserved_duration);
-        record_planned_start(job.job_id, *at, true);
+        record_estimated_start(job.job_id, *at, true);
         if (reservations.size() == 1) {
           m_fcfs_reservation_time = *at;
         }
