@@ -51,7 +51,7 @@ delayed by backfilling.
 ### Experimental external selection
 
 The C++ and Python APIs can opt into a circular-buffer EASY scheduler that
-separates feasibility from selection. Construct `Simulation` with a candidate
+separates feasibility from selection. Construct [`Simulation`][cpp-simulation] with a candidate
 limit, a job-cost function, and a selection function:
 
 ```cpp
@@ -76,7 +76,7 @@ Simulation sim(params, cost_from_job_order, select_lowest_cost);
 ```
 
 The cost function runs when each job enters the wait queue and its result is
-stored as `JobEntry::m_cost`. When the FCFS head is blocked, the scheduler
+stored as [`JobEntry::m_cost`][cpp-fcfseasycustomscheduler-jobentry]. When the FCFS head is blocked, the scheduler
 collects up to the configured number of feasible candidates in FCFS order and
 passes their `(job_id, cost)` pairs to the selector. Returning an ID not in the
 offered vector is an error. Returning `std::nullopt` skips backfilling for that
@@ -172,3 +172,6 @@ result; see [Wait Queues](dev/WAIT_QUEUES.md).
 Production scheduler sources and option mappings are in
 [Scheduling Loops](user-guide/SCHEDULER_LOOPS.md#sources); accounting and modeling
 limitations are in [Realism and Known Gaps](user-guide/REALISM_AND_GAPS.md).
+
+[cpp-fcfseasycustomscheduler-jobentry]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt23FCFSEasyCustomScheduler8JobEntryE
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE

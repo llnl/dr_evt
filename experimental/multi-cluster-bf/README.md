@@ -5,8 +5,8 @@ wait queue shared by K systems (or resource partitions) of possibly unequal
 capacity. A job is bound to a system only when it starts. Resource matching,
 the head reservation (shadow time), and backfilling are evaluated across the
 whole set. The scheduler lives entirely in this directory; the only change
-to `src/sim` is one virtual with a default, `SchedulerBase::can_ever_run()`,
-consulted by `Simulation::submit_job()` so that a partitioning scheduler can
+to `src/sim` is one virtual with a default, [`SchedulerBase::can_ever_run()`][cpp-schedulerbase-can-ever-run],
+consulted by [`Simulation::submit_job()`][cpp-simulation-submit-job] so that a partitioning scheduler can
 decline requests no partition can hold.
 
 Status (2026-11-09): implemented for homogeneous node types and unequal
@@ -18,7 +18,7 @@ systems".
 This is not the dispatcher in `../multi-cluster`. That program binds each
 job to one system at submission (`choose_system`,
 `mpi_performance_dispatch.cpp:803-943`) and then runs one independent
-single-system EASY `Simulation` per system. Here there is one queue, one
+single-system EASY [`Simulation`][cpp-simulation] per system. Here there is one queue, one
 scheduler, and late binding. The systems-table format of that experiment
 (`#machine,size,GPU`) is accepted for configuration; the GPU column is
 ignored.
@@ -114,12 +114,12 @@ identical placements from the two implementations.
 - **Infeasible projection.** The experimental resource model returns
   `+inf` when the head cannot fit on a system. The current core reservation
   helper likewise signals an impossible fit with its maximum-time sentinel.
-- **Jobs larger than every system.** The core `Simulation` rejects jobs
+- **Jobs larger than every system.** The core [`Simulation`][cpp-simulation] rejects jobs
   larger than `total_nodes`, which here is the sum of all systems. For a
   job larger than the largest system but within that sum, the scheduler
-  answers `can_ever_run()` with false and the core takes the same rejection
+  answers [`can_ever_run()`][cpp-schedulerbase-can-ever-run] with false and the core takes the same rejection
   path: the job is logged, excluded from the output, and the run continues.
-  This hook, `SchedulerBase::can_ever_run()` with a default of true, is the
+  This hook, [`SchedulerBase::can_ever_run()`][cpp-schedulerbase-can-ever-run] with a default of true, is the
   one addition to `src/sim` made for this experiment.
 - **Same-instant events.** The core processes every END at a timestamp
   before it schedules. Nothing changes here.
@@ -140,15 +140,15 @@ identical placements from the two implementations.
 
 ![Driver, core, and scheduler](../../docs/_static/multi-cluster-bf-architecture.svg)
 
-The core `Simulation` sees one pool of `sum_k C_k` nodes. The scheduler
+The core [`Simulation`][cpp-simulation] sees one pool of `sum_k C_k` nodes. The scheduler
 enforces the partition internally:
 
-- `MultiSystemBackfillScheduler` derives from `FCFSEasyCustomScheduler` only so
+- [`MultiSystemBackfillScheduler`][cpp-experimental-multisystembackfillscheduler] derives from [`FCFSEasyCustomScheduler`][cpp-fcfseasycustomscheduler] only so
   that it can be injected through the existing constructor
-  `BasicSimulation(Sim_Params, std::unique_ptr<FCFSEasyCustomScheduler>)`
+  [`BasicSimulation(Sim_Params, std::unique_ptr<FCFSEasyCustomScheduler>)`][cpp-subclass-constructor]
   (`src/sim/sim.hpp:167`). It overrides every virtual of the scheduler
   interface and keeps its own deque wait queue, modelled on
-  `FCFSHybridDequeScheduler`. The inherited circular buffer and resource
+  [`FCFSHybridDequeScheduler`][cpp-fcfshybriddequescheduler]. The inherited circular buffer and resource
   accounting stay unused; the core's calls into them are harmless.
 - It records `job -> (system, demand)` for every job it starts. On each
   pass it rebuilds per-system usage and projected releases by walking the
@@ -156,17 +156,17 @@ enforces the partition internally:
   single-system projection already does. If the total it derives disagrees
   with the `free_nodes` the core passes in, it throws.
 - It sets `m_fcfs_reservation_time = T*`, so
-  `Simulation::get_fcfs_head_shadow_time()` and `get_backfill_window()`
-  keep their meaning, and exposes `reserved_system()` and `shadow_times()`.
+  [`Simulation::get_fcfs_head_shadow_time()`][cpp-simulation-get-fcfs-head-shadow-time] and [`get_backfill_window()`][cpp-simulation-get-backfill-window]
+  keep their meaning, and exposes [`reserved_system()`][cpp-experimental-multisystembackfillscheduler-reserved-system] and [`shadow_times()`][cpp-experimental-multisystembackfillscheduler-shadow-times].
 
 ### The resource-model seam
 
 ![One scheduling pass](../../docs/_static/multi-cluster-bf-pass.svg)
 
-`CountResourceModel` is the only class that knows resources are integers.
-The scheduler asks it six questions per system and job: `admissible`,
-`demand`, `fits_now`, `leftover` (for best and worst fit), `earliest_fit`
-(the projection, returning `+inf` when impossible), and `allocate`. A
+[`CountResourceModel`][cpp-experimental-countresourcemodel] is the only class that knows resources are integers.
+The scheduler asks it six questions per system and job: [`admissible`][cpp-experimental-countresourcemodel-admissible],
+[`demand`][cpp-experimental-countresourcemodel-demand], [`fits_now`][cpp-experimental-countresourcemodel-fits-now], [`leftover`][cpp-experimental-countresourcemodel-leftover] (for best and worst fit), [`earliest_fit`][cpp-experimental-countresourcemodel-earliest-fit]
+(the projection, returning `+inf` when impossible), and [`allocate`][cpp-experimental-countresourcemodel-allocate]. A
 heterogeneous model answers the same questions with vector capacities and
 system-dependent demands; the policy code does not change. The Python
 reference has the same split (`CountResourceModel` and
@@ -176,7 +176,7 @@ reference has the same split (`CountResourceModel` and
 
 | File | Role |
 |---|---|
-| `multi_system_backfill_scheduler.hpp/.cpp` | `CountResourceModel`, `MultiSystemBackfillScheduler`, systems-table parsing |
+| `multi_system_backfill_scheduler.hpp/.cpp` | [`CountResourceModel`][cpp-experimental-countresourcemodel], [`MultiSystemBackfillScheduler`][cpp-experimental-multisystembackfillscheduler], systems-table parsing |
 | `multi_system_backfill_sim.cpp` | driver binary `multi_system_backfill_sim` |
 | `python_multi_system_reference.py` | independent Python reference; shares no code with `scripts/python_reference_scheduler.py` |
 | `machines.csv` | example systems table |
@@ -270,5 +270,24 @@ reference, and tests carry over. What changes:
   stored on the job record so END releases what START took and the output
   names the system, the run time above, an end notification to the
   scheduler, and statistics asking the scheduler's model for usage. The
-  admission predicate, `can_ever_run()`, is already in place. These are
+  admission predicate, [`can_ever_run()`][cpp-schedulerbase-can-ever-run], is already in place. These are
   hooks with defaults, not an array in the core.
+
+[cpp-experimental-countresourcemodel]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt12experimental18CountResourceModelE
+[cpp-experimental-countresourcemodel-admissible]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental18CountResourceModel10admissibleE11system_id_t11num_nodes_t
+[cpp-experimental-countresourcemodel-allocate]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt12experimental18CountResourceModel8allocateE11system_id_t11num_nodes_t
+[cpp-experimental-countresourcemodel-demand]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental18CountResourceModel6demandE11system_id_t11num_nodes_t
+[cpp-experimental-countresourcemodel-earliest-fit]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental18CountResourceModel12earliest_fitE11system_id_t11num_nodes_tRNSt6vectorI9release_tEE10sim_time_t
+[cpp-experimental-countresourcemodel-fits-now]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental18CountResourceModel8fits_nowE11system_id_t11num_nodes_t
+[cpp-experimental-countresourcemodel-leftover]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental18CountResourceModel8leftoverE11system_id_t11num_nodes_t
+[cpp-experimental-multisystembackfillscheduler]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt12experimental28MultiSystemBackfillSchedulerE
+[cpp-experimental-multisystembackfillscheduler-reserved-system]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental28MultiSystemBackfillScheduler15reserved_systemEv
+[cpp-experimental-multisystembackfillscheduler-shadow-times]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt12experimental28MultiSystemBackfillScheduler12shadow_timesEv
+[cpp-fcfseasycustomscheduler]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt23FCFSEasyCustomSchedulerE
+[cpp-fcfshybriddequescheduler]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt24FCFSHybridDequeSchedulerE
+[cpp-schedulerbase-can-ever-run]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4NK6dr_evt13SchedulerBase12can_ever_runE11num_nodes_t
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE
+[cpp-simulation-get-backfill-window]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation19get_backfill_windowEv
+[cpp-simulation-get-fcfs-head-shadow-time]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation25get_fcfs_head_shadow_timeEv
+[cpp-simulation-submit-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10submit_jobE8job_no_t10sim_time_t10sim_time_t
+[cpp-subclass-constructor]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15BasicSimulationE10Sim_ParamsNSt10unique_ptrI23FCFSEasyCustomSchedulerEE

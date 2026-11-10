@@ -17,7 +17,8 @@ INPUT                  = src/ \
                          src/sim/ \
                          src/trace/ \
                          src/utils/ \
-                         python/dr_evt_bindings.cpp
+                         python/dr_evt_bindings.cpp \
+                         experimental/multi-cluster-bf/multi_system_backfill_scheduler.hpp
 FILE_PATTERNS          = *.hpp *.cpp *.tpp *.md
 EXTENSION_MAPPING      = tpp=C++
 INCLUDE_PATH           = src/

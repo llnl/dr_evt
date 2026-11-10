@@ -130,7 +130,7 @@ the wire fields.
 The gRPC request and response are documented in
 [GetStartTimesByEstCachesRequest / GetStartTimesByEstCachesResponse](../CLIENT_SERVER_GUIDE.md#cached-start-estimates).
 
-Returns `Estimated_Job_Starts` containing:
+Returns [`Estimated_Job_Starts`][cpp-simulation-estimated-job-starts] containing:
 
 - `estimated_at`: the last planning timestamp; absent before planning and
   immediately after checkpoint restore.
@@ -292,7 +292,7 @@ returns the current FCFS head's projected start, or -1 when no head waits or
 no projected capacity change lets it start.
 
 [get_backfill_window()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation19get_backfill_windowEv)
-returns `Backfill_Window`: current time, available nodes, head shadow time,
+returns [`Backfill_Window`][cpp-simulation-backfill-window]: current time, available nodes, head shadow time,
 and ordered running-job release events. Releases use requested-limit
 estimates; the head projection also accounts for scheduled capacity changes.
 These snapshots expose planning inputs rather than forecasting the whole queue.
@@ -414,3 +414,6 @@ for choosing replay.
 See [full results for all ten configurations](https://github.com/LLNL/dr_evt/blob/main/validation/performance/estimated-starts/prediction-evaluation/cache-first/NORMALIZED_RESULTS.md),
 [the concise comparison](https://github.com/LLNL/dr_evt/blob/main/validation/performance/estimated-starts/prediction-evaluation/COMPARISON.md),
 and [reproduction instructions](https://github.com/LLNL/dr_evt/blob/main/validation/performance/estimated-starts/prediction-evaluation/README.md).
+
+[cpp-simulation-backfill-window]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation15Backfill_WindowE
+[cpp-simulation-estimated-job-starts]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation20Estimated_Job_StartsE

@@ -33,5 +33,10 @@ Important decisions worth preserving in the repository:
 
 How batch, progressive, and live inputs move through the job store, scheduler,
 event loop, resource accounting, and output. This is the companion explanation
-for the Doxygen comments on `append_job`, `submit_job`, and the two
-`insert_job` methods.
+for the Doxygen comments on [`append_job`][cpp-simulation-append-job], [`submit_job`][cpp-simulation-submit-job], and
+[`SchedulerBase::insert_job()`][cpp-schedulerbase-insert-job] / [`Trace::insert_job()`][cpp-trace-insert-job].
+
+[cpp-schedulerbase-insert-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv4N6dr_evt13SchedulerBase10insert_jobE8job_no_t10sim_time_t7tdiff_t11num_nodes_t
+[cpp-simulation-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10append_jobE10sim_time_t11num_nodes_tRKNSt6stringE7tdiff_tNSt8optionalI7tdiff_tEE
+[cpp-simulation-submit-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10submit_jobE8job_no_t10sim_time_t10sim_time_t
+[cpp-trace-insert-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace10insert_jobE8job_no_t10sim_time_t

@@ -22,12 +22,12 @@ The command-line simulator chooses between these already-specialized concrete
 simulation types once at startup. The trace-type choice is therefore not made
 for each job.
 
-The standard trace continues to store `Job_Record` directly. It does not add a
+The standard trace continues to store [`Job_Record`][cpp-job-record] directly. It does not add a
 power-usage pointer, vector, variant, optional field, discriminator, or other
 power-usage-specific per-job storage.
 
-The power-usage trace instead stores `Pcon_Job_Record`, which derives from
-`Job_Record` and carries three power-usage values inline:
+The power-usage trace instead stores [`Pcon_Job_Record`][cpp-pcon-job-record], which derives from
+[`Job_Record`][cpp-job-record] and carries three power-usage values inline:
 
 ```text
 avgpcon
@@ -69,5 +69,8 @@ time,free_nodes,allocated_nodes,avgpcon,minpcon,maxpcon
 ```
 
 Selecting the standard trace type does not add power-usage fields to
-`Job_Record` or to the standard resource-history sample, and introduces no per-job
+[`Job_Record`][cpp-job-record] or to the standard resource-history sample, and introduces no per-job
 experimental allocation or dynamic container.
+
+[cpp-job-record]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/job-store.html#_CPPv4N6dr_evt10Job_RecordE
+[cpp-pcon-job-record]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/trace.html#_CPPv4N6dr_evt15Pcon_Job_RecordE

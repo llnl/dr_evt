@@ -38,7 +38,7 @@ A complete runnable example is
 
 For experimental external backfill selection, set
 `params.num_max_candidates`, then call
-`Simulation(params, job_cost_function, backfill_selector)`. The cost callback
+[`Simulation(params, job_cost_function, backfill_selector)`][cpp-simulation-simulation]. The cost callback
 receives `(job_id, submit_time, runtime_estimate, nodes_requested)`. The
 selector receives a list of `(job_id, cost)` pairs and returns one offered ID
 or `None`.
@@ -59,8 +59,8 @@ or `None`.
 | `sim_start_time` | `float` |
 | `trace_format` | `str` |
 | `timestamp_format` | `str` |
-| `run_time_mode` | `RunTimeMode` |
-| `backfill_policy` | `BackfillPolicy` |
+| `run_time_mode` | [`RunTimeMode`][cpp-runtimemode] |
+| `backfill_policy` | [`BackfillPolicy`][cpp-backfillpolicy] |
 | `num_max_candidates` | `int` |
 | `reservation_depth` | `int` |
 | `backfill_queue_depth` | `int`; waiting jobs examined per backfill pass (0 is unlimited) |
@@ -71,9 +71,9 @@ or `None`.
 | `backfill_interval` | `float`; seconds between periodic backfill passes (0 backfills at every event) |
 | `planning_time_resolution` | `float`; grid planned run times are rounded up to (0 is exact) |
 | `planning_horizon` | `float`; reservation look-ahead of event-driven and periodic backfill (default unlimited) |
-| `priority_policy` | `PriorityPolicy` |
+| `priority_policy` | [`PriorityPolicy`][cpp-prioritypolicy] |
 | `node_release_delay` | `float`; seconds an ended job's nodes stay unavailable (0 disables) |
-| `node_release_delay_model` | `ReleaseDelayModel` |
+| `node_release_delay_model` | [`ReleaseDelayModel`][cpp-releasedelaymodel] |
 | `node_release_delay_spread` | `float`; `UNIFORM` half-width |
 | `verbose` | `bool` |
 
@@ -121,32 +121,35 @@ Their scheduling semantics are documented in
 
 ## Simulation methods
 
+Method links open the corresponding C++ API descriptions; the signatures below
+are Python signatures. `get_trace_size()` is a Python-only convenience wrapper.
+
 | Method | Result |
 |---|---|
-| `run()` | Run a configured batch trace to completion. |
-| `initialize_trace(max_jobs=0)` | Load the configured trace and return the number loaded. |
-| `append_job(submit_time, num_nodes, queue, limit_time, actual_run_time=None)` | Append and enqueue one live job; return its ID. Jobs must be appended in non-decreasing `submit_time` order; the limit must be a positive whole number of seconds; a known runtime must be positive and no greater than the limit. |
-| `append_jobs(requests)` | Atomically append and enqueue ordered `JobAppendRequest` values; return their IDs. |
-| `get_job_statuses(job_idxs)` | Return lifecycle and timing snapshots for appended job IDs. |
-| `get_start_times_by_est_caches()` | Read the latest live-planner predictions and their planning timestamp, without running a forecast. |
-| `advance_to(target_time)` | Process events at or before the target. |
-| `run_until_exclusive(target_time)` | Process events strictly before the target. |
-| `save_checkpoint(filename)` | Save complete simulation state to a same-build binary checkpoint. |
-| `load_checkpoint(filename)` | Replace current state from a compatible checkpoint. |
-| `get_current_time()` | Return current simulation time. |
-| `get_nodes_in_use()` | Return allocated nodes. |
-| `get_current_utilization()` | Return instantaneous usage of effective scheduled capacity. |
-| `get_resource_area()` | Return Custom-FCFS allocated-node area in node-seconds; unavailable for standard schedulers. |
-| `get_available_nodes()` | Return nodes a new job could use now; excludes releasing nodes. |
-| `get_nodes_releasing()` | Return nodes whose job has ended but which are not yet reusable (node release delay). |
-| `get_active_job_count()` | Return waiting jobs. |
-| `get_fcfs_head_shadow_time()` | Return the FCFS-head reservation time, or `-1` when no head waits or no projected release or scheduled capacity change lets it start. |
-| `get_backfill_window()` | Return the current FCFS/EASY reservation snapshot, including all running-job releases. |
-| `estimate_queue_horizon(utilization)` | On demand, estimate the supported FCFS/EASY waiting-queue drain time from the shadow time. |
-| `get_start_times_by_queue_drain(utilization, estimation_depth=0)` | Return queue-order resource-area start approximations; protected reservations are exact, other results are optimistic. |
-| `get_statistics()` | Return a `Statistics` snapshot. |
-| `write_simulated_trace()` | Write the configured job-schedule output. |
-| `print_stats()` | Print summary statistics. |
+| [`run()`][cpp-simulation-run] | Run a configured batch trace to completion. |
+| [`initialize_trace(max_jobs=0)`][cpp-simulation-initialize-trace] | Load the configured trace and return the number loaded. |
+| [`append_job(submit_time, num_nodes, queue, limit_time, actual_run_time=None)`][cpp-simulation-append-job] | Append and enqueue one live job; return its ID. Jobs must be appended in non-decreasing `submit_time` order; the limit must be a positive whole number of seconds; a known runtime must be positive and no greater than the limit. |
+| [`append_jobs(requests)`][cpp-simulation-append-jobs] | Atomically append and enqueue ordered `JobAppendRequest` values; return their IDs. |
+| [`get_job_statuses(job_idxs)`][cpp-simulation-get-job-statuses] | Return lifecycle and timing snapshots for appended job IDs. |
+| [`get_start_times_by_est_caches()`][cpp-simulation-get-start-times-by-est-caches] | Read the latest live-planner predictions and their planning timestamp, without running a forecast. |
+| [`advance_to(target_time)`][cpp-simulation-advance-to] | Process events at or before the target. |
+| [`run_until_exclusive(target_time)`][cpp-simulation-run-until-exclusive] | Process events strictly before the target. |
+| [`save_checkpoint(filename)`][cpp-simulation-save-checkpoint] | Save complete simulation state to a same-build binary checkpoint. |
+| [`load_checkpoint(filename)`][cpp-simulation-load-checkpoint] | Replace current state from a compatible checkpoint. |
+| [`get_current_time()`][cpp-simulation-get-current-time] | Return current simulation time. |
+| [`get_nodes_in_use()`][cpp-simulation-get-nodes-in-use] | Return allocated nodes. |
+| [`get_current_utilization()`][cpp-simulation-get-current-utilization] | Return instantaneous usage of effective scheduled capacity. |
+| [`get_resource_area()`][cpp-simulation-get-resource-area] | Return Custom-FCFS allocated-node area in node-seconds; unavailable for standard schedulers. |
+| [`get_available_nodes()`][cpp-simulation-get-available-nodes] | Return nodes a new job could use now; excludes releasing nodes. |
+| [`get_nodes_releasing()`][cpp-simulation-get-nodes-releasing] | Return nodes whose job has ended but which are not yet reusable (node release delay). |
+| [`get_active_job_count()`][cpp-simulation-get-active-job-count] | Return waiting jobs. |
+| [`get_fcfs_head_shadow_time()`][cpp-simulation-get-fcfs-head-shadow-time] | Return the FCFS-head reservation time, or `-1` when no head waits or no projected release or scheduled capacity change lets it start. |
+| [`get_backfill_window()`][cpp-simulation-get-backfill-window] | Return the current FCFS/EASY reservation snapshot, including all running-job releases. |
+| [`estimate_queue_horizon(utilization)`][cpp-simulation-estimate-queue-horizon] | On demand, estimate the supported FCFS/EASY waiting-queue drain time from the shadow time. |
+| [`get_start_times_by_queue_drain(utilization, estimation_depth=0)`][cpp-simulation-get-start-times-by-queue-drain] | Return queue-order resource-area start approximations; protected reservations are exact, other results are optimistic. |
+| [`get_statistics()`][cpp-simulation-get-statistics] | Return a [`Statistics`][cpp-simulation-statistics] snapshot. |
+| [`write_simulated_trace()`][cpp-simulation-write-simulated-trace] | Write the configured job-schedule output. |
+| [`print_stats()`][cpp-simulation-print-stats] | Print summary statistics. |
 | `get_trace_size()` | Return the number of records currently in the job store. |
 
 Detailed time-advancement and job-submission contracts are defined in the
@@ -158,7 +161,7 @@ modes, progressive loading, and output recovery.
 
 ## Supporting types
 
-`get_start_times_by_est_caches()` returns `EstimatedJobStarts` with optional `estimated_at`
+[`get_start_times_by_est_caches()`][cpp-simulation-get-start-times-by-est-caches] returns `EstimatedJobStarts` with optional `estimated_at`
 and a list of `EstimatedJobStart` values. Each contains `job_idx`, optional
 `expected_start_time`, and `start_time_kind`. Eligible pending jobs are sorted
 by expected start, with unknowns last. Predictions are saved during live
@@ -172,7 +175,7 @@ for job in plan.jobs:
     print(plan.estimated_at, job.job_idx, job.expected_start_time)
 ```
 
-This follows Slurm's `squeue --start` reporting model. `get_job_statuses()`
+This follows Slurm's `squeue --start` reporting model. [`get_job_statuses()`][cpp-simulation-get-job-statuses]
 reuses cached starts by default and forecasts missing starts. See
 {ref}`Public interface behavior <scheduler-public-interface-behavior>`
 for the comparison with Slurm `sbatch --test-only` and exact lookahead.
@@ -182,12 +185,12 @@ actual_run_time=None)` represents one entry passed to `append_jobs()`. A known
 actual runtime lets `RunTimeMode.ACTUAL` complete a streamed job before its
 wall-time limit without any external per-job bookkeeping.
 
-`get_job_statuses()` preserves the requested ID order (including duplicates).
+[`get_job_statuses()`][cpp-simulation-get-job-statuses] preserves the requested ID order (including duplicates).
 It first uses live cached starts within the requested queue depth, retaining
 their `RESERVED` or `ESTIMATED` kind. With default reuse, a cache-only request skips forecasting.
 Cached starts before the current time are recomputed; other cached starts may
 remain stale between periodic passes. Use
-`get_job_statuses(job_idxs, use_cached_predictions=False)` for the
+[`get_job_statuses(job_idxs, use_cached_predictions=False)`][cpp-simulation-get-job-statuses] for the
 forecast without backfill described below (cache reuse disabled).
 Set `use_cached_unprotected_predictions=False` with cache reuse enabled to
 preserve compatible cached reservation windows and forecast unprotected jobs.
@@ -206,7 +209,7 @@ that respects protected reservations. Every projected placement consumes its
 requested time window before the next queue job is placed; estimates are still
 non-binding forecasts based on requested time limits, not start guarantees.
 Pass `estimation_depth` to
-`get_job_statuses()` to limit temporary planning and pending timing to a queue
+[`get_job_statuses()`][cpp-simulation-get-job-statuses] to limit temporary planning and pending timing to a queue
 prefix; zero is the default and considers the complete waiting queue. This
 changes neither the scheduler nor its reservation plan. Running and completed jobs
 have `start_time` and `end_time`; rejected jobs have no timing. The compact
@@ -224,7 +227,7 @@ when duration estimates are reliable or future policy behavior is the focus;
 the benchmark does not establish an accuracy threshold for that choice. See
 {ref}`the measured comparison <choosing-how-much-computation-to-spend>`.
 
-`get_start_times_by_queue_drain(utilization, estimation_depth=0)` is a separate
+[`get_start_times_by_queue_drain(utilization, estimation_depth=0)`][cpp-simulation-get-start-times-by-queue-drain] is a separate
 fast resource-area approximation. It returns queue-order estimates without
 per-job first-fit placement; it is available through C++ and Python, not gRPC.
 
@@ -239,7 +242,7 @@ their original times.
 `shadow_time`, and an ordered list of `ResourceRelease` values. Each release
 contains `time` and `nodes_released`.
 
-`Statistics` exposes:
+[`Statistics`][cpp-simulation-statistics] exposes:
 
 - `jobs_submitted` (jobs accepted into the wait queue), `jobs_started`,
   `jobs_completed`, `jobs_running`, and `jobs_waiting`;
@@ -258,7 +261,7 @@ occupancy after all events and scheduling decisions at each timestamp.
 accounting horizon (the snapshot time while work is running, or the last
 resource event after it becomes idle). During non-preemptive draining,
 effective capacity is at least the running allocation. Unlike
-`get_current_utilization()`, intervals that are far apart therefore carry
+[`get_current_utilization()`][cpp-simulation-get-current-utilization], intervals that are far apart therefore carry
 proportionally more weight. Standard schedulers retain the post-hoc
 scheduled-workload calculation and do not perform live area bookkeeping.
 
@@ -275,3 +278,34 @@ of the Test Suite README. The test implementation is
 [`tests/test_python_api.py`](https://github.com/LLNL/dr_evt/blob/main/tests/test_python_api.py).
 
 </div>
+
+[cpp-backfillpolicy]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv414BackfillPolicy
+[cpp-prioritypolicy]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv414PriorityPolicy
+[cpp-releasedelaymodel]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv417ReleaseDelayModel
+[cpp-runtimemode]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/scheduling-backfill.html#_CPPv411RunTimeMode
+[cpp-simulation-advance-to]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10advance_toE10sim_time_t
+[cpp-simulation-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10append_jobE10sim_time_t11num_nodes_tRKNSt6stringE7tdiff_tNSt8optionalI7tdiff_tEE
+[cpp-simulation-append-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation11append_jobsERKNSt6vectorI18Job_Append_RequestEE
+[cpp-simulation-estimate-queue-horizon]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation22estimate_queue_horizonEd
+[cpp-simulation-get-active-job-count]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation20get_active_job_countEv
+[cpp-simulation-get-available-nodes]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation19get_available_nodesEv
+[cpp-simulation-get-backfill-window]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation19get_backfill_windowEv
+[cpp-simulation-get-current-time]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation16get_current_timeEv
+[cpp-simulation-get-current-utilization]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation23get_current_utilizationEv
+[cpp-simulation-get-fcfs-head-shadow-time]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation25get_fcfs_head_shadow_timeEv
+[cpp-simulation-get-job-statuses]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb
+[cpp-simulation-get-nodes-in-use]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation16get_nodes_in_useEv
+[cpp-simulation-get-nodes-releasing]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation19get_nodes_releasingEv
+[cpp-simulation-get-resource-area]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation17get_resource_areaEv
+[cpp-simulation-get-start-times-by-est-caches]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation29get_start_times_by_est_cachesEv
+[cpp-simulation-get-start-times-by-queue-drain]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation30get_start_times_by_queue_drainEd6size_t
+[cpp-simulation-get-statistics]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation14get_statisticsEv
+[cpp-simulation-initialize-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation16initialize_traceE10num_jobs_t
+[cpp-simulation-load-checkpoint]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15load_checkpointERKNSt6stringE
+[cpp-simulation-print-stats]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation11print_statsERNSt7ostreamE
+[cpp-simulation-run]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation3runEv
+[cpp-simulation-run-until-exclusive]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation19run_until_exclusiveE10sim_time_t
+[cpp-simulation-save-checkpoint]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15save_checkpointERKNSt6stringE
+[cpp-simulation-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15BasicSimulationE10Sim_Params19job_cost_function_t19backfill_selector_t
+[cpp-simulation-statistics]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10StatisticsE
+[cpp-simulation-write-simulated-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation21write_simulated_traceEv

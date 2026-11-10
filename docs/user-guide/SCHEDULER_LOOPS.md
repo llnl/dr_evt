@@ -458,7 +458,7 @@ R is zero for allocation-only behavior, one for EASY, N for hybrid, and
 effectively unlimited for conservative. After R reservations, immediate
 allocation tests can continue within Q: R=32, Q=64 permits another 32 tests.
 Reservations set the dirty bit and can request another pass even without a
-start. However, response/annotation processing can clear `is_scheduled()` before
+start. However, response/annotation processing can clear [`is_scheduled()`][cpp-job-record-is-scheduled] before
 a later matching reply, so an earlier reservation does not guarantee a retry.
 Immediate-allocation `EBUSY` failures count toward Q; allocation-or-reservation
 `EBUSY` failures do not.
@@ -663,7 +663,7 @@ Accounting and policy evidence limits are in
 - **Spur:** inspected source revision `693c0b32bf91a0965a63a263206e6e22a3e5a9e9`:
   `crates/spurctld/src/scheduler_loop.rs` (timer/notification selection,
   classification, trial placement, dispatch; timer selection at lines 232–250),
-  `crates/spurctld/src/cluster.rs` (`submit_job`, `classify_pending_jobs_with`),
+  `crates/spurctld/src/cluster.rs` ([`submit_job`][cpp-simulation-submit-job], `classify_pending_jobs_with`),
   `crates/spur-sched/src/backfill.rs` (`init_timelines`, `schedule_jobs_with`),
   and `crates/spur-core/src/config.rs` (`SchedulerConfig`).
 - **OpenPBS:** inspected source revision `cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a`:
@@ -678,7 +678,7 @@ Accounting and policy evidence limits are in
   and [backfill](https://www.ibm.com/docs/en/SSWRJV_10.1.0/lsf_admin/backfill.html),
   plus the supplied *Backfill scheduling* excerpt, updated 2026-10-26.
 
-- **DR_EVT:** `src/sim/sim.cpp` (`advance_to_impl`),
+- **DR_EVT:** `src/sim/sim.cpp` ([`advance_to_impl`][cpp-simulation-advance-to-impl]),
   `src/sim/scheduler_*.cpp`, and `src/sim/scheduler_base.cpp` on this branch.
 
 References for accounting differences, fallback timing, and evidence limits
@@ -693,3 +693,7 @@ and [NOTICE](https://github.com/flux-framework/flux-core/blob/d0309fcf0e672d90e6
 and [NOTICE](https://github.com/flux-framework/flux-sched/blob/9eba598b4e0940d597695e65f20f5357fc513427/NOTICE.LLNS),
 [Spur LICENSE](https://github.com/ROCm/spur/blob/693c0b32bf91a0965a63a263206e6e22a3e5a9e9/LICENSE),
 and [OpenPBS LICENSE](https://github.com/openpbs/openpbs/blob/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/LICENSE).
+
+[cpp-job-record-is-scheduled]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/job-store.html#_CPPv4NK6dr_evt10Job_Record12is_scheduledEv
+[cpp-simulation-advance-to-impl]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I_b_b_b_b_bEN6dr_evt15BasicSimulation15advance_to_implEv10sim_time_tP23FCFSEasyCustomScheduler
+[cpp-simulation-submit-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10submit_jobE8job_no_t10sim_time_t10sim_time_t

@@ -1,19 +1,19 @@
 # Output-Trace Buffers and Streaming Trace State
 
-`Trace` owns the state required to run a simulation and produce its output
+[`Trace`][cpp-trace] owns the state required to run a simulation and produce its output
 traces. The two potentially unbounded collections—the job-record store and the
 resource-history log—use `boost::circular_buffer`. This keeps their memory
 behavior explicit while allowing a simulation to accept jobs incrementally.
 
-`Simulation` owns a `Trace`; schedulers access job records through `Trace`
+[`Simulation`][cpp-simulation] owns a [`Trace`][cpp-trace]; schedulers access job records through [`Trace`][cpp-trace]
 rather than retaining a pointer to a separate, fixed-layout job vector.
 
 ## The two circular buffers
 
 | Buffer | Contents | When entries can be released | What happens when full |
 | --- | --- | --- | --- |
-| `Trace::m_data` | Job records used for scheduling, statistics, and the simulated-job trace | After the departure event has been processed and the schedule row has been consumed, or immediately for a rejected job | Write and reclaim the eligible front prefix; grow or abort if insertion still lacks space |
-| `Trace::m_resource_history` | Finalized `(time, free_nodes, allocated_nodes)` resource samples | Immediately after the sample is recorded | Flush samples to the resource-trace file or structured Redis output and clear the buffer |
+| [`Trace::m_data`][cpp-trace-m-data] | Job records used for scheduling, statistics, and the simulated-job trace | After the departure event has been processed and the schedule row has been consumed, or immediately for a rejected job | Write and reclaim the eligible front prefix; grow or abort if insertion still lacks space |
+| [`Trace::m_resource_history`][cpp-trace-context-m-resource-history] | Finalized `(time, free_nodes, allocated_nodes)` resource samples | Immediately after the sample is recorded | Flush samples to the resource-trace file or structured Redis output and clear the buffer |
 
 The buffers are independent of the scheduler's circular FCFS wait queue. The
 CSV output files are streamed; they are not circular buffers themselves. See
@@ -23,7 +23,7 @@ defaults.
 ## Job-record storage and stable identifiers
 
 Jobs retain their permanent `job_no` even as completed records are reclaimed
-from the front of `m_data`. `Trace::job_at(job_no)` is the sole translation
+from the front of `m_data`. [`Trace::job_at(job_no)`][cpp-trace-job-at] is the sole translation
 point between that permanent identifier and the buffer's physical position:
 
 ```text
@@ -33,15 +33,15 @@ physical position = job_no - m_num_reclaimed
 This works because job records are reclaimed only from the front and are never
 compacted in the middle. A backfilled job may finish before an earlier job, but
 it remains stored until every preceding record is also reclaimable. Schedulers
-therefore hold a `Trace` reference and use `job_at()` rather than indexing the
+therefore hold a [`Trace`][cpp-trace] reference and use [`job_at()`][cpp-trace-job-at] rather than indexing the
 buffer directly.
 
-Before a record is discarded, `write_job_range()` consumes the eligible range
+Before a record is discarded, [`write_job_range()`][cpp-trace-write-job-range] consumes the eligible range
 for the simulated job trace and accumulates summary statistics through
-`write_job_line()`. A permanent job-number cursor tracks the next row to write
+[`write_job_line()`][cpp-trace-write-job-line]. A permanent job-number cursor tracks the next row to write
 across physical `pop_front()` operations. The same range path is used by
 reclamation and final output, so each scheduled job is written and counted
-exactly once without adding a flag to every `Job_Record`.
+exactly once without adding a flag to every [`Job_Record`][cpp-job-record].
 
 For Redis output, the eligible const-iterator range is passed directly from
 `m_data` to `RedisOutput`. Redis serializes that range in one transaction before
@@ -65,7 +65,7 @@ Reclamation is lazy and batched. It is not attempted after every completion.
 It is triggered by:
 
 - insertion pressure when the job store needs space;
-- an explicit `flush_completed_jobs()` call;
+- an explicit [`flush_completed_jobs()`][cpp-simulation-flush-completed-jobs] call;
 - final output; or
 - `--job_flush_interval` processed departures.
 
@@ -78,7 +78,7 @@ writes the whole completed contiguous front prefix as one output block.
   time-side check is `end_time <= current_time`; a pending event at the boundary
   prevents reclamation.
 - A permanently unschedulable job is marked with
-  `Job_Record::unscheduled_sentinel()` and can be reclaimed without waiting for
+  [`Job_Record::unscheduled_sentinel()`][cpp-job-record-unscheduled-sentinel] and can be reclaimed without waiting for
   an end time that will never exist.
 - Resource samples need no delay. Once written to the resource-history buffer,
   no later simulation step needs to read them, so a full buffer can be flushed
@@ -87,7 +87,7 @@ writes the whole completed contiguous front prefix as one output block.
 For job records, the insertion order is reclaim first, then grow or abort only
 if the required room is still unavailable. This permits a completed job's slot
 to be reused without increasing capacity. The standalone replay tool does not
-enable periodic reclamation because its later `print()`, `print_span()`, and
+enable periodic reclamation because its later [`print()`][cpp-trace-print], [`print_span()`][cpp-trace-print-span], and
 submission-statistics passes still consume the resident records.
 
 ## Loading and streaming jobs
@@ -96,17 +96,17 @@ There are three ways jobs enter `m_data`.
 
 ### Single-file batch loading
 
-`load_data()` reads and sorts the whole input trace before simulation starts.
+[`load_data()`][cpp-trace-load-data] reads and sorts the whole input trace before simulation starts.
 The job store grows to fit the entire file, even if a smaller initial
 `--job_store_capacity` was requested. Consequently, that setting controls the
 initial allocation in single-file mode, not the steady-state memory limit.
 
 ### Streaming API
 
-`Trace::append_job()` and `Simulation::append_job()` add one newly arriving
+[`Trace::append_job()`][cpp-trace-append-job] and [`Simulation::append_job()`][cpp-simulation-append-job] add one newly arriving
 job. Their gRPC counterpart is `AppendJobRequest`.
 
-`Trace::append_jobs()` and `Simulation::append_jobs()` add a vector of newly
+[`Trace::append_jobs()`][cpp-trace-append-jobs] and [`Simulation::append_jobs()`][cpp-simulation-append-jobs] add a vector of newly
 arriving jobs; their gRPC counterpart is `AppendJobsRequest`. A batch is
 validated and given capacity before any record is appended:
 
@@ -116,14 +116,14 @@ validated and given capacity before any record is appended:
 4. If necessary, capacity grows once to fit the batch, or the operation aborts
    before changing `m_data` when `--job_store_overflow=abort` is selected.
 
-This makes a batch append all-or-nothing. `submit_job(job_no, ...)` is not an
+This makes a batch append all-or-nothing. [`submit_job(job_no, ...)`][cpp-simulation-submit-job] is not an
 append operation: it schedules a job record that is already present.
 
 ### Progressive multi-file loading
 
 `--infile_list` supplies a pre-split, pre-sorted sequence of trace files.
-`Trace::load_next_file()` reads one file at a time, and
-`Simulation::run_progressive()` advances the simulation through that file
+[`Trace::load_next_file()`][cpp-trace-load-next-file] reads one file at a time, and
+[`Simulation::run_progressive()`][cpp-simulation-run-progressive] advances the simulation through that file
 before loading the next. This avoids keeping all files' job records in memory
 at once.
 
@@ -134,8 +134,8 @@ boundaries.
 
 ## Capacity and memory-pressure checks
 
-`resolve_job_store_capacity()` and the shared
-`Trace::ensure_batch_capacity()` helper implement the job-store capacity
+[`resolve_job_store_capacity()`][cpp-trace-resolve-job-store-capacity] and the shared
+[`Trace::ensure_batch_capacity()`][cpp-trace-ensure-batch-capacity] helper implement the job-store capacity
 policy. The default job-store capacity is sized for the loaded job count;
 resource history defaults to twice that count, because each job contributes at
 most a start and an end resource sample. Both defaults have a minimum capacity
@@ -161,7 +161,7 @@ future adaptive single-file reader could choose chunks according to remaining
 job-store capacity and memory pressure, but it is not required for the current
 streaming or multi-file interfaces.
 
-The reclamation-safety decision is isolated in `is_front_reclaimable()`. That
+The reclamation-safety decision is isolated in [`is_front_reclaimable()`][cpp-trace-is-front-reclaimable]. That
 keeps the current single-process rule simple while leaving a natural extension
 point for a future optimistic or parallel simulation horizon.
 
@@ -177,3 +177,27 @@ point for a future optimistic or parallel simulation horizon.
 - [`tests/test_progressive_load.cpp`](https://github.com/LLNL/dr_evt/blob/main/tests/test_progressive_load.cpp)
   and [`tests/run_progressive_load_tests.sh`](https://github.com/LLNL/dr_evt/blob/main/tests/run_progressive_load_tests.sh):
   multi-file loading and memory-pressure behavior
+
+[cpp-job-record]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/job-store.html#_CPPv4N6dr_evt10Job_RecordE
+[cpp-job-record-unscheduled-sentinel]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/job-store.html#_CPPv4N6dr_evt10Job_Record20unscheduled_sentinelEv
+[cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE
+[cpp-simulation-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10append_jobE10sim_time_t11num_nodes_tRKNSt6stringE7tdiff_tNSt8optionalI7tdiff_tEE
+[cpp-simulation-append-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation11append_jobsERKNSt6vectorI18Job_Append_RequestEE
+[cpp-simulation-flush-completed-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation20flush_completed_jobsEv
+[cpp-simulation-run-progressive]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation15run_progressiveEv
+[cpp-simulation-submit-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10submit_jobE8job_no_t10sim_time_t10sim_time_t
+[cpp-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4I0EN6dr_evt10BasicTraceE
+[cpp-trace-append-job]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace10append_jobE10sim_time_tRK7epoch_t11num_nodes_t11job_queue_t9timeout_tNSt8optionalI7tdiff_tEE
+[cpp-trace-append-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace11append_jobsE10sim_time_tRKNSt6vectorI18Job_Append_RequestEE
+[cpp-trace-context-m-resource-history]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace7Context18m_resource_historyE
+[cpp-trace-ensure-batch-capacity]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace21ensure_batch_capacityE10sim_time_t6size_t
+[cpp-trace-is-front-reclaimable]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4NK6dr_evt10BasicTrace20is_front_reclaimableE10sim_time_t
+[cpp-trace-job-at]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4NK6dr_evt10BasicTrace6job_atE8job_no_t
+[cpp-trace-load-data]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace9load_dataE10num_jobs_t
+[cpp-trace-load-next-file]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace14load_next_fileE10sim_time_tRKNSt6stringE
+[cpp-trace-m-data]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace6m_dataE
+[cpp-trace-print]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4NK6dr_evt10BasicTrace5printERNSt7ostreamE
+[cpp-trace-print-span]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4NK6dr_evt10BasicTrace10print_spanERNSt7ostreamE
+[cpp-trace-resolve-job-store-capacity]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace26resolve_job_store_capacityE10num_jobs_t
+[cpp-trace-write-job-line]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace14write_job_lineERK10Job_Record
+[cpp-trace-write-job-range]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace15write_job_rangeEN12trace_data_t14const_iteratorEN12trace_data_t14const_iteratorE8job_no_t10sim_time_t

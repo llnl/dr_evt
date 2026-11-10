@@ -81,7 +81,7 @@ under that prefix.
 departure. Output remains in permanent job-ID order: a later backfilled job
 that completes early waits until every earlier job is also complete. The
 default interval `0` follows the job-store capacity. Capacity pressure, an
-explicit `flush_completed_jobs()`, and final output also trigger writes.
+explicit [`flush_completed_jobs()`][cpp-simulation-flush-completed-jobs], and final output also trigger writes.
 
 ## Key layout
 
@@ -192,7 +192,7 @@ the full record.
 ## Query job status (Redis optional)
 
 Job-status queries do not require Redis. The in-process, Python, and gRPC
-`get_job_statuses()` APIs query DR_EVT's in-memory status metadata and work in
+[`get_job_statuses()`][cpp-simulation-get-job-statuses] APIs query DR_EVT's in-memory status metadata and work in
 ordinary builds as well as Redis-enabled builds. They report pending, running,
 completed, and rejected appended jobs; pending jobs can include an estimated
 start time.
@@ -250,7 +250,7 @@ A hash found in Redis is the authoritative finalized record. An absent hash
 means the job may still be pending, running, completed but waiting for an
 ordered flush, or rejected, so only missing IDs are sent back to the server.
 
-`get_job_statuses()` accepts multiple IDs and returns results in request order.
+[`get_job_statuses()`][cpp-simulation-get-job-statuses] accepts multiple IDs and returns results in request order.
 The same bulk status operation is exposed by the Python binding and the gRPC
 `GetJobStatusesRequest` API. The no-option client invocation remains available;
 it batch-appends the CSV and finishes the simulation without an intermediate
@@ -279,3 +279,6 @@ redis://username:password@redis.example.org:6379/2
 The optional final path selects the Redis database number. Avoid placing
 password-bearing commands in shared shell history or process listings. TLS is
 not enabled by the current DR_EVT Redis++ configuration.
+
+[cpp-simulation-flush-completed-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation20flush_completed_jobsEv
+[cpp-simulation-get-job-statuses]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb
