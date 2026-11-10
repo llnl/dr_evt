@@ -242,9 +242,9 @@ def run_experiment(args, grpc, pb, service):
                 windows = [response.get_backfill_window for response in responses]
                 horizon_responses = call_all(
                     executor, sessions, lambda messages: messages.ClientMessage(
-                        get_prediction_horizon=messages.GetPredictionHorizonRequest(
+                        estimate_queue_horizon=messages.EstimateQueueHorizonRequest(
                             utilization=args.prediction_utilization)))
-                horizons = [response.get_prediction_horizon.horizon
+                horizons = [response.estimate_queue_horizon.horizon
                             for response in horizon_responses]
                 choice = choose_system(
                     job, systems, windows, horizons, args.wait_tolerance)

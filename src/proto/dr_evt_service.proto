@@ -46,11 +46,11 @@ message ClientMessage {
         GetBackfillWindowRequest get_backfill_window = 16;
         GetCurrentUtilizationRequest get_current_utilization = 17;
         RunRequest run = 18;
-        GetPredictionHorizonRequest get_prediction_horizon = 19;
+        EstimateQueueHorizonRequest estimate_queue_horizon = 19;
         SaveCheckpointRequest save_checkpoint = 20;
         LoadCheckpointRequest load_checkpoint = 21;
         GetJobStatusesRequest get_job_statuses = 22;
-        GetEstimatedJobStartsRequest get_estimated_job_starts = 23;
+        GetStartTimesByEstCachesRequest get_start_times_by_est_caches = 23;
     }
 }
 
@@ -261,7 +261,7 @@ message GetBackfillWindowRequest {}
 message GetCurrentUtilizationRequest {}
 // Estimate how long the currently waiting resource-time demand takes to drain
 // after the FCFS-head shadow time. Computed only when queried.
-message GetPredictionHorizonRequest {
+message EstimateQueueHorizonRequest {
     double utilization = 1;
 }
 message GetStatisticsRequest {}
@@ -298,11 +298,11 @@ message ServerMessage {
         GetBackfillWindowResponse get_backfill_window = 17;
         GetCurrentUtilizationResponse get_current_utilization = 18;
         RunResponse run = 19;
-        GetPredictionHorizonResponse get_prediction_horizon = 20;
+        EstimateQueueHorizonResponse estimate_queue_horizon = 20;
         SaveCheckpointResponse save_checkpoint = 21;
         LoadCheckpointResponse load_checkpoint = 22;
         GetJobStatusesResponse get_job_statuses = 23;
-        GetEstimatedJobStartsResponse get_estimated_job_starts = 24;
+        GetStartTimesByEstCachesResponse get_start_times_by_est_caches = 24;
     }
 }
 
@@ -396,7 +396,7 @@ message GetJobStatusesResponse {
 
 // Read predictions saved by the latest live scheduling pass, like squeue
 // --start. This request never computes a new forecast or advances simulation.
-message GetEstimatedJobStartsRequest {}
+message GetStartTimesByEstCachesRequest {}
 
 message EstimatedJobStart {
     uint32 job_idx = 1;
@@ -405,7 +405,7 @@ message EstimatedJobStart {
     StartTimeKind start_time_kind = 3;
 }
 
-message GetEstimatedJobStartsResponse {
+message GetStartTimesByEstCachesResponse {
     // Absent before any planning pass or immediately after checkpoint restore.
     // With periodic backfill this can precede the current simulation time.
     optional double estimated_at = 1;
@@ -436,7 +436,7 @@ message GetCurrentUtilizationResponse {
     double utilization = 1;
 }
 
-message GetPredictionHorizonResponse {
+message EstimateQueueHorizonResponse {
     double horizon = 1;
 }
 

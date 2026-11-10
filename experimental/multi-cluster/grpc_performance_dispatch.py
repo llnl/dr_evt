@@ -544,13 +544,13 @@ def run_experiment(args, grpc, pb, service):
                     executor,
                     sessions,
                     lambda messages: messages.ClientMessage(
-                        get_prediction_horizon=messages.GetPredictionHorizonRequest(
+                        estimate_queue_horizon=messages.EstimateQueueHorizonRequest(
                             utilization=args.prediction_utilization
                         )
                     ),
                 )
                 horizons = [
-                    response.get_prediction_horizon.horizon
+                    response.estimate_queue_horizon.horizon
                     for response in horizon_responses
                 ]
                 workload = sample_workload(workloads, generator)

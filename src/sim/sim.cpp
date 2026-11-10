@@ -2278,7 +2278,7 @@ void BasicSimulation<TraceType>::record_appended_job_start(job_no_t job_idx) {
 
 template <typename TraceType>
 typename BasicSimulation<TraceType>::Estimated_Job_Starts
-BasicSimulation<TraceType>::get_estimated_job_starts() const {
+BasicSimulation<TraceType>::get_start_times_by_est_caches() const {
   Estimated_Job_Starts result{m_scheduler->m_estimated_at, {}};
   std::unordered_map<job_no_t, SchedulerBase::Estimated_Start> predictions;
   predictions.reserve(m_scheduler->m_estimated_starts.size());
@@ -2293,10 +2293,11 @@ BasicSimulation<TraceType>::get_estimated_job_starts() const {
       continue;
     }
     Estimated_Job_Start job{job_idx, std::nullopt, Start_Time_Kind::NONE};
-    if (const auto found = predictions.find(job_idx); found != predictions.end()) {
+    if (const auto found = predictions.find(job_idx);
+        found != predictions.end()) {
       job.expected_start_time = found->second.start;
       job.start_time_kind = found->second.reserved ? Start_Time_Kind::RESERVED
-                                                 : Start_Time_Kind::ESTIMATED;
+                                                   : Start_Time_Kind::ESTIMATED;
       ++known_starts;
     }
     result.jobs.push_back(job);
@@ -2307,14 +2308,14 @@ BasicSimulation<TraceType>::get_estimated_job_starts() const {
     const auto known_end =
         known_starts == result.jobs.size()
             ? result.jobs.end()
-            : std::stable_partition(result.jobs.begin(), result.jobs.end(),
-                                    [](const auto &job) {
-                                      return job.expected_start_time.has_value();
-                                    });
+            : std::stable_partition(
+                  result.jobs.begin(), result.jobs.end(), [](const auto &job) {
+                    return job.expected_start_time.has_value();
+                  });
     std::stable_sort(result.jobs.begin(), known_end,
                      [](const auto &a, const auto &b) {
-      return *a.expected_start_time < *b.expected_start_time;
-    });
+                       return *a.expected_start_time < *b.expected_start_time;
+                     });
   }
   return result;
 }
@@ -2406,17 +2407,20 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
         predictions.erase(prediction.job_id);
       }
     }
-    const size_t count = estimation_depth == 0
-                             ? pending_job_ids.size()
-                             : std::min(estimation_depth, pending_job_ids.size());
+    const size_t count =
+        estimation_depth == 0
+            ? pending_job_ids.size()
+            : std::min(estimation_depth, pending_job_ids.size());
     size_t last_missing = 0;
     for (size_t i = 0; i < count; ++i) {
       const auto id = pending_job_ids[i];
       const auto [first, last] = requested_pending_statuses.equal_range(id);
-      if (first == last) continue;
+      if (first == last)
+        continue;
       const auto cached = predictions.find(id);
       if (cached != predictions.end() &&
-          convert_epoch<sim_time_t>(m_trace.job_at(id).get_submit_time()) <= m_current_time) {
+          convert_epoch<sim_time_t>(m_trace.job_at(id).get_submit_time()) <=
+              m_current_time) {
         for (auto request = first; request != last; ++request) {
           auto &status = result[request->second];
           status.expected_start_time = cached->second.start;
@@ -2429,7 +2433,8 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
         last_missing = i + 1;
       }
     }
-    if (last_missing == 0) return result;
+    if (last_missing == 0)
+      return result;
     // The remaining requested starts depend on the jobs ahead of them,
     // but no forecast is needed beyond the last missing requested start.
     forecast_depth = last_missing;
@@ -2566,7 +2571,7 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
 #if defined(DR_EVT_HAS_SER20)
 template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Exact_Start_Result>
-BasicSimulation<TraceType>::get_exact_job_start_times(
+BasicSimulation<TraceType>::get_start_times_by_lookahead(
     const std::vector<job_no_t> &job_idxs, size_t estimation_depth) const {
   // Capture enumeration IDs before replay: the clone drains its wait queue.
   std::vector<job_no_t> requested = job_idxs;
@@ -2641,19 +2646,20 @@ BasicSimulation<TraceType>::get_exact_job_start_times(
 
 template <typename TraceType>
 std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>
-BasicSimulation<TraceType>::get_queue_drain_start_times(
+BasicSimulation<TraceType>::get_start_times_by_queue_drain(
     double utilization, size_t estimation_depth) const {
   if (m_params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
-    return get_queue_drain_start_times_impl<true>(utilization,
-                                                  estimation_depth);
+    return get_start_times_by_queue_drain_impl<true>(utilization,
+                                                     estimation_depth);
   }
-  return get_queue_drain_start_times_impl<false>(utilization, estimation_depth);
+  return get_start_times_by_queue_drain_impl<false>(utilization,
+                                                    estimation_depth);
 }
 
 template <typename TraceType>
 template <bool GroupEvents>
 std::vector<typename BasicSimulation<TraceType>::Queue_Drain_Start_Estimate>
-BasicSimulation<TraceType>::get_queue_drain_start_times_impl(
+BasicSimulation<TraceType>::get_start_times_by_queue_drain_impl(
     double utilization, size_t estimation_depth) const {
   if (!std::isfinite(utilization) || utilization < 0.0 || utilization > 1.0) {
     throw std::invalid_argument("utilization must be finite and in [0, 1]");
@@ -3699,7 +3705,7 @@ BasicSimulation<TraceType>::get_backfill_window() const {
 
 template <typename TraceType>
 tdiff_t
-BasicSimulation<TraceType>::get_prediction_horizon(double utilization) const {
+BasicSimulation<TraceType>::estimate_queue_horizon(double utilization) const {
   return m_scheduler->prediction_horizon(m_running_jobs, m_current_time,
                                          utilization);
 }

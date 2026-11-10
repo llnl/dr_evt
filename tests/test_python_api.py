@@ -375,7 +375,7 @@ def test_backfill_window_api(result):
         ]
         # No running-job completion remains after the shadow event, so the
         # 1000 node-seconds are drained at U * total_nodes = 50 nodes.
-        assert abs(sim.get_prediction_horizon(0.5) - 20.0) < 1e-12
+        assert abs(sim.estimate_queue_horizon(0.5) - 20.0) < 1e-12
         # Once the waiting head starts, the snapshot continues to expose the
         # projected releases of running work.
         sim.advance_to(100.0)
@@ -389,8 +389,8 @@ def test_backfill_window_api(result):
         standard.advance_to(0.0)
         standard.append_job(0.0, 50, QUEUE_INPUT, 8.0)
         standard.advance_to(0.0)
-        assert standard.get_prediction_horizon(0.5) == 8.0
-        starts = standard.get_queue_drain_start_times(1.0, estimation_depth=1)
+        assert standard.estimate_queue_horizon(0.5) == 8.0
+        starts = standard.get_start_times_by_queue_drain(1.0, estimation_depth=1)
         assert len(starts) == 1
         assert starts[0].expected_start_time == 40.0
         assert starts[0].start_time_kind == dr_evt.StartTimeKind.RESERVED
@@ -771,7 +771,7 @@ def test_periodic_backfill(result):
 def test_exact_lookahead(result):
     """Exact lookahead replays an isolated in-memory scheduler clone."""
     print("\n12. Exact Lookahead")
-    if not hasattr(dr_evt.Simulation, "get_exact_job_start_times"):
+    if not hasattr(dr_evt.Simulation, "get_start_times_by_lookahead"):
         result.record_pass("Exact lookahead unavailable without Ser20")
         return
 
@@ -794,18 +794,18 @@ def test_exact_lookahead(result):
         sim.advance_to(0.0)
 
         before = sim.get_current_time()
-        exact = sim.get_exact_job_start_times([head, candidate])
+        exact = sim.get_start_times_by_lookahead([head, candidate])
         assert [status.start_time for status in exact] == [10.0, 0.0]
         assert [status.outcome for status in exact] == [
             dr_evt.ExactStartOutcome.STARTED,
             dr_evt.ExactStartOutcome.STARTED,
         ]
-        assert len(sim.get_exact_job_start_times([head, candidate], 1)) == 2
-        never = sim.get_exact_job_start_times([impossible])[0]
+        assert len(sim.get_start_times_by_lookahead([head, candidate], 1)) == 2
+        never = sim.get_start_times_by_lookahead([impossible])[0]
         assert never.outcome == dr_evt.ExactStartOutcome.REJECTED
         assert never.start_time is None
         assert sim.get_current_time() == before
-        enumerated = sim.get_exact_job_start_times([], 1)
+        enumerated = sim.get_start_times_by_lookahead([], 1)
         assert len(enumerated) == 1
         assert enumerated[0].job_idx == head
         assert enumerated[0].start_time == 10.0

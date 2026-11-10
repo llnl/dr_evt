@@ -1,6 +1,6 @@
 # Cached-start performance
 
-The initial cached API added about 5% to bounded hybrid simulation time; EASY was unchanged. Inlining reduced hybrid overhead to about 2.4%. Cached queries were 5.7–7.2× faster than fresh forecasting, but returned fewer predictions. See [the current accuracy comparison](prediction-evaluation/COMPARISON.md) for costs normalized by predicted jobs.
+The initial cached API added about 5% to bounded hybrid simulation time; EASY was unchanged. Inlining reduced hybrid overhead to about 2.4%. Cached queries were 5.7–7.2× faster than forecasting without backfill, but returned fewer predictions. See [the current accuracy comparison](prediction-evaluation/COMPARISON.md) for costs normalized by predicted jobs.
 
 ## Method
 
@@ -40,12 +40,12 @@ Short-run wall times include launch and OS scheduling noise; use the longer loop
 
 Hybrid R=32/Q=64, 100 nodes: one running job occupies 99 nodes until t=1000; waiting jobs request 100 nodes for 10 seconds. Timing excludes setup and planning; results are consumed and response lengths checked.
 
-| Waiting jobs | Fresh statuses before (µs/query) | Fresh statuses after (µs/query) | Cached starts after (µs/query) | Cached speedup over fresh after |
+| Waiting jobs | Forecast without backfill before (µs/query) | Forecast without backfill after (µs/query) | Cached starts after (µs/query) | Cached speedup over forecast without backfill after |
 | ---: | ---: | ---: | ---: | ---: |
 | 1,000 | 64.18 | 62.59 | 11.03 | 5.67× |
 | 10,000 | 833.73 | 843.05 | 116.61 | 7.23× |
 
-Cached lookup leaves unexamined starts unknown; fresh forecasting estimates the full requested queue. These timings compare different coverage levels.
+Cached lookup leaves unexamined starts unknown; forecasting without backfill estimates the full requested queue. These timings compare different coverage levels.
 
 ## Optimizations and storage
 

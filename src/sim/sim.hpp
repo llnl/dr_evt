@@ -379,7 +379,7 @@ public:
    * projections, and K eligible known starts. Unknowns retain queue order
    * without sorting. No prediction fields are added to waiting-queue entries.
    */
-  Estimated_Job_Starts get_estimated_job_starts() const;
+  Estimated_Job_Starts get_start_times_by_est_caches() const;
 
   /** Completion state of one synchronous exact-lookahead request. */
   enum class Exact_Start_Outcome {
@@ -435,16 +435,18 @@ public:
 
   /**
    * @brief Query with explicit cache reuse.
-   * @param[in] job_idxs Appended job identifiers; empty enumerates waiting jobs.
-   * @param[in] estimation_depth Waiting-queue prefix to forecast; zero is unlimited.
+   * @param[in] job_idxs Appended job identifiers; empty enumerates waiting
+   * jobs.
+   * @param[in] estimation_depth Waiting-queue prefix to forecast; zero is
+   * unlimited.
    * @param[in] use_cached_predictions Reuse live starts and forecast gaps when
    * true. False requests the original entirely fresh serial forecast.
-   * @return Job statuses in request order, or waiting-queue order for empty IDs.
+   * @return Job statuses in request order, or waiting-queue order for empty
+   * IDs.
    */
   std::vector<Job_Status>
   get_job_statuses(const std::vector<job_no_t> &job_idxs,
-                   size_t estimation_depth,
-                   bool use_cached_predictions) const;
+                   size_t estimation_depth, bool use_cached_predictions) const;
 
 #if defined(DR_EVT_HAS_SER20)
   /**
@@ -458,8 +460,8 @@ public:
    * until the requested starts are known or the clone drains.
    */
   std::vector<Exact_Start_Result>
-  get_exact_job_start_times(const std::vector<job_no_t> &job_idxs,
-                            size_t estimation_depth = 0) const;
+  get_start_times_by_lookahead(const std::vector<job_no_t> &job_idxs,
+                               size_t estimation_depth = 0) const;
 #endif
 
   /**
@@ -481,8 +483,8 @@ public:
    * [0, 1].
    */
   std::vector<Queue_Drain_Start_Estimate>
-  get_queue_drain_start_times(double utilization,
-                              size_t estimation_depth = 0) const;
+  get_start_times_by_queue_drain(double utilization,
+                                 size_t estimation_depth = 0) const;
 
 protected:
   /**
@@ -511,8 +513,8 @@ protected:
    */
   template <bool GroupEvents>
   std::vector<Queue_Drain_Start_Estimate>
-  get_queue_drain_start_times_impl(double utilization,
-                                   size_t estimation_depth) const;
+  get_start_times_by_queue_drain_impl(double utilization,
+                                      size_t estimation_depth) const;
 
 #if defined(DR_EVT_HAS_SER20)
   /** Estimate serialized checkpoint bytes before allocating a buffer. */
@@ -778,7 +780,7 @@ public:
    * @throws std::logic_error if the scheduler does not support prediction or
    * does not use EASY backfilling.
    */
-  tdiff_t get_prediction_horizon(double utilization) const;
+  tdiff_t estimate_queue_horizon(double utilization) const;
 
   /**
    * Get detailed scheduling statistics
@@ -902,9 +904,9 @@ public:
 
 protected:
   /**
-   * Advance using compile-time-selected accounting, warm-start, and trigger paths.
-   * WarmStage is instantiated only while historical jobs remain; the normal
-   * stage contains no pre-start-time condition.
+   * Advance using compile-time-selected accounting, warm-start, and trigger
+   * paths. WarmStage is instantiated only while historical jobs remain; the
+   * normal stage contains no pre-start-time condition.
    */
   template <bool AccountResources, bool WarmStage = false,
             bool PeriodicBackfill = false, bool FixedPeriodicDispatch = false,

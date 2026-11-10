@@ -128,7 +128,7 @@ Their scheduling semantics are documented in
 | `append_job(submit_time, num_nodes, queue, limit_time, actual_run_time=None)` | Append and enqueue one live job; return its ID. Jobs must be appended in non-decreasing `submit_time` order; the limit must be a positive whole number of seconds; a known runtime must be positive and no greater than the limit. |
 | `append_jobs(requests)` | Atomically append and enqueue ordered `JobAppendRequest` values; return their IDs. |
 | `get_job_statuses(job_idxs)` | Return lifecycle and timing snapshots for appended job IDs. |
-| `get_estimated_job_starts()` | Read the latest live-planner predictions and their planning timestamp, without running a forecast. |
+| `get_start_times_by_est_caches()` | Read the latest live-planner predictions and their planning timestamp, without running a forecast. |
 | `advance_to(target_time)` | Process events at or before the target. |
 | `run_until_exclusive(target_time)` | Process events strictly before the target. |
 | `save_checkpoint(filename)` | Save complete simulation state to a same-build binary checkpoint. |
@@ -142,8 +142,8 @@ Their scheduling semantics are documented in
 | `get_active_job_count()` | Return waiting jobs. |
 | `get_fcfs_head_shadow_time()` | Return the FCFS-head reservation time, or `-1` when no head waits or no projected release or scheduled capacity change lets it start. |
 | `get_backfill_window()` | Return the current FCFS/EASY reservation snapshot, including all running-job releases. |
-| `get_prediction_horizon(utilization)` | On demand, estimate the supported FCFS/EASY waiting-queue drain time from the shadow time. |
-| `get_queue_drain_start_times(utilization, estimation_depth=0)` | Return queue-order resource-area start approximations; protected reservations are exact, other results are optimistic. |
+| `estimate_queue_horizon(utilization)` | On demand, estimate the supported FCFS/EASY waiting-queue drain time from the shadow time. |
+| `get_start_times_by_queue_drain(utilization, estimation_depth=0)` | Return queue-order resource-area start approximations; protected reservations are exact, other results are optimistic. |
 | `get_statistics()` | Return a `Statistics` snapshot. |
 | `write_simulated_trace()` | Write the configured job-schedule output. |
 | `print_stats()` | Print summary statistics. |
@@ -158,7 +158,7 @@ modes, progressive loading, and output recovery.
 
 ## Supporting types
 
-`get_estimated_job_starts()` returns `EstimatedJobStarts` with optional `estimated_at`
+`get_start_times_by_est_caches()` returns `EstimatedJobStarts` with optional `estimated_at`
 and a list of `EstimatedJobStart` values. Each contains `job_idx`, optional
 `expected_start_time`, and `start_time_kind`. Eligible pending jobs are sorted
 by expected start, with unknowns last. Predictions are saved during live
@@ -167,14 +167,14 @@ Out-of-horizon estimates can be present without protection. A periodic plan
 can be older than the current time; no cached plan survives checkpoint restore.
 
 ```python
-plan = sim.get_estimated_job_starts()
+plan = sim.get_start_times_by_est_caches()
 for job in plan.jobs:
     print(plan.estimated_at, job.job_idx, job.expected_start_time)
 ```
 
 This follows Slurm's `squeue --start` reporting model. `get_job_statuses()`
 reuses cached starts by default and forecasts missing starts. See
-[Scheduling Predictions](../dev/SCHEDULING_PREDICTIONS.md#slurm-comparison)
+{ref}`Public interface behavior <scheduler-public-interface-behavior>`
 for the comparison with Slurm `sbatch --test-only` and exact lookahead.
 
 `JobAppendRequest(submit_time, num_nodes, queue, limit_time,
@@ -187,8 +187,9 @@ It first uses live cached starts within the requested queue depth, retaining
 their `RESERVED` or `ESTIMATED` kind. A cache-only request skips forecasting.
 Cached starts before the current time are recomputed; other cached starts may
 remain stale between periodic passes. Use
-`get_job_statuses(job_idxs, use_cached_predictions=False)` for the original
-entirely fresh conservative forecast described below.
+`get_job_statuses(job_idxs, use_cached_predictions=False)` for the
+forecast without backfill described below (cache reuse disabled). This
+recomputes all pending starts, including protected reservations.
 A pending `JobStatus` has `state == JobState.PENDING` and an
 `expected_start_time` projected from current capacity, running-job limit-time
 releases, and the scheduler's current queue order. Each pending job is placed
@@ -218,7 +219,7 @@ when duration estimates are reliable or future policy behavior is the focus;
 the benchmark does not establish an accuracy threshold for that choice. See
 {ref}`the measured comparison <choosing-how-much-computation-to-spend>`.
 
-`get_queue_drain_start_times(utilization, estimation_depth=0)` is a separate
+`get_start_times_by_queue_drain(utilization, estimation_depth=0)` is a separate
 fast resource-area approximation. It returns queue-order estimates without
 per-job first-fit placement; it is available through C++ and Python, not gRPC.
 

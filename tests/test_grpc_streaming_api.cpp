@@ -390,9 +390,9 @@ bool test_backfill_window(const std::string &server_address,
     }
 
     ClientMessage horizon_query;
-    horizon_query.mutable_get_prediction_horizon()->set_utilization(1.0);
+    horizon_query.mutable_estimate_queue_horizon()->set_utilization(1.0);
     const auto horizon_response = client.call(horizon_query);
-    if (std::fabs(horizon_response.get_prediction_horizon().horizon() - 200.0) >
+    if (std::fabs(horizon_response.estimate_queue_horizon().horizon() - 200.0) >
         1e-12) {
       std::cerr << "  FAIL: expected prediction horizon 200\n";
       client.finish();
@@ -517,7 +517,7 @@ bool test_warm_start(const std::string &server_address,
 }
 
 bool test_estimated_job_starts(const std::string &server_address,
-                             const std::string &trace_file) {
+                               const std::string &trace_file) {
   SimulationClient client(
       grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
   try {
@@ -532,8 +532,8 @@ bool test_estimated_job_starts(const std::string &server_address,
     }
     const auto ids = client.call(batch).append_jobs();
     ClientMessage query;
-    query.mutable_get_estimated_job_starts();
-    const auto initial = client.call(query).get_estimated_job_starts();
+    query.mutable_get_start_times_by_est_caches();
+    const auto initial = client.call(query).get_start_times_by_est_caches();
     assert(!initial.has_estimated_at() && initial.jobs_size() == 3);
     for (const auto &job : initial.jobs()) {
       assert(!job.has_expected_start_time());
@@ -541,7 +541,7 @@ bool test_estimated_job_starts(const std::string &server_address,
     ClientMessage advance;
     advance.mutable_advance_to()->set_target_time(0);
     client.call(advance);
-    const auto cached = client.call(query).get_estimated_job_starts();
+    const auto cached = client.call(query).get_start_times_by_est_caches();
     assert(cached.has_estimated_at() && cached.estimated_at() == 0);
     assert(cached.jobs_size() == 2);
     assert(cached.jobs(0).job_idx() == ids.job_idx(1));
@@ -552,8 +552,13 @@ bool test_estimated_job_starts(const std::string &server_address,
     assert(!cached.jobs(1).has_expected_start_time());
     ClientMessage fresh;
     fresh.mutable_get_job_statuses()->add_job_idx(ids.job_idx(2));
-    assert(client.call(fresh).get_job_statuses().jobs(0).expected_start_time() == 110);
-    assert(!client.call(query).get_estimated_job_starts().jobs(1).has_expected_start_time());
+    assert(
+        client.call(fresh).get_job_statuses().jobs(0).expected_start_time() ==
+        110);
+    assert(!client.call(query)
+                .get_start_times_by_est_caches()
+                .jobs(1)
+                .has_expected_start_time());
     assert(client.finish().ok());
     return true;
   } catch (const std::exception &error) {

@@ -40,7 +40,7 @@ in-process via the streaming API:
 | `RunUntilExclusiveRequest` | `Simulation::run_until_exclusive()` |
 | `GetFCFSHeadShadowTimeRequest` | FCFS-head shadow time only: the earliest reserved start time, or `-1` with no waiting head |
 | `GetBackfillWindowRequest` | One FCFS/EASY reservation snapshot: current capacity, shadow time, and projected releases |
-| `GetPredictionHorizonRequest` | On-demand FCFS/EASY waiting-resource-time horizon after the shadow time |
+| `EstimateQueueHorizonRequest` | On-demand FCFS/EASY waiting-resource-time horizon after the shadow time |
 | `SaveCheckpointRequest` | Return the current simulation state as binary checkpoint bytes |
 | `LoadCheckpointRequest` | Replace the current simulation state from compatible checkpoint bytes |
 | `GetStatisticsRequest`, `GetCurrentTimeRequest`, etc. | The monitoring/statistics methods |
@@ -51,7 +51,8 @@ one `JobStatus` per ID in the same order. A pending job carries
 `start_time` and `end_time`; and a rejected job carries no timing value.
 The request reuses cached live start predictions by default and forecasts
 missing starts. Set the optional `use_cached_predictions` field to `false`
-for an entirely fresh conservative forecast; absent or `true` enables reuse.
+for a forecast without backfill that recomputes all pending starts, including
+reservations; absent or `true` enables reuse.
 `expected_start_time` is paired with a `start_time_kind`: `reserved` is a
 protected scheduler reservation, while `estimated` is a non-binding earliest
 fit that respects protected reservations. A short job behind a blocked head
@@ -116,7 +117,7 @@ a 60-node job predicted to end at time 100, and a 100-node FCFS head, the
 response at time 0 has `shadow_time = 100` and releases `(50, 40)` and
 `(100, 60)`.
 
-Send `GetPredictionHorizonRequest` with a utilization factor in `[0, 1]` to
+Send `EstimateQueueHorizonRequest` with a utilization factor in `[0, 1]` to
 estimate how long the current waiting resource-time demand takes to drain after
 the shadow time. Zero selects the fallback factor `1`. The server scans fields
 already stored in supported FCFS queues only for this request; no prediction

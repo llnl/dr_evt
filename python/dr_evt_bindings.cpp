@@ -327,7 +327,8 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readonly("start_time_kind",
                     &Simulation::Estimated_Job_Start::start_time_kind);
   py::class_<Simulation::Estimated_Job_Starts>(m, "EstimatedJobStarts")
-      .def_readonly("estimated_at", &Simulation::Estimated_Job_Starts::estimated_at)
+      .def_readonly("estimated_at",
+                    &Simulation::Estimated_Job_Starts::estimated_at)
       .def_readonly("jobs", &Simulation::Estimated_Job_Starts::jobs);
 
   // Main Simulation class
@@ -376,7 +377,8 @@ PYBIND11_MODULE(dr_evt, m) {
            "batch; "
            "no request is appended.")
 
-      .def("get_estimated_job_starts", &Simulation::get_estimated_job_starts,
+      .def("get_start_times_by_est_caches",
+           &Simulation::get_start_times_by_est_caches,
            "Read the latest live-planner predictions, like squeue --start. "
            "Returns estimated_at and eligible pending jobs sorted by expected "
            "start; unknown starts are last. Does not run a forecast. "
@@ -401,8 +403,9 @@ PYBIND11_MODULE(dr_evt, m) {
            "Scheduled jobs have start_time and end_time.")
 
 #if defined(DR_EVT_HAS_SER20)
-      .def("get_exact_job_start_times", &Simulation::get_exact_job_start_times,
-           py::arg("job_idxs"), py::arg("estimation_depth") = 0,
+      .def("get_start_times_by_lookahead",
+           &Simulation::get_start_times_by_lookahead, py::arg("job_idxs"),
+           py::arg("estimation_depth") = 0,
            "Replay an output-free in-memory clone to return exact scheduler "
            "start times. This synchronous query runs until requested jobs "
            "start or the clone drains; it does not mutate the live simulation.")
@@ -472,14 +475,14 @@ PYBIND11_MODULE(dr_evt, m) {
            "Return a BackfillWindow snapshot for evaluating a backfill "
            "candidate, including all running-job releases.")
 
-      .def("get_prediction_horizon", &Simulation::get_prediction_horizon,
+      .def("estimate_queue_horizon", &Simulation::estimate_queue_horizon,
            py::arg("utilization"),
            "Estimate the waiting-queue drain time from the FCFS shadow time. "
            "Computed on demand for supported EASY schedulers; future arrivals "
            "are excluded.")
 
-      .def("get_queue_drain_start_times",
-           &Simulation::get_queue_drain_start_times, py::arg("utilization"),
+      .def("get_start_times_by_queue_drain",
+           &Simulation::get_start_times_by_queue_drain, py::arg("utilization"),
            py::arg("estimation_depth") = 0,
            "Return queue-order resource-area start approximations. Zero depth "
            "covers the complete waiting queue; results are not guarantees.")

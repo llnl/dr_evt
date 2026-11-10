@@ -147,7 +147,7 @@ int main() {
                 (native ? 11 : 10),
             "status predictions must use the selected forecast rule");
     require(
-        simulation.get_queue_drain_start_times(1.0)[0].expected_start_time ==
+        simulation.get_start_times_by_queue_drain(1.0)[0].expected_start_time ==
             (native ? 11 : 10),
         "queue-drain reservations must use the selected forecast rule");
 
@@ -164,7 +164,7 @@ int main() {
                 forecast[1].expected_start_time ==
                     forecast[0].expected_start_time,
             "forecast queries must preserve duplicate requests and grouping");
-    const auto drain = forecast_only.get_queue_drain_start_times(1.0);
+    const auto drain = forecast_only.get_start_times_by_queue_drain(1.0);
     require(drain.size() == 1 &&
                 drain[0].expected_start_time == (native ? 11 : 10) &&
                 drain[0].start_time_kind ==

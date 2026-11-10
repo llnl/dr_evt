@@ -410,10 +410,10 @@ public:
           }
           break;
         }
-        case ClientMessage::kGetEstimatedJobStarts: {
+        case ClientMessage::kGetStartTimesByEstCaches: {
           require_init(sim);
-          const auto predictions = sim->get_estimated_job_starts();
-          auto *out = resp.mutable_get_estimated_job_starts();
+          const auto predictions = sim->get_start_times_by_est_caches();
+          auto *out = resp.mutable_get_start_times_by_est_caches();
           if (predictions.estimated_at) {
             out->set_estimated_at(*predictions.estimated_at);
           }
@@ -423,8 +423,10 @@ public:
             if (prediction.expected_start_time) {
               job->set_expected_start_time(*prediction.expected_start_time);
               job->set_start_time_kind(
-                  prediction.start_time_kind == dr_evt::Simulation::Start_Time_Kind::RESERVED
-                      ? START_TIME_KIND_RESERVED : START_TIME_KIND_ESTIMATED);
+                  prediction.start_time_kind ==
+                          dr_evt::Simulation::Start_Time_Kind::RESERVED
+                      ? START_TIME_KIND_RESERVED
+                      : START_TIME_KIND_ESTIMATED);
             }
           }
           break;
@@ -541,11 +543,11 @@ public:
           }
           break;
         }
-        case ClientMessage::kGetPredictionHorizon: {
+        case ClientMessage::kEstimateQueueHorizon: {
           require_init(sim);
-          resp.mutable_get_prediction_horizon()->set_horizon(
-              sim->get_prediction_horizon(
-                  req.get_prediction_horizon().utilization()));
+          resp.mutable_estimate_queue_horizon()->set_horizon(
+              sim->estimate_queue_horizon(
+                  req.estimate_queue_horizon().utilization()));
           break;
         }
         case ClientMessage::kGetStatistics: {
