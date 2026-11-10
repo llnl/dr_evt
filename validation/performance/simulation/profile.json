@@ -1,0 +1,125 @@
+{
+  "profiler": "GNU gprof",
+  "sample_interval_seconds": 0.01,
+  "sampled_application_seconds": 3.72,
+  "jobs": 20000,
+  "generator": {
+    "seed": 2718,
+    "arrivals": "four jobs per second",
+    "nodes": [
+      1,
+      8
+    ],
+    "time_limit_seconds": [
+      1,
+      30
+    ]
+  },
+  "options": [
+    "--total_nodes",
+    "128",
+    "--trace_format",
+    "simple",
+    "--timestamp_format",
+    "epoch",
+    "--run_time_mode",
+    "limit",
+    "--max_jobs",
+    "20000",
+    "--queue_impl",
+    "circular",
+    "--dispatch_interval",
+    "1",
+    "--dispatch_queue_depth",
+    "10000",
+    "--backfill_policy",
+    "conservative"
+  ],
+  "input_sha256": "235c1fa1e259081dc207dea32f9cbecf6c723ac2c914a25b92220f91e4e17508",
+  "schedule_sha256": "b38f715d5af8c74b6a54ce37a8cbf1e4eebaf89be60886ce495b05d64952b852",
+  "normal_simulator_sha256": "c3f9f6382dc136aeabe28f9fec7f8f41ed08c78c22f7f34ca921aa9814b67aa7",
+  "profile_simulator_sha256": "2f800b2914ddf068b2276f0eefb8fc3e10bcca9061ebe52b36f674c673c06d26",
+  "uninstrumented_wall_seconds": {
+    "runs": [
+      3.8674287099856883,
+      4.111571002053097,
+      3.8618861259892583,
+      3.85605562699493,
+      3.8582949599949643
+    ],
+    "median": 3.8618861259892583,
+    "min": 3.85605562699493,
+    "max": 4.111571002053097
+  },
+  "top_functions": [
+    {
+      "percent": 67.2,
+      "self_seconds": 2.5,
+      "calls": 18309188,
+      "function": "dr_evt::Reservation_Search_Cache::earliest_fit(unsigned int, double, double) const"
+    },
+    {
+      "percent": 26.08,
+      "self_seconds": 0.97,
+      "calls": 18309188,
+      "function": "dr_evt::Reservation_Timeline::reserve(double, unsigned int, double) [clone .part.0]"
+    },
+    {
+      "percent": 5.38,
+      "self_seconds": 0.2,
+      "calls": 9281,
+      "function": "dr_evt::PeriodicFCFSHybridCircularScheduler::schedule_cached_pass(unsigned int, std::map<unsigned long, dr_evt::Running_Job, std::less<unsigned long>, std::allocator<std::pair<unsigned long const, dr_evt::Running_Job> > > const&, double)"
+    },
+    {
+      "percent": 0.54,
+      "self_seconds": 0.02,
+      "calls": 9281,
+      "function": "dr_evt::PeriodicFCFSHybridCircularScheduler::prefix_reuses_interval_shapes() const"
+    },
+    {
+      "percent": 0.27,
+      "self_seconds": 0.01,
+      "calls": 20000,
+      "function": "dr_evt::BasicSimulation<dr_evt::BasicTrace<dr_evt::Standard_Trace_Policy> >::submit_job(unsigned long, double, double)"
+    },
+    {
+      "percent": 0.27,
+      "self_seconds": 0.01,
+      "calls": 16806,
+      "function": "dr_evt::SchedulerBase::reservation_timeline(unsigned int, std::map<unsigned long, dr_evt::Running_Job, std::less<unsigned long>, std::allocator<std::pair<unsigned long const, dr_evt::Running_Job> > > const&, double, std::vector<dr_evt::Running_Job, std::allocator<dr_evt::Running_Job> > const&) const"
+    },
+    {
+      "percent": 0.27,
+      "self_seconds": 0.01,
+      "calls": null,
+      "function": "_init"
+    }
+  ],
+  "symbol_correction": "Complete nm table, with weak function symbols normalized from W to T; compiler clones remain separate.",
+  "profile_and_normal_schedules_identical": true,
+  "capacity_and_duration_audits_passed": true,
+  "source_revision": "f680afdd9b02f249008fae8cea48573ee1449e4b",
+  "hardware": "Apple M3 Max",
+  "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.39",
+  "compiler": "g++-14 (Ubuntu 14.2.0-4ubuntu2~24.04.1) 14.2.0",
+  "profile_build": {
+    "CMAKE_BUILD_TYPE": "Release",
+    "DR_EVT_GPROF": "ON",
+    "BUILD_SHARED_LIBS": "OFF",
+    "DR_EVT_WITH_SER20": "OFF",
+    "DR_EVT_BUILD_PYTHON": "OFF",
+    "DR_EVT_ENABLE_PROTOBUF": "OFF",
+    "DR_EVT_ENABLE_GRPC": "OFF",
+    "DR_EVT_LEGACY_RESERVATION_BARRIER": "OFF",
+    "flags": [
+      "-O3",
+      "-g",
+      "-pg",
+      "-fno-lto",
+      "-fno-ipa-icf"
+    ]
+  },
+  "scope": "Self-time samples in application text; excludes unsampled shared-library code. Compiler clones are resolved using the complete symbol table.",
+  "peak_waiting_jobs": 10487,
+  "simulated_makespan_seconds": 10979
+}

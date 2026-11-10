@@ -38,7 +38,7 @@ can change with the trace's arrival pattern, job sizes and durations, queue
 depth, backfill policy, and machine.
 
 For sampled hot-path measurements within the circular FCFS scheduler, see
-[Performance Analysis](PERFORMANCE_ANALYSIS.md). That profile complements this
+[Optimization History](performance-analysis/OPTIMIZATION_HISTORY.md). That historical profile complements this
 end-to-end queue comparison; the two measurements use different workloads and
 should not be compared numerically.
 

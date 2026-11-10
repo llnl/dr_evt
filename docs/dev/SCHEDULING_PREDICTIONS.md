@@ -107,23 +107,28 @@ queue-drain information for experiments.
 
 | API | Purpose | Gap addressed |
 | --- | --- | --- |
-| {cpp:func}`get_start_times_by_est_caches() <dr_evt::BasicSimulation::get_start_times_by_est_caches>` | Report estimates from live planning | Provides estimate age and distinguishes unknown, estimated, and reserved starts. |
-| {cpp:func}`get_job_statuses() <dr_evt::BasicSimulation::get_job_statuses>` | Reuse cached starts and forecast gaps | Extends sparse cached coverage while accounting for earlier queued work, without full replay. |
-| {cpp:func}`get_start_times_by_queue_drain() <dr_evt::BasicSimulation::get_start_times_by_queue_drain>` | Estimate per-job starts from resource-time area | Offers a coarse alternative to per-job window placement or replay. |
-| {cpp:func}`get_start_times_by_lookahead() <dr_evt::BasicSimulation::get_start_times_by_lookahead>` | Run an isolated scheduler continuation | Includes future scheduling passes and backfill effects absent from a simple resource-release projection. |
-| {cpp:func}`estimate_queue_horizon() <dr_evt::BasicSimulation::estimate_queue_horizon>` | Report an aggregate EASY queue-drain metric | Summarizes remaining workload rather than promising individual starts. |
-| {cpp:func}`get_fcfs_head_shadow_time() <dr_evt::BasicSimulation::get_fcfs_head_shadow_time>` / {cpp:func}`get_backfill_window() <dr_evt::BasicSimulation::get_backfill_window>` | Inspect head protection and current capacity/releases | Makes the reservation inputs available for policy experiments and diagnostics. |
+| [get_start_times_by_est_caches()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation29get_start_times_by_est_cachesEv) | Report estimates from live planning | Provides estimate age and distinguishes unknown, estimated, and reserved starts. |
+| [get_job_statuses()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb) | Reuse cached starts and forecast gaps | Extends sparse cached coverage while accounting for earlier queued work, without full replay. |
+| [get_start_times_by_queue_drain()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation30get_start_times_by_queue_drainEd6size_t) | Estimate per-job starts from resource-time area | Offers a coarse alternative to per-job window placement or replay. |
+| [get_start_times_by_lookahead()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation28get_start_times_by_lookaheadERKNSt6vectorI8job_no_tEE6size_t) | Run an isolated scheduler continuation | Includes future scheduling passes and backfill effects absent from a simple resource-release projection. |
+| [estimate_queue_horizon()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation22estimate_queue_horizonEd) | Report an aggregate EASY queue-drain metric | Summarizes remaining workload rather than promising individual starts. |
+| [get_fcfs_head_shadow_time()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation25get_fcfs_head_shadow_timeEv) / [get_backfill_window()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation19get_backfill_windowEv) | Inspect head protection and current capacity/releases | Makes the reservation inputs available for policy experiments and diagnostics. |
 
-The cached and status APIs are exposed in C++, Python, and gRPC. See the
+The cached, status, aggregate-horizon, and reservation-snapshot APIs are exposed
+in C++, Python, and gRPC. See the
 [Python API](../api/PYTHON_API.md) and [streaming API](../api/STREAMING_API.md)
-for language-specific signatures and response fields. The API names in the
-table link to the generated C++ parameter and return-value documentation.
+for language-specific signatures and response fields. The API names link
+to the generated C++ parameter and return-value documentation. The gRPC
+operations below are request/response pairs carried by
+[SimulationService.Session](../CLIENT_SERVER_GUIDE.md#the-service-definition); their links describe
+the wire fields.
 
 ## API behavior
 
-### Cached start estimates: `get_start_times_by_est_caches()`
+### Cached start estimates: [get_start_times_by_est_caches()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation29get_start_times_by_est_cachesEv)
 
-C++ parameters and return type: {cpp:func}`dr_evt::BasicSimulation::get_start_times_by_est_caches`.
+The gRPC request and response are documented in
+[GetStartTimesByEstCachesRequest / GetStartTimesByEstCachesResponse](../CLIENT_SERVER_GUIDE.md#cached-start-estimates).
 
 Returns `Estimated_Job_Starts` containing:
 
@@ -151,13 +156,10 @@ K known results. Only known results are sorted; all-unknown responses skip
 sorting and all-known responses skip partitioning. Live planning adds cache
 writes, not additional resource searches.
 
-The gRPC messages are `GetStartTimesByEstCachesRequest` and
-`GetStartTimesByEstCachesResponse`.
-
 ### Reservation-aware forecasts
 
-This temporary forecast model is used by `get_job_statuses()` when it needs
-missing starts, and by `get_start_times_by_queue_drain()`. Both account for
+This temporary forecast model is used by [get_job_statuses()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb) when it needs
+missing starts, and by [get_start_times_by_queue_drain()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation30get_start_times_by_queue_drainEd6size_t). Both account for
 running-job releases, capacity changes, and protected windows. Cached protected
 windows are reused only when the selected cache mode allows it; otherwise the
 status forecast recomputes policy reservations. Cached lookup
@@ -169,11 +171,12 @@ Out-of-horizon fits create no reservation and consume no reservation-depth slot.
 The query's `estimation_depth` sets its reporting prefix independently of live
 backfill examination depth; it does not change scheduling.
 
-#### Job status and start estimates: `get_job_statuses()`
+#### Job status and start estimates: [get_job_statuses()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb)
 
-C++ parameters and return type: {cpp:func}`dr_evt::BasicSimulation::get_job_statuses`.
+The gRPC request and response are documented in
+[GetJobStatusesRequest / GetJobStatusesResponse](../CLIENT_SERVER_GUIDE.md#job-status-forecasts).
 
-`get_job_statuses()` reports
+[get_job_statuses()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb) reports
 lifecycle state and start/end timing. It reuses cached starts by default,
 refreshes starts before current time, and forecasts missing starts. With default
 cache reuse, cache-only requests skip forecasting. Small requests stop after
@@ -220,9 +223,9 @@ intervals and unrounded pending time limits, unlike live scheduling with
 `DR_EVT_LEGACY_RESERVATION_BARRIER=ON` or a planning-time grid. Use replay when
 those policy and boundary details matter.
 
-#### Resource-area start estimates: `get_start_times_by_queue_drain()`
+#### Resource-area start estimates: [get_start_times_by_queue_drain()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation30get_start_times_by_queue_drainEd6size_t)
 
-C++ parameters and return type: {cpp:func}`dr_evt::BasicSimulation::get_start_times_by_queue_drain`.
+This API is available in C++ and Python; it has no gRPC counterpart.
 
 Computes start approximations from cumulative resource-time area. Protected
 jobs return their reservation; each unreserved job is assigned the time at
@@ -242,11 +245,12 @@ zero selecting 1.
 This area approximation does not ensure a contiguous feasible window for each
 job or reproduce later backfill choices. Unreserved estimates can overlap and
 are not reservations. The stronger contiguous-window forecast is provided by
-`get_job_statuses()`, rather than this area calculation.
+[get_job_statuses()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb), rather than this area calculation.
 
-### Start times by lookahead: `get_start_times_by_lookahead()`
+### Start times by lookahead: [get_start_times_by_lookahead()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation28get_start_times_by_lookaheadERKNSt6vectorI8job_no_tEE6size_t)
 
-C++ parameters and return type: {cpp:func}`dr_evt::BasicSimulation::get_start_times_by_lookahead`.
+This API is available in C++ and Python when serialization is enabled; it has
+no gRPC counterpart.
 
 Clones runnable state into a reusable in-memory buffer and advances the copy
 through ordinary scheduler events. It returns start times with `started`,
@@ -267,9 +271,10 @@ completion events; the performance evaluation below uses such an adapter.
 Accuracy therefore depends on duration estimates even though scheduler
 behavior is faithfully reproduced. Cost grows with the events replayed.
 
-### Aggregate queue horizon: `estimate_queue_horizon()`
+### Aggregate queue horizon: [estimate_queue_horizon()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation22estimate_queue_horizonEd)
 
-C++ parameters and return type: {cpp:func}`dr_evt::BasicSimulation::estimate_queue_horizon`.
+The gRPC request and response are documented in
+[EstimateQueueHorizonRequest / EstimateQueueHorizonResponse](../CLIENT_SERVER_GUIDE.md#aggregate-queue-horizon).
 
 The existing aggregate metric is available only for EASY-capable FCFS
 schedulers using EASY backfilling. Call it after scheduling at the current
@@ -282,21 +287,24 @@ resource-area API above already supports those reservation policies.
 
 ### Reservation snapshots
 
-{cpp:func}`get_fcfs_head_shadow_time() <dr_evt::BasicSimulation::get_fcfs_head_shadow_time>`
+[get_fcfs_head_shadow_time()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation25get_fcfs_head_shadow_timeEv)
 returns the current FCFS head's projected start, or -1 when no head waits or
 no projected capacity change lets it start.
 
-{cpp:func}`get_backfill_window() <dr_evt::BasicSimulation::get_backfill_window>`
+[get_backfill_window()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation19get_backfill_windowEv)
 returns `Backfill_Window`: current time, available nodes, head shadow time,
 and ordered running-job release events. Releases use requested-limit
 estimates; the head projection also accounts for scheduled capacity changes.
 These snapshots expose planning inputs rather than forecasting the whole queue.
+Their gRPC counterparts are documented in
+[GetFCFSHeadShadowTimeRequest / GetFCFSHeadShadowTimeResponse](../CLIENT_SERVER_GUIDE.md#head-shadow-time)
+and [GetBackfillWindowRequest / GetBackfillWindowResponse](../CLIENT_SERVER_GUIDE.md#backfill-window).
 
 ## API contract
 
 ### Request scope and results
 
-For `get_job_statuses()`, explicit IDs are appended-job IDs and preserve request
+For [get_job_statuses()](https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4NK6dr_evt15BasicSimulation16get_job_statusesERKNSt6vectorI8job_no_tEE6size_tbb), explicit IDs are appended-job IDs and preserve request
 order and duplicates. An empty list enumerates waiting jobs in scheduler order.
 Zero `estimation_depth` covers the full queue; a finite depth limits pending
 timing to that prefix, while explicit requested IDs retain status records.

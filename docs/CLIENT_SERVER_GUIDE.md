@@ -22,6 +22,7 @@ Build and connection instructions are in
 [Client/Server Setup](user-guide/grpc-setup.md). Dependency discovery is
 documented in [Installation](getting-started/installation.md).
 
+(grpc-service-definition)=
 ## The service definition
 
 `src/proto/dr_evt_service.proto` defines a single bidirectional-streaming
@@ -35,17 +36,22 @@ in-process via the streaming API:
 | `InitializeTraceRequest` | `Simulation::initialize_trace()` |
 | `AppendJobRequest` | `Simulation::append_job()` - a genuinely new job, optionally including its known `actual_run_time` |
 | `AppendJobsRequest` | `Simulation::append_jobs()` - the batch counterpart, with an optional known runtime per job |
-| `GetJobStatusesRequest` | Query lifecycle and timing for IDs returned by the append APIs |
+| [GetJobStatusesRequest](#job-status-forecasts) | Query lifecycle and timing for IDs returned by the append APIs |
+| [GetStartTimesByEstCachesRequest](#cached-start-estimates) | Read cached start estimates with their planning timestamp |
 | `AdvanceToRequest` | `Simulation::advance_to()` |
 | `RunUntilExclusiveRequest` | `Simulation::run_until_exclusive()` |
-| `GetFCFSHeadShadowTimeRequest` | FCFS-head shadow time only: the earliest reserved start time, or `-1` with no waiting head |
-| `GetBackfillWindowRequest` | One FCFS/EASY reservation snapshot: current capacity, shadow time, and projected releases |
-| `EstimateQueueHorizonRequest` | On-demand FCFS/EASY waiting-resource-time horizon after the shadow time |
+| [GetFCFSHeadShadowTimeRequest](#head-shadow-time) | FCFS-head shadow time only: the earliest reserved start time, or `-1` with no waiting head |
+| [GetBackfillWindowRequest](#backfill-window) | One FCFS/EASY reservation snapshot: current capacity, shadow time, and projected releases |
+| [EstimateQueueHorizonRequest](#aggregate-queue-horizon) | On-demand FCFS/EASY waiting-resource-time horizon after the shadow time |
 | `SaveCheckpointRequest` | Return the current simulation state as binary checkpoint bytes |
 | `LoadCheckpointRequest` | Replace the current simulation state from compatible checkpoint bytes |
 | `GetStatisticsRequest`, `GetCurrentTimeRequest`, etc. | The monitoring/statistics methods |
 
-`GetJobStatusesRequest.job_idx` accepts multiple appended-job IDs and returns
+(grpc-job-statuses)=
+### Job status forecasts
+
+`GetJobStatusesRequest` returns `GetJobStatusesResponse.jobs`, a list of
+`JobStatus` records. `GetJobStatusesRequest.job_idx` accepts multiple appended-job IDs and returns
 one `JobStatus` per ID in the same order. A pending job carries
 `expected_start_time`; a running or completed job carries `scheduled` with
 `start_time` and `end_time`; and a rejected job carries no timing value.
@@ -63,14 +69,34 @@ fit that respects protected reservations. A short job behind a blocked head
 can therefore receive an estimate earlier than the head. `estimation_depth`
 on the request limits temporary planning and pending timing to a queue prefix;
 zero is the default and considers the complete waiting queue. It does not
-change scheduling policy or reservations. The head's reserved value equals the shadow time from
-`GetFCFSHeadShadowTimeRequest`.
+change scheduling policy or reservations. A cached head reservation reflects
+the shadow time from its planning pass; a recomputed forecast can differ from
+an older `GetFCFSHeadShadowTimeRequest` snapshot.
 Every projected placement consumes its requested time window before the next
 queue job is placed; use a full scheduler lookahead when a policy-exact future
 schedule is required.
 Unknown or non-appended IDs produce `ErrorResponse`. The request reads the
 server's simulation state and works regardless of whether Redis output support
 is compiled or configured.
+
+(grpc-estimated-starts)=
+### Cached start estimates
+
+Send the empty `GetStartTimesByEstCachesRequest` to read the latest live
+planning estimates without forecasting or advancing the simulation.
+`GetStartTimesByEstCachesResponse` contains:
+
+- Optional `estimated_at`: the planning timestamp; absent before planning or
+  after checkpoint restore.
+- `jobs`: eligible pending jobs ordered by known expected start, with unknown
+  starts last. Each entry has `job_idx`, optional `expected_start_time`, and
+  `start_time_kind` distinguishing protected reservations from estimates.
+
+Future arrivals, running jobs, and completed jobs are excluded. Unexamined
+jobs can have no estimate; cached values can be stale between planning passes.
+This request corresponds to `get_start_times_by_est_caches()`.
+
+### Session and checkpoint operations
 
 See [Checkpoint/Restart](user-guide/checkpoint-restart.md) for checkpoint
 request requirements, compatibility, and file or Redis output recovery.
@@ -91,9 +117,15 @@ protocol itself does not require that.
 
 ### FCFS/EASY shadow-time and resource-change queries
 
+(grpc-head-shadow-time)=
+#### Head shadow time
+
 Send `GetFCFSHeadShadowTimeRequest` when only the FCFS queue head's earliest
 reserved start time is needed. Its `GetFCFSHeadShadowTimeResponse.shadow_time`
 is `-1` when no job is waiting.
+
+(grpc-backfill-window)=
+#### Backfill window
 
 Send `GetBackfillWindowRequest` when the resource-change times that lead to
 that reservation are also needed. After submitting work and advancing the
@@ -121,9 +153,13 @@ a 60-node job predicted to end at time 100, and a 100-node FCFS head, the
 response at time 0 has `shadow_time = 100` and releases `(50, 40)` and
 `(100, 60)`.
 
+(grpc-queue-horizon)=
+#### Aggregate queue horizon
+
 Send `EstimateQueueHorizonRequest` with a utilization factor in `[0, 1]` to
 estimate how long the current waiting resource-time demand takes to drain after
-the shadow time. Zero selects the fallback factor `1`. The server scans fields
+the shadow time. `EstimateQueueHorizonResponse.horizon` is that duration, not
+an absolute job start time. Zero selects the fallback factor `1`. The server scans fields
 already stored in supported FCFS queues only for this request; no prediction
 state is maintained during normal scheduling.
 
