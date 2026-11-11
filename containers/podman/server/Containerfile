@@ -5,8 +5,10 @@ FROM ubuntu:24.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
+# LC rootless Podman maps only the invoking UID/GID, so APT cannot switch to
+# its _apt sandbox account. Keep package downloads under the container root.
+RUN apt-get -o APT::Sandbox::User=root update \
+    && apt-get -o APT::Sandbox::User=root install --yes --no-install-recommends \
         bc \
         build-essential \
         ca-certificates \
@@ -40,8 +42,8 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
+RUN apt-get -o APT::Sandbox::User=root update \
+    && apt-get -o APT::Sandbox::User=root install --yes --no-install-recommends \
         bc \
         libboost-all-dev \
         libhiredis1.1 \

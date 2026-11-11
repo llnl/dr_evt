@@ -1,4 +1,4 @@
-# Docker client/server containers
+# Docker containers
 
 ```
 containers/docker/
@@ -16,10 +16,88 @@ The containers are deliberately given narrow host filesystem access:
   at `/input` from `DR_EVT_DATA_DIR`. The client streams the rows; the server
   reads only the CSV header during session initialization.
 
+The server image also contains the native `simulator` executable. It can be
+started with a shell instead of the gRPC server when measuring in-process
+simulation performance.
+
 The Ubuntu 24.04 build stages use GCC 13 with C++20 enabled and build Ser20
 through the normal FetchContent fallback. Both images fetch and link Redis++;
 the server writes Redis output and the example client performs pipelined job
 lookups.
+
+## Run the simulator directly
+
+This workflow is independent of client/server mode: it starts a shell in the
+server image and runs the installed Release-build `simulator` in-process. The
+client image, Compose stack, and Redis service are not needed.
+
+From the repository root, create the input and output directories and copy the
+trace under a known name. Replace `/path/to/trace.csv` with the real host path:
+
+```bash
+mkdir -p results data
+cp /path/to/trace.csv data/jobs.csv
+ls -l data/jobs.csv
+```
+
+Build the server image from the repository root:
+
+```bash
+docker build -f containers/docker/server/Dockerfile \
+  -t dr-evt-server:local .
+docker image inspect dr-evt-server:local >/dev/null
+```
+
+Alternatively, load a previously saved Docker image archive and use the image
+name printed by `docker load` in the later `docker run` command:
+
+```bash
+docker load --input /path/to/dr-evt-server.tar
+docker images
+```
+
+Start an interactive shell with the host input mounted read-only at `/input`
+and the host output directory mounted at `/data`. The numeric user keeps output
+files owned by the current host user:
+
+```bash
+docker run --interactive --tty --rm \
+  --user "$(id -u):$(id -g)" \
+  --volume "$PWD/data:/input:ro" \
+  --volume "$PWD/results:/data" \
+  --entrypoint /bin/bash \
+  dr-evt-server:local
+```
+
+The shell starts in `/data`. Confirm the mounted filename, then run the
+simulator. Replace `1000` with the simulated machine's node count and add any
+trace-format or scheduling options required by the experiment:
+
+```bash
+ls -l /input/jobs.csv
+time /opt/dr-evt/bin/simulator /input/jobs.csv \
+  --total_nodes 1000 \
+  --outfile /data/jobs.out.csv \
+  --resource_trace /data/resources.csv
+```
+
+The input path must match the name shown by `ls /input`; a missing or incorrect
+name causes an input error. The simulator always writes a scheduled job trace
+and resource trace, so the explicit `/data` paths above make both files persist
+on the host. For a trace without an actual-runtime column, add
+`--run_time_mode limit` to use each job's time limit as its run time.
+
+Keep the shell open for repeated measurements so container startup is excluded.
+Use the same input, output settings, and simulator options for every comparison;
+writing large output traces is part of the reported elapsed time. When
+finished, leave the container and inspect the host-owned results:
+
+```bash
+exit
+ls -lh results/
+```
+
+## Run the client/server containers
 
 From the repository root, create the two host directories and start the
 server:
