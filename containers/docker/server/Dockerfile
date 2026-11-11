@@ -135,6 +135,9 @@ RUN python3 -m venv /opt/dr-evt-docs-venv \
         -r /tmp/dr-evt-docs-requirements.txt \
     && rm -f /tmp/dr-evt-docs-requirements.txt
 
+ENV PATH="/opt/dr-evt-docs-venv/bin:${PATH}" \
+    SPHINXBUILD="/opt/dr-evt-docs-venv/bin/sphinx-build"
+
 # Clone, patch, and build the pinned native Slurm simulator used by the study.
 RUN if [ "$WITH_SLURM" = 1 ]; then \
       git clone https://github.com/SchedMD/slurm.git /slurm-modern-source \

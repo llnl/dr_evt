@@ -485,12 +485,15 @@ the container additionally makes manual `mpirun` commands behave consistently.
 ### Build the documentation
 
 Mount the repository read-write so Doxygen XML and Sphinx HTML can be written
-under `docs/`, then activate the preinstalled documentation environment:
+under `docs/`, then activate the preinstalled documentation environment. Do
+not reuse the benchmark or MPI-test shell: those commands deliberately mount
+`/workspace` read-only, and an existing container's mount mode cannot be
+changed. Exit that container and start this one from the repository root:
 
 ```bash
 podman run --interactive --tty --rm \
   --userns=keep-id \
-  --volume "$PWD:/workspace" \
+  --volume "$PWD:/workspace:rw" \
   --workdir /workspace \
   --entrypoint /bin/bash \
   localhost/dr-evt-server:local
@@ -499,11 +502,34 @@ podman run --interactive --tty --rm \
 Inside the container:
 
 ```bash
-source /opt/dr-evt-docs-venv/bin/activate
-make -C docs html
+cd /workspace/docs
+test -w . || {
+  echo "ERROR: /workspace is not writable; exit and use the documentation container command above" >&2
+  exit 1
+}
+test -x /opt/dr-evt-docs-venv/bin/sphinx-build || {
+  echo "ERROR: the image does not contain the documentation environment" >&2
+  exit 1
+}
+make clean
+make html
 ```
 
 The generated site is available on the host under `docs/_build/html`.
+Images built from the current Containerfile set `SPHINXBUILD` automatically.
+For an older archive where `make html` reports `sphinx-build: not found`, set
+it once in that shell and rerun the build:
+
+```bash
+export SPHINXBUILD=/opt/dr-evt-docs-venv/bin/sphinx-build
+make html
+```
+
+If Doxygen reports that it cannot write `docs/doxygen/xml/compound.xsd`, the
+repository is read-only or the container UID does not own the mounted files.
+Confirm that the launch command includes both `--userns=keep-id` and the
+`:rw` mount above; do not try to repair a host checkout with `chmod` or
+`chown` from the container.
 
 ### Scheduler comparison sources
 

@@ -225,9 +225,9 @@ these two differences; it does not impose a universal order on Slurm.
 
 ## Reproduction
 
-Follow the source and workload preparation in the
-[Slurm validation README](../../validation/slurm/README.md), then generate a
-fresh comparison and evidence directory with:
+Follow the source and workload preparation in
+`validation/slurm/README.md`, then generate a fresh comparison and evidence
+directory with:
 
 ```sh
 SLURM_LICENSE_RESULTS="$PWD/validation/slurm/results/licenses/reproduction" \
