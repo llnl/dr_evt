@@ -327,8 +327,8 @@ The generated site is written to `docs/_build/html/index.html`.
 - [gRPC Client/Server](docs/CLIENT_SERVER_GUIDE.md)
 - [Developer Notes](docs/dev/README.md)
 
-Docker and rootless Podman packaging are available; setup details remain with
-the
+Docker and rootless Podman packaging support both distributed client/server
+deployment and direct simulator performance runs; setup details remain with the
 [Docker](https://github.com/LLNL/dr_evt/blob/main/containers/docker/README.md)
 and
 [Podman](https://github.com/LLNL/dr_evt/blob/main/containers/podman/README.md)

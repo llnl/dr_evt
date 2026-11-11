@@ -1,4 +1,4 @@
-# Rootless Podman client/server containers
+# Rootless Podman containers
 
 ```
 containers/podman/
@@ -10,6 +10,10 @@ These images run without `sudo`. Podman builds containers in a user namespace;
 the runtime commands use `--userns=keep-id` so processes use your host UID/GID.
 Consequently, files written into a bind mount are owned by your regular host
 user instead of by root.
+
+The server image also contains the native `simulator` executable. It can be
+started with a shell instead of the gRPC server when measuring in-process
+simulation performance.
 
 ## LC/Dane setup
 
@@ -36,9 +40,10 @@ The primary GID printed by `id` should be the account's normal primary group,
 not only a project group, and the Podman command should print `true`. A primary
 GID mismatch can make `newuidmap` reject the rootless user namespace.
 
-An allocated shell may not provide a systemd user bus. A warning about failing
-to move `slirp4netns` to `user.slice` is nonfatal when `podman run --detach`
-still prints a container ID and `podman ps` shows the container running.
+An allocated shell may not provide a systemd user bus. Warnings about failing
+to add the pause process to a systemd sandbox cgroup or move `slirp4netns` to
+`user.slice` are nonfatal when the requested image or container operation
+otherwise succeeds.
 
 LC's rootless configuration maps only the invoking UID/GID. The Containerfiles
 therefore run APT downloads as container root rather than switching to APT's
@@ -114,6 +119,90 @@ podman build \
   -f "$TASK_CONTEXT/containers/podman/client/Containerfile" \
   -t dr-evt-client:local "$TASK_CONTEXT"
 ```
+
+## Run the simulator directly (including LC performance runs)
+
+This workflow is independent of client/server mode: it starts a shell in the
+server image and runs the installed Release-build `simulator` in-process. The
+client image, Podman network, and Redis container are not needed.
+
+Run these commands from the repository root in an allocated LC compute-node
+shell. Create the input and output directories on the shared filesystem and
+copy the trace under a known name. Replace `/path/to/trace.csv` with the real
+host path:
+
+```bash
+enable-podman
+```
+
+At the `bash-4.4$` shell prompt opened by `enable-podman`, continue with:
+
+```bash
+mkdir -p results data
+cp /path/to/trace.csv data/jobs.csv
+ls -l data/jobs.csv
+```
+
+Load a previously saved server image archive and confirm its exact name:
+
+```bash
+podman load --input /path/to/dr-evt-server.tar
+podman image exists localhost/dr-evt-server:local
+podman images localhost/dr-evt-server:local
+```
+
+`Loaded image: localhost/dr-evt-server:local` confirms a successful load. The
+systemd user-bus warning described in [LC/Dane setup](#lcdane-setup) does not
+invalidate that result. If no archive is available, build the server image
+from the repository root instead:
+
+```bash
+podman build -f containers/podman/server/Containerfile \
+  -t dr-evt-server:local .
+```
+
+Start an interactive shell with the host input mounted read-only at `/input`
+and the host output directory mounted at `/data`:
+
+```bash
+podman run --interactive --tty --rm \
+  --userns=keep-id \
+  --volume "$PWD/data:/input:ro" \
+  --volume "$PWD/results:/data" \
+  --entrypoint /bin/bash \
+  localhost/dr-evt-server:local
+```
+
+The shell starts in `/data`. Confirm the mounted filename, then run the
+simulator. Replace `1000` with the simulated machine's node count and add any
+trace-format or scheduling options required by the experiment:
+
+```bash
+ls -l /input/jobs.csv
+time /opt/dr-evt/bin/simulator /input/jobs.csv \
+  --total_nodes 1000 \
+  --outfile /data/jobs.out.csv \
+  --resource_trace /data/resources.csv
+```
+
+The input path must match the name shown by `ls /input`; a missing or incorrect
+name causes an input error. The simulator always writes a scheduled job trace
+and resource trace, so the explicit `/data` paths above make both files persist
+on the host. For a trace without an actual-runtime column, add
+`--run_time_mode limit` to use each job's time limit as its run time.
+
+Keep the shell open for repeated measurements so container startup is excluded.
+Use the same allocation, CPU binding, input, output settings, and simulator
+options for every comparison; writing large output traces is part of the
+reported elapsed time. When finished, leave the container and inspect the
+host-owned results:
+
+```bash
+exit
+ls -lh results/
+```
+
+## Run the client/server containers
 
 Start Redis on the private network. Its port is published only on host
 loopback so `redis-cli` can query results locally:
