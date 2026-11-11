@@ -2063,9 +2063,5 @@
       -35286,
       -61239
     ]
-  },
-  "result_directories": {
-    "on": "/Users/yeom2/work/dr_evt/validation/slurm/evidence/license-on-acknowledged-20261108/on",
-    "off": "/Users/yeom2/work/dr_evt/validation/slurm/evidence/license-on-acknowledged-20261108/off"
   }
 }

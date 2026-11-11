@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# DR_EVT gRPC simulation server image. Build from the repository root:
-# docker build -f containers/docker/server/Dockerfile -t dr-evt-server .
+# DR_EVT gRPC simulation server image.
+# Use the clean-clone build context documented in containers/docker/README.md.
 
 FROM ubuntu:24.04 AS build
 
@@ -36,24 +36,202 @@ RUN cmake -S . -B /build -G Ninja \
         -DDR_EVT_ENABLE_GRPC=ON \
         -DDR_EVT_WITH_SER20=ON \
         -DDR_EVT_WITH_REDIS=ON \
+        -DDR_EVT_WITH_UNIT_TESTING=ON \
     && cmake --build /build \
-    && cmake --install /build
+    && cmake --install /build \
+    && test -x /opt/dr-evt/bin/tests/test_progressive_load \
+    && test -x /opt/dr-evt/bin/tests/test_append_job_api \
+    && test -x /opt/dr-evt/bin/tests/test_grpc_streaming_api \
+    && test -x /opt/dr-evt/bin/dr_evt_server
 
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Native scheduler support defaults to enabled. Set only the corresponding
+# build argument to 0 when that external comparison is not needed.
+ARG WITH_SLURM=1
+ARG WITH_EPFL_SLURM=1
+ARG WITH_OPENPBS=1
+ARG WITH_FICTION=1
+
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         bc \
+        build-essential \
+        ca-certificates \
+        ccache \
+        clang-18 \
+        clang-tools-18 \
+        cmake \
+        cppcheck \
+        doxygen \
+        g++-14 \
+        gcc-14 \
+        gdb \
+        git \
+        graphviz \
+        lcov \
         libboost-all-dev \
-        libhiredis1.1 \
         libgrpc++-dev \
+        libhiredis1.1 \
+        libhiredis-dev \
+        libopenmpi-dev \
         libprotobuf-dev \
         libssl-dev \
+        linux-tools-generic \
+        ninja-build \
+        openmpi-bin \
+        pkg-config \
+        procps \
+        protobuf-compiler \
+        protobuf-compiler-grpc \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+        redis-server \
+        strace \
+        time \
+        valgrind \
+    && { { [ "$WITH_SLURM" = 0 ] && [ "$WITH_EPFL_SLURM" = 0 ]; } || apt-get install --yes --no-install-recommends \
+        autoconf automake libcurl4-openssl-dev libedit-dev libjansson-dev \
+        liblua5.1-dev liblz4-dev libmunge-dev libncurses-dev libnuma-dev \
+        libpam0g-dev libreadline-dev libsqlite3-dev libtool munge \
+        python3-matplotlib zlib1g-dev; } \
+    && { [ "$WITH_OPENPBS" = 0 ] || apt-get install --yes --no-install-recommends \
+        autoconf automake bison flex libcjson-dev libedit-dev libexpat1-dev \
+        libhwloc-dev libical-dev libncurses-dev libtool libx11-dev libxext-dev \
+        libxft-dev libxt-dev postgresql-server-dev-all python3-matplotlib swig \
+        tcl-dev tk-dev; } \
+    && { [ "$WITH_FICTION" = 0 ] || apt-get install --yes --no-install-recommends \
+        autoconf automake file jq libarchive-dev libboost-graph-dev \
+        libboost-program-options-dev libboost-serialization-dev libedit-dev \
+        libfaketime libhwloc-dev libjansson-dev liblua5.1-dev liblz4-dev \
+        libncurses-dev libsqlite3-dev libtool libyaml-cpp-dev libzmq3-dev \
+        lua-posix lua5.1 meson patch python3-cffi python3-jsonschema \
+        python3-matplotlib python3-ply python3-pydantic python3-pytest \
+        python3-setuptools python3-tqdm python3-wheel python3-yaml uuid-dev; } \
+    && { [ "$WITH_FICTION" = 0 ] || python3 -m pip install --break-system-packages \
+        'meson-python>=0.16,<0.19'; } \
     && rm -rf /var/lib/apt/lists/*
 
+# Prefer a real versioned perf binary when Ubuntu installed one. Otherwise keep
+# the linux-tools-common launcher; host-kernel compatibility is runtime-specific.
+RUN PERF_BIN="$(find /usr/lib/linux-tools -type f -name perf 2>/dev/null | sort -V | tail -n 1)" \
+    && if [ -n "$PERF_BIN" ]; then ln -sf "$PERF_BIN" /usr/local/bin/perf; fi \
+    && command -v perf
+
 COPY --from=build /opt/dr-evt /opt/dr-evt
+COPY --from=build /src/docs/requirements.txt /tmp/dr-evt-docs-requirements.txt
+COPY --from=build /src/validation /dr_evt_source/validation
+COPY --from=build /src/validation/slurm /validation-slurm
+COPY --from=build /src/validation/flux /validation
+
+# Keep the supported Sphinx/Breathe toolchain isolated from Ubuntu's system
+# Python while making documentation builds available in interactive shells.
+RUN python3 -m venv /opt/dr-evt-docs-venv \
+    && /opt/dr-evt-docs-venv/bin/python -m pip install --no-cache-dir \
+        -r /tmp/dr-evt-docs-requirements.txt \
+    && rm -f /tmp/dr-evt-docs-requirements.txt
+
+# Clone, patch, and build the pinned native Slurm simulator used by the study.
+RUN if [ "$WITH_SLURM" = 1 ]; then \
+      git clone https://github.com/SchedMD/slurm.git /slurm-modern-source \
+      && git -C /slurm-modern-source checkout --detach 17abb848e20054009d136a2c504a23e5462f26c8 \
+      && mkdir -p /workspace/slurm-modern-source /workspace/slurm-modern-build /results \
+      && git -C /slurm-modern-source archive HEAD \
+        | tar -xf - -C /workspace/slurm-modern-source \
+      && cd /workspace/slurm-modern-build \
+      && /workspace/slurm-modern-source/configure \
+        --prefix=/workspace/slurm-modern-install \
+        --sysconfdir=/workspace/slurm-modern-etc --enable-multiple-slurmd \
+        --disable-x11 --with-hdf5=no --with-hwloc=no \
+      && make -C src -j4 \
+      && make -C src install \
+      && git -C /slurm-modern-source rev-parse HEAD > /results/slurm-revision.txt \
+      && /workspace/slurm-modern-install/sbin/slurmctld -V > /results/slurm-version.txt \
+      && bash /dr_evt_source/validation/slurm/licenses/build_event.sh \
+      && bash /dr_evt_source/validation/slurm/licenses/build_state_client.sh \
+      && printf '%s\n' /opt/dr-evt/bin/simulator > /workspace/dr_evt-simulator; \
+    fi
+
+# Build the pinned historical Slurm 17.11.7 simulator used by the EPFL study.
+RUN if [ "$WITH_EPFL_SLURM" = 1 ]; then \
+      git clone https://github.com/ubccr-slurm-simulator/slurm_simulator.git /slurm-source \
+      && git -C /slurm-source checkout --detach 3fb607e00f53006c9076028f4529a071545556d8 \
+      && mkdir -p /workspace/slurm-source /workspace/epfl-slurm-build /results \
+      && git -C /slurm-source archive HEAD | tar -xf - -C /workspace/slurm-source \
+      && python3 /validation-slurm/prepare.py \
+      && cd /workspace/epfl-slurm-build \
+      && CFLAGS='-O2 -g -fcommon' /workspace/slurm-source/configure \
+        --prefix=/workspace/slurm-install --sysconfdir=/workspace/slurm-etc \
+        --enable-simulator --enable-front-end --disable-x11 \
+        --with-hdf5=no --with-hwloc=no \
+      && make -C src -j4 \
+      && make -C src install; \
+    fi
+
+# Build the unmodified pinned OpenPBS scheduler and the repository's adapter.
+RUN if [ "$WITH_OPENPBS" = 1 ]; then \
+      mkdir -p /dr_evt_source/external \
+      && git clone https://github.com/openpbs/openpbs.git /dr_evt_source/external/openpbs \
+      && git -C /dr_evt_source/external/openpbs checkout --detach cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a \
+      && mkdir -p /workspace/openpbs-sources/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a \
+        /workspace/openpbs-builds/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a /results \
+      && git -C /dr_evt_source/external/openpbs archive HEAD \
+        | tar -xf - -C /workspace/openpbs-sources/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a \
+      && cd /workspace/openpbs-sources/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a \
+      && bash autogen.sh \
+      && cd /workspace/openpbs-builds/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a \
+      && /workspace/openpbs-sources/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a/configure \
+        --prefix=/workspace/openpbs-install \
+        --with-pbs-server-home=/workspace/openpbs-home --with-python=/usr \
+      && make -C src/include -j4 \
+      && make -C src/lib -j4 \
+      && make -C src/scheduler -j4 \
+      && python3 /dr_evt_source/validation/openpbs/link.py \
+        /workspace/openpbs-sources/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a \
+        /workspace/openpbs-builds/cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a; \
+    fi
+
+ENV FLUX_PREFIX=/workspace/install \
+    PATH=/workspace/install/bin:$PATH \
+    LD_LIBRARY_PATH=/workspace/install/lib:/workspace/install/lib64 \
+    PKG_CONFIG_PATH=/workspace/install/lib/pkgconfig:/workspace/install/lib64/pkgconfig \
+    FLUX_FICTION_JOBTAP_SO=/workspace/fiction-build/src/emu-jobtap.so
+
+# Build the exact upstream revisions used by the Fiction validation study.
+# Sources remain available for audit and validation-specific overlays.
+RUN if [ "$WITH_FICTION" = 1 ]; then \
+      mkdir -p /sources /workspace /results \
+      && git clone https://github.com/flux-framework/flux-core.git /sources/flux-core \
+      && git -C /sources/flux-core checkout --detach d0309fcf0e672d90e65b0797168e56a430b9fb57 \
+      && git clone https://github.com/flux-framework/flux-sched.git /sources/flux-sched \
+      && git -C /sources/flux-sched checkout --detach 9eba598b4e0940d597695e65f20f5357fc513427 \
+      && git clone https://github.com/flux-framework/flux-fiction.git /sources/flux-fiction \
+      && git -C /sources/flux-fiction checkout --detach 346cbd65bf7da3798e2a351b44e0f57a5b20da96 \
+      && python3 /validation/prepare.py \
+      && cd /workspace/flux-core \
+      && export FLUX_VERSION="$(cat /workspace/flux-core.version)" \
+      && ./autogen.sh \
+      && ./configure --prefix=/workspace/install --disable-docs \
+      && make -j4 \
+      && make install \
+      && eval "$(/workspace/install/bin/flux env)" \
+      && cmake -S /workspace/flux-sched -B /workspace/flux-sched-build \
+        -DFLUX_SCHED_VER=0.0.0 -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/workspace/install -DCMAKE_PREFIX_PATH=/workspace/install \
+        -DENABLE_DOCS=OFF \
+      && cmake --build /workspace/flux-sched-build -j4 \
+      && cmake --install /workspace/flux-sched-build \
+      && python3 -m pip install --break-system-packages --no-build-isolation --no-deps \
+        --config-settings=setup-args=-Dflux_prefix=/workspace/install \
+        --config-settings=build-dir=/workspace/fiction-build \
+        -e /workspace/flux-fiction \
+      && test -x /workspace/install/bin/flux \
+      && test -f /workspace/fiction-build/src/emu-jobtap.so; \
+    fi
 
 # Session result files are written in the current directory.
 WORKDIR /data
