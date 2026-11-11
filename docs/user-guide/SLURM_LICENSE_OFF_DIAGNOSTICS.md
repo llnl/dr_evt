@@ -221,24 +221,25 @@ job 469 one backfill slot at that single tick reproduces **every start and
 completion** in the gated native run. This is a controlled explanation of
 these two differences; it does not impose a universal order on Slurm.
 
-[Earlier ordering-control PDF](https://github.com/LLNL/dr_evt/blob/main/validation/slurm/evidence/gated-lassen-20261108/on/comparison-metrics.pdf)
-· [Controlled reference data](../_static/scheduler-validation/slurm/divergence/gated-ordering/ordering-diagnosis.json).
+[Controlled reference data](../_static/scheduler-validation/slurm/divergence/gated-ordering/ordering-diagnosis.json).
 
-## Saved evidence and reproduction
+## Reproduction
 
-The current archive is in
-[validation/slurm/evidence/license-on-acknowledged-20261108](https://github.com/LLNL/dr_evt/tree/main/validation/slurm/evidence/license-on-acknowledged-20261108).
-It contains the rerun license-on results, the reused acknowledged license-off
-native record with refreshed DR_EVT references, independent audits, lossless
-snapshot deltas, configurations, source/binary hashes, current plotting data
-and scripts, and fresh local DR_EVT timings. Both comparisons use identical
-native/adapter binaries and the same current simulator binary.
+Follow the source and workload preparation in
+`validation/slurm/README.md`, then generate a fresh comparison and evidence
+directory with:
 
-The [earlier diagnostic archive](https://github.com/LLNL/dr_evt/tree/main/validation/slurm/evidence/gated-lassen-20261108)
-retains the startup and scheduler-order controlled replays and both four-job
-scenarios. Earlier results there are historical evidence.
+```sh
+SLURM_LICENSE_RESULTS="$PWD/validation/slurm/results/licenses/reproduction" \
+  bash validation/slurm/run.sh
+```
 
-For either Lassen plot folder, run `python3 plot.py plot-input.json`.
+The workflow rebuilds and runs native Slurm and DR_EVT and writes independent
+audits, lossless snapshot deltas, configurations, source and binary hashes,
+plotting inputs, figures, and local timings to the selected directory. Use a
+different empty result directory for each reproduction.
+
+For either generated Lassen plot folder, run `python3 plot.py plot-input.json`.
 For the four-job folder, run `python3 plot_timeline.py . --case pooled` or
 `--case protection`. For the diagnosis, run
 `python3 plot_gated_diagnosis.py gated-diagnosis-data.json`.

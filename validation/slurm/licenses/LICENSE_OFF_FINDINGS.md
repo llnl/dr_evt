@@ -104,9 +104,10 @@ only those two jobs reproduces its 972 differing starts. The corrected clock
 preserves subsecond time when TIME repeats a second, and the driver waits for
 main dispatch to finish before advancing after arrivals/completions. The audit
 also checks that no fitting eligible job remains waiting in the license-off pool.
-See `validation/slurm/evidence/gated-lassen-20261108/` for the complete results,
-controlled startup/order replays, audits, plots and performance records. The
-original serial-event results above remain historical evidence.
+Reproduce the complete comparison, audits, plots, and performance records with
+`bash validation/slurm/run.sh`, as described in
+[the validation README](../README.md). The original serial-event results above
+remain historical observations.
 
 ## Scope of the observed matches
 
@@ -120,5 +121,6 @@ Enforcing main scheduling before backfill would test that specific ordering.
 License-on has now been rerun with the corrected clock and dispatch
 acknowledgements and matches all 2,000 starts/completions. Both current DR_EVT
 references have also been verified against the acknowledged license-off native
-record. Current results are in `validation/slurm/evidence/license-on-acknowledged-20261108/`.
-The earlier two-delay license-on run remains historical ordering evidence.
+record. Run the validation workflow to reproduce both comparisons and their
+audits. The earlier two-delay license-on run remains a historical ordering
+observation.

@@ -143,21 +143,19 @@ delay is zero; the inclusive endpoint fit rule does not extend job runtimes.
 An earlier gated license-on run exposed backfill-before-main ordering and two
 30-second start delays. A separate first license-off attempt missed initial
 dispatch, causing 972 differing starts. Controlled replays explain those
-recorded runs in [LICENSE_OFF_FINDINGS.md](licenses/LICENSE_OFF_FINDINGS.md)
-and `evidence/gated-lassen-20261108/`. They are historical diagnoses, not the
-current comparison. An exact match in a later run does not establish
+recorded runs in [LICENSE_OFF_FINDINGS.md](licenses/LICENSE_OFF_FINDINGS.md).
+They are historical diagnoses, not the current comparison. An exact match in
+a later run does not establish
 agreement for every order Slurm can use or bound possible divergence.
 
-## Current results and independent audits
+## Reproducing current results and independent audits
 
-Small-case figures show feasible assignments to node-equivalent rows for
-license planning on and off, protected DR_EVT, and diagnostic DR_EVT.
-The Lassen figure has six metric panels. Current published comparisons and
-their audited source evidence are in `evidence/license-on-acknowledged-20261108/`.
-The license-on native run uses the corrected clock and dispatch acknowledgements.
-License-off reuses the acknowledged native record with identical Slurm/adapter
-binaries, and both DR_EVT references use the same current simulator binary.
-Both exact matches are recorded outcomes under uncontrolled scheduler order.
+The validation run produces small-case figures with feasible assignments to
+node-equivalent rows for license planning on and off, protected DR_EVT, and
+diagnostic DR_EVT. It also produces a six-panel Lassen figure.
+Both native runs use the corrected clock and dispatch acknowledgements, the
+same freshly built Slurm and adapter binaries, and the same current simulator
+binary. Any exact matches are outcomes under uncontrolled scheduler order.
 
 The protected comparison uses reservation depth 32, backfill examination depth 64,
 planning resolution one second, and a 72-hour planning horizon. The Lassen
@@ -172,20 +170,17 @@ and resource curves. `audit.json` independently verifies arrivals, runtimes,
 license counts, private node ownership, and both schedulers' resource traces.
 A passing audit does not imply matching schedules.
 
-To compare a rebuilt DR_EVT against an audited native run without rerunning
-Slurm, use a fresh output directory:
+To reproduce the comparison and its audits from source, use a fresh result
+directory:
 
 ```sh
-python3 validation/slurm/licenses/verify_backfill_retry.py \
-  validation/slurm/evidence/license-on-acknowledged-20261108/on \
-  build/simulator \
-  validation/slurm/results/licenses/controlled/backfill-retry-fixed/lassen-prefix2000-hybrid-r32-q64
+SLURM_LICENSE_RESULTS="$PWD/validation/slurm/results/licenses/reproduction" \
+  bash validation/slurm/run.sh
 ```
 
-This saves the new schedule, resource curves, checks, source diff, binary
-hashes, plotting data, and figures. It reuses the native schedule and its
-audit. Use `--skip-plots` if matplotlib is available only in a separate
-environment, then run the copied `plot.py` against the new `report.json`.
+This rebuilds and runs native Slurm and DR_EVT, then saves schedules, resource
+curves, audits, source and binary hashes, plotting data, and figures in that
+directory. Use a different empty directory for each reproduction.
 
 Historical 2,000-job results before the endpoint correction are in
 `results/licenses/controlled/dr-evt-performance-on-20261108/`:

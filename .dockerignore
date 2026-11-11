@@ -5,6 +5,8 @@
 build
 build-*
 docs/_build
+docs/_static
+validation/**/evidence
 __pycache__
 *.py[cod]
 *.core

@@ -1,8 +1,0 @@
-{
-  "scope": "Controller startup, virtual node registration, scheduling, completion RPCs, observation and snapshots; excludes DR_EVT and plotting",
-  "platform": "Linux validation container",
-  "batch_main_dispatch": true,
-  "interventions": [],
-  "on_seconds": 723.7726378299994,
-  "off_seconds": 739.2877493780106
-}

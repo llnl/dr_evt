@@ -166,7 +166,6 @@
       "src/utils/unit_tests/t_state_rngen.cpp": "5c327e952643b60b11029aa102209b9ca79992a96fa11885f8621c044c16b957",
       "src/utils/unit_tests/t_state_ser20.cpp": "39da5b36f65bddac918060542c4f3e9cf6c94dced733c12d8c40c866be8475cc"
     },
-    "native_reference": "validation/slurm/evidence/license-on-acknowledged-20261108/off",
     "native_validation_and_tests_finished_before_timing": true
   },
   "runs": [
