@@ -7,6 +7,9 @@ set_full_path(THIS_DIR_HEADERS
     resource/resource_model.hpp
     resource/capacity_model.hpp
     resource/count_timeline.hpp
+    resource/bitmap.hpp
+    resource/placement_timeline.hpp
+    resource/placement_model.hpp
     scheduler_policies.hpp
     schedule_windows.hpp
     scheduler_base.hpp

@@ -36,6 +36,15 @@ Resource models
 .. doxygenfile:: resource_model.hpp
    :project: dr_evt
 
+.. doxygenfile:: bitmap.hpp
+   :project: dr_evt
+
+.. doxygenfile:: placement_timeline.hpp
+   :project: dr_evt
+
+.. doxygenfile:: placement_model.hpp
+   :project: dr_evt
+
 Experimental multi-cluster scheduling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

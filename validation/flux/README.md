@@ -113,6 +113,31 @@ The [minimal reproducer](DIVERGENCE.md) verifies the identified node-reservation
 placement difference with four jobs. Expected divergences and matching controls
 are assertions, so its checks exit successfully when the observations agree.
 
+## Placement oracle
+
+[placement_oracle.py](placement_oracle.py) captures native Fluxion start times,
+allocated node IDs, and future node reservations for the reusable placement model.
+It does not run DR_EVT or compare these results with CapacityModel schedules.
+See [the oracle contract and examples](PLACEMENT_ORACLE.md).
+
+```sh
+flux env python3 /validation/placement_oracle.py --outdir /results/placement-oracle
+python3 /validation/placement_oracle.py --verify /validation/evidence/placement-oracle.json
+python3 -m unittest discover -s /validation -p test_placement_oracle.py -v
+```
+
+The default native harness generates the oracle after its Fiction smoke checks.
+Ordinary CI audits the checked fixture and rejection cases without needing Flux.
+It also runs `test_placement_model` and compares the validation-only C++ driver
+with all 60 native cases, including exact reservation snapshots:
+
+```sh
+python3 validation/flux/compare_placement_model.py ./build/test_flux_placement_driver
+```
+
+The driver uses the reusable bitmap model; simulator CLI/API placement selection
+is a separate integration step.
+
 ## Resource evidence and synchronization
 
 `resource_observer/sitecustomize.py` is opt-in through

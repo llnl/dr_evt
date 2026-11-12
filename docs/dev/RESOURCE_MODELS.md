@@ -58,7 +58,7 @@ memory, bandwidth, storage, cores, and GPUs need jointly feasible requests and
 timelines; they are not implemented by this extraction. Placement-aware models
 will additionally identify resources and enforce locality or topology rules.
 They may use capacity accounting as a component rather than inherit this scalar
-base. No placement class is introduced yet.
+base. The whole-node bitmap model below is the first placement implementation.
 
 CLI, protobuf, Python bindings, trace formats, and checkpoint layout retain their
 current node-count interfaces. This change introduces an internal C++ base;
@@ -72,3 +72,75 @@ dense interval oracle, and checks observer snapshots and accounting boundaries.
 Compile-time checks verify direct construction, scalar types, and absence of
 virtual dispatch or fields. Runtime diagnostic, scheduling, delayed-release,
 and checkpoint tests exercise CapacityModel through the scheduler and trace.
+
+## Whole-node placement
+
+`PlacementModel<Observer, NodeOrder>` is a concrete, stateless model. Requests
+remain node quantities; allocations contain exact node identities. Its
+`Bitmap` uses contiguous 64-bit words with zero padding bits. Selection takes
+whole words at once and scans bits only in the final partial word. The default
+order is `NodeOrder::LowIdFirst`; `HighIdFirst` is another compile-time
+specialization. This order is independent of storage layout. Word-wise OR,
+AND-NOT, AND, and XOR support bulk set operations, while `std::popcount` and bit
+scans allow compiler-selected hardware instructions. Committed release clears
+exact bits and rejects missing charges; it does not toggle them.
+
+```cpp
+using Model = dr_evt::PlacementModel<>;
+Model::Timeline plan(dr_evt::Bitmap(128, true), 0);
+auto placement = Model::find_fit(plan, 4, 60, 0);
+if (placement) {
+    Model::reserve(plan, std::move(*placement), 4, 60);
+}
+```
+
+`PlacementTimeline` keeps exact half-open intervals with dense resource masks.
+A future reservation owns its mask. `borrow_running()` references the caller's
+existing allocation owner without copying its bitmap or changing running-job
+metadata. Borrowed allocations must stay immutable and alive until the planning
+pass and its copies finish. A committed allocation must remain with its owner
+through completion and any delayed release. No job-ID side map is introduced.
+
+A derived, contiguous 64-row grid provides the coarse early filter. Each row
+unions the nodes free at any point in its bucket. Intersecting touched rows
+produces an optimistic candidate set: failure proves infeasibility, while
+success requires the exact interval search. This avoids false negatives even
+when nodes become free at different moments within a bucket. Exact search
+removes every node blocked anywhere in the requested interval and returns one
+fixed allocation. Earliest-fit candidates are the requested time and exact
+interval ends; accepted starts are never rounded to bucket boundaries.
+
+The grid belongs to the pass-local timeline, is invalidated on insertion, and
+is rebuilt lazily from temporary interval references. Copying a timeline copies
+exact state and preserves borrowed owners, but drops the derived grid. Empty
+allocations add no intervals. Nonpositive durations query an instant; reserving
+such a duration is a no-op. Queries on a shared timeline are not thread-safe
+because they may rebuild its cache.
+
+Both models use `if constexpr` to omit disabled observer work. Placement order
+also specializes at compile time. No speedup is claimed for the coarse filter:
+its rebuild and storage costs must be measured against exact-only search for
+representative workloads. This implementation provides CPU word parallelism;
+it does not implement GPU execution.
+
+## Placement validation and integration scope
+
+`test_placement_model` checks bitmap word boundaries and selection, invalid
+updates, observer metadata, borrowed-owner lifetime, exact release boundaries,
+fractional times, and randomized placement against an independent dense
+node-by-time oracle. Every valid exact fit must pass the coarse filter.
+
+The validation-only `test_flux_placement_driver` uses this model for FCFS,
+EASY, HYBRID, and conservative queue traversal. Each job record owns its live
+allocation; the planner borrows it until the pass ends, and completion releases
+and clears that same allocation. The comparison checks exact IDs, execution
+times, and future reservations against all 60 captured native Fluxion cases.
+CapacityModel is not an equality reference. See the
+[Fluxion placement oracle](https://github.com/LLNL/dr_evt/blob/main/validation/flux/PLACEMENT_ORACLE.md).
+
+The reusable model is not yet selectable by the simulator. CLI, protobuf,
+Python, trace serialization, and checkpoints keep their capacity interfaces.
+Connecting placement to those layers requires carrying allocation ownership
+through existing START/END/RELEASE events, including delayed release after job
+record reclamation. Cores, GPUs, topology, sharing, and multiple resource types
+are future work.

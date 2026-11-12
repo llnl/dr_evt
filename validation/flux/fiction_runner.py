@@ -14,18 +14,23 @@ CAPACITY = 4
 
 
 def run_case(case, jobs, policy, queue_depth=100, reservation_depth=None, timeout=120,
-             match_policy='lonodex', total_nodes=CAPACITY, scheduler_backend='fluxion'):
+             match_policy='lonodex', total_nodes=CAPACITY, scheduler_backend='fluxion',
+             observe_reservations=False):
     """Return raw transition rows, ordered by input job index.
 
     Jobs are (submission offset, nodes, time limit, actual runtime).
     Each node has one core; jobs own complete nodes. Priorities are equal,
     and runtime estimates are the submitted limits.
+    observe_reservations captures native allocations and future reservations
+    at quiescent boundaries; it is available only with Fluxion.
     """
     case = Path(case)
     if scheduler_backend not in ('fluxion', 'sched-simple'):
         raise ValueError(f'Unknown scheduler backend: {scheduler_backend}')
     if scheduler_backend == 'sched-simple' and (policy != 'fcfs' or reservation_depth):
         raise ValueError('sched-simple supports FCFS without backfill')
+    if observe_reservations and scheduler_backend != 'fluxion':
+        raise ValueError('Reservation snapshots require Fluxion')
     case.mkdir(parents=True, exist_ok=True)
     trace = case / 'trace.csv'
     with trace.open('w', newline='') as stream:
@@ -58,11 +63,16 @@ def run_case(case, jobs, policy, queue_depth=100, reservation_depth=None, timeou
     run_dir = case / ('run-' + uuid.uuid4().hex[:12])
     (case / 'run-directory.txt').write_text(str(run_dir) + '\n')
     environment = os.environ.copy()
-    if scheduler_backend == 'sched-simple':
-        environment['DR_EVT_FICTION_SCHEDULER'] = 'sched-simple'
+    if scheduler_backend == 'sched-simple' or observe_reservations:
         support = Path(__file__).parent
         environment['PYTHONPATH'] = (str(support / 'resource_observer') + ':' + str(support)
                                      + ':' + environment.get('PYTHONPATH', ''))
+    if scheduler_backend == 'sched-simple':
+        environment['DR_EVT_FICTION_SCHEDULER'] = 'sched-simple'
+    if observe_reservations:
+        environment.pop('DR_EVT_FICTION_SCHEDULER', None)
+        environment['DR_EVT_OBSERVE_RESOURCES'] = '1'
+        environment['DR_EVT_OBSERVE_RESERVATIONS'] = '1'
     with (case / 'run.log').open('w') as log:
         started = time.perf_counter()
         with subprocess.Popen(['flux-fiction-run', str(config), '--run-dir', str(run_dir)],

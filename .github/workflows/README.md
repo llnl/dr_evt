@@ -78,6 +78,10 @@ This directory contains GitHub Actions workflows for automated testing.
 - Streaming append API test - installed `test_append_job_api`
 - OpenPBS harness audit tests (5) -
   `python3 -m unittest discover -s validation/openpbs -p test_compare.py -v`
+- Bitmap placement model tests and all 60 native Fluxion allocation/reservation
+  comparisons (`test_placement_model`, `compare_placement_model.py`)
+- Flux placement oracle and identity audits -
+  `python3 -m unittest discover -s validation/flux -p test_placement_oracle.py -v`
 - OpenPBS forecast policy - installed `test_openpbs_forecast`
 
 **Compiler:**

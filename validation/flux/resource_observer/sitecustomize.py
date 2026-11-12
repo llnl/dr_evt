@@ -17,7 +17,7 @@ if os.environ.get('DR_EVT_OBSERVE_RESOURCES') == '1':
     original = Simulation.quiescent_cb
 
     def snapshot_then_advance(self, reply_epoch, bucket_time, span_id=None):
-        """Read allocation maps after starts/releases, excluding reservations."""
+        """Read native ownership and opt-in reservations after starts/releases."""
         if (reply_epoch == self.current_epoch
                 and bucket_time == float(self.current_time)
                 and not self.failed_reason):
@@ -42,6 +42,19 @@ if os.environ.get('DR_EVT_OBSERVE_RESOURCES') == '1':
                         'job': job.trace_index, 'jobid': str(jobid),
                         'allocation': (snapshot['jobs'][str(int(JobID(jobid)))] if simple else
                                        find(f'jobid-alloc={jobid}'))})
+            if os.environ.get('DR_EVT_OBSERVE_RESERVATIONS') == '1':
+                if simple:
+                    raise RuntimeError('Reservation snapshots require Fluxion')
+                record['reserved'] = find('sched-future=reserved')
+                record['reservations'] = []
+                for jobid, job in self.job_map.items():
+                    resources = find(f'jobid-reserved={jobid}')
+                    if resources['R'] is not None:
+                        info = handle.rpc('sched-fluxion-resource.info', {
+                            'jobid': int(JobID(jobid))}).get()
+                        record['reservations'].append({
+                            'job': job.trace_index, 'jobid': str(jobid),
+                            'allocation': resources, 'info': info})
             record['observer_sha256'] = hashlib.sha256(
                 Path(__file__).read_bytes()).hexdigest()
             output = Path(self.output_dir) / 'resource-manager-snapshots.jsonl'

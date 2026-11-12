@@ -178,6 +178,17 @@ jobs:
         id: openpbs-audits
         run: python3 -m unittest discover -s validation/openpbs -p test_compare.py -v
 
+      - name: Run Bitmap Placement Model Tests
+        id: bitmap-placement
+        run: |
+          $GITHUB_WORKSPACE/install/bin/tests/test_placement_model
+          python3 validation/flux/compare_placement_model.py \
+            "$GITHUB_WORKSPACE/install/bin/tests/test_flux_placement_driver"
+
+      - name: Run Flux Placement Oracle Audits
+        id: flux-placement-audits
+        run: python3 -m unittest discover -s validation/flux -p test_placement_oracle.py -v
+
       - name: Run Periodic Backfill Tests
         id: periodic-backfill
         run: |
@@ -383,6 +394,8 @@ jobs:
           echo "  Scheduler correctness - Installed (34 fixtures): ${{ steps.scheduler-correctness-installed.outcome }}"
           echo "  Node release delay: ${{ steps.node-release-delay.outcome }}"
           echo "  OpenPBS validation audits (5 tests): ${{ steps.openpbs-audits.outcome }}"
+          echo "  Bitmap placement and native comparison: ${{ steps.bitmap-placement.outcome }}"
+          echo "  Flux placement oracle audits: ${{ steps.flux-placement-audits.outcome }}"
           echo "  Periodic backfill (reference, retry, endpoint): ${{ steps.periodic-backfill.outcome }}"
           echo "  Planning horizon: ${{ steps.planning-horizon.outcome }}"
           echo "  Queue Impl Differential (34×4 impls): ${{ steps.queue-impl.outcome }}"
