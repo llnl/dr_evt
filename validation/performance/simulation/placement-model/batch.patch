@@ -1,0 +1,43 @@
+--- a/src/sim/resource/placement_timeline.hpp
++++ b/src/sim/resource/placement_timeline.hpp
+@@ -327,0 +328,40 @@
++  /** @brief Seed an empty planner from an existing running-record range.
++   * @tparam Range Borrowed iterable of existing running records.
++   * @tparam Describe Callable returning an Interval with a borrowed mask.
++   * @param[in] records Existing records; the range itself is not retained.
++   * @param[in] describe Maps a record to its exact release and borrowed allocation.
++   * @throws std::invalid_argument if the planner is nonempty, a mask is owned,
++   * timing or domains are invalid, or live allocations overlap.
++   * @throws std::bad_alloc if interval or temporary validation storage cannot be allocated.
++   * @details Each interval must begin at this planner's origin. Allocations must
++   * remain immutable and alive through this planner and its copies. A temporary
++   * union validates disjointness; interval metadata sorts once and transfers into
++   * the planner only after the complete batch is admitted. Failure leaves it unchanged.
++   * Exceptions from the descriptor propagate before ownership transfer. */
++  template <typename Range, typename Describe>
++  void seed_running(Range &&records, Describe describe) {
++    if (!m_intervals.empty()) throw std::invalid_argument("batch seed requires an empty timeline");
++    std::vector<Interval> initial;
++    if constexpr (requires { records.size(); }) initial.reserve(records.size());
++    Bitmap occupied(m_pool.capacity());
++    for (const auto &record : records) {
++      auto interval = describe(record);
++      if (interval.start != m_origin ||
++          !std::holds_alternative<std::reference_wrapper<const BitmapAllocation>>(interval.masks))
++        throw std::invalid_argument("batch interval must borrow a live allocation at the origin");
++      const auto end = endpoint(m_origin, interval.finish-m_origin);
++      if (end <= m_origin) throw std::invalid_argument("running release must be in the future");
++      const auto &allocation = interval.allocation();
++      if (!m_pool.contains(allocation) || occupied.intersects(allocation))
++        throw std::invalid_argument("invalid or overlapping running allocation");
++      if (allocation.count() == 0) continue;
++      occupied.add(allocation);
++      initial.push_back(std::move(interval));
++    }
++    std::sort(initial.begin(), initial.end(), [](const Interval &left, const Interval &right) {
++      return left.finish != right.finish ? left.finish < right.finish : left.job < right.job;
++    });
++    m_intervals = std::move(initial);
++    if constexpr (coarse_filter_enabled) m_filter.dirty = true;
++  }
++

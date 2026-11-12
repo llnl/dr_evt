@@ -27,6 +27,7 @@
 #include "params/sim_params.hpp"
 #include "sim/capacity_schedule.hpp"
 #include "sim/resource/count_timeline.hpp"
+#include "sim/running_jobs.hpp"
 #include "sim/scheduler_policies.hpp"
 #include "trace/job_record.hpp"
 #include "trace/trace.hpp"
@@ -48,16 +49,6 @@ template <typename TraceType> class BasicSimulation;
 /** \addtogroup dr_evt_sim
  *  @{ */
 
-/**
- * @brief Describes a currently running job for reservation calculations.
- */
-struct Running_Job {
-  sim_time_t start_time;
-  tdiff_t run_time;
-  num_nodes_t nodes;
-};
-
-using running_jobs_t = std::map<job_no_t, Running_Job>;
 /// Jobs selected during the current scheduling pass but not yet published.
 using projected_starts_t = std::vector<Running_Job>;
 
@@ -229,6 +220,45 @@ public:
   virtual std::vector<job_no_t> schedule(num_nodes_t free_nodes,
                                          const running_jobs_t &running_jobs,
                                          sim_time_t current_time) = 0;
+
+  /** @brief Select exact allocations for a placement-enabled simulation.
+   * @param[in] free_nodes Current available quantity.
+   * @param[in] running_jobs Existing live allocation owners, borrowed for this
+   * call.
+   * @param[in] current_time Scheduling timestamp.
+   * @return Owning decisions to transfer into running records before START
+   * events.
+   * @throws std::logic_error if this scheduler uses capacity accounting. */
+  virtual std::vector<Placement_Decision>
+  schedule_placements(num_nodes_t free_nodes,
+                      const running_jobs_t &running_jobs,
+                      sim_time_t current_time) {
+    (void)free_nodes;
+    (void)running_jobs;
+    (void)current_time;
+    throw std::logic_error("scheduler does not support placement");
+  }
+
+  /** @brief Borrow the most recent exact reservation-reporting snapshot.
+   * @return Owned future intervals valid until the next schedule call or
+   * destruction; empty for capacity schedulers. Live allocations are never
+   * borrowed here. */
+  virtual std::span<const PlacementInterval> placement_reservations() const {
+    return {};
+  }
+
+  /** @brief Read placement's shared examination budget for exact continuation.
+   * @return Timestamp and examined count; default schedulers report no
+   * placement budget. */
+  virtual std::pair<sim_time_t, size_t> placement_budget() const {
+    return {0, 0};
+  }
+  /** @brief Restore placement examination state after queue reconstruction.
+   * @param[in] budget Timestamp and examined count saved by a checkpoint.
+   * @details Capacity schedulers do not use this placement-only state. */
+  virtual void restore_placement_budget(std::pair<sim_time_t, size_t> budget) {
+    (void)budget;
+  }
 
   /**
    * @brief Run an event-driven FCFS pass without a periodic backfill scan.
@@ -558,6 +588,21 @@ std::unique_ptr<SchedulerBase> create_scheduler(
     size_t dispatch_queue_depth = 0, bool dispatch_on_events = false,
     bool per_pass_accounting = false, bool diagnostic_no_reservations = false,
     ResourceDiagnostics *resource_diagnostics = nullptr);
+
+/** @brief Select a resource model and its concrete scheduler once at
+ * construction.
+ * @param[in] total_nodes Physical node inventory.
+ * @param[in] initial_job_count Initial queue sizing hint.
+ * @param[in] params Complete validated scheduling/resource selection.
+ * @param[in,out] resource_diagnostics Optional simulation-owned observer
+ * counters.
+ * @return Owning scheduler with compile-time resource operations.
+ * @throws std::invalid_argument for unsupported resource or scheduling
+ * combinations. */
+std::unique_ptr<SchedulerBase>
+create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
+                 const Sim_Params &params,
+                 ResourceDiagnostics *resource_diagnostics = nullptr);
 
 /**@}*/
 

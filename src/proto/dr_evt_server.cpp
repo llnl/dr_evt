@@ -331,6 +331,13 @@ public:
           sp.m_dispatch_on_events = r.dispatch_on_events();
           sp.m_per_pass_accounting = r.per_pass_accounting();
           sp.m_resource_model_diagnostics = r.resource_model_diagnostics();
+          if (!r.resource_model().empty())
+            sp.m_resource_model = r.resource_model();
+          if (!r.placement_order().empty())
+            sp.m_placement_order = r.placement_order();
+          if (!r.placement_optimizations().empty())
+            sp.m_placement_optimizations = r.placement_optimizations();
+          sp.m_placement_coarse_filter = r.placement_coarse_filter();
           sp.m_diagnostic_no_reservations = r.diagnostic_no_reservations();
           if (!std::isfinite(r.planning_time_resolution()) ||
               r.planning_time_resolution() < 0.0) {
@@ -466,6 +473,8 @@ public:
                            .use_cached_unprotected_predictions())) {
             auto *job = out->add_jobs();
             job->set_job_idx(status.job_idx);
+            for (const auto id : status.node_ids)
+              job->add_node_ids(id);
             using State = dr_evt::Simulation::Job_State;
             switch (status.state) {
             case State::PENDING:

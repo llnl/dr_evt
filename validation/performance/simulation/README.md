@@ -58,6 +58,14 @@ The [first milestone results](count-model/README.md) record the correctness
 checks and measured overhead of the original standalone count model. Current
 code uses CapacityModel directly; the redundant CountModel wrapper was removed.
 
+## Bitmap placement optimization trials
+
+The [placement trials](placement-model/README.md) measure immediate selection,
+batch running-allocation seeding, reusable query scratch, and boolean fitting
+independently and together. They use the same 500-node EASY/HYBRID settings as
+`tests/benchmark_wait_queues.sh`, a reproducible seeded 20K-job trace, and focused
+reservation-query workloads.
+
 `compare_count_model.py` compares baseline and candidate binaries, with an
 optional explicitly instrumented or historical binary supplied via `--hooks`.
 It checks exact schedule/resource-history hashes on every run
@@ -143,3 +151,12 @@ stress-cached-conservative`. This avoids repeating long runs unnecessarily.
 
 Build/run `test_capacity_model-bin` to check the independent interval oracle,
 explicit recording/counting observers, and delayed-release integration.
+
+## Integrated placement benchmark
+
+[Placement simulator scripts](placement-model/SIMULATOR.md) preserve the existing
+wait-queue benchmark input and add comparisons of capacity and each compiled
+placement strategy. The seeded 20K input is available through an explicit
+`--generate-trace` invocation of `benchmark_placement.py`; it does not replace
+existing benchmark inputs. Whole-simulator results remain to be measured on the
+target platform.

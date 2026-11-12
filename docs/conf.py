@@ -78,6 +78,7 @@ exclude_patterns = [
     '.DS_Store',
     'dev/wip-notes/*',  # Exclude development session notes
     'dev/FLUX_VALIDATION_PLAN.md',  # Local, untracked validation notes
+    'dev/RESOURCE_MODEL_PLAN.md',  # Local, untracked resource-model notes
 ]
 
 # Source file suffix

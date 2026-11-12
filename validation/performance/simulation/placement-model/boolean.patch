@@ -1,0 +1,21 @@
+--- a/src/sim/resource/placement_model.hpp
++++ b/src/sim/resource/placement_model.hpp
+@@ -67 +67,7 @@
+-    return find_at(plan, quantity, duration, start, context).has_value();
++    const bool result = plan.can_fit(start, quantity, duration);
++    if constexpr (Observer::enabled) {
++      context.timeline = &plan;
++      Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
++          context, quantity, 0, 0, start, duration, result});
++    }
++    return result;
+--- a/src/sim/resource/placement_timeline.hpp
++++ b/src/sim/resource/placement_timeline.hpp
+@@ -445 +445,6 @@
+-    return find_at(quantity, duration, start).has_value();
++    const auto end = endpoint(start, duration);
++    Bitmap candidates = m_pool;
++    if constexpr (coarse_filter_enabled) filter(candidates, start, end);
++    if (candidates.count() < quantity) return false;
++    refine(candidates, start, end);
++    return candidates.count() >= quantity;

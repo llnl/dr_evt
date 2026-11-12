@@ -498,3 +498,31 @@ for complete C++ call sequences.
 [cpp-simulation-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15BasicSimulationE10Sim_Params19job_cost_function_t19backfill_selector_t
 [cpp-simulation-statistics-utilization]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10Statistics11utilizationE
 [cpp-trace-load-data]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace9load_dataE10num_jobs_t
+
+## Exact placement resources
+
+Select `resource_model = "placement"` in SimParams (Python uses
+`params.resource_model`) or `resource_model: "placement"` in gRPC InitRequest.
+`placement_order` defaults to `"low"`, `placement_optimizations` to `"all"`, and
+`placement_coarse_filter` to false. The CLI/protobuf/Python options select the
+same simulator implementation. See
+[Resource Models](../dev/RESOURCE_MODELS.md) for supported configurations.
+
+JobStatus.node_ids contains exact live or reserved node IDs. A pending status
+reports only the latest live reservation, with kind RESERVED; jobs without a
+reservation have no pending estimate. The query does not substitute an aggregate
+forecast by default. Disabling either cache-reuse flag selects an aggregate
+approximation, which omits node identities. Use exact lookahead for a fresh
+placement forecast when Ser20 is enabled. Query depth limits pending
+reporting, and queries preserve requested order and duplicates.
+
+Exact allocations survive END through delayed RELEASE and checkpoint restart.
+Released IDs are not retained in completed statuses. Reservation reporting
+snapshots, like existing estimate caches, are rebuilt by scheduling after
+checkpoint restore. Resource CSV output continues to report aggregate counts.
+
+Aggregate queue-drain and capacity-area horizon forecasts remain available in
+placement mode as approximations. Their results omit identity constraints;
+policy protection in an aggregate forecast does not establish an exact node
+reservation. Backfill-window summaries contain counts and the actual head start,
+but cannot establish an exact placement fit.

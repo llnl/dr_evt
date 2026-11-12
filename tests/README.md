@@ -121,6 +121,7 @@ server; no pre-existing Redis service is used.
 | Planning horizon | 9 differential + 34 identity + 1 option check | CTest (`test_planning_horizon_reference`) | Event-driven `--planning_horizon` for easy, hybrid, conservative, and sjf against the Python references, with and without a horizon; an explicit unlimited horizon byte-identical to the default on the 34 workloads; rejected values. Periodic horizon cases live in the configuration suite. |
 | SWF input | 8 CLI cases | `run_swf_tests.sh` (CTest `test_swf`) | Standard Workload Format parsing: equivalence with simple-format CSV, header-derived and overridden cores-per-node, MaxNodes as the default machine size, skipped records, malformed lines, and option consistency |
 | Native CTest | Build-dependent | CTest | All enabled registrations, including serialization, planner endpoints, periodic and event-driven dispatch, placement accounting, queue depth, exact checkpoint/restart, batch/streaming equivalence, trace tools, and optional MPI/Python tests; use `ctest --test-dir build -N` for the configured inventory |
+| Bitmap placement model | 1 native binary + 60 Fluxion cases | CTest (`test_placement_model`, `test_flux_placement_model`) | Word-parallel bitmap selection, exact identity reservations, coarse-filter safety against a dense node-time oracle, borrowed allocation lifetime, accounting errors, and native Fluxion allocation/reservation equality with the coarse filter enabled and disabled, for both ID orders and all four queue policies |
 | OpenPBS validation audits | 5 | `python3 -m unittest discover -s validation/openpbs -p test_compare.py -v` | Harness capacity, arrival, duration, trace conversion, and candidate-fit checks; quick and full CI, without a native scheduler build |
 | One-second forecast event grouping | 1 native binary + 2 CLI cases and a Protobuf-config case in placement-pass integration | CTest (`test_openpbs_forecast`, `test_placement_pass_integration`) | Inclusive predicted-event groups, separated/lone releases, exact reservation intervals, event retention, streaming starts, and checkpoint continuation; pending-status and queue-drain forecasts retain grouping while actual releases can start jobs earlier; quick CI also runs the native binary |
 
@@ -415,3 +416,15 @@ For a scheduler-correctness fixture:
 
 Regenerate expected outputs only for an intentional behavior change, and
 review the generated diff before committing it.
+
+`test_placement_integration` runs actual Simulation placement checks for delayed
+RELEASE after trace reclamation, checkpoint continuation with bounded queue
+examination, 65-node bitmap boundaries, ordering, diagnostics and invalid
+configuration/requests. Python and gRPC API suites also exercise live and
+reserved node-ID reporting. The Fluxion comparator drives the same simulator,
+rather than a standalone scheduling loop.
+
+`test_placement_scripts.py` checks input preservation in the existing benchmark,
+seeded-input reproducibility, output conservation and capacity audits, failure
+reports, filter/strategy selection, and unchanged recorded workloads in the
+native placement adapter. It is registered with CTest when Python is available.

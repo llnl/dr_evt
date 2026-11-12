@@ -42,6 +42,14 @@ DISPATCH_ON_EVENTS=0
 DISPATCH_RUNS=3
 DISPATCH_OPTIONS_SET=0
 CONFIG_HEADER=""
+RESOURCE_MODEL="capacity"
+PLACEMENT_OUTPUT="/tmp/dr-evt-main-placement-results.json"
+PLACEMENT_NODES=500
+PLACEMENT_COARSE_FILTER=off
+CAPACITY_BASELINE=""
+PLACEMENT_REQUIRE_RESERVATIONS=0
+PLACEMENT_OPTIONS_SET=0
+RUNS_SET=0
 
 print_usage() {
     echo "Usage: $0 [OPTIONS] [TRACE_FILE]"
@@ -50,6 +58,16 @@ print_usage() {
     echo "Variants: deque, multimap, circular, all block sizes, and Python reference"
     echo ""
     echo "ARGUMENTS:"
+    echo "  --resource-model capacity|placement"
+    echo "                Placement compares the actual circular simulator across all"
+    echo "                six compile-time strategies, plus capacity; --runs sets repeats."
+    echo "  --placement-output PATH"
+    echo "                Placement JSON report (default /tmp/dr-evt-main-placement-results.json)."
+    echo "  --nodes N     Placement inventory (default 500); use 128 for contention."
+    echo "  --placement-coarse-filter off|on|both (default off)"
+    echo "  --capacity-baseline PATH   Optional matching pre-integration binary."
+    echo "  --require-reservations     Reject a placement run with no reservations."
+    echo "                Placement uses the same existing TRACE_FILE and default input."
     echo "  --backfill-policy POLICY"
     echo "                all (default) runs EASY and hybrid comparisons;"
     echo "                easy benchmarks all FCFS queue variants; hybrid benchmarks"
@@ -86,6 +104,47 @@ print_usage() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --resource-model)
+            if [[ $# -lt 2 || ( "$2" != "capacity" && "$2" != "placement" ) ]]; then
+                echo "Error: --resource-model requires capacity or placement" >&2
+                exit 1
+            fi
+            RESOURCE_MODEL="$2"
+            shift 2
+            ;;
+        --placement-output)
+            if [[ $# -lt 2 ]]; then echo "Error: --placement-output requires a path" >&2; exit 1; fi
+            PLACEMENT_OUTPUT="$2"
+            PLACEMENT_OPTIONS_SET=1
+            shift 2
+            ;;
+        --nodes)
+            if [[ $# -lt 2 || ! "$2" =~ ^[1-9][0-9]*$ ]]; then
+                echo "Error: --nodes requires a positive integer" >&2; exit 1
+            fi
+            PLACEMENT_NODES="$2"
+            PLACEMENT_OPTIONS_SET=1
+            shift 2
+            ;;
+        --placement-coarse-filter)
+            if [[ $# -lt 2 || ! "$2" =~ ^(off|on|both)$ ]]; then
+                echo "Error: --placement-coarse-filter requires off, on, or both" >&2; exit 1
+            fi
+            PLACEMENT_COARSE_FILTER="$2"
+            PLACEMENT_OPTIONS_SET=1
+            shift 2
+            ;;
+        --capacity-baseline)
+            if [[ $# -lt 2 ]]; then echo "Error: --capacity-baseline requires a path" >&2; exit 1; fi
+            CAPACITY_BASELINE="$2"
+            PLACEMENT_OPTIONS_SET=1
+            shift 2
+            ;;
+        --require-reservations)
+            PLACEMENT_REQUIRE_RESERVATIONS=1
+            PLACEMENT_OPTIONS_SET=1
+            shift
+            ;;
         --config-header)
             if [[ $# -lt 2 ]]; then
                 echo "Error: --config-header requires a path" >&2
@@ -124,6 +183,7 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             DISPATCH_RUNS="$2"
+            RUNS_SET=1
             DISPATCH_OPTIONS_SET=1
             shift 2
             ;;
@@ -190,7 +250,7 @@ if [[ "$BENCHMARK_MODE" != "all" && "$BENCHMARK_MODE" != "easy" && "$BENCHMARK_M
     exit 1
 fi
 
-if [[ "$DISPATCH_OPTIONS_SET" == "1" && "$DISPATCH_MODE" == "0" ]]; then
+if [[ "$DISPATCH_OPTIONS_SET" == "1" && "$DISPATCH_MODE" == "0" && "$RESOURCE_MODEL" != "placement" ]]; then
     echo "Error: fixed-dispatch options require --dispatch-interval" >&2
     exit 1
 fi
@@ -199,12 +259,17 @@ if [[ "$DISPATCH_MODE" == "1" && ( "$BENCHMARK_MODE" == "all" || "$HYBRID_BACKFI
     exit 1
 fi
 
+if [[ "$PLACEMENT_OPTIONS_SET" == "1" && "$RESOURCE_MODEL" != "placement" ]]; then
+    echo "Error: placement benchmark options require --resource-model placement" >&2
+    exit 1
+fi
+
 # Locate the installed simulator. This is shared with the other test scripts.
 source "$SCRIPT_DIR/set_simulator_path.sh"
 source "$SCRIPT_DIR/select_python.sh"
 
 # Check trace file exists
-if [[ ! -f "$TRACE_FILE" ]]; then
+if [[ -n "$TRACE_FILE" && ! -f "$TRACE_FILE" ]]; then
     echo "Error: Trace file not found: $TRACE_FILE"
     exit 1
 fi
@@ -216,6 +281,30 @@ TRACE_FORMAT="simple"
 TIMESTAMP_FORMAT="epoch"
 # Use run_time_mode=limit (jobs run for full time_limit) for consistent benchmarking.
 RUN_TIME_MODE="limit"
+
+# Placement is measured through complete runs of the same simulator, with
+# independent compile-time strategies selected once by its constructor.
+if [[ "$RESOURCE_MODEL" == "placement" ]]; then
+    if [[ "$DISPATCH_MODE" != "0" || "$HYBRID_BACKFILL_INTERVAL" != "0" ||
+          "$DISPATCH_ON_EVENTS" != "0" || "$DISPATCH_QUEUE_DEPTH" != "0" || "$WITH_PYTHON_REFERENCE" != "0" ]]; then
+        echo "Error: placement benchmark requires event-driven scheduling and does not use the aggregate Python oracle" >&2
+        exit 1
+    fi
+    if [[ "$RUNS_SET" == "0" ]]; then DISPATCH_RUNS=9; fi
+    select_python_interpreter 3 7
+    placement_args=(--binary "$SIMULATOR" --policy "$BENCHMARK_MODE"
+        --nodes "$PLACEMENT_NODES" --runs "$DISPATCH_RUNS"
+        --reservation-depth "$HYBRID_RESERVATION_DEPTH" --queue-depth "$HYBRID_QUEUE_DEPTH"
+        --output "$PLACEMENT_OUTPUT")
+    if [[ -n "$TRACE_FILE" ]]; then placement_args+=(--trace "$TRACE_FILE"); fi
+    if [[ -n "$CONFIG_HEADER" ]]; then placement_args+=(--config-header "$CONFIG_HEADER"); fi
+    if [[ -n "$CAPACITY_BASELINE" ]]; then placement_args+=(--capacity-baseline "$CAPACITY_BASELINE"); fi
+    if [[ "$PLACEMENT_COARSE_FILTER" == "on" ]]; then placement_args+=(--coarse-filter); fi
+    if [[ "$PLACEMENT_COARSE_FILTER" == "both" ]]; then placement_args+=(--compare-coarse-filter); fi
+    if [[ "$PLACEMENT_REQUIRE_RESERVATIONS" == "1" ]]; then placement_args+=(--require-reservations); fi
+    "$PYTHON_BIN" validation/performance/simulation/placement-model/benchmark_placement.py "${placement_args[@]}"
+    exit $?
+fi
 
 # Fixed periodic dispatch has only a circular implementation. Measure complete runs
 # rather than compare queue variants or invoke the separate-backfill oracle.

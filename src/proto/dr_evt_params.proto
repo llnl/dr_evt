@@ -220,6 +220,14 @@ message DR_EVT_Params {
         // Count resource operations using an observer selected at construction.
         // Default false. CLI: --resource_model_diagnostics.
         bool resource_model_diagnostics = 52;
+        // "capacity" (default) or "placement"; placement requires event-driven FCFS/circular.
+        string resource_model = 53;
+        // "low" (default) or "high", selected at construction.
+        string placement_order = 54;
+        // "all" (default), "none", "fast", "batch", "scratch", or "boolean".
+        string placement_optimizations = 55;
+        // Opt in to the compile-time coarse-filter specialization.
+        bool placement_coarse_filter = 56;
     }
 
     message Tracing_Params {

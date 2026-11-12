@@ -161,6 +161,17 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readwrite("per_pass_accounting", &Sim_Params::m_per_pass_accounting,
                      "bool: Event-driven placement passes with per-pass Q/R "
                      "accounting and guarded reservation-only retries.")
+      .def_readwrite("resource_model", &Sim_Params::m_resource_model,
+                     "capacity (default) or exact whole-node placement.")
+      .def_readwrite(
+          "placement_order", &Sim_Params::m_placement_order,
+          "low (default) or high node IDs; selected at construction.")
+      .def_readwrite("placement_optimizations",
+                     &Sim_Params::m_placement_optimizations,
+                     "all (default), none, fast, batch, scratch, or boolean.")
+      .def_readwrite("placement_coarse_filter",
+                     &Sim_Params::m_placement_coarse_filter,
+                     "Opt in to the compile-time coarse placement filter.")
       .def_readwrite(
           "resource_model_diagnostics",
           &Sim_Params::m_resource_model_diagnostics,
@@ -317,6 +328,9 @@ PYBIND11_MODULE(dr_evt, m) {
                     &Simulation::Job_Status::expected_start_time,
                     "Optional[float]: Pending reservation-derived or "
                     "estimated start; inspect start_time_kind.")
+      .def_readonly(
+          "node_ids", &Simulation::Job_Status::node_ids,
+          "Exact live/cleanup or reserved placement IDs; empty for capacity.")
       .def_readonly("start_time_kind", &Simulation::Job_Status::start_time_kind,
                     "StartTimeKind: NONE, RESERVED, or ESTIMATED source of a "
                     "pending start time.");

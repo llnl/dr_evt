@@ -58,6 +58,10 @@ static constexpr int OPT_RESOURCE_MODEL_DIAGNOSTICS = 1024;
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
 /** @brief Long-option table for the simulator CLI. */
+static constexpr int OPT_RESOURCE_MODEL = 1100;
+static constexpr int OPT_PLACEMENT_ORDER = 1101;
+static constexpr int OPT_PLACEMENT_OPTIMIZATIONS = 1102;
+static constexpr int OPT_PLACEMENT_COARSE_FILTER = 1103;
 static const struct option sim_longopts[] = {
     {"help", no_argument, 0, 'h'},
     {"infile", required_argument, 0, 'i'},
@@ -79,6 +83,11 @@ static const struct option sim_longopts[] = {
     {"dispatch_queue_depth", required_argument, 0, OPT_DISPATCH_QUEUE_DEPTH},
     {"dispatch_on_events", no_argument, 0, OPT_DISPATCH_ON_EVENTS},
     {"per_pass_accounting", no_argument, 0, OPT_PER_PASS_ACCOUNTING},
+    {"resource_model", required_argument, 0, OPT_RESOURCE_MODEL},
+    {"placement_order", required_argument, 0, OPT_PLACEMENT_ORDER},
+    {"placement_optimizations", required_argument, 0,
+     OPT_PLACEMENT_OPTIMIZATIONS},
+    {"placement_coarse_filter", no_argument, 0, OPT_PLACEMENT_COARSE_FILTER},
     {"resource_model_diagnostics", no_argument, 0,
      OPT_RESOURCE_MODEL_DIAGNOSTICS},
     {"diagnostic_no_reservations", no_argument, 0,
@@ -352,6 +361,18 @@ void Sim_Params::getopt(int &argc, char **&argv) {
                   << std::endl;
         print_usage(argv[0], 1);
       }
+      break;
+    case OPT_RESOURCE_MODEL:
+      m_resource_model = optarg;
+      break;
+    case OPT_PLACEMENT_ORDER:
+      m_placement_order = optarg;
+      break;
+    case OPT_PLACEMENT_OPTIMIZATIONS:
+      m_placement_optimizations = optarg;
+      break;
+    case OPT_PLACEMENT_COARSE_FILTER:
+      m_placement_coarse_filter = true;
       break;
     case OPT_RESOURCE_MODEL_DIAGNOSTICS:
       m_resource_model_diagnostics = true;
@@ -931,6 +952,15 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        backfill pass by every scheduler (easy, conservative,\n"
          "        hybrid; FCFS, SJF, LJF; custom EASY); 0 means unlimited.\n"
          "\n"
+         "    --resource_model capacity|placement\n"
+         "        Placement uses exact node identities with event-driven FCFS "
+         "and circular queues.\n"
+         "    --placement_order low|high (default low)\n"
+         "    --placement_coarse_filter (default disabled)\n"
+         "    --placement_optimizations all|none|fast|batch|scratch|boolean "
+         "(default all)\n"
+         "        Select compile-time placement strategies once at "
+         "construction.\n"
          "    --resource_model_diagnostics\n"
          "        Count resource operations per simulation (default: "
          "disabled).\n"
@@ -1231,6 +1261,11 @@ void Sim_Params::print() const {
   msg += " - reservation_depth: " + to_string(m_reservation_depth) + "\n";
   msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) + "\n";
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
+  msg += " - resource_model: " + m_resource_model + "\n";
+  msg += " - placement_order: " + m_placement_order + "\n";
+  msg += " - placement_optimizations: " + m_placement_optimizations + "\n";
+  msg += " - placement_coarse_filter: " +
+         std::string(m_placement_coarse_filter ? "true" : "false") + "\n";
   msg += " - resource_model_diagnostics: " +
          std::string(m_resource_model_diagnostics ? "true" : "false") + "\n";
   msg += " - per_pass_accounting: " +

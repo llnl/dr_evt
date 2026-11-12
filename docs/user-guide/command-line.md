@@ -19,6 +19,10 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | System | `--sim_start_time TIME` | Set the global simulation start time as a nonnegative epoch value or ISO timestamp; a positive value warm-starts replay input. |
 | System | `--warm_start_wait_queue MODE` | Select `inherit` (default) or legacy `drop` handling for jobs waiting at a replay warm-start boundary. |
 | Scheduling | `-b, --backfill_policy POLICY` | Select `easy`, `conservative`, `hybrid`, or `none`. |
+| Resources | `--resource_model MODEL` | Select aggregate capacity (default) or exact whole-node placement. |
+| Resources | `--placement_order ORDER` | Prefer low (default) or high node IDs. |
+| Resources | `--placement_optimizations MODE` | Select `all` (default), `none`, `fast`, `batch`, `scratch`, or `boolean` at construction. |
+| Resources | `--placement_coarse_filter` | Enable the optional optimistic coarse filter; default OFF. |
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Limit counted waiting-job examinations during backfill; accounting depends on trigger mode and policy. |
 | Scheduling | `--diagnostic_no_reservations` | Diagnostic current-capacity dispatch without future reservations; requires the periodic hybrid/conservative configuration. |
@@ -1063,3 +1067,33 @@ do not use the selected live scheduler. Reading counters does not run planning.
 This replaces the removed `DR_EVT_RESOURCE_MODEL_DIAGNOSTICS` CMake option.
 See [Resource diagnostics](../dev/RESOURCE_DIAGNOSTICS.md) for API access and
 lifetime details.
+
+## Exact whole-node placement
+
+```sh
+simulator jobs.csv --resource_model placement --total_nodes 500 \
+  --trace_format simple --timestamp_format epoch --run_time_mode limit \
+  --priority_policy fcfs --queue_impl circular --backfill_policy hybrid \
+  --reservation_depth 32 --backfill_queue_depth 32
+```
+
+Allocation and reservation use exact node identities throughout the main
+simulation. Nodes become reusable at RELEASE, including configured cleanup
+after END. EASY reserves one waiting job; HYBRID reserves up to its depth;
+conservative reserves each examined waiting job; `none` stops at a blocked head.
+Reservations use half-open intervals and allow a later job to start earlier
+when it does not overlap protected node/time intervals.
+
+Placement requires event-driven circular FCFS, static capacity and exact
+planning times. Periodic dispatch/backfill, custom schedulers, replay input/warm
+start, capacity schedules, per-pass accounting and nonzero planning resolution
+are rejected. Capacity remains the default resource model.
+
+Optimization options select template specializations once at construction:
+`fast` uses immediate allocation before lazily creating a timeline, `batch`
+seeds running intervals together, `scratch` reuses query-local bitmap storage,
+`boolean` checks feasibility without constructing a result, and `all` combines
+them. `none` disables all four for comparison. The coarse filter is independent,
+OFF by default, and every accepted fit still receives an exact check.
+
+See [Resource Models](../dev/RESOURCE_MODELS.md) for ownership and validation.

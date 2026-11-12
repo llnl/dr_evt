@@ -65,11 +65,12 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    21; // 21: runtime resource diagnostics setting; 20: diagnostic reservation
-        // policy; 19: placement-pass accounting; 18: arrival dispatch wakes;
-        // 17: dispatch controls; 16: periodic dirty flag; 15: periodic
-        // deadline; 14: backfill_queue_depth; 13: scalar event/sample times;
-        // 12: release delay; 11: reservation_depth
+    22; // 22: placement selection and exact running allocations; 21: runtime
+        // resource diagnostics setting; 20: diagnostic reservation policy; 19:
+        // placement-pass accounting; 18: arrival dispatch wakes; 17: dispatch
+        // controls; 16: periodic dirty flag; 15: periodic deadline; 14:
+        // backfill_queue_depth; 13: scalar event/sample times; 12: release
+        // delay; 11: reservation_depth
 
 /// Trace policy identifier stored in a checkpoint so a file written by one
 /// trace type is not restored into another.
@@ -372,16 +373,9 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
       m_trace(m_params.m_infile, m_params.m_trace_format,
               m_params.m_timestamp_format, m_params.m_timezone,
               m_params.m_resource_model_diagnostics),
-      m_scheduler(create_scheduler(
-          m_params.m_total_nodes, m_trace.data().size(),
-          m_params.m_backfill_policy, m_params.m_priority_policy,
-          m_params.m_queue_impl, m_params.m_block_size,
-          m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow,
-          m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
-          m_params.m_backfill_interval, m_params.m_dispatch_interval,
-          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting, m_params.m_diagnostic_no_reservations,
-          m_trace.m_resource_diagnostics.get())),
+      m_scheduler(create_scheduler(m_params.m_total_nodes,
+                                   m_trace.data().size(), m_params,
+                                   m_trace.m_resource_diagnostics.get())),
       m_custom_scheduler(nullptr), m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -398,6 +392,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
       m_warm_resource_area(0.0), m_warm_resource_end(0.0), m_jobs_releasing(0),
       m_rng(m_params.m_seed), m_queue_length_sum(0), m_queue_length_samples(0),
       m_queue_length_peak(0) {
+  if (m_params.m_resource_model == "placement")
+    m_running_jobs.enable_placement(m_params.m_total_nodes);
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
   m_scheduler->set_planning_time_resolution(
       m_params.m_planning_time_resolution);
@@ -437,6 +433,9 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
       m_warm_resource_area(0.0), m_warm_resource_end(0.0), m_jobs_releasing(0),
       m_rng(m_params.m_seed), m_queue_length_sum(0), m_queue_length_samples(0),
       m_queue_length_peak(0) {
+  if (m_params.m_resource_model != "capacity")
+    throw std::invalid_argument(
+        "custom schedulers require resource_model=capacity");
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
   m_custom_scheduler->set_backfill_queue_depth(m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
@@ -475,6 +474,9 @@ BasicSimulation<TraceType>::BasicSimulation(
   if (!m_scheduler) {
     throw std::invalid_argument("custom scheduler must not be null");
   }
+  if (m_params.m_resource_model != "capacity")
+    throw std::invalid_argument(
+        "custom schedulers require resource_model=capacity");
   m_trace.set_cores_per_node(m_params.m_cores_per_node);
   m_custom_scheduler->set_backfill_queue_depth(m_params.m_backfill_queue_depth);
   m_scheduler->set_planning_time_resolution(
@@ -546,6 +548,10 @@ template <typename TraceType> void BasicSimulation<TraceType>::run() {
 
   // Initialize: load jobs and determine durations
   initialize_trace();
+  if (m_running_jobs.placement() &&
+      m_trace.dcols().get_trace_mode() == TraceMode::REPLAY)
+    throw std::invalid_argument("placement requires simulation-mode input; "
+                                "replay traces contain no node identities");
 
   if (m_params.m_verbose) {
     std::cout << "Loaded " + std::to_string(m_trace.data().size()) +
@@ -1214,6 +1220,13 @@ size_t BasicSimulation<TraceType>::checkpoint_reserve_bytes() const {
   }
   bytes = saturating_add(bytes, m_running_jobs.size(),
                          sizeof(running_jobs_t::value_type) + 16);
+  if (const auto *state = m_running_jobs.placement()) {
+    for (const auto &[id, record] : state->jobs) {
+      (void)id;
+      bytes = saturating_add(bytes, record.allocation.words().size() + 1,
+                             sizeof(std::uint64_t));
+    }
+  }
   bytes = saturating_add(bytes, m_pending_queue_arrivals.size(), 32);
   bytes = saturating_add(bytes, m_event_queue.size(), 32);
   bytes =
@@ -1309,6 +1322,11 @@ void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
       m_params.visit_fields(params_writer);
     }
     writer.value(m_custom_scheduler != nullptr);
+    if (m_running_jobs.placement()) {
+      const auto budget = m_scheduler->placement_budget();
+      writer.value(budget.first);
+      writer.value(budget.second);
+    }
     writer.value(static_cast<std::uint64_t>(m_capacity_changes.size()));
     for (const auto &change : m_capacity_changes) {
       writer.value(change.time);
@@ -1392,6 +1410,12 @@ void BasicSimulation<TraceType>::save_checkpoint_impl(std::ostream &output,
       writer.value(running.start_time);
       writer.value(running.run_time);
       writer.value(running.nodes);
+      if (const auto *state = m_running_jobs.placement()) {
+        const auto &allocation = state->jobs.at(job_id).allocation;
+        writer.value(static_cast<std::uint64_t>(allocation.words().size()));
+        for (auto word : allocation.words())
+          writer.value(word);
+      }
     }
     writer.value(static_cast<std::uint64_t>(m_pending_queue_arrivals.size()));
     for (const auto &[time, count] : m_pending_queue_arrivals) {
@@ -1622,6 +1646,16 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(recorded.m_backfill_queue_depth,
                              m_params.m_backfill_queue_depth,
                              "backfill_queue_depth");
+    require_checkpoint_match(recorded.m_resource_model,
+                             m_params.m_resource_model, "resource_model");
+    require_checkpoint_match(recorded.m_placement_order,
+                             m_params.m_placement_order, "placement_order");
+    require_checkpoint_match(recorded.m_placement_optimizations,
+                             m_params.m_placement_optimizations,
+                             "placement_optimizations");
+    require_checkpoint_match(recorded.m_placement_coarse_filter,
+                             m_params.m_placement_coarse_filter,
+                             "placement_coarse_filter");
     require_checkpoint_match(recorded.m_per_pass_accounting,
                              m_params.m_per_pass_accounting,
                              "per_pass_accounting");
@@ -1674,6 +1708,9 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
     require_checkpoint_match(checkpoint_uses_custom_scheduler,
                              m_custom_scheduler != nullptr,
                              "custom scheduler kind");
+    std::optional<std::pair<sim_time_t, size_t>> placement_budget;
+    if (m_running_jobs.placement())
+      placement_budget = {reader.value<sim_time_t>(), reader.value<size_t>()};
     const size_t capacity_change_count = reader.count();
     require_checkpoint_match(capacity_change_count, m_capacity_changes.size(),
                              "capacity schedule size");
@@ -1801,7 +1838,22 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
       const auto job_id = reader.value<job_no_t>();
       Running_Job running{reader.value<sim_time_t>(), reader.value<tdiff_t>(),
                           reader.value<num_nodes_t>()};
-      m_running_jobs.emplace(job_id, running);
+      if (m_running_jobs.placement()) {
+        const auto width = reader.count();
+        if (width != (static_cast<size_t>(m_params.m_total_nodes) + 63) / 64)
+          throw std::runtime_error(
+              "checkpoint placement bitmap has invalid width");
+        std::vector<std::uint64_t> words(width);
+        for (auto &word : words)
+          word = reader.value<std::uint64_t>();
+        Bitmap allocation(m_params.m_total_nodes, true);
+        allocation.intersect_words(words);
+        if (!words.empty() && allocation.words().back() != words.back())
+          throw std::runtime_error(
+              "checkpoint placement includes padding bits");
+        m_running_jobs.commit(job_id, running, std::move(allocation));
+      } else
+        m_running_jobs.emplace(job_id, running);
     }
     m_pending_queue_arrivals.clear();
     for (size_t i = 0, count = reader.count(); i < count; ++i) {
@@ -1885,17 +1937,6 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
         static_cast<job_no_t>(m_trace.m_num_reclaimed);
     const auto resident_job_count =
         static_cast<job_no_t>(m_trace.m_data.size());
-    m_trace.reset_policy_runtime_state();
-    for (const auto &[job_id, running] : m_running_jobs) {
-      (void)running;
-      if (job_id < first_resident_job ||
-          job_id - first_resident_job >= resident_job_count) {
-        throw std::runtime_error(
-            "checkpoint running-job map references a non-resident job");
-      }
-      m_trace.restore_policy_running_job(
-          m_trace.m_data[job_id - first_resident_job]);
-    }
 
 #if MARK_DAT_PERIOD
     m_trace.m_ctx.m_pAll_cnt = reader.value<num_jobs_t>();
@@ -1924,6 +1965,46 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
         m_trace.m_ctx.m_evtq.emplace(job_id, time, type);
       }
     }
+
+    // Release events own cleanup timing/counts after the trace record is gone.
+    // Restore active policy state only for jobs that are still executing.
+    m_trace.reset_policy_runtime_state();
+    size_t cleanup_owners = 0;
+    std::uint64_t cleanup_nodes = 0;
+    std::uint64_t occupied_nodes = 0;
+    for (const auto &[job_id, running] : m_running_jobs) {
+      occupied_nodes += running.nodes;
+      const auto release = std::find_if(
+          m_trace.m_ctx.m_evtq.begin(), m_trace.m_ctx.m_evtq.end(),
+          [job_id](const DR_Event &event) {
+            return event.get_job_idx() == job_id && event.is_release();
+          });
+      if (release != m_trace.m_ctx.m_evtq.end()) {
+        if (release->get_time() <= m_current_time ||
+            release->get_nodes() != running.nodes)
+          throw std::runtime_error(
+              "checkpoint cleanup owner has an invalid release event");
+        ++cleanup_owners;
+        cleanup_nodes += running.nodes;
+        continue;
+      }
+      if (job_id < first_resident_job ||
+          job_id - first_resident_job >= resident_job_count)
+        throw std::runtime_error("checkpoint running-job map references a "
+                                 "non-resident job without a release event");
+      m_trace.restore_policy_running_job(
+          m_trace.m_data[job_id - first_resident_job]);
+    }
+    if (cleanup_owners != m_jobs_releasing ||
+        cleanup_nodes != m_trace.m_ctx.m_n_nodes_releasing)
+      throw std::runtime_error(
+          "checkpoint cleanup accounting differs from release owners");
+    if (m_running_jobs.placement() &&
+        occupied_nodes !=
+            static_cast<std::uint64_t>(m_trace.m_ctx.m_n_nodes_in_use) +
+                m_trace.m_ctx.m_n_nodes_releasing)
+      throw std::runtime_error(
+          "checkpoint placement accounting differs from trace quantities");
 
     m_trace.m_resource_history_capacity = reader.value<size_t>();
     m_trace.m_resource_history_capacity_resolved = reader.value<bool>();
@@ -2006,16 +2087,11 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
             "checkpoint custom scheduler queue ownership is inconsistent");
       }
     } else {
-      m_scheduler = create_scheduler(
-          m_params.m_total_nodes, m_trace.m_data.size(),
-          m_params.m_backfill_policy, m_params.m_priority_policy,
-          m_params.m_queue_impl, m_params.m_block_size,
-          m_params.m_wait_queue_capacity, m_params.m_wait_queue_overflow,
-          m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
-          m_params.m_backfill_interval, m_params.m_dispatch_interval,
-          m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting, m_params.m_diagnostic_no_reservations,
-          m_trace.m_resource_diagnostics.get());
+      m_scheduler =
+          create_scheduler(m_params.m_total_nodes, m_trace.data().size(),
+                           m_params, m_trace.m_resource_diagnostics.get());
+      if (placement_budget)
+        m_scheduler->restore_placement_budget(*placement_budget);
       m_scheduler->set_planning_time_resolution(
           m_params.m_planning_time_resolution);
       m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -2419,6 +2495,32 @@ BasicSimulation<TraceType>::get_job_statuses_impl(
       }
       result.push_back(status);
     }
+  }
+  if (const auto *state = m_running_jobs.placement();
+      state && use_cached_predictions && use_cached_unprotected_predictions) {
+    for (auto &status : result) {
+      if (const auto found = state->jobs.find(status.job_idx);
+          found != state->jobs.end())
+        status.node_ids = found->second.allocation.ids();
+      if (status.state != Job_State::PENDING)
+        continue;
+      if (estimation_depth != 0) {
+        const auto end = pending_job_ids.begin() +
+                         std::min(estimation_depth, pending_job_ids.size());
+        if (std::find(pending_job_ids.begin(), end, status.job_idx) == end)
+          continue;
+      }
+      for (const auto &reservation : m_scheduler->placement_reservations()) {
+        if (reservation.job == status.job_idx &&
+            reservation.start >= m_current_time) {
+          status.expected_start_time = reservation.start;
+          status.start_time_kind = Start_Time_Kind::RESERVED;
+          status.node_ids = reservation.allocation().ids();
+          break;
+        }
+      }
+    }
+    return result;
   }
   if (requested_pending_statuses.empty()) {
     return result;
@@ -3261,7 +3363,10 @@ void BasicSimulation<TraceType>::advance_to_impl(
     while (true) {
       num_nodes_t free_nodes = get_available_nodes();
       publish_capacity_outlook();
-      auto jobs_to_run = [&] {
+      auto jobs_to_run = [&]() -> Scheduling_Decisions {
+        if (m_running_jobs.placement())
+          return m_scheduler->schedule_placements(free_nodes, m_running_jobs,
+                                                  m_current_time);
         if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
           return periodic_scheduler->schedule_event(free_nodes, m_running_jobs,
                                                     m_current_time);
@@ -3270,22 +3375,24 @@ void BasicSimulation<TraceType>::advance_to_impl(
                                        m_current_time);
         }
       }();
-
-      if (jobs_to_run.empty()) {
+      if (jobs_to_run.empty())
         break;
-      }
 
-      // Process ALL jobs returned by scheduler (backfilling can return
-      // multiple)
-      for (job_no_t job : jobs_to_run) {
+      for (size_t selected = 0; selected < jobs_to_run.size(); ++selected) {
+        const job_no_t job = jobs_to_run.job(selected);
         m_trace.insert_job(job, m_current_time);
         record_appended_job_start(job);
         const auto &record = m_trace.job_at(job);
-        m_running_jobs[job] = {
+        const Running_Job running{
             m_current_time,
             planning_run_time(m_current_time,
                               static_cast<tdiff_t>(record.get_limit_time())),
             record.get_num_nodes()};
+        if (m_running_jobs.placement())
+          m_running_jobs.commit(job, running,
+                                jobs_to_run.take_allocation(selected));
+        else
+          m_running_jobs[job] = running;
         m_jobs_started++;
 
         // Records a resource-history sample internally (Trace's own
@@ -3605,7 +3712,10 @@ void BasicSimulation<TraceType>::advance_to_impl(
         num_nodes_t free_nodes = get_available_nodes();
         publish_capacity_outlook();
 
-        auto jobs_to_run = [&] {
+        auto jobs_to_run = [&]() -> Scheduling_Decisions {
+          if (m_running_jobs.placement())
+            return m_scheduler->schedule_placements(free_nodes, m_running_jobs,
+                                                    m_current_time);
           if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
             return periodic_evaluation
                        ? m_scheduler->schedule(free_nodes, m_running_jobs,
@@ -3617,23 +3727,24 @@ void BasicSimulation<TraceType>::advance_to_impl(
                                          m_current_time);
           }
         }();
-
-        if (jobs_to_run.empty()) {
-          break; // Scheduler can't start anything else
-        }
-
+        if (jobs_to_run.empty())
+          break;
         started_at_tick = true;
-        // Process ALL jobs returned by scheduler (backfilling can return
-        // multiple)
-        for (job_no_t job : jobs_to_run) {
+        for (size_t selected = 0; selected < jobs_to_run.size(); ++selected) {
+          const job_no_t job = jobs_to_run.job(selected);
           m_trace.insert_job(job, m_current_time);
           record_appended_job_start(job);
           const auto &record = m_trace.job_at(job);
-          m_running_jobs[job] = {
+          const Running_Job running{
               m_current_time,
               planning_run_time(m_current_time,
                                 static_cast<tdiff_t>(record.get_limit_time())),
               record.get_num_nodes()};
+          if (m_running_jobs.placement())
+            m_running_jobs.commit(job, running,
+                                  jobs_to_run.take_allocation(selected));
+          else
+            m_running_jobs[job] = running;
           m_jobs_started++;
 
           // Process this START event - records a resource-history

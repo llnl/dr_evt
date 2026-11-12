@@ -108,6 +108,10 @@ private:
     visit("dispatch_queue_depth", self.m_dispatch_queue_depth);
     visit("dispatch_on_events", self.m_dispatch_on_events);
     visit("per_pass_accounting", self.m_per_pass_accounting);
+    visit("resource_model", self.m_resource_model);
+    visit("placement_order", self.m_placement_order);
+    visit("placement_optimizations", self.m_placement_optimizations);
+    visit("placement_coarse_filter", self.m_placement_coarse_filter);
     visit("resource_model_diagnostics", self.m_resource_model_diagnostics);
     visit("diagnostic_no_reservations", self.m_diagnostic_no_reservations);
     visit("planning_time_resolution", self.m_planning_time_resolution);
@@ -236,6 +240,15 @@ public:
   bool m_per_pass_accounting;
   /// Select resource observation once at simulation construction; default OFF.
   bool m_resource_model_diagnostics;
+  std::string m_resource_model =
+      "capacity"; ///< Capacity or whole-node placement accounting.
+  std::string m_placement_order =
+      "low"; ///< Compile-time low/high node selection.
+  std::string m_placement_optimizations =
+      "all"; ///< Construction-time trial selector: all, none, fast, batch,
+             ///< scratch, boolean.
+  bool m_placement_coarse_filter =
+      false; ///< Select the coarse timeline specialization once.
   /// Diagnostic periodic model: consider later fitting jobs without
   /// reservations.
   bool m_diagnostic_no_reservations;

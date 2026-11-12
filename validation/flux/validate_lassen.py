@@ -1,4 +1,4 @@
-"""Compare a recorded Lassen workload using event-driven per-pass backfill."""
+"""Compare the recorded Lassen workload using capacity or exact placement."""
 import argparse
 import csv
 from datetime import datetime, timezone
@@ -78,25 +78,45 @@ def main():
     parser.add_argument('--policy', choices=('none', 'hybrid'), default='hybrid')
     parser.add_argument('--scheduler-backend', choices=('fluxion', 'sched-simple'),
                         default='fluxion')
+    parser.add_argument('--resource-model', choices=('capacity', 'placement'), default='capacity',
+                        help='DR_EVT resource model; default preserves the existing capacity comparison')
+    parser.add_argument('--placement-order', choices=('low', 'high'), default='low')
+    parser.add_argument('--placement-optimizations', choices=('none', 'fast', 'batch', 'scratch', 'boolean', 'all'), default='all')
+    parser.add_argument('--placement-coarse-filter', action='store_true')
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--outdir', type=Path, default=Path('/results/lassen-backfill'))
     args = parser.parse_args()
     if args.scheduler_backend == 'sched-simple' and args.policy != 'none':
         parser.error('sched-simple requires --policy none')
     reservations = args.reservation_depth if args.policy == 'hybrid' else 0
+    if (args.total_nodes < 1 or args.max_jobs < 0 or args.queue_depth < 0 or
+            (args.policy == 'hybrid' and args.reservation_depth < 1) or args.timeout <= 0):
+        parser.error('nodes and timeout must be positive; hybrid needs positive reservation depth; job limit and queue depth nonnegative')
+    if args.resource_model == 'capacity' and (args.placement_order != 'low' or
+            args.placement_optimizations != 'all' or args.placement_coarse_filter):
+        parser.error('placement options require --resource-model placement')
     period = source_period(args.trace)
     jobs, origin, source_indices = load_jobs(args.trace, args.max_jobs, args.total_nodes)
     selected_period = source_period(args.trace, source_indices)
     root = args.outdir
     root.mkdir(parents=True, exist_ok=True)
+    if args.resource_model == 'placement' and (root / 'workload.json').exists():
+        parser.error('placement output already exists; choose a new --outdir to preserve earlier evidence')
     label = f'{args.policy}_r{reservations}_q{args.queue_depth}_{args.trace.stem}_jobs_{len(jobs)}'
+    if args.resource_model == 'placement':
+        label += f'_placement_{args.placement_order}_{args.placement_optimizations}'
+        if args.placement_coarse_filter:
+            label += '_coarse'
     case = root / label
     case.mkdir(exist_ok=True)
     os.environ['DR_EVT_OBSERVE_RESOURCES'] = '1'
     observer = Path(__file__).with_name('resource_observer')
     os.environ['PYTHONPATH'] = str(observer) + ':' + os.environ.get('PYTHONPATH', '')
     observed = simulator_case(case, jobs, args.simulator, args.policy, args.queue_depth,
-                              reservations, args.total_nodes)
+                              reservations, args.total_nodes, resource_model=args.resource_model,
+                              placement_optimizations=args.placement_optimizations,
+                              placement_order=args.placement_order, coarse_filter=args.placement_coarse_filter,
+                              timeout=args.timeout)
     manifest = {
         'workload_source': 'user-provided Lassen dataset', 'source_file': args.trace.name,
         'source_period': period,
@@ -105,7 +125,13 @@ def main():
         'source_time_origin': origin, 'source_row_indices': source_indices,
         'source_selection': 'earliest arrivals, stable input order for ties',
         'initial_state': 'empty cluster', 'capacity': args.total_nodes,
-        'per_pass_accounting': True, 'output_time_precision_decimals': 3,
+        'per_pass_accounting': args.resource_model == 'capacity', 'output_time_precision_decimals': 3,
+        'dr_evt_resource_model': args.resource_model,
+        'dr_evt_queue_depth_semantics': ('per-pass examination' if args.resource_model == 'capacity'
+                                         else 'shared per-timestamp backfill examination'),
+        'placement_order': args.placement_order if args.resource_model == 'placement' else None,
+        'placement_optimizations': args.placement_optimizations if args.resource_model == 'placement' else None,
+        'placement_coarse_filter': args.placement_coarse_filter if args.resource_model == 'placement' else None,
         'durations': 'recorded duration, or recorded end_time minus begin_time; unchanged',
         'resource_model': 'homogeneous whole-node pool, one core per node',
         'queue_depth': args.queue_depth, 'reservation_depth': reservations,
@@ -121,7 +147,8 @@ def main():
         transitions = run_case(case, jobs, 'hybrid' if args.policy == 'hybrid' else 'fcfs',
                                args.queue_depth, reservations or None, timeout=args.timeout,
                                total_nodes=args.total_nodes,
-                               scheduler_backend=args.scheduler_backend)
+                               scheduler_backend=args.scheduler_backend,
+                               match_policy='hinodex' if args.resource_model == 'placement' and args.placement_order == 'high' else 'lonodex')
     except Exception as error:
         manifest.update(status='incomplete', error=str(error))
         (root / 'workload.json').write_text(json.dumps(manifest, indent=2) + '\n')
@@ -145,8 +172,11 @@ def main():
              'backfill_policy': args.policy, 'reservation_depth': reservations,
              'fiction_scheduler': args.scheduler_backend,
              'fiction_match_policy': ('native resource-pool allocation' if
-                                      args.scheduler_backend == 'sched-simple' else 'lonodex'),
-             'reference_queue_depth': args.queue_depth, 'per_pass_accounting': True,
+                                      args.scheduler_backend == 'sched-simple' else
+                                      'hinodex' if args.resource_model == 'placement' and args.placement_order == 'high' else 'lonodex'),
+             'reference_queue_depth': args.queue_depth,
+             'per_pass_accounting': args.resource_model == 'capacity',
+             'dr_evt_resource_model': args.resource_model,
              'dr_evt_schedule': observed, 'reference_schedule': reference}
     # The plotter expects the case-directory name derived from these policies.
     capture = {'case': label, 'native_duplicate_owners': 0,

@@ -27,7 +27,8 @@ if working_tree:
     with tarfile.open(fileobj=buffer, mode='w') as snapshot:
         names = set(git('ls-files', '-z').decode().split('\0'))
         names.update(git('ls-files', '-z', '--others', '--exclude-standard',
-                         '--', 'src', 'tests', 'python').decode().split('\0'))
+                         '--', 'src', 'tests', 'python',
+                         'validation/flux/placement_driver.cpp').decode().split('\0'))
         for name in sorted(names):
             if not name or not (SOURCE / name).is_file():
                 continue

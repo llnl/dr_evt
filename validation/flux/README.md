@@ -7,8 +7,10 @@ four-job start-time divergence with Fiction. The FCFS run uses `sched-simple`,
 with Fluxion unloaded. The hybrid-backfill run and four-job reproducer use
 Fluxion to make scheduling and resource-placement decisions; they do not use
 `sched-simple`. Fiction drives simulated arrivals and completions in both
-experiments. DR_EVT implements its own capacity-count scheduler.
-Every DR_EVT validation invocation uses `--per_pass_accounting`.
+experiments. The historical comparisons use DR_EVT's capacity-count scheduler and
+`--per_pass_accounting`. The existing `validate_lassen.py` runner also supports
+`--resource-model placement`, which selects exact node identities through the
+main simulator and uses its supported timestamp-based examination budget.
 
 ## Build and run the checks
 
@@ -113,6 +115,31 @@ The [minimal reproducer](DIVERGENCE.md) verifies the identified node-reservation
 placement difference with four jobs. Expected divergences and matching controls
 are assertions, so its checks exit successfully when the observations agree.
 
+## Placement oracle
+
+[placement_oracle.py](placement_oracle.py) captures native Fluxion start times,
+allocated node IDs, and future node reservations for the reusable placement model.
+It does not run DR_EVT or compare these results with CapacityModel schedules.
+See [the oracle contract and examples](PLACEMENT_ORACLE.md).
+
+```sh
+flux env python3 /validation/placement_oracle.py --outdir /results/placement-oracle
+python3 /validation/placement_oracle.py --verify /validation/evidence/placement-oracle.json
+python3 -m unittest discover -s /validation -p test_placement_oracle.py -v
+```
+
+The default native harness generates the oracle after its Fiction smoke checks.
+Ordinary CI audits the checked fixture and rejection cases without needing Flux.
+It also runs `test_placement_model` and compares the C++ driver running the main Simulation
+with all 60 native cases, including exact reservation snapshots:
+
+```sh
+python3 validation/flux/compare_placement_model.py ./build/test_flux_placement_driver
+```
+
+The driver uses the main simulator with `resource_model=placement`; CLI/API placement selection
+is available for event-driven circular FCFS whole-node scheduling.
+
 ## Resource evidence and synchronization
 
 `resource_observer/sitecustomize.py` is opt-in through
@@ -156,3 +183,22 @@ and generated results remain ignored. The plotting script is standalone:
 ```sh
 python3 plot_comparison.py --plot-input plot-input.json
 ```
+
+## Run the placement variants on another platform
+
+Use `compare_placement_model.py --all-optimizations --output REPORT.json` with
+the built `test_flux_placement_driver` to run all 720 saved comparisons without
+installing Flux. `--optimizations none fast` selects a subset; the existing
+single-mode invocation and environment selection remain supported.
+
+For a native Lassen/Fiction comparison, keep the same input file, 756 nodes,
+2,000-job chronological prefix, R32 and Q64, and add `--resource-model placement`
+to the existing `validate_lassen.py` command. `--placement-order high` also
+selects native hinodex; `--placement-optimizations` and
+`--placement-coarse-filter` select the alternative simulator specializations.
+Capacity remains the default. Slurm and OpenPBS retain their existing capacity
+comparisons. The private root-level `lassen-756-01.csv` is read unchanged and
+stays untracked.
+
+[Cross-platform instructions](../performance/simulation/placement-model/SIMULATOR.md)
+include build, API checks, existing-input benchmarks and explicit 20K runs.

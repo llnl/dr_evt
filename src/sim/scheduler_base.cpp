@@ -34,6 +34,7 @@
 #include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
 #include "sim/scheduler_ljf_easy.hpp"
 #include "sim/scheduler_periodic_fcfs_hybrid_circular.hpp"
+#include "sim/scheduler_placement_circular.hpp"
 #include "sim/scheduler_sjf_easy.hpp"
 #include <algorithm>
 #include <cmath>
@@ -539,6 +540,119 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
     return std::make_unique<FCFSEasyDequeScheduler>(
         total_nodes, backfill_policy, backfill_queue_depth);
   }
+}
+
+namespace {
+/** @brief Construct the compile-time resource/observer specialization.
+ * @tparam Features Compile-time placement optimization mask.
+ * @tparam Order Compile-time node ordering.
+ * @tparam Filter Compile-time coarse-filter selector.
+ * @param[in] nodes Physical inventory size.
+ * @param[in] jobs Initial queue sizing hint.
+ * @param[in] params Complete resource and policy configuration.
+ * @param[in,out] diagnostics Optional simulation-owned observer counters.
+ * @return Owning concrete placement scheduler.
+ * @throws std::bad_alloc if scheduler or queue storage cannot be allocated. */
+template <unsigned Features, NodeOrder Order, auto Filter>
+std::unique_ptr<SchedulerBase>
+placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
+                    ResourceDiagnostics *diagnostics) {
+  constexpr auto features = [] { return Features; };
+  if (diagnostics)
+    return std::make_unique<PlacementCircularScheduler<
+        PlacementModel<SimulationResourceObserver, Order, Filter, features>>>(
+        nodes, jobs, params, diagnostics);
+  return std::make_unique<PlacementCircularScheduler<
+      PlacementModel<NoResourceObserver, Order, Filter, features>>>(
+      nodes, jobs, params, nullptr);
+}
+/** @brief Select node order and filtering once, without hot-path flags.
+ * @tparam Features Compile-time placement optimization mask.
+ * @param[in] nodes Physical inventory size.
+ * @param[in] jobs Initial queue sizing hint.
+ * @param[in] params Resource and scheduling configuration.
+ * @param[in,out] diagnostics Optional observer owner.
+ * @return Owning scheduler using the selected template specialization.
+ * @throws std::bad_alloc if scheduler storage cannot be allocated. */
+template <unsigned Features>
+std::unique_ptr<SchedulerBase>
+placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
+                    ResourceDiagnostics *diagnostics) {
+  if (params.m_placement_order == "high") {
+    if (params.m_placement_coarse_filter)
+      return placement_scheduler<Features, NodeOrder::HighIdFirst,
+                                 EnableCoarseFilter>(nodes, jobs, params,
+                                                     diagnostics);
+    return placement_scheduler<Features, NodeOrder::HighIdFirst,
+                               DisableCoarseFilter>(nodes, jobs, params,
+                                                    diagnostics);
+  }
+  if (params.m_placement_coarse_filter)
+    return placement_scheduler<Features, NodeOrder::LowIdFirst,
+                               EnableCoarseFilter>(nodes, jobs, params,
+                                                   diagnostics);
+  return placement_scheduler<Features, NodeOrder::LowIdFirst,
+                             DisableCoarseFilter>(nodes, jobs, params,
+                                                  diagnostics);
+}
+} // namespace
+
+std::unique_ptr<SchedulerBase>
+create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
+                 const Sim_Params &params, ResourceDiagnostics *diagnostics) {
+  if (params.m_resource_model != "capacity" &&
+      params.m_resource_model != "placement")
+    throw std::invalid_argument("resource_model must be capacity or placement");
+  if (params.m_placement_order != "low" && params.m_placement_order != "high")
+    throw std::invalid_argument("placement_order must be low or high");
+  const auto &features = params.m_placement_optimizations;
+  if (features != "all" && features != "none" && features != "fast" &&
+      features != "batch" && features != "scratch" && features != "boolean")
+    throw std::invalid_argument("placement_optimizations must be all, none, "
+                                "fast, batch, scratch, or boolean");
+  if (params.m_resource_model == "capacity")
+    return create_scheduler(
+        total_nodes, initial_job_count, params.m_backfill_policy,
+        params.m_priority_policy, params.m_queue_impl, params.m_block_size,
+        params.m_wait_queue_capacity, params.m_wait_queue_overflow,
+        params.m_reservation_depth, params.m_backfill_queue_depth,
+        params.m_backfill_interval, params.m_dispatch_interval,
+        params.m_dispatch_queue_depth, params.m_dispatch_on_events,
+        params.m_per_pass_accounting, params.m_diagnostic_no_reservations,
+        diagnostics);
+  if ((params.m_priority_policy != PriorityPolicy::FCFS &&
+       params.m_priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) ||
+      params.m_queue_impl != QueueImplementation::CIRCULAR ||
+      params.m_backfill_interval != 0 || params.m_dispatch_interval != 0 ||
+      params.m_dispatch_on_events || params.m_dispatch_queue_depth != 0 ||
+      params.m_per_pass_accounting || params.m_diagnostic_no_reservations ||
+      !params.m_capacity_schedule.empty() || params.m_sim_start_time != 0 ||
+      params.m_planning_time_resolution != 0)
+    throw std::invalid_argument(
+        "placement requires event-driven FCFS, queue_impl=circular, static "
+        "capacity, exact planning times, and no replay warm start or per-pass "
+        "accounting");
+  if (params.m_backfill_policy == BackfillPolicy::HYBRID &&
+      params.m_reservation_depth == 0)
+    throw std::invalid_argument(
+        "hybrid placement requires reservation_depth > 0");
+  if (features == "none")
+    return placement_scheduler<0>(total_nodes, initial_job_count, params,
+                                  diagnostics);
+  if (features == "fast")
+    return placement_scheduler<1>(total_nodes, initial_job_count, params,
+                                  diagnostics);
+  if (features == "batch")
+    return placement_scheduler<2>(total_nodes, initial_job_count, params,
+                                  diagnostics);
+  if (features == "scratch")
+    return placement_scheduler<4>(total_nodes, initial_job_count, params,
+                                  diagnostics);
+  if (features == "boolean")
+    return placement_scheduler<8>(total_nodes, initial_job_count, params,
+                                  diagnostics);
+  return placement_scheduler<15>(total_nodes, initial_job_count, params,
+                                 diagnostics);
 }
 
 } // namespace dr_evt

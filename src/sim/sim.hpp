@@ -47,8 +47,10 @@ class SchedulerBase;
  *  @{ */
 
 /**
- * @brief Orchestrate scheduling and accounting through discrete-event simulation.
- * @tparam TraceType Trace implementation owning job records and event accounting.
+ * @brief Orchestrate scheduling and accounting through discrete-event
+ * simulation.
+ * @tparam TraceType Trace implementation owning job records and event
+ * accounting.
  * @details Configuration, trace, and scheduler belong to this simulation.
  * Diagnostic selection is fixed at construction; counters belong to its trace.
  */
@@ -176,6 +178,7 @@ public:
    * @details Configuration and callbacks are owned by the simulation. Resource
    * diagnostics are selected once and observe trace event accounting; this
    * custom scheduler does not use the CapacityModel fit/reservation operations.
+   * @throws std::invalid_argument if resource_model is not capacity.
    * @throws std::runtime_error if the input trace cannot be initialized.
    */
   BasicSimulation(Sim_Params params, job_cost_function_t cost_function,
@@ -186,12 +189,27 @@ public:
    * @param[in] params Configuration transferred into this simulation.
    * @param[in] scheduler Non-null scheduler whose ownership is transferred.
    * @details Diagnostics are selected once from params and observe the trace's
-   * event accounting. The scheduler is destroyed before the trace counter owner.
-   * @throws std::invalid_argument if scheduler is null.
+   * event accounting. The scheduler is destroyed before the trace counter
+   * owner.
+   * @throws std::invalid_argument if scheduler is null or resource_model is not
+   * capacity.
    * @throws std::runtime_error if the input trace cannot be initialized.
    */
   BasicSimulation(Sim_Params params,
                   std::unique_ptr<FCFSEasyCustomScheduler> scheduler);
+
+  /** @brief Borrow current exact allocations for placement inspection.
+   * @return Placement-only running owners, valid until the next simulation
+   * mutation; null when capacity accounting is selected. */
+  const running_jobs_t::PlacementState *placement_state() const {
+    return m_running_jobs.placement();
+  }
+
+  /** @brief Borrow the latest exact reservation-reporting snapshot.
+   * @return Intervals valid until the next scheduling call or destruction. */
+  std::span<const PlacementInterval> placement_reservations() const {
+    return m_scheduler->placement_reservations();
+  }
 
   /**
    * @brief Run a complete batch simulation for the configured trace.
@@ -200,6 +218,8 @@ public:
    * With max_time configured, processes events through that inclusive
    * boundary; otherwise drains the event queue. For externally fed work, use
    * append_job() or append_jobs() followed by advance_to() instead.
+   * @throws std::invalid_argument for replay input in placement mode; replay
+   * records do not carry exact resource identities.
    */
   void run();
 
@@ -380,6 +400,8 @@ public:
      */
     std::optional<sim_time_t> expected_start_time;
     Start_Time_Kind start_time_kind = Start_Time_Kind::NONE;
+    std::vector<num_nodes_t> node_ids{}; ///< Exact live or reserved IDs in
+                                         ///< placement mode; empty otherwise.
   };
 
   /** @brief Resource-area approximation for one waiting job. */
@@ -456,6 +478,10 @@ public:
    * backfill uses a strict completion-before-reservation test and may round
    * planned releases to planning_time_resolution; use exact lookahead when
    * those boundary details matter.
+   * @note Placement mode reports exact live or reserved node_ids and only
+   * reservations from the latest scheduling pass; it does not run a capacity
+   * forecast. Reporting snapshots are cleared on checkpoint restore and
+   * rebuilt by subsequent scheduling. Released allocations are not retained.
    * @param[in] job_idxs Identifiers returned by append_job() or append_jobs().
    * An empty vector returns the waiting jobs in scheduler queue order, limited
    * by estimation_depth; those queue entries need not have been appended.
@@ -473,6 +499,8 @@ public:
 
   /**
    * @brief Query with explicit cache reuse.
+   * @note In placement mode, false selects an aggregate approximation;
+   * use get_start_times_by_lookahead() for a fresh exact placement forecast.
    * @param[in] job_idxs Appended job identifiers; empty enumerates waiting
    * jobs.
    * @param[in] estimation_depth Waiting-queue prefix to forecast; zero is
@@ -489,6 +517,8 @@ public:
 
   /**
    * @brief Query with protected-only or full cache reuse.
+   * @note In placement mode, disabling either reuse flag selects an aggregate
+   * approximation; default reuse reports the live exact reservation snapshot.
    * @param[in] job_idxs Appended job identifiers; empty enumerates waiting
    * jobs.
    * @param[in] estimation_depth Waiting-queue prefix; zero is unlimited.
@@ -745,14 +775,17 @@ public:
    * @return Estimated start time as sim_time_t, or -1 when the queue is empty
    * or when no running-job release or scheduled capacity change ever lets
    * the head start (a reduction below its request with no later increase).
+   * An expired placement forecast is unknown until another scheduling pass.
    */
   sim_time_t get_fcfs_head_shadow_time() const {
     if (m_scheduler->active_job_count() == 0) {
       return -1.0;
     }
     const sim_time_t reservation = m_scheduler->get_fcfs_reservation_time();
-    return reservation == std::numeric_limits<sim_time_t>::max() ? -1.0
-                                                                 : reservation;
+    return reservation == std::numeric_limits<sim_time_t>::max() ||
+                   (m_running_jobs.placement() && reservation < m_current_time)
+               ? -1.0
+               : reservation;
   }
 
   /**
@@ -791,6 +824,9 @@ public:
 
   /**
    * @brief Return the current EASY-backfilling reservation projection.
+   * @note In placement mode this summarizes quantities and the actual head
+   * start; it cannot prove a placement fit. Inspect placement_reservations()
+   * for exact masks.
    * @details
    * The result is a snapshot: available nodes and release times reflect
    * current scheduler state, while release times are based on the same
@@ -802,6 +838,8 @@ public:
 
   /**
    * @brief Estimate the Custom-FCFS waiting-queue drain time.
+   * @note This aggregate approximation is available in placement mode and
+   * does not account for exact resource identities.
    * @details Computes the resource-area prediction horizon beginning at the
    * FCFS head's shadow time. Current waiting demand A_Q is the sum of each
    * waiting job's requested nodes times estimated runtime. Service capacity

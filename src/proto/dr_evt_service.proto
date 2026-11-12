@@ -86,10 +86,12 @@ message ClientMessage {
 // Hybrid requires positive reservation_depth. Conservative protects every
 // examined waiting job; EASY protects one. Queue-depth zero is unlimited.
 // CLI names are field names prefixed with --; boolean switches map to true.
-// Scheduling uses interchangeable capacity counts, not a node resource graph.
+// Scheduling defaults to capacity counts; resource_model: "placement" enables exact whole-node identities.
 // InitRequest does not accept priority_policy: "fcfs_conservative". For the
-// event-driven conservative implementation use per_pass_accounting: true,
+// capacity event-driven conservative implementation use per_pass_accounting: true,
 // priority_policy: "fcfs", backfill_policy: "conservative" and a circular queue.
+// Placement supports all four policies with priority_policy: "fcfs" and
+// per_pass_accounting: false; periodic dispatch and capacity schedules are rejected.
 message InitRequest {
     // CLI: --total_nodes.
     uint32 total_nodes = 1;
@@ -173,6 +175,13 @@ message InitRequest {
     // Select per-simulation resource operation counters at construction.
     // Default false. CLI: --resource_model_diagnostics.
     bool resource_model_diagnostics = 33;
+    // "capacity" (default) or "placement"; placement requires event-driven FCFS/circular.
+    string resource_model = 34;
+    // "low" (default) or "high"; template selection occurs at construction.
+    string placement_order = 35;
+    // "all" (default), "none", "fast", "batch", "scratch", or "boolean".
+    string placement_optimizations = 36;
+    bool placement_coarse_filter = 37; // compile-time coarse-filter opt-in
 
     // Planning time-limit grid for scheduler projections; zero is exact.
     // CLI: --planning_time_resolution.
@@ -355,6 +364,8 @@ message GetJobStatusesRequest {
     // Maximum waiting-queue prefix to temporarily plan and report. Zero
     // (default) considers every waiting job; this does not alter scheduling.
     uint64 estimation_depth = 2;
+    // Placement defaults report live exact reservations. Disabling either reuse
+    // flag selects an aggregate approximation without exact node identities.
     // Defaults to true when absent: reuse live predictions and forecast gaps.
     optional bool use_cached_predictions = 3;
     // Defaults to true when absent. With cache reuse enabled, false reuses
@@ -395,6 +406,8 @@ message JobStatus {
         double expected_start_time = 4;
     }
     StartTimeKind start_time_kind = 5;
+    // Exact live/cleanup or reserved node identities in placement mode; empty for capacity.
+    repeated uint32 node_ids = 6;
 }
 
 message GetJobStatusesResponse {

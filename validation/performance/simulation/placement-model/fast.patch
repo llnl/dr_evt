@@ -1,0 +1,62 @@
+--- a/src/sim/resource/placement_model.hpp
++++ b/src/sim/resource/placement_model.hpp
+@@ -54,0 +55,30 @@
++  /** @brief Select an immediate allocation before future commitments exist.
++   * @param[in] eligible Caller-owned inventory, not retained.
++   * @param[in] occupied Caller-owned allocation and cleanup union, not retained.
++   * @param[in] quantity Requested identities.
++   * @param[in] duration Planned duration; nonpositive means a point query.
++   * @param[in] start Exact immediate start.
++   * @param[in] context Synchronous observation metadata, not retained.
++   * @return Owning placement or std::nullopt when insufficient.
++   * @throws std::invalid_argument for mismatched domains or invalid timing.
++   * @throws std::bad_alloc if result or diagnostic storage cannot be allocated.
++   * @pre No future reservation or resource outage constrains these resources.
++   * @details Currently free nodes remain available; after future commitments
++   * exist, use the timeline fitting operations. */
++  static std::optional<Placement> find_available(const State &eligible, const State &occupied,
++      Request quantity, tdiff_t duration, sim_time_t start, ResourceContext context = {}) {
++    const auto end = duration > 0 ? start + duration : start;
++    if (!std::isfinite(start) || !std::isfinite(duration) || !std::isfinite(end) || !std::isfinite(end - start) ||
++        (duration > 0 && end <= start)) throw std::invalid_argument("invalid placement interval");
++    auto allocation = eligible.template select_excluding<Order>(occupied, quantity);
++    if constexpr (Observer::enabled) {
++      auto free = eligible;
++      free.remove(occupied);
++      const auto count = static_cast<num_nodes_t>(free.count());
++      Observer::observe({ResourceOperation::FitNow, ResourceScope::Available, context,
++                         quantity, count, count, start, duration, allocation.has_value()});
++    }
++    if (!allocation) return std::nullopt;
++    return Placement{start, std::move(*allocation)};
++  }
++
+--- a/src/sim/resource/bitmap.hpp
++++ b/src/sim/resource/bitmap.hpp
+@@ -318,0 +319,26 @@
++  /** @brief Select eligible members excluding a borrowed blocked mask.
++   * @tparam Order Compile-time selection order.
++   * @param[in] blocked Unavailable identities in the same domain; not retained.
++   * @param[in] quantity Requested members; zero selects an empty set.
++   * @return Owning selection or std::nullopt when insufficient.
++   * @throws std::invalid_argument if domains differ.
++   * @throws std::bad_alloc if result storage cannot be allocated.
++   * @details Sources are unchanged; no intermediate exclusion mask is allocated. */
++  template <NodeOrder Order = NodeOrder::LowIdFirst>
++  std::optional<Bitmap> select_excluding(const Bitmap &blocked, num_nodes_t quantity) const {
++    same_domain(blocked);
++    if (quantity > m_capacity) return std::nullopt;
++    Bitmap selected(m_capacity);
++    size_t remaining = quantity;
++    for (size_t cursor = 0; cursor < m_words.size() && remaining; ++cursor) {
++      const size_t index = Order == NodeOrder::LowIdFirst ? cursor : m_words.size()-cursor-1;
++      const auto bits = m_words[index] & ~blocked.m_words[index];
++      const auto available = static_cast<size_t>(std::popcount(bits));
++      const auto taken = std::min(remaining, available);
++      selected.m_words[index] = taken == available ? bits : partial_word<Order>(bits, taken);
++      remaining -= taken;
++    }
++    if (remaining) return std::nullopt;
++    return selected;
++  }
++

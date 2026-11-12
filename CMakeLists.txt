@@ -768,6 +768,28 @@ target_link_libraries(test_capacity_model-bin PRIVATE dr_evt)
 set_target_properties(test_capacity_model-bin PROPERTIES OUTPUT_NAME test_capacity_model)
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_capacity_model-bin)
 
+# Reusable bitmap placement model and native Fluxion fixture comparison.
+add_executable(test_placement_model-bin tests/test_placement_model.cpp)
+target_include_directories(test_placement_model-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_placement_model-bin PRIVATE dr_evt)
+set_target_properties(test_placement_model-bin PROPERTIES OUTPUT_NAME test_placement_model)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_placement_model-bin)
+
+add_executable(test_placement_integration-bin tests/test_placement_integration.cpp)
+target_include_directories(test_placement_integration-bin PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(test_placement_integration-bin PRIVATE dr_evt)
+set_target_properties(test_placement_integration-bin PROPERTIES OUTPUT_NAME test_placement_integration)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_placement_integration-bin)
+
+add_executable(test_flux_placement_driver-bin validation/flux/placement_driver.cpp)
+target_include_directories(test_flux_placement_driver-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_flux_placement_driver-bin PRIVATE dr_evt)
+set_target_properties(test_flux_placement_driver-bin PROPERTIES OUTPUT_NAME test_flux_placement_driver)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_flux_placement_driver-bin)
+
 add_executable(test_placement_pass_accounting-bin
   tests/test_placement_pass_accounting.cpp)
 target_include_directories(test_placement_pass_accounting-bin PRIVATE
@@ -915,6 +937,8 @@ if(DR_EVT_WITH_UNIT_TESTING)
   add_test(NAME test_placement_pass_accounting
     COMMAND $<TARGET_FILE:test_placement_pass_accounting-bin>)
   add_test(NAME test_capacity_model COMMAND $<TARGET_FILE:test_capacity_model-bin>)
+  add_test(NAME test_placement_integration COMMAND $<TARGET_FILE:test_placement_integration-bin>)
+  add_test(NAME test_placement_model COMMAND $<TARGET_FILE:test_placement_model-bin>)
   add_test(NAME test_openpbs_forecast
     COMMAND $<TARGET_FILE:test_openpbs_forecast-bin>)
   add_test(
@@ -941,6 +965,9 @@ if(DR_EVT_WITH_UNIT_TESTING)
     LABELS "unit;native" RUN_SERIAL TRUE
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   if(Python3_Interpreter_FOUND)
+    add_test(NAME test_placement_scripts
+      COMMAND ${Python3_EXECUTABLE} -m unittest discover
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/tests -p test_placement_scripts.py -v)
     add_test(
       NAME test_python_periodic_reference
       COMMAND ${Python3_EXECUTABLE}
@@ -966,6 +993,10 @@ if(DR_EVT_WITH_UNIT_TESTING)
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_placement_pass_tests.py
         $<TARGET_FILE:sim-bin>)
+    add_test(NAME test_flux_placement_model
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/validation/flux/compare_placement_model.py
+        $<TARGET_FILE:test_flux_placement_driver-bin>)
   endif()
   add_test(
     NAME test_periodic_backfill_reference

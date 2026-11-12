@@ -86,17 +86,24 @@ private:
  * @param[in,out] client Connected client receiving initialization responses.
  * @param[in] trace_file Valid input trace containing a header and no job rows.
  * @param[in] backfill_policy Backfill policy requested for this session.
- * @param[in] resource_model_diagnostics Enable session-owned operation counters.
+ * @param[in] resource_model_diagnostics Enable session-owned operation
+ * counters.
+ * @param[in] resource_model Capacity or exact placement resources.
  * @throws std::runtime_error if a request fails or the trace contains jobs.
  * @details Sends Init followed by InitializeTrace; the empty trace establishes
  * the input schema while subsequent append requests supply the actual jobs.
  */
 void connect_and_init(SimulationClient &client, const std::string &trace_file,
                       const char *backfill_policy = "easy",
-                      bool resource_model_diagnostics = false) {
+                      bool resource_model_diagnostics = false,
+                      const char *resource_model = "capacity") {
   ClientMessage init_req;
   auto *init = init_req.mutable_init();
   init->set_total_nodes(100);
+  init->set_resource_model(resource_model);
+  init->set_placement_order("high");
+  init->set_placement_optimizations("all");
+  init->set_placement_coarse_filter(true);
   init->set_resource_model_diagnostics(resource_model_diagnostics);
   init->set_trace_format("simple");
   init->set_timestamp_format("epoch");
@@ -611,6 +618,56 @@ bool test_estimated_job_starts(const std::string &server_address,
   }
 }
 
+/** @brief Exercise exact allocation and future reservations over the gRPC wire.
+ * @param[in] server_address Running server endpoint.
+ * @param[in] trace_file Header-only input trace on the server filesystem.
+ * @return True when live and reserved IDs survive serialization and release. */
+bool test_placement(const std::string &server_address,
+                    const std::string &trace_file) {
+  SimulationClient client(
+      grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+  try {
+    connect_and_init(client, trace_file, "easy", false, "placement");
+    for (unsigned job = 0; job < 2; ++job) {
+      ClientMessage request;
+      auto *append = request.mutable_append_job();
+      append->set_submit_time(job);
+      append->set_num_nodes(job == 0 ? 100 : 50);
+      append->set_queue(kTestQueueInput);
+      append->set_limit_time(job == 0 ? 10 : 5);
+      client.call(request);
+    }
+    ClientMessage advance;
+    advance.mutable_advance_to()->set_target_time(1);
+    client.call(advance);
+    ClientMessage query;
+    query.mutable_get_job_statuses()->add_job_idx(0);
+    query.mutable_get_job_statuses()->add_job_idx(1);
+    auto statuses = client.call(query).get_job_statuses();
+    if (statuses.jobs_size() != 2 || statuses.jobs(0).node_ids_size() != 100 ||
+        statuses.jobs(1).node_ids_size() != 50 ||
+        statuses.jobs(1).node_ids(0) != 50 ||
+        statuses.jobs(1).expected_start_time() != 10 ||
+        statuses.jobs(1).start_time_kind() !=
+            dr_evt_grpc::START_TIME_KIND_RESERVED)
+      throw std::runtime_error("gRPC lost exact live or reserved identities");
+    advance.mutable_advance_to()->set_target_time(10);
+    client.call(advance);
+    statuses = client.call(query).get_job_statuses();
+    if (statuses.jobs(0).node_ids_size() != 0 ||
+        statuses.jobs(1).node_ids_size() != 50 ||
+        statuses.jobs(1).node_ids(0) != 50 ||
+        statuses.jobs(1).scheduled().start_time() != 10)
+      throw std::runtime_error(
+          "gRPC placement release/start disagrees with reservation");
+  } catch (const std::exception &error) {
+    std::cerr << "Placement gRPC FAIL: " << error.what() << '\n';
+    client.finish();
+    return false;
+  }
+  return client.finish().ok();
+}
+
 int main(int argc, char **argv) {
   if (argc < 3) {
     std::cerr << "Usage: " << argv[0]
@@ -628,6 +685,7 @@ int main(int argc, char **argv) {
           .string();
 
   bool ok = true;
+  ok &= test_placement(server_address, trace_file);
   ok &= test_single_append(server_address, trace_file);
   ok &= test_batch_append(server_address, trace_file);
   ok &= test_estimated_job_starts(server_address, trace_file);

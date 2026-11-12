@@ -21,8 +21,8 @@ the first submission.
 Both schedulers use equal priorities, FCFS order, no system latency or node
 release delay, and an unlimited planning horizon. Fair share, usage accounting,
 preemption, GPUs, and heterogeneous topology are excluded.
-DR_EVT uses `--per_pass_accounting` to select the event-driven placement
-implementation: immediate starts and reservations
+The recorded 2,000-job comparisons used aggregate capacity with
+`--per_pass_accounting` to select event-driven per-pass accounting: immediate starts and reservations
 count toward Q, and Q/R reset each pass. The resource-time reservation rule is
 `DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`.
 
@@ -190,3 +190,12 @@ With NumPy and Matplotlib installed, download either complete figure folder and 
 ```sh
 python3 plot_comparison.py --plot-input plot-input.json
 ```
+
+## Integrated exact placement
+
+The main simulator now supports `--resource_model placement` for event-driven
+circular FCFS whole-node scheduling. The saved 60-case Fluxion identity oracle
+is compared with the actual Simulation event loop, including reservations,
+low/high node order, all six optimization modes and both coarse-filter settings.
+This is separate from the historical 2,000-job aggregate-capacity results above.
+See [Resource Models](../dev/RESOURCE_MODELS.md) for supported scope and tests.
