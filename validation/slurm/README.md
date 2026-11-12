@@ -109,6 +109,81 @@ batches with native backfill; allocation and reservation algorithms remain
 native Slurm. The lightweight observer fetches full job records on state
 transitions; pending-job forecast timestamps may be stale in snapshots.
 
+## How virtual nodes are configured
+
+A virtual node is a named compute-node record in Slurm's controller. In this
+harness, the record is backed by a daemon on the test host or by the validation
+adapter. Each job requests its own private node, so jobs never compete for
+that node's identity. Shared `capacity` licenses represent the original trace's
+node demand. The following two setups use this resource model; the default
+trace-driven comparison uses the adapter setup.
+
+### Earlier wall-clock controls: multiple slurmd daemons on one host
+
+[licenses/compare.py](licenses/compare.py) runs a native `slurmctld` and one
+`slurmd` per private node. Slurm is built with `--enable-multiple-slurmd`, as
+shown in [licenses/build.sh](licenses/build.sh). All node addresses point to
+localhost, but each daemon has a distinct port, spool directory, and PID file.
+An excerpt of the generated four-node configuration is:
+
+```ini
+SlurmdSpoolDir=/tmp/slurm-control/spool-%n
+SlurmdPidFile=/tmp/slurm-control/slurmd-%n.pid
+SlurmdParameters=config_overrides
+Licenses=capacity:4
+NodeName=case0n0 NodeHostname=localhost NodeAddr=127.0.0.1 Port=18000 CPUs=1 RealMemory=128 State=UNKNOWN
+NodeName=case0n1 NodeHostname=localhost NodeAddr=127.0.0.1 Port=18001 CPUs=1 RealMemory=128 State=UNKNOWN
+```
+
+The harness creates each spool directory and starts the daemons with their
+logical node names. For those two nodes, the commands are equivalent to:
+
+```sh
+slurmd -D -f /tmp/slurm-control/slurm.conf -N case0n0
+slurmd -D -f /tmp/slurm-control/slurm.conf -N case0n1
+```
+
+These are separate processes launched by the harness; `-D` keeps each in the
+foreground. It waits for the nodes to register as idle, then submits jobs
+with `--nodes=1 --nodelist=case0n0 --licenses=capacity:2`, for example. That
+request represents a two-node trace job on one private dummy node. Jobs in
+this setup execute short `sleep` scripts, and elapsed wall time drives their
+completion. The configuration above is an excerpt, not a complete standalone
+`slurm.conf`.
+
+### Default trace-driven comparison: registration and completion RPCs
+
+[licenses/event_trace.py](licenses/event_trace.py) runs native `slurmctld`
+without launching `slurmd` processes. It defines one node per input job:
+
+```ini
+SlurmdTimeout=0
+Licenses=capacity:756
+NodeName=n[0000-1999] NodeHostname=localhost NodeAddr=127.0.0.1 Port=18000 CPUs=1 RealMemory=128 State=IDLE
+```
+
+This excerpt illustrates the 2,000-job, 756-node Lassen comparison. The harness
+generates the node range and license count from the workload. After the
+controller's startup probe, it sends `REGISTER n0000`, and the corresponding
+command for every other node, to [licenses/client.c](licenses/client.c).
+The client sends `MESSAGE_NODE_REGISTRATION_STATUS`, the registration RPC
+normally sent by `slurmd`, with the node name and configured CPU/memory values.
+`SlurmdTimeout=0` disables subsequent daemon-liveness probes.
+
+For submission, the client calls `slurm_allocate_resources()` with the job's
+private node as `req_nodes`, one requested compute node, and
+`capacity:<original node demand>` as its licenses. A 32-node trace job thus
+uses one private node and 32 of the 756 shared licenses. Slurm's native
+selection and backfill plugins decide when that request can start.
+
+No job process executes in this setup. The adapter observes Slurm's allocation,
+advances virtual time to the observed start plus the recorded actual duration,
+and sends the job-completion and epilog-completion RPCs to release resources.
+The adapter supplies node
+registration and workload events; Slurm retains ownership of allocation and
+reservation decisions. Virtual nodes and the virtual clock are separate parts
+of the harness; the clock and event batching are described below.
+
 ## Event batching, acknowledgements, and clock handling
 
 Main scheduling tries to start waiting jobs when jobs arrive or finish.

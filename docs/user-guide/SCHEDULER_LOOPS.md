@@ -421,6 +421,26 @@ This loop describes the backfill policy in `flux-sched` at the cited
 revision `9eba598b4e0940d597695e65f20f5357fc513427`. A pass starts at the queue
 head with fresh examination and reservation counters.
 
+For Fluxion's EASY, HYBRID, and conservative policies, allocation and
+reservation happen in the same queue traversal. For each pending job, the
+scheduler:
+
+1. Tries to allocate resources now, respecting reservations already
+   established in that pass.
+2. If the job cannot start now and reservation slots remain, tries to reserve
+   a feasible future interval.
+3. Continues to later jobs, allowing them to backfill around those
+   reservations.
+
+Once HYBRID's reservation depth is reached, later jobs can still start now,
+but cannot receive new future reservations in that pass. The queue examination
+limit Q can stop the traversal before it reaches those later jobs.
+
+Starting a later job now while an earlier job waits is backfill; allocation
+with no earlier reservation to pass is an ordinary immediate allocation.
+A reserved job remains pending: its reservation does not launch it. A later
+pass can allocate it when resources become available.
+
 ```text
 on a scheduling-relevant event:
     update state and reconsider blocked jobs when the event permits
@@ -455,8 +475,7 @@ pass resets both and replaces the reservation plan. Q therefore limits each
 pass, and R each plan, rather than cumulative work across passes.
 
 R is zero for allocation-only behavior, one for EASY, N for hybrid, and
-effectively unlimited for conservative. After R reservations, immediate
-allocation tests can continue within Q: R=32, Q=64 permits another 32 tests.
+effectively unlimited for conservative.
 Reservations set the dirty bit and can request another pass even without a
 start. However, response/annotation processing can clear [`is_scheduled()`][cpp-job-record-is-scheduled] before
 a later matching reply, so an earlier reservation does not guarantee a retry.
