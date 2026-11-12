@@ -14,6 +14,13 @@ git clone https://github.com/SchedMD/slurm.git external/slurm
 git -C external/slurm checkout --detach 17abb848e20054009d136a2c504a23e5462f26c8
 ```
 
+The default event campaign now also writes `results/placement/`. That run
+removes the synthetic license pool, submits each job as an exclusive N-node
+request on a shared homogeneous pool, and compares Slurm's native node list
+with the exact IDs selected by DR_EVT placement scheduling. The historical
+protected and no-reservation capacity runs remain separate. Native and DR_EVT
+process times in all three trees are collected on the same campaign host.
+
 The image contains Linux build tools and dependencies, not a downloaded Slurm
 checkout. The runner mounts `external/slurm` read-only and exports its committed
 source into a Docker build volume, where it builds Slurm and DR_EVT. It adds

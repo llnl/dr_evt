@@ -5,7 +5,7 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file dr_evt_params.cpp
+/** @file proto/dr_evt_params.cpp
  * @brief Protobuf configuration-to-parameter conversion.
  * @details Enabled by --config FILE. Simulation_Params scheduling fields
  * become Sim_Params values used by create_scheduler(). In particular

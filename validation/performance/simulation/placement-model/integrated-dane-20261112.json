@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "scope": "Curated whole-process placement benchmark summary; full local reports retain commands, samples, outputs, and audits",
+  "date": "2026-11-12",
+  "host": "Dane x86_64 compute node",
+  "platform": "Linux-4.18.0-553.174.1.1toss.t4.x86_64-x86_64-with-glibc2.28",
+  "compiler": "GCC 13.3.1",
+  "build": "Release; optional serialization, Python, Protobuf, and gRPC disabled; observers disabled in timed runs",
+  "revision": "04e32d2a7c1410ee2540b874bd125fe18da4e202",
+  "working_tree_dirty": true,
+  "binary_sha256": "ac86dc36f4bb65aab64632f8cbf11fd1809fb2d4c83755342ad7c8419cf0ca49",
+  "warmups": 1,
+  "measured_runs": 3,
+  "nodes": 500,
+  "raw_reports": {
+    "contended_10k": {
+      "local_path": "results/dane-20261112/placement-existing-10k-r3.json",
+      "sha256": "8933498a0c21dc41d05321fb223b306881c984fe808c9b478df55dbc91958d2c"
+    },
+    "seeded_low_load_20k": {
+      "local_path": "results/dane-20261112/placement-20k-500-r3.json",
+      "sha256": "480ddc9c812efaf75cf80e7a0035592f72a7d0fba929d4659aff0c357b21e6f5"
+    }
+  },
+  "workloads": {
+    "contended_10k": {
+      "jobs": 10000,
+      "trace_sha256": "f7b4816688db7914b64c4a655599a7817d3712105a5197bcf05fccc80ced05ae",
+      "description": "Existing tests/test_traces/scale/huge_10000jobs.csv; heavily queued",
+      "cases": {
+        "easy": {
+          "medians_ms": {"none": 18717.603, "fast": 18699.687, "batch": 18683.343, "scratch": 17448.988, "boolean": 16814.685, "all": 16634.363, "all_coarse": 26187.416},
+          "cpu_medians_ms": {"none": 18668.406, "fast": 18644.592, "batch": 18630.676, "scratch": 17399.168, "boolean": 16766.316, "all": 16580.958, "all_coarse": 26107.823},
+          "ranges_ms": {"none": [18689.477, 18735.093], "all": [16629.732, 16634.420], "all_coarse": [26185.298, 26943.874]},
+          "operation_calls": {"fit_now": 116697287, "find_fit": 27570, "reserve": 27570, "allocate": 10000, "release": 10000}
+        },
+        "hybrid_r32_q32": {
+          "medians_ms": {"none": 1526.481, "fast": 1524.105, "batch": 1517.698, "scratch": 1312.839, "boolean": 1525.724, "all": 1311.228, "all_coarse": 2981.346},
+          "cpu_medians_ms": {"none": 1511.162, "fast": 1507.165, "batch": 1500.809, "scratch": 1295.715, "boolean": 1508.483, "all": 1296.508, "all_coarse": 2961.969},
+          "ranges_ms": {"none": [1525.899, 1529.275], "all": [1310.910, 1314.397], "all_coarse": [2978.841, 2995.970]},
+          "operation_calls": {"fit_now": 26739, "find_fit": 638058, "reserve": 629028, "allocate": 10000, "release": 10000}
+        }
+      }
+    },
+    "seeded_low_load_20k": {
+      "jobs": 20000,
+      "trace_sha256": "235c1fa1e259081dc207dea32f9cbecf6c723ac2c914a25b92220f91e4e17508",
+      "description": "Seed 2718; four arrivals per second; 1-8 nodes; 1-30 second limits; no future reservations",
+      "cases": {
+        "easy": {
+          "medians_ms": {"none": 300.904, "fast": 106.664, "batch": 174.660, "scratch": 300.112, "boolean": 299.992, "all": 102.141, "all_coarse": 100.634},
+          "cpu_medians_ms": {"none": 285.193, "fast": 86.114, "batch": 159.891, "scratch": 285.571, "boolean": 284.766, "all": 87.075, "all_coarse": 83.740},
+          "ranges_ms": {"none": [298.849, 302.437], "all": [101.139, 102.551], "all_coarse": [96.606, 100.709]},
+          "operation_calls": {"fit_now": 20000, "find_fit": 0, "reserve": 0, "allocate": 20000, "release": 20000}
+        },
+        "hybrid_r32_q32": {
+          "medians_ms": {"none": 304.209, "fast": 102.132, "batch": 181.303, "scratch": 304.254, "boolean": 305.473, "all": 107.705, "all_coarse": 98.195},
+          "cpu_medians_ms": {"none": 285.110, "fast": 85.998, "batch": 160.149, "scratch": 285.548, "boolean": 284.772, "all": 87.242, "all_coarse": 81.907},
+          "ranges_ms": {"none": [303.687, 307.387], "all": [102.783, 2049.312], "all_coarse": [95.819, 110.061]},
+          "operation_calls": {"fit_now": 20000, "find_fit": 0, "reserve": 0, "allocate": 20000, "release": 20000}
+        }
+      }
+    }
+  },
+  "correctness": "All placement variants had identical per-case schedule/resource hashes; all job, duration, capacity, and resource-history audits passed",
+  "limitations": [
+    "Three measured runs support large effects, not small percentage claims",
+    "Some low-load wall samples contain system-noise outliers; CPU medians remain stable",
+    "Aggregate capacity is not an equality or speedup baseline for exact placement",
+    "Operation diagnostics were collected in separate untimed runs"
+  ]
+}

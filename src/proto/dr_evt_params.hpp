@@ -5,7 +5,7 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file dr_evt_params.hpp
+/** @file proto/dr_evt_params.hpp
  * @brief Protobuf configuration loading for simulator parameters.
  * @details Enabled by --config FILE. Simulation_Params uses CLI field names
  * without --. The loader supplies ordering, backfill, queue, timing, and

@@ -23,12 +23,20 @@ SLURM_VALIDATION
 OPENPBS_VALIDATION
 ```
 
-Slurm and OpenPBS give each job a private dummy node or vnode, suppressing
+The historical capacity comparisons give each Slurm/OpenPBS job a private
+dummy node or vnode, suppressing
 competition for node identities while retaining shared-capacity constraints.
 The native schedulers still assign nodes. Production resource binding can
 therefore cause further divergence, as the
 [Fiction comparison with Fluxion](FLUX_VALIDATION.md#minimal-reproducer-for-backfill-start-time-differences)
 demonstrates.
+
+The native runners also provide a separate placement campaign. In that mode,
+Slurm/OpenPBS schedule whole-node requests on one shared homogeneous node pool,
+and the reports compare exact native node identities with DR_EVT placement
+allocations as well as starts, completions, resource bounds, and process time.
+Capacity and placement results are kept in separate directories so historical
+laptop timings are not reused in a host-specific campaign.
 
 See [Scheduling Loops](SCHEDULER_LOOPS.md) for policy rules,
 [Realism and Known Gaps](REALISM_AND_GAPS.md) for model limits, and the
