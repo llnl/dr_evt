@@ -182,6 +182,7 @@ jobs:
         id: bitmap-placement
         run: |
           $GITHUB_WORKSPACE/install/bin/tests/test_placement_model
+          $GITHUB_WORKSPACE/install/bin/tests/test_placement_integration
           python3 validation/flux/compare_placement_model.py \
             "$GITHUB_WORKSPACE/install/bin/tests/test_flux_placement_driver"
 

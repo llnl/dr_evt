@@ -16,6 +16,15 @@
 
 namespace dr_evt {
 
+/** @brief Compile-time selectors for independently measurable placement
+ * features.
+ * @hideinitializer */
+inline constexpr auto AllPlacementOptimizations = [] { return 15U; };
+/** @brief Baseline placement operations, with all optional optimizations
+ * disabled.
+ * @hideinitializer */
+inline constexpr auto NoPlacementOptimizations = [] { return 0U; };
+
 /**
  * @brief Stateless whole-node placement operations over caller-owned bitmaps.
  * @tparam Observer Static observer; NoResourceObserver removes hooks at compile
@@ -24,6 +33,9 @@ namespace dr_evt {
  * storage.
  * @tparam CoarseFilter Captureless constexpr lambda returning bool; selects
  * timeline filtering and cache storage at compile time; defaults to exact-only.
+ * @tparam Features Captureless constexpr lambda returning an unsigned mask:
+ * 1 immediate fast path, 2 batch seeding, 4 reusable scratch, 8 boolean
+ * fitting.
  * @details Requests are quantities, but placements and committed allocations
  * retain exact identities. This model is separate from scalar CapacityModel.
  * Planning and live accounting states remain distinct and caller-owned. Neither
@@ -31,9 +43,18 @@ namespace dr_evt {
  */
 template <typename Observer = NoResourceObserver,
           NodeOrder Order = NodeOrder::LowIdFirst,
-          auto CoarseFilter = DisableCoarseFilter>
+          auto CoarseFilter = DisableCoarseFilter,
+          auto Features = AllPlacementOptimizations>
 class PlacementModel {
 public:
+  static constexpr bool immediate_fast_path =
+      (Features() & 1U) != 0; ///< Immediate selection strategy.
+  static constexpr bool batch_seeding =
+      (Features() & 2U) != 0; ///< Initial running admission strategy.
+  static constexpr bool reusable_scratch =
+      (Features() & 4U) != 0; ///< Query storage strategy.
+  static constexpr bool boolean_only =
+      (Features() & 8U) != 0; ///< Feasibility result strategy.
   /// Number of interchangeable whole nodes requested.
   using Request = num_nodes_t;
   /// Caller-owned resource membership for one accounting scope.
@@ -102,7 +123,8 @@ public:
    * allocated. */
   static bool can_fit(const Timeline &plan, Request quantity, tdiff_t duration,
                       sim_time_t start, ResourceContext context = {}) {
-    const bool result = plan.can_fit(start, quantity, duration);
+    const bool result = plan.template can_fit<boolean_only, reusable_scratch>(
+        start, quantity, duration);
     if constexpr (Observer::enabled) {
       context.timeline = &plan;
       Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
@@ -125,7 +147,8 @@ public:
                                           Request quantity, tdiff_t duration,
                                           sim_time_t start,
                                           ResourceContext context = {}) {
-    auto result = plan.template find_at<Order>(quantity, duration, start);
+    auto result = plan.template find_at<Order, reusable_scratch>(
+        quantity, duration, start);
     if constexpr (Observer::enabled) {
       context.timeline = &plan;
       Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
@@ -150,7 +173,8 @@ public:
                                            Request quantity, tdiff_t duration,
                                            sim_time_t start,
                                            ResourceContext context = {}) {
-    auto result = plan.template earliest_fit<Order>(quantity, duration, start);
+    auto result = plan.template earliest_fit<Order, reusable_scratch>(
+        quantity, duration, start);
     if constexpr (Observer::enabled) {
       context.timeline = &plan;
       Observer::observe({ResourceOperation::FindFit, ResourceScope::Timeline,

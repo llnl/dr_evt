@@ -1,4 +1,4 @@
-# Placement optimization trials
+# Standalone placement optimization trials
 
 Four changes were tried independently against `a2d45c7`, then combined. Exact
 placement remains the correctness reference; aggregate capacity can produce
@@ -56,7 +56,8 @@ The shared scheduling timer includes resource accounting, timeline setup,
 queue traversal, reservations, event handling, and identical decision hashes.
 It excludes CSV parsing, initial owning job-record construction, output, and
 final audits. This is a validation harness, not whole-simulator wall time.
-Placement is still not selectable through the simulator CLI/API.
+These historical numbers predate CLI/API integration. Whole-simulator placement
+measurements remain pending; these numbers do not measure the integrated simulator.
 
 ## Reproduce
 

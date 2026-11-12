@@ -2,16 +2,21 @@
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
 /** @file placement_driver.cpp
- * @brief Validation-only queue traversal using the reusable placement model.
+ * @brief Native fixture protocol driving the actual Simulation scheduler and
+ * event loop.
  * @details Whole nodes, equal priority, unlimited queue examination, no release
- * delay or dispatch latency. This is not a simulator scheduler implementation.
+ * delay or dispatch latency. All scheduling and accounting use the main
+ * simulator.
  */
 #define DR_EVT_HAS_CONFIG 1
-#include "sim/resource/placement_model.hpp"
+#include "sim/sim.hpp"
+#include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <ranges>
 #include <string>
+#include <unistd.h>
 
 using namespace dr_evt;
 
@@ -23,7 +28,6 @@ struct Job {
   tdiff_t runtime;       ///< Actual runtime used for completion.
   bool launched = false; ///< Whether the job has ever started.
   sim_time_t finish = 0; ///< Actual completion time, meaningful after launch.
-  BitmapAllocation allocation; ///< Live identities; cleared on completion.
 };
 
 /** @brief Write IDs directly from a borrowed bitmap without an expanded side
@@ -61,95 +65,85 @@ static void write_ids(const BitmapAllocation &mask, std::ostream &out) {
 template <NodeOrder Order, auto CoarseFilter = DisableCoarseFilter>
 static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
                 bool strict, std::ostream &out) {
-  using Model = PlacementModel<NoResourceObserver, Order, CoarseFilter>;
-  Bitmap occupied(capacity);
-  const Bitmap inventory(capacity, true);
+  // Each process owns one header-only input; appended jobs use the normal API.
+  char filename[] = "/tmp/dr-evt-placement-fixture-XXXXXX";
+  const int descriptor = mkstemp(filename);
+  if (descriptor < 0)
+    throw std::runtime_error("cannot create fixture input");
+  close(descriptor);
+  struct Cleanup {
+    const char *path;
+    ~Cleanup() { std::remove(path); }
+  } cleanup{filename};
+  {
+    std::ofstream input(filename);
+    input << "job_submit_time,num_nodes,time_limit\n";
+  }
+  Sim_Params params;
+  params.m_infile = filename;
+  params.m_trace_format = "simple";
+  params.m_timestamp_format = "epoch";
+  params.m_total_nodes = capacity;
+  params.m_resource_model = "placement";
+  params.m_placement_order = Order == NodeOrder::LowIdFirst ? "low" : "high";
+  params.m_placement_coarse_filter = CoarseFilter();
+  if (const auto *features = std::getenv("DR_EVT_PLACEMENT_OPTIMIZATIONS"))
+    params.m_placement_optimizations = features;
+  params.m_backfill_policy = strict       ? BackfillPolicy::NONE
+                             : slots == 1 ? BackfillPolicy::EASY
+                             : slots >= jobs.size()
+                                 ? BackfillPolicy::CONSERVATIVE
+                                 : BackfillPolicy::HYBRID;
+  params.m_reservation_depth = slots;
+  Simulation simulation(params);
+  std::vector<job_no_t> ids;
+  ids.reserve(jobs.size());
+  for (const auto &job : jobs) {
+#if DR_EVT_LEGACY_QUEUE_INPUT
+    constexpr const char *queue = "pbatch";
+#else
+    constexpr const char *queue = "1";
+#endif
+    ids.push_back(simulation.append_job(job.submit, job.quantity, queue,
+                                        job.limit, job.runtime));
+  }
   sim_time_t time = jobs.empty() ? 0 : jobs.front().submit;
   size_t completed = 0;
   while (completed < jobs.size()) {
-    for (auto &job : jobs) {
-      if (job.launched && job.finish == time &&
-          job.allocation.capacity() != 0) {
-        Model::release(occupied, job.allocation);
-        job.allocation = Bitmap{};
-        ++completed;
-      }
-    }
-    // This planner dies before any job-owned allocation changes at the next
-    // event.
-    std::optional<typename Model::Timeline> plan;
-    const auto ensure_plan = [&]() {
-      if (plan)
-        return;
-      plan.emplace(inventory, time);
-      auto live = jobs | std::views::filter([time](const Job &job) {
-                    return job.launched && job.finish > time;
-                  });
-      plan->seed_running(live, [&](const Job &job) {
-        return typename Model::Timeline::Interval{
-            time, job.finish + job.limit - job.runtime,
-            static_cast<job_no_t>(&job - jobs.data()),
-            std::cref(job.allocation)};
-      });
-    };
-    size_t reserved = 0;
+    simulation.advance_to(time);
+    const auto statuses = simulation.get_job_statuses(ids);
+    completed = 0;
     for (size_t index = 0; index < jobs.size(); ++index) {
       auto &job = jobs[index];
-      if (job.launched || job.submit > time)
-        continue;
-      std::optional<typename Model::Placement> placement;
-      if (!plan)
-        placement = Model::find_available(inventory, occupied, job.quantity,
-                                          job.limit, time);
-      if (!placement && (plan || reserved < slots)) {
-        ensure_plan();
-        placement = reserved < slots
-                        ? Model::find_fit(*plan, job.quantity, job.limit, time)
-                        : Model::find_at(*plan, job.quantity, job.limit, time);
+      const auto &status = statuses[index];
+      if (status.state == Simulation::Job_State::COMPLETED)
+        ++completed;
+      if (!job.launched && status.start_time) {
+        job.launched = true;
+        job.finish = *status.end_time;
+        out << "{\"schedule\":{\"job\":" << index
+            << ",\"start\":" << *status.start_time
+            << ",\"finish\":" << job.finish << ",\"node_ids\":";
+        write_ids(simulation.placement_state()->jobs.at(ids[index]).allocation,
+                  out);
+        out << "}}\n";
       }
-      if (!placement) {
-        if (strict)
-          break;
-        continue;
-      }
-      if (placement->start > time) {
-        Model::reserve(*plan, std::move(*placement), job.quantity, job.limit,
-                       {index, time});
-        ++reserved;
-        continue;
-      }
-      Model::allocate(occupied, placement->allocation);
-      job.allocation = std::move(placement->allocation);
-      job.launched = true;
-      job.finish = time + job.runtime;
-      if (plan)
-        plan->borrow_running(job.allocation, time + job.limit, index);
-      out << "{\"schedule\":{\"job\":" << index << ",\"start\":" << time
-          << ",\"finish\":" << job.finish << ",\"node_ids\":";
-      write_ids(job.allocation, out);
-      out << "}}\n";
     }
     out << "{\"snapshot\":{\"time\":" << time << ",\"allocations\":[";
     bool first = true;
-    for (size_t index = 0; index < jobs.size(); ++index) {
-      const auto &job = jobs[index];
-      if (!job.launched || job.finish <= time)
-        continue;
+    for (const auto &[id, record] : simulation.placement_state()->jobs) {
       if (!first)
         out << ',';
       first = false;
-      out << "{\"job\":" << index << ",\"node_ids\":";
-      write_ids(job.allocation, out);
+      out << "{\"job\":" << id << ",\"node_ids\":";
+      write_ids(record.allocation, out);
       out << '}';
     }
     out << "],\"reservations\":[";
     first = true;
-    // Queue order, independent of the planner's temporal storage order.
     for (size_t index = 0; index < jobs.size(); ++index) {
-      for (const auto &interval :
-           plan ? plan->intervals()
-                : std::span<const typename Model::Timeline::Interval>{}) {
-        if (interval.job != index || interval.start <= time)
+      for (const auto &interval : simulation.placement_reservations()) {
+        if (interval.job != ids[index] || interval.start <= time)
           continue;
         if (!first)
           out << ',';
@@ -164,11 +158,11 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     if (completed == jobs.size())
       break;
     auto next = std::numeric_limits<sim_time_t>::infinity();
-    for (const auto &job : jobs) {
-      if (!job.launched && job.submit > time)
-        next = std::min(next, job.submit);
-      if (job.launched && job.finish > time)
-        next = std::min(next, job.finish);
+    for (size_t index = 0; index < jobs.size(); ++index) {
+      if (!jobs[index].launched && jobs[index].submit > time)
+        next = std::min(next, jobs[index].submit);
+      if (statuses[index].end_time && *statuses[index].end_time > time)
+        next = std::min(next, *statuses[index].end_time);
     }
     if (!std::isfinite(next))
       throw std::runtime_error("pending jobs cannot progress");

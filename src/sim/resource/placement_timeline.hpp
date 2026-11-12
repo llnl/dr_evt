@@ -25,6 +25,27 @@ struct BitmapPlacement {
   BitmapAllocation allocation; ///< Selected resource identities.
 };
 
+/** @brief Exact half-open interval and its allocation ownership. */
+struct PlacementInterval {
+  sim_time_t start;  ///< Inclusive blocked start.
+  sim_time_t finish; ///< Exclusive blocked finish.
+  job_no_t job;      ///< Caller job identity, or max() when anonymous.
+  /// Owned reservation mask or borrowed live allocation, never both.
+  std::variant<BitmapAllocation, std::reference_wrapper<const BitmapAllocation>>
+      masks;
+
+  /** @brief Borrow this interval's exact identities.
+   * @return Allocation view valid for the interval's lifetime; a live owner
+   * must additionally outlive the timeline. */
+  const BitmapAllocation &allocation() const noexcept {
+    if (const auto *owned = std::get_if<BitmapAllocation>(&masks)) {
+      return *owned;
+    }
+    return std::get<std::reference_wrapper<const BitmapAllocation>>(masks)
+        .get();
+  }
+};
+
 /** @brief Compile-time selector for the opt-in coarse-filter specialization.
  * @hideinitializer
  */
@@ -74,27 +95,8 @@ public:
   /// Compile-time filter choice; no runtime flag is stored.
   static constexpr bool coarse_filter_enabled = CoarseFilter();
 
-  /** @brief Exact half-open interval and its allocation ownership. */
-  struct Interval {
-    sim_time_t start;  ///< Inclusive blocked start.
-    sim_time_t finish; ///< Exclusive blocked finish.
-    job_no_t job;      ///< Caller job identity, or max() when anonymous.
-    /// Owned reservation mask or borrowed live allocation, never both.
-    std::variant<BitmapAllocation,
-                 std::reference_wrapper<const BitmapAllocation>>
-        masks;
-
-    /** @brief Borrow this interval's exact identities.
-     * @return Allocation view valid for the interval's lifetime; a live owner
-     * must additionally outlive the timeline. */
-    const BitmapAllocation &allocation() const noexcept {
-      if (const auto *owned = std::get_if<BitmapAllocation>(&masks)) {
-        return *owned;
-      }
-      return std::get<std::reference_wrapper<const BitmapAllocation>>(masks)
-          .get();
-    }
-  };
+  /// Common exact interval type shared by both filter specializations.
+  using Interval = PlacementInterval;
 
 private:
   static constexpr size_t buckets = 64;
@@ -454,6 +456,8 @@ public:
   /** @brief Find selected identities at an exact start, without changing the
    * plan.
    * @tparam Order Compile-time resource selection order.
+   * @tparam ReuseScratch Reuse and transfer one query buffer instead of
+   * allocating a separate result.
    * @param[in] quantity Resources requested; zero returns an empty allocation.
    * @param[in] duration Requested duration; nonpositive means a point query.
    * @param[in] start Exact query start.
@@ -461,17 +465,33 @@ public:
    * @throws std::invalid_argument for invalid query timing.
    * @throws std::bad_alloc if result, scratch, or filter storage cannot be
    * allocated. */
-  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  template <NodeOrder Order = NodeOrder::LowIdFirst, bool ReuseScratch = true>
   std::optional<BitmapPlacement> find_at(num_nodes_t quantity, tdiff_t duration,
                                          sim_time_t start) const {
-    Bitmap candidates;
-    if (!select_at<Order>(candidates, quantity, duration, start))
-      return std::nullopt;
-    return BitmapPlacement{start, std::move(candidates)};
+    if constexpr (ReuseScratch) {
+      Bitmap candidates;
+      if (!select_at<Order>(candidates, quantity, duration, start))
+        return std::nullopt;
+      return BitmapPlacement{start, std::move(candidates)};
+    } else {
+      const auto end = endpoint(start, duration);
+      Bitmap candidates = m_pool;
+      if constexpr (coarse_filter_enabled)
+        filter(candidates, start, end);
+      if (candidates.count() < quantity)
+        return std::nullopt;
+      refine(candidates, start, end);
+      auto allocation = candidates.template select<Order>(quantity);
+      if (!allocation)
+        return std::nullopt;
+      return BitmapPlacement{start, std::move(*allocation)};
+    }
   }
 
   /** @brief Find the earliest exact placement after a requested start.
    * @tparam Order Compile-time resource selection order.
+   * @tparam ReuseScratch Reuse and transfer one query buffer instead of
+   * allocating a separate result.
    * @param[in] quantity Number of resources requested.
    * @param[in] duration Requested duration; nonpositive means a point query.
    * @param[in] start Earliest exact start.
@@ -483,34 +503,50 @@ public:
    * @details Availability can improve only at exact interval ends. Coarse
    * boundaries are never used as candidate starts or as final admission tests.
    */
-  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  template <NodeOrder Order = NodeOrder::LowIdFirst, bool ReuseScratch = true>
   std::optional<BitmapPlacement>
   earliest_fit(num_nodes_t quantity, tdiff_t duration, sim_time_t start) const {
     endpoint(start, duration);
     if (quantity > m_pool.count())
       return std::nullopt;
     Bitmap candidates;
-    if (select_at<Order>(candidates, quantity, duration, start))
-      return BitmapPlacement{start, std::move(candidates)};
+    const auto attempt = [&](sim_time_t at) -> std::optional<BitmapPlacement> {
+      if constexpr (ReuseScratch) {
+        if (!select_at<Order>(candidates, quantity, duration, at))
+          return std::nullopt;
+        return BitmapPlacement{at, std::move(candidates)};
+      } else
+        return find_at<Order, false>(quantity, duration, at);
+    };
+    if (auto result = attempt(start))
+      return result;
     sim_time_t previous = start;
     for (const auto &interval : m_intervals) {
       if (interval.finish <= previous)
         continue;
       previous = interval.finish;
-      if (select_at<Order>(candidates, quantity, duration, previous))
-        return BitmapPlacement{previous, std::move(candidates)};
+      if (auto result = attempt(previous))
+        return result;
     }
     return std::nullopt;
   }
 
   /** @brief Check an exact interval's identity feasibility.
+   * @tparam BooleanOnly Omit allocation-result selection when true.
+   * @tparam ReuseScratch Buffer strategy when an allocation result is
+   * requested.
    * @param[in] start Requested exact start.
    * @param[in] quantity Number of resources requested.
    * @param[in] duration Requested duration; nonpositive means a point query.
    * @return true when one fixed set of identities fits throughout the interval.
    * @throws std::invalid_argument for invalid query timing.
    * @throws std::bad_alloc if scratch or filter storage cannot be allocated. */
+  template <bool BooleanOnly = true, bool ReuseScratch = true>
   bool can_fit(sim_time_t start, num_nodes_t quantity, tdiff_t duration) const {
+    if constexpr (!BooleanOnly)
+      return find_at<NodeOrder::LowIdFirst, ReuseScratch>(quantity, duration,
+                                                          start)
+          .has_value();
     const auto end = endpoint(start, duration);
     Bitmap candidates = m_pool;
     if constexpr (coarse_filter_enabled)
@@ -560,6 +596,19 @@ public:
     if (placement.allocation.count() == 0)
       return;
     insert(placement.start, end, job, std::move(placement.allocation));
+  }
+
+  /** @brief End planning while retaining only owned future reservations.
+   * @details Removes borrowed live/projected masks before their owners can
+   * change. Retained reservations are reporting snapshots, not live
+   * commitments. Invalidates interval views and the derived coarse cache. */
+  void discard_borrowed() {
+    std::erase_if(m_intervals, [](const Interval &interval) {
+      return std::holds_alternative<
+          std::reference_wrapper<const BitmapAllocation>>(interval.masks);
+    });
+    if constexpr (coarse_filter_enabled)
+      m_filter.dirty = true;
   }
 
   /** @brief Borrow exact intervals for inspection or trace generation.

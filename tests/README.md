@@ -416,3 +416,10 @@ For a scheduler-correctness fixture:
 
 Regenerate expected outputs only for an intentional behavior change, and
 review the generated diff before committing it.
+
+`test_placement_integration` runs actual Simulation placement checks for delayed
+RELEASE after trace reclamation, checkpoint continuation with bounded queue
+examination, 65-node bitmap boundaries, ordering, diagnostics and invalid
+configuration/requests. Python and gRPC API suites also exercise live and
+reserved node-ID reporting. The Fluxion comparator drives the same simulator,
+rather than a standalone scheduling loop.

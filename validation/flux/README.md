@@ -128,15 +128,15 @@ python3 -m unittest discover -s /validation -p test_placement_oracle.py -v
 
 The default native harness generates the oracle after its Fiction smoke checks.
 Ordinary CI audits the checked fixture and rejection cases without needing Flux.
-It also runs `test_placement_model` and compares the validation-only C++ driver
+It also runs `test_placement_model` and compares the C++ driver running the main Simulation
 with all 60 native cases, including exact reservation snapshots:
 
 ```sh
 python3 validation/flux/compare_placement_model.py ./build/test_flux_placement_driver
 ```
 
-The driver uses the reusable bitmap model; simulator CLI/API placement selection
-is a separate integration step.
+The driver uses the main simulator with `resource_model=placement`; CLI/API placement selection
+is available for event-driven circular FCFS whole-node scheduling.
 
 ## Resource evidence and synchronization
 

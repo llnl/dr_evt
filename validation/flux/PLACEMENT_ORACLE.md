@@ -65,11 +65,11 @@ Fluxion supplies the expected scheduling and placement decisions.
 The reusable C++ `PlacementModel` is compared with these exact starts, finishes,
 node IDs, and reservation snapshots by `compare_placement_model.py`, which
 runs both coarse-filter and exact-only compile-time specializations. The
-validation-only driver groups arrivals and completions at each timestamp,
+driver feeds the main Simulation, grouping arrivals and completions at each timestamp,
 rebuilds the pass-local plan from borrowed running allocations, and uses the
 same queue policies and reservation limits. Each job owns its live bitmap until
 completion; speculative future masks belong to the planner. This driver is
-separate from simulator CLI integration. CapacityModel schedules are not an equality target for this oracle.
+using the same scheduler and event loop as simulator CLI/API placement. CapacityModel schedules are not an equality target for this oracle.
 
 ## Generate and verify
 
@@ -110,4 +110,8 @@ the enabled template specialization once before processing jobs; `--exact-only`
 explicitly keeps the default. Both specializations use the same exact planner;
 there is no per-query runtime filter switch. `compare_placement_model.py`
 checks both automatically. This argument belongs only to the validation driver,
-not the simulator CLI.
+mapped to `--placement_coarse_filter` in the simulator CLI.
+
+The driver also accepts `DR_EVT_PLACEMENT_OPTIMIZATIONS=none|fast|batch|scratch|boolean|all`.
+Run the comparison for each value to check all compiled optimization strategies
+with both coarse-filter specializations against the saved Fluxion evidence.

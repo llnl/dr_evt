@@ -140,7 +140,9 @@ pool; IBM's rule concerns borrowed reserved slots.
 The built-in model uses one homogeneous node pool with FCFS, SJF, or LJF
 ordering. It does not model multifactor priority (age, fair share, QOS),
 preemption, dependencies and arrays, per-user/account limits, partitions,
-node topology and placement, or node failures. Scheduled capacity changes
+node topology or node failures. Exact whole-node placement is available through
+`--resource_model placement` for event-driven circular FCFS; it does not model
+core/GPU topology or shared resources. Scheduled capacity changes in capacity mode
 alter the pool size; they do not model those mechanisms. Health checks, missed
 notifications, state inconsistency, and failure recovery are outside the model;
 timers used only for those purposes need no simulation equivalent.

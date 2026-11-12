@@ -898,6 +898,65 @@ def test_resource_model_diagnostics(result):
         result.record_fail("Runtime resource diagnostics", str(error))
 
 
+def test_placement_api(result):
+    """Exercise model selection, live identities, reservations, and restart."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="dr-evt-placement-api-") as temp:
+            trace = os.path.join(temp, "empty.csv")
+            with open(trace, "w") as stream:
+                stream.write("job_submit_time,num_nodes,time_limit\n")
+            assert dr_evt.SimParams().resource_model == "capacity"
+            for features in ("none", "fast", "batch", "scratch", "boolean", "all"):
+                params = dr_evt.SimParams()
+                params.infile = trace
+                params.trace_format = "simple"
+                params.timestamp_format = "epoch"
+                params.total_nodes = 4
+                params.resource_model = "placement"
+                params.placement_order = "high"
+                params.placement_optimizations = features
+                params.placement_coarse_filter = True
+                sim = dr_evt.Simulation(params)
+                first = sim.append_job(0, 3, QUEUE_INPUT, 10)
+                second = sim.append_job(1, 2, QUEUE_INPUT, 5)
+                sim.advance_to(1)
+                statuses = sim.get_job_statuses([first, second])
+                assert statuses[0].node_ids == [1, 2, 3]
+                assert statuses[1].expected_start_time == 10
+                assert statuses[1].start_time_kind == dr_evt.StartTimeKind.RESERVED
+                assert statuses[1].node_ids == [2, 3]
+                aggregate = sim.get_job_statuses([second], use_cached_predictions=False)
+                assert aggregate[0].expected_start_time == 10
+                assert aggregate[0].node_ids == []
+                assert len(sim.get_start_times_by_queue_drain(1)) == 1
+                if hasattr(sim, "get_start_times_by_lookahead"):
+                    lookahead = sim.get_start_times_by_lookahead([second])
+                    assert lookahead[0].start_time == 10
+                assert sim.get_current_time() == 1
+                if hasattr(sim, "save_checkpoint"):
+                    checkpoint = os.path.join(temp, features + ".checkpoint")
+                    sim.save_checkpoint(checkpoint)
+                    restored = dr_evt.Simulation(params)
+                    restored.load_checkpoint(checkpoint)
+                    assert restored.get_job_statuses([first])[0].node_ids == [1, 2, 3]
+                    sim = restored
+                sim.advance_to(10)
+                assert sim.get_job_statuses([second])[0].node_ids == [2, 3]
+                sim.advance_to(15)
+                assert sim.get_available_nodes() == 4
+                assert sim.get_job_statuses([second])[0].node_ids == []
+            params.resource_model = "invalid"
+            try:
+                dr_evt.Simulation(params)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("invalid resource model accepted")
+        result.record_pass("Placement API, identities, reservations, exact lookahead, restart")
+    except Exception as error:
+        result.record_fail("Placement API", str(error))
+
+
 def main():
     print("="*60)
     print("DR_EVT Python API Test Suite")
@@ -913,6 +972,7 @@ def main():
     test_streaming_api(result)
     test_monitoring_api(result)
     test_resource_model_diagnostics(result)
+    test_placement_api(result)
     test_backfill_window_api(result)
     test_custom_backfill_api(result)
     test_statistics(result)

@@ -170,17 +170,42 @@ updates, observer metadata, borrowed-owner lifetime, exact release boundaries,
 fractional times, and randomized placement for both filter specializations against an independent
 dense node-by-time oracle. Every valid exact fit must pass the coarse filter.
 
-The validation-only `test_flux_placement_driver` uses this model for FCFS,
-EASY, HYBRID, and conservative queue traversal. Each job record owns its live
-allocation; the planner borrows it until the pass ends, and completion releases
-and clears that same allocation. The comparison runs both filter specializations and checks exact IDs, execution
-times, and future reservations against all 60 captured native Fluxion cases.
-CapacityModel is not an equality reference. See the
+`test_flux_placement_driver` now drives the actual `Simulation` scheduler and
+START/END/RELEASE event loop. All six optimization modes, both filter
+specializations, low/high matching, FCFS, EASY, HYBRID and conservative policies
+are compared with the 60 captured Fluxion cases. Checks include exact node IDs,
+execution times and future reservations. CapacityModel is not an equality
+reference. See the
 [Fluxion placement oracle](https://github.com/LLNL/dr_evt/blob/main/validation/flux/PLACEMENT_ORACLE.md).
 
-The reusable model is not yet selectable by the simulator. CLI, protobuf,
-Python, trace serialization, and checkpoints keep their capacity interfaces.
-Connecting placement to those layers requires carrying allocation ownership
-through existing START/END/RELEASE events, including delayed release after job
-record reclamation. Cores, GPUs, topology, sharing, and multiple resource types
-are future work.
+Select `--resource_model placement` in the simulator, `resource_model` in
+protobuf configuration/InitRequest, or `SimParams.resource_model` in Python.
+Capacity remains the default. Placement supports whole-node exclusive resources
+with event-driven circular FCFS queues, static inventory and exact planning
+times. Periodic/custom schedulers, replay warm start, capacity schedules,
+per-pass accounting and rounded planning times are rejected explicitly.
+
+The running-job store selects either its original count map or a placement map
+at construction. Capacity records retain their original scalar layout. Each
+placement record owns its bitmap until RELEASE, including cleanup after END and
+trace-record reclamation. An occupied union is updated at commit/release for
+immediate selection. Pending decisions transfer their masks into this owner;
+planning borrows masks only until the pass ends. The retained reporting snapshot
+owns future reservations. There is no second job-ID allocation map.
+
+Checkpoints preserve exact running/cleanup allocations and the timestamp's
+examination budget, validate allocation width/domain/cardinality/overlap and
+restore the selected specialization. Like existing estimated-start caches,
+reservation reporting snapshots are rebuilt after restore by scheduling.
+JobStatus.node_ids reports live or reserved IDs in C++, Python and gRPC; released
+IDs are not retained. CSV resource history remains aggregate accounting. A
+sparse allocated/released-ID trace, cores, GPUs, topology, sharing and multiple
+resource types are future work.
+
+`test_placement_integration` exercises the main simulator's bitmap boundaries,
+node order, delayed release, reclamation, diagnostics, bounded queues and
+checkpoint continuation. Whole-simulator performance measurements remain pending; the historical
+standalone placement trials do not measure this integration.
+
+Aggregate queue-drain, horizon and uncached status forecasts remain available
+as approximations in placement mode. They do not prove an exact placement fit.

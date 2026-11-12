@@ -776,6 +776,13 @@ target_link_libraries(test_placement_model-bin PRIVATE dr_evt)
 set_target_properties(test_placement_model-bin PROPERTIES OUTPUT_NAME test_placement_model)
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_placement_model-bin)
 
+add_executable(test_placement_integration-bin tests/test_placement_integration.cpp)
+target_include_directories(test_placement_integration-bin PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(test_placement_integration-bin PRIVATE dr_evt)
+set_target_properties(test_placement_integration-bin PROPERTIES OUTPUT_NAME test_placement_integration)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_placement_integration-bin)
+
 add_executable(test_flux_placement_driver-bin validation/flux/placement_driver.cpp)
 target_include_directories(test_flux_placement_driver-bin PRIVATE
   ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
@@ -930,6 +937,7 @@ if(DR_EVT_WITH_UNIT_TESTING)
   add_test(NAME test_placement_pass_accounting
     COMMAND $<TARGET_FILE:test_placement_pass_accounting-bin>)
   add_test(NAME test_capacity_model COMMAND $<TARGET_FILE:test_capacity_model-bin>)
+  add_test(NAME test_placement_integration COMMAND $<TARGET_FILE:test_placement_integration-bin>)
   add_test(NAME test_placement_model COMMAND $<TARGET_FILE:test_placement_model-bin>)
   add_test(NAME test_openpbs_forecast
     COMMAND $<TARGET_FILE:test_openpbs_forecast-bin>)
