@@ -178,7 +178,7 @@ static void integrated_accounting() {
   require(status[0].start_time == 0 && status[1].start_time == 13 &&
               status[1].end_time == 18,
           "live allocation must respect delayed release");
-#if DR_EVT_COUNT_MODEL_HOOKS
+#if DR_EVT_RESOURCE_MODEL_DIAGNOSTICS
   const auto calls = [](ResourceOperation operation) {
     return CountingResourceObserver::calls[static_cast<size_t>(operation)];
   };
@@ -187,10 +187,10 @@ static void integrated_accounting() {
               calls(ResourceOperation::Hold) == 2 &&
               calls(ResourceOperation::Release) == 4 &&
               calls(ResourceOperation::Reserve) >= 2,
-          "integration hooks must charge each start/release exactly once");
+          "resource diagnostics must observe each start/release exactly once");
 #else
   for (auto calls : CountingResourceObserver::calls) {
-    require(calls == 0, "disabled hooks must leave diagnostic state untouched");
+    require(calls == 0, "disabled diagnostics must leave observer counters untouched");
   }
 #endif
   std::filesystem::remove_all(directory);

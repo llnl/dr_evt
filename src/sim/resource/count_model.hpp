@@ -111,8 +111,9 @@ template <typename Observer = NoResourceObserver> struct CountModel {
   }
 };
 
-// A diagnostic build observes the same model, without runtime hook selection.
-#if DR_EVT_COUNT_MODEL_HOOKS
+// Resource diagnostics select the observer, not the resource model.
+// Currently CountModel is the only model wired to this build option.
+#if DR_EVT_RESOURCE_MODEL_DIAGNOSTICS
 using ActiveCountModel = CountModel<CountingResourceObserver>;
 #else
 using ActiveCountModel = CountModel<>;

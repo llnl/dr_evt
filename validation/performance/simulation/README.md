@@ -77,13 +77,19 @@ cmake -S SOURCE -B BUILD \
 cmake --build BUILD --target sim-bin -j4
 ```
 
-For the diagnostic candidate, add `-DDR_EVT_COUNT_MODEL_HOOKS=ON`; it defaults to
-OFF. Do not pass the new option to a baseline revision that predates it.
+For the diagnostic candidate, add `-DDR_EVT_RESOURCE_MODEL_DIAGNOSTICS=ON`;
+it defaults to OFF. CountModel is used in both configurations; the option enables only its
+operation counters. CountModel is currently the only resource model wired to
+this option. Do not pass it to a baseline revision that predates it.
 The diagnostic observer counts resource calls and requested quantities without
 per-event heap allocation. It is intended for single-threaded diagnostic runs.
 Custom test observers can inspect job/pass/timeline context, fit results,
-reservation intervals, and scalar before/after values. Normal builds eliminate
-observation records and observer dispatch at compile time.
+reservation intervals, and scalar before/after values. With diagnostics disabled,
+the active model eliminates observation records and observer dispatch at compile
+time. This instrumentation does not automatically
+check invariants or emit reports; tests inspect the counters. The recorded
+measurements used the previous option name, `DR_EVT_COUNT_MODEL_HOOKS`, with
+the same behavior.
 
 Run the comparison after all builds/tests have finished, without concurrent
 compilation or profiling:
