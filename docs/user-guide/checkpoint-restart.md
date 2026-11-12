@@ -41,7 +41,12 @@ resumed.advance_to(1000.0);
 Checkpoints record the scheduling controls, including
 `per_pass_accounting`, `diagnostic_no_reservations`, `dispatch_on_events`,
 and the next tick deadline.
-This build uses checkpoint format 20; older checkpoints must be regenerated.
+This build uses checkpoint format 21; older checkpoints must be regenerated.
+The checkpoint also records `resource_model_diagnostics`. The destination
+simulation selects observation using its own construction setting; this may
+differ from the recorded setting. Diagnostic counters are not checkpointed and
+restart at zero after a successful load.
+
 Restart preserves the selected reservation and accounting policies, arrival
 notification behavior, and timer phase.
 

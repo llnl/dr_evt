@@ -861,6 +861,43 @@ def test_warm_start_batch_mode(result):
         os.unlink(trace_file.name)
 
 
+def test_resource_model_diagnostics(result):
+    """Runtime selection preserves results and isolates counters per simulation."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="dr-evt-resource-diagnostics-") as temp:
+            trace = os.path.join(temp, "empty.csv")
+            with open(trace, "w") as stream:
+                stream.write("job_submit_time,num_nodes,time_limit\n")
+            assert dr_evt.SimParams().resource_model_diagnostics is False
+            snapshots = []
+            sims = []
+            for enabled in (False, True, True):
+                params = dr_evt.SimParams()
+                params.infile = trace
+                params.total_nodes = 4
+                params.per_pass_accounting = True
+                params.resource_model_diagnostics = enabled
+                params.node_release_delay = 3
+                sim = dr_evt.Simulation(params)
+                sim.append_job(0, 4, QUEUE_INPUT, 10)
+                sim.append_job(0, 4, QUEUE_INPUT, 5)
+                sim.advance_to(30)
+                states = sim.get_job_statuses([0, 1])
+                assert [job.start_time for job in states] == [0, 13]
+                counters = sim.get_resource_diagnostics()
+                if enabled:
+                    assert counters.calls[4:7] == [2, 4, 2]
+                    snapshots.append(counters)
+                else:
+                    assert counters is None
+                sims.append(sim)
+            assert snapshots[0].calls == snapshots[1].calls
+            assert sims[1].get_resource_diagnostics().calls == snapshots[0].calls
+        result.record_pass("Runtime resource diagnostics and independent owners")
+    except Exception as error:
+        result.record_fail("Runtime resource diagnostics", str(error))
+
+
 def main():
     print("="*60)
     print("DR_EVT Python API Test Suite")
@@ -875,6 +912,7 @@ def main():
     test_sim_params(result)
     test_streaming_api(result)
     test_monitoring_api(result)
+    test_resource_model_diagnostics(result)
     test_backfill_window_api(result)
     test_custom_backfill_api(result)
     test_statistics(result)

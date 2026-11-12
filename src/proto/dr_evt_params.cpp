@@ -137,6 +137,7 @@ set_sim_options(const dr_evt_proto::DR_EVT_Params::Simulation_Params &cfg,
   sp.m_dispatch_queue_depth = cfg.dispatch_queue_depth();
   sp.m_dispatch_on_events = cfg.dispatch_on_events();
   sp.m_per_pass_accounting = cfg.per_pass_accounting();
+  sp.m_resource_model_diagnostics = cfg.resource_model_diagnostics();
   sp.m_diagnostic_no_reservations = cfg.diagnostic_no_reservations();
   if (!std::isfinite(cfg.planning_time_resolution()) ||
       cfg.planning_time_resolution() < 0.0) {

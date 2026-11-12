@@ -761,6 +761,13 @@ set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
 
 # Time-varying capacity schedule parser validation.
+add_executable(test_count_model-bin tests/test_count_model.cpp)
+target_include_directories(test_count_model-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_count_model-bin PRIVATE dr_evt)
+set_target_properties(test_count_model-bin PROPERTIES OUTPUT_NAME test_count_model)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_count_model-bin)
+
 add_executable(test_placement_pass_accounting-bin
   tests/test_placement_pass_accounting.cpp)
 target_include_directories(test_placement_pass_accounting-bin PRIVATE
@@ -907,6 +914,7 @@ if(DR_EVT_WITH_UNIT_TESTING)
     COMMAND $<TARGET_FILE:test_block_queue-bin>)
   add_test(NAME test_placement_pass_accounting
     COMMAND $<TARGET_FILE:test_placement_pass_accounting-bin>)
+  add_test(NAME test_count_model COMMAND $<TARGET_FILE:test_count_model-bin>)
   add_test(NAME test_openpbs_forecast
     COMMAND $<TARGET_FILE:test_openpbs_forecast-bin>)
   add_test(

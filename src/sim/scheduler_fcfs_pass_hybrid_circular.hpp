@@ -28,6 +28,7 @@
 #define DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_CIRCULAR_HPP
 
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/resource/count_model.hpp"
 #include <unordered_set>
 
 namespace dr_evt {
@@ -66,16 +67,18 @@ protected:
   /**
    * @brief Run placement passes using a compile-time forecast planner.
    * @tparam Timeline Reservation_Timeline-compatible forecast model.
+   * @tparam Model Resource operations and observer, selected at compile time.
    * @param[in] free_nodes Capacity available for immediate starts.
    * @param[in] running_jobs Running jobs and requested release estimates.
    * @param[in] current_time Actual scheduling time, unchanged by forecasting.
+   * @param[in,out] diagnostics Optional counters; required by
+   * SimulationResourceObserver and owned by the simulation trace.
    * @return Jobs selected for immediate execution.
    */
-  template <typename Timeline>
-  std::vector<job_no_t>
-  schedule_with_forecast(num_nodes_t free_nodes,
-                         const running_jobs_t &running_jobs,
-                         sim_time_t current_time);
+  template <typename Timeline, typename Model = CountModel<>>
+  std::vector<job_no_t> schedule_with_forecast(
+      num_nodes_t free_nodes, const running_jobs_t &running_jobs,
+      sim_time_t current_time, ResourceDiagnostics *diagnostics = nullptr);
 
 public:
   /**

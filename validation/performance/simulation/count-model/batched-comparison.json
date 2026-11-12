@@ -1,0 +1,808 @@
+{
+  "baseline_revision": "d3794773563c0f92c9c1b05d294bd5f505a93314",
+  "compiler": "GCC 13.3.0 Linux arm64",
+  "build_settings": "Release -O3 -g; static; LTO off; ser20/python/protobuf/grpc off; hooks off/off/on",
+  "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.39",
+  "machine": "aarch64",
+  "runs": 9,
+  "batch_size": 20,
+  "warmups": 1,
+  "binaries": {
+    "baseline": {
+      "path": "/tmp/dr-evt-count/baseline-build/simulator",
+      "sha256": "23eacc8a4ead8680b17f67e39877c433053a1ec6e2c84a8d140d59b0d22cc5b8"
+    },
+    "model": {
+      "path": "/tmp/dr-evt-count/model-build/simulator",
+      "sha256": "461c5103cd83429a62b356542c7f06d27d92e821668af90763a9703f5a0b7190"
+    },
+    "hooks": {
+      "path": "/tmp/dr-evt-count/hooks-build/simulator",
+      "sha256": "bf2f2dd3bd62e36d73f8c8fa396af690f4ce3f64be71e93d79a6dbac2f9df625"
+    }
+  },
+  "inputs": {
+    "mixed": {
+      "path": "/tmp/dr-evt-count/final-short/mixed.csv",
+      "capacity": 756,
+      "sha256": "9d8a7a93784fa4f63015dc20e5096ee2f4443e5bda1faa708fc2a33cdcc1ffa3",
+      "jobs": 2000,
+      "seed": 7351
+    },
+    "stress": {
+      "path": "/tmp/dr-evt-count/final-short/stress.csv",
+      "capacity": 128,
+      "sha256": "235c1fa1e259081dc207dea32f9cbecf6c723ac2c914a25b92220f91e4e17508",
+      "jobs": 20000,
+      "seed": 2718
+    },
+    "per-pass-stress": {
+      "path": "/tmp/dr-evt-count/final-short/per-pass-stress.csv",
+      "capacity": 128,
+      "sha256": "fd52b7fc71e16574451282beeb3dda57bd3ec756e5b2fcf361d475675740e24f",
+      "jobs": 8000,
+      "seed": 2718
+    }
+  },
+  "cases": {
+    "mixed-none": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            6.348995596636087,
+            6.170841644052416,
+            6.279664492467418,
+            6.323954201070592,
+            6.335366645362228,
+            6.397389550693333,
+            6.463339601759799,
+            6.348918948788196,
+            6.41826874925755
+          ],
+          "cpu_ms": [
+            6.259999999999994,
+            6.0547000000000075,
+            6.158250000000022,
+            6.213500000000011,
+            6.237150000000016,
+            6.296950000000026,
+            6.3624500000000594,
+            6.25295000000004,
+            6.307950000000008
+          ],
+          "median_wall_ms": 6.348918948788196,
+          "median_cpu_ms": 6.25295000000004
+        },
+        "model": {
+          "wall_ms": [
+            6.383799944887869,
+            6.029835503431968,
+            6.356418703217059,
+            6.2174354941817,
+            6.218643704778515,
+            6.3602707465179265,
+            6.376270798500627,
+            6.296847996418364,
+            6.404718698468059
+          ],
+          "cpu_ms": [
+            6.279549999999995,
+            5.9124499999999705,
+            6.249549999999996,
+            6.103800000000001,
+            6.1140500000000095,
+            6.258600000000009,
+            6.283950000000057,
+            6.186550000000041,
+            6.30395000000002
+          ],
+          "median_wall_ms": 6.356418703217059,
+          "median_cpu_ms": 6.249549999999996
+        },
+        "hooks": {
+          "wall_ms": [
+            6.498745846329257,
+            6.1791542917490005,
+            6.346006254898384,
+            6.219245903776027,
+            6.450783400214277,
+            6.415837546228431,
+            6.356499998946674,
+            6.339893749100156,
+            6.288166649756022
+          ],
+          "cpu_ms": [
+            6.397249999999982,
+            6.070050000000013,
+            6.251150000000033,
+            6.111550000000022,
+            6.3473499999999925,
+            6.313350000000012,
+            6.258549999999991,
+            6.234000000000039,
+            6.194900000000003
+          ],
+          "median_wall_ms": 6.346006254898384,
+          "median_cpu_ms": 6.251150000000033
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": -0.8201546245880209,
+          "bootstrap_95_percent": [
+            -1.8424022967819864,
+            0.5481866812165226
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": -1.061898783774029,
+          "bootstrap_95_percent": [
+            -1.9736578405202043,
+            0.3123003194888341
+          ]
+        },
+        "observation_wall": {
+          "median_percent": 0.6836079369595183,
+          "bootstrap_95_percent": [
+            -0.3100683797589321,
+            2.476332699823147
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "3a551a2bb19de29369cf8bb77de3352fbfdb6d0812529bde1d40cf9fd49e1c9e",
+        "resources": "225ae0c2d4848e467a50b53ca37885308255945790475c53b3e5826ec4a8bb7d"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/baseline-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "none",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-none-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-none-baseline-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "none",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-none-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-none-model-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/hooks-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "none",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-none-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-none-hooks-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ]
+      }
+    },
+    "mixed-easy": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            12.801527051487938,
+            9.856064594350755,
+            9.718052097014152,
+            9.789068790269084,
+            9.760593698592857,
+            9.626312294858508,
+            9.541864608763717,
+            9.678010188508779,
+            9.923785450519063
+          ],
+          "cpu_ms": [
+            9.453350000000082,
+            9.740999999999904,
+            9.606500000000011,
+            9.664150000000044,
+            9.650649999999994,
+            9.525350000000042,
+            9.426849999999966,
+            9.581950000000058,
+            9.816849999999747
+          ],
+          "median_wall_ms": 9.760593698592857,
+          "median_cpu_ms": 9.606500000000011
+        },
+        "model": {
+          "wall_ms": [
+            9.810954198474064,
+            9.983991552144289,
+            9.770895840483718,
+            9.804945750511251,
+            9.818616707343608,
+            9.758193691959605,
+            9.746666604769416,
+            9.661683510057628,
+            9.822995806462131
+          ],
+          "cpu_ms": [
+            9.68745,
+            9.869499999999952,
+            9.659600000000063,
+            9.687699999999955,
+            9.7185999999999,
+            9.644550000000013,
+            9.631250000000046,
+            9.558099999999998,
+            9.729249999999972
+          ],
+          "median_wall_ms": 9.804945750511251,
+          "median_cpu_ms": 9.68745
+        },
+        "hooks": {
+          "wall_ms": [
+            10.18863535427954,
+            10.313058347674087,
+            9.878937443136238,
+            9.954495952115394,
+            10.10776034090668,
+            10.25904803245794,
+            10.05379575653933,
+            9.80911874503363,
+            10.15161664399784
+          ],
+          "cpu_ms": [
+            10.079750000000006,
+            10.198049999999933,
+            9.754699999999955,
+            9.836300000000042,
+            9.987450000000155,
+            10.14439999999999,
+            9.939899999999811,
+            9.707049999999999,
+            10.057549999999798
+          ],
+          "median_wall_ms": 10.10776034090668,
+          "median_cpu_ms": 9.987450000000155
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": 0.5437688843611177,
+          "bootstrap_95_percent": [
+            -1.015637072762987,
+            1.370009543234274
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": 0.7040976514525621,
+          "bootstrap_95_percent": [
+            -0.2489054941850033,
+            2.168274662268743
+          ]
+        },
+        "observation_wall": {
+          "median_percent": 3.1511199082117303,
+          "bootstrap_95_percent": [
+            1.525252718469594,
+            3.849586372182001
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "ab28c59206035faebb1eef74f3264d87f6aca5fe705e75308cb12a50693f4ee7",
+        "resources": "d8bf8f33c6b5fd7ac084690c507854a8ac5bfded96bc369d5b11c6cf0f215c3a"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/baseline-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "easy",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-easy-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-easy-baseline-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "easy",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-easy-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-easy-model-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/hooks-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "easy",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-easy-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-easy-hooks-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ]
+      }
+    },
+    "mixed-hybrid": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            21.076862400514074,
+            21.012197952950373,
+            21.1058497952763,
+            20.72430004773196,
+            21.216622853535227,
+            21.24645850271918,
+            21.065650004311465,
+            20.99975214805454,
+            20.845856398227625
+          ],
+          "cpu_ms": [
+            20.939149999999927,
+            20.876599999999968,
+            20.956750000000124,
+            20.564599999999977,
+            20.64374999999996,
+            21.07870000000039,
+            20.890249999999742,
+            20.843049999999796,
+            20.688450000000024
+          ],
+          "median_wall_ms": 21.065650004311465,
+          "median_cpu_ms": 20.876599999999968
+        },
+        "model": {
+          "wall_ms": [
+            21.12997499643825,
+            21.100502100307494,
+            20.7450228423113,
+            20.486354251625016,
+            20.71446250192821,
+            20.719470852054656,
+            20.78250215272419,
+            20.64276041055564,
+            20.891510348883457
+          ],
+          "cpu_ms": [
+            21.008799999999894,
+            20.95919999999989,
+            20.61069999999993,
+            20.335349999999966,
+            20.547649999999738,
+            20.552700000000005,
+            20.62130000000007,
+            20.480199999999773,
+            20.73269999999989
+          ],
+          "median_wall_ms": 20.7450228423113,
+          "median_cpu_ms": 20.61069999999993
+        },
+        "hooks": {
+          "wall_ms": [
+            21.587531303521246,
+            21.487554244231433,
+            22.1208103466779,
+            21.055849952972494,
+            20.726949951495044,
+            21.019395950133912,
+            21.342220992664807,
+            21.272327046608552,
+            21.4769998943666
+          ],
+          "cpu_ms": [
+            21.448899999999732,
+            21.35485000000011,
+            21.00479999999994,
+            20.91395000000027,
+            20.56175000000023,
+            20.85254999999989,
+            21.1833999999997,
+            21.11305000000011,
+            21.31709999999991
+          ],
+          "median_wall_ms": 21.342220992664807,
+          "median_cpu_ms": 21.11305000000011
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": -1.3441211238643058,
+          "bootstrap_95_percent": [
+            -2.3668250836788807,
+            0.25199479369795164
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": -1.1147797671727688,
+          "bootstrap_95_percent": [
+            -1.740868059137346,
+            0.3326305031482457
+          ]
+        },
+        "observation_wall": {
+          "median_percent": 2.6932216141608567,
+          "bootstrap_95_percent": [
+            1.447551919741774,
+            3.0498180646953976
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "18f6bdb2f124a21a67f061c1fb7624951b5d5d4888a7ce559befdbe93ee78457",
+        "resources": "71196d11961c0ba1a789c1c74b567fd8b27e6afc9bc8ef696d0904d29edf431f"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/baseline-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "hybrid",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-hybrid-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-hybrid-baseline-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "hybrid",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-hybrid-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-hybrid-model-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/hooks-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "hybrid",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-hybrid-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-hybrid-hooks-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ]
+      }
+    },
+    "mixed-conservative": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            40.64225854817778,
+            39.85751464497298,
+            40.34889369213488,
+            41.10430621076375,
+            40.700331193511374,
+            41.11610629770439,
+            40.44593550497666,
+            40.202043708995916,
+            41.48946879431605
+          ],
+          "cpu_ms": [
+            40.459050000000005,
+            39.67680000000007,
+            39.66664999999983,
+            40.92025000000017,
+            40.519400000000594,
+            40.92800000000047,
+            40.2588999999998,
+            39.93329999999885,
+            40.7309999999995
+          ],
+          "median_wall_ms": 40.64225854817778,
+          "median_cpu_ms": 40.459050000000005
+        },
+        "model": {
+          "wall_ms": [
+            39.30481244169641,
+            39.61004604934715,
+            39.63259579904843,
+            41.28053749445826,
+            40.79878745251335,
+            41.15469369280618,
+            41.36831249052193,
+            40.74001880653668,
+            40.75573330919724
+          ],
+          "cpu_ms": [
+            39.1369499999998,
+            39.42045000000026,
+            39.451650000000186,
+            41.099650000000494,
+            40.61225000000003,
+            40.96219999999844,
+            40.64040000000055,
+            40.559350000000144,
+            40.58800000000091
+          ],
+          "median_wall_ms": 40.75573330919724,
+          "median_cpu_ms": 40.58800000000091
+        },
+        "hooks": {
+          "wall_ms": [
+            40.585670794826,
+            41.26990200893488,
+            40.89983550366014,
+            41.982768807793036,
+            41.69853561324999,
+            41.42021049337927,
+            40.61446879932191,
+            40.503818792058155,
+            41.28901879012119
+          ],
+          "cpu_ms": [
+            40.40409999999957,
+            41.08115000000041,
+            40.71674999999994,
+            41.794949999999616,
+            40.76700000000004,
+            41.23385000000044,
+            40.42734999999995,
+            40.32470000000042,
+            41.11559999999994
+          ],
+          "median_wall_ms": 41.26990200893488,
+          "median_cpu_ms": 40.76700000000004
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": 0.09384982814859555,
+          "bootstrap_95_percent": [
+            -1.7752603046612747,
+            1.3381784802656282
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": 0.08356137607008485,
+          "bootstrap_95_percent": [
+            -0.6460954512455985,
+            0.9476165518699009
+          ]
+        },
+        "observation_wall": {
+          "median_percent": 1.7011195976531335,
+          "bootstrap_95_percent": [
+            -0.5797739456139595,
+            3.2587825092145417
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "e07a7ebb97d8d285437bcf6817d11eeeac0b4cfb690e8cade9dad42fcb06866e",
+        "resources": "c74a816dc5049be25e6bec0c6a32c3a29a02f5c568f1fce49f851d9fe7ac5da3"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/baseline-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-conservative-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-conservative-baseline-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-conservative-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-conservative-model-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/hooks-build/simulator",
+          "/tmp/dr-evt-count/final-short/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-short/mixed-conservative-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-short/mixed-conservative-hooks-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ]
+      }
+    }
+  },
+  "candidate_source_sha256": {
+    "src/sim/resource/count_model.hpp": "5f8b181aa0d7931db1242fc3284bd61e676f5238c212e0a4e74c1531fdfedeb5",
+    "src/sim/resource/count_timeline.hpp": "3a611e0cc3b64b5d9fa758c0c5c6552dfe5793e04d5949f445ed02b4062fc185",
+    "src/sim/resource/resource_model.hpp": "5add65baa807eb20c5b6f951f7a1bc3c10a1490bbc490e5e57583a3b8d04431e",
+    "src/sim/scheduler_base.hpp": "af8a98d7f15c5c195d5a855f7ec5db61a9224d6435997bb399f10f0c1014d7f4",
+    "src/sim/scheduler_fcfs_pass_hybrid_circular.hpp": "6ae3ed86e4aff8a3b5abb87c306298ff679981729f7e8f0a10b8c6d1abd5175a",
+    "src/sim/scheduler_fcfs_pass_hybrid_circular.cpp": "1168ff2b307ff051af2e3acb2da480bfb2cadb0f8532ea012ebb99ad8803aa4b",
+    "src/trace/trace.cpp": "9a9ea7982a18cbbaf29ff0f3124464ab622a93802cdc0559083ed0f0bc0880fc",
+    "src/sim/CMakeLists.txt": "ecbba5f55287e7b0dfc4a91487a9080fe1b0f2f35e9a1a3c34cb00f2bbad0043",
+    "CMakeLists.txt": "3e6b78de21872743df83b6e54d312ab0defb926eaa2648f6daf903f7a74f7e3d",
+    "cmake/configure_files/dr_evt_config.hpp.in": "57853255fe8e3970ccccd48dc85c9912320440a738e7d78eb712fe4371a41053",
+    "tests/test_count_model.cpp": "2648073eb01be47be61bcfa8d4b79469cfc9dd7304616ad353c30ae51a5915d5",
+    "validation/performance/simulation/compare_count_model.py": "f23acdc932c6f9aa0d38f0bd02c15afbc661749e06b414aa5a97db3e0bab76dd"
+  },
+  "hardware": "Apple M3 Max, Linux arm64 Docker"
+}

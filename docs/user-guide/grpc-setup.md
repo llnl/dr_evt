@@ -237,3 +237,13 @@ client/server specifically, but addresses the same underlying concern.
 - [Distributed client/server tests](https://github.com/LLNL/dr_evt/blob/main/tests/README.md#distributed-clientserver-tests) - exact gRPC and MPI commands and fixtures
 
 [cpp-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4I0EN6dr_evt15BasicSimulationE
+
+## Resource model diagnostics
+
+Set `InitRequest.resource_model_diagnostics = true` to enable resource operation
+counters for that simulation. `GetStatisticsResponse.resource_model_diagnostics`
+is present only when enabled, including the statistics in `FinishSimulationResponse`.
+It contains named operation call/quantity counters and `failed_fits`. Counters
+are isolated between sessions and reset after a successful checkpoint load.
+The existing statistics JSON file retains its aggregate-statistics schema;
+read resource counters from the statistics response.

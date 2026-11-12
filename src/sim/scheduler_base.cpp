@@ -21,6 +21,7 @@
  */
 
 #include "sim/scheduler_base.hpp"
+#include "sim/forecast_1s_evt_group_timeline.hpp"
 #include "sim/scheduler_fcfs_1s_evt_group_circular.hpp"
 #include "sim/scheduler_fcfs_easy_block.hpp"
 #include "sim/scheduler_fcfs_easy_circular.hpp"
@@ -211,6 +212,42 @@ std::unique_ptr<SchedulerBase> create_hybrid_scheduler(
 }
 } // anonymous namespace
 
+namespace {
+/** @brief Placement passes observing counters owned by the simulation trace.
+ * @tparam Forecast Timeline used for the policy's reservation timing. */
+template <typename Forecast>
+class ObservedPassScheduler final : public FCFSPassHybridCircularScheduler {
+  ResourceDiagnostics &m_diagnostics;
+
+public:
+  /** @brief Construct a scheduler borrowing a simulation's diagnostic owner.
+   * @tparam Args Shared placement-scheduler constructor argument types.
+   * @param[in,out] diagnostics Counter owner, which outlives this scheduler.
+   * @param[in] args Arguments forwarded to the shared scheduler. */
+  template <typename... Args>
+  ObservedPassScheduler(ResourceDiagnostics &diagnostics, Args &&...args)
+      : FCFSPassHybridCircularScheduler(std::forward<Args>(args)...),
+        m_diagnostics(diagnostics) {}
+  /**
+   * @brief Run placement passes with simulation-owned resource observation.
+   * @param[in] free_nodes Capacity available for immediate starts.
+   * @param[in] running_jobs Running jobs and their projected release estimates.
+   * @param[in] current_time Actual scheduling time, unchanged by forecasting.
+   * @return Job identifiers selected for immediate execution.
+   * @throws std::invalid_argument if the planning horizon is bounded.
+   * @details Uses Forecast for reservation timing and updates the borrowed
+   * diagnostic counters without changing allocation or reservation decisions.
+   */
+  std::vector<job_no_t> schedule(num_nodes_t free_nodes,
+                                 const running_jobs_t &running_jobs,
+                                 sim_time_t current_time) override {
+    return schedule_with_forecast<Forecast,
+                                  CountModel<SimulationResourceObserver>>(
+        free_nodes, running_jobs, current_time, &m_diagnostics);
+  }
+};
+} // namespace
+
 std::unique_ptr<SchedulerBase>
 create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  BackfillPolicy backfill_policy, PriorityPolicy priority_policy,
@@ -220,7 +257,8 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
                  size_t reservation_depth, size_t backfill_queue_depth,
                  tdiff_t backfill_interval, tdiff_t dispatch_interval,
                  size_t dispatch_queue_depth, bool dispatch_on_events,
-                 bool per_pass_accounting, bool diagnostic_no_reservations) {
+                 bool per_pass_accounting, bool diagnostic_no_reservations,
+                 ResourceDiagnostics *resource_diagnostics) {
   if (priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
     if (dispatch_interval != 0.0 || backfill_interval != 0.0 ||
         dispatch_queue_depth != 0 || dispatch_on_events ||
@@ -229,6 +267,13 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument("fcfs_1s_evt_group requires event-driven "
                                   "scheduling, queue_impl=circular, "
                                   "and protected reservations");
+    }
+    if (resource_diagnostics != nullptr) {
+      return std::make_unique<
+          ObservedPassScheduler<OneSecondEventGroupTimeline>>(
+          *resource_diagnostics, total_nodes, initial_job_count,
+          backfill_policy, wait_queue_capacity, wait_queue_overflow,
+          reservation_depth, backfill_queue_depth);
     }
     return std::make_unique<FCFSOneSecondEventGroupCircularScheduler>(
         total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
@@ -268,6 +313,12 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
     if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
+    }
+    if (resource_diagnostics != nullptr) {
+      return std::make_unique<ObservedPassScheduler<CountTimeline>>(
+          *resource_diagnostics, total_nodes, initial_job_count,
+          backfill_policy, wait_queue_capacity, wait_queue_overflow,
+          reservation_depth, backfill_queue_depth);
     }
     return std::make_unique<FCFSPassHybridCircularScheduler>(
         total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,

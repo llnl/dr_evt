@@ -1,0 +1,278 @@
+{
+  "baseline_revision": "d3794773563c0f92c9c1b05d294bd5f505a93314",
+  "compiler": "GCC 13.3.0 Linux arm64",
+  "build_settings": "Release -O3 -g; static; LTO off; optional dependencies off; before CountModel / tuple elision / tuple elision with hooks",
+  "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.39",
+  "machine": "aarch64",
+  "runs": 15,
+  "batch_size": 40,
+  "warmups": 1,
+  "binaries": {
+    "baseline": {
+      "path": "/tmp/dr-evt-count/model-build/simulator",
+      "sha256": "461c5103cd83429a62b356542c7f06d27d92e821668af90763a9703f5a0b7190"
+    },
+    "model": {
+      "path": "/tmp/dr-evt-count/tuple-build/simulator",
+      "sha256": "e978c9db627ac3c134b5b860f4dc28d4316ca85b82a9a793cca35377ff54cae4"
+    },
+    "hooks": {
+      "path": "/tmp/dr-evt-count/tuple-hooks-build/simulator",
+      "sha256": "b2be8a89dca688615bfeb74d1663767eeaa41b6ad94986f1cc638d904a1e38da"
+    }
+  },
+  "inputs": {
+    "mixed": {
+      "path": "/tmp/dr-evt-count/tuple-easy-recheck/mixed.csv",
+      "capacity": 756,
+      "sha256": "9d8a7a93784fa4f63015dc20e5096ee2f4443e5bda1faa708fc2a33cdcc1ffa3",
+      "jobs": 2000,
+      "seed": 7351
+    },
+    "stress": {
+      "path": "/tmp/dr-evt-count/tuple-easy-recheck/stress.csv",
+      "capacity": 128,
+      "sha256": "235c1fa1e259081dc207dea32f9cbecf6c723ac2c914a25b92220f91e4e17508",
+      "jobs": 20000,
+      "seed": 2718
+    },
+    "per-pass-stress": {
+      "path": "/tmp/dr-evt-count/tuple-easy-recheck/per-pass-stress.csv",
+      "capacity": 128,
+      "sha256": "fd52b7fc71e16574451282beeb3dda57bd3ec756e5b2fcf361d475675740e24f",
+      "jobs": 8000,
+      "seed": 2718
+    }
+  },
+  "cases": {
+    "mixed-easy": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            8.888183355156798,
+            8.88214380829595,
+            8.876769746711943,
+            8.849588605517056,
+            9.26665834558662,
+            8.946257279603742,
+            8.87383641966153,
+            8.89757492550416,
+            8.987190597690642,
+            8.88342607067898,
+            8.860441701835953,
+            8.842018777795602,
+            9.559907352377195,
+            8.972399876802228,
+            8.8623739007744
+          ],
+          "cpu_ms": [
+            8.821625000000015,
+            8.814525000000028,
+            8.803525000000043,
+            8.783600000000044,
+            9.162574999999942,
+            8.880150000000059,
+            8.804600000000168,
+            8.828000000000163,
+            8.831350000000135,
+            8.81702499999982,
+            8.793275000000111,
+            8.775350000000024,
+            8.926649999999926,
+            8.90679999999986,
+            8.796049999999799
+          ],
+          "median_wall_ms": 8.88342607067898,
+          "median_cpu_ms": 8.81702499999982
+        },
+        "model": {
+          "wall_ms": [
+            9.057524825038854,
+            9.256589574215468,
+            8.885444850602653,
+            8.908002194948494,
+            8.898707253683824,
+            8.885483276390005,
+            8.887648933159653,
+            8.92624165135203,
+            8.924059353012126,
+            9.038905223133042,
+            8.992106320511084,
+            9.010573948035017,
+            8.8805907042115,
+            8.878396824002266,
+            8.937822942971252
+          ],
+          "cpu_ms": [
+            8.988725000000018,
+            9.190849999999953,
+            8.821224999999997,
+            8.841400000000075,
+            8.830874999999919,
+            8.819800000000011,
+            8.82190000000016,
+            8.859174999999729,
+            8.857399999999886,
+            8.97307500000001,
+            8.926949999999918,
+            8.945000000000068,
+            8.815125000000107,
+            8.813875000000097,
+            8.867399999999758
+          ],
+          "median_wall_ms": 8.924059353012126,
+          "median_cpu_ms": 8.857399999999886
+        },
+        "hooks": {
+          "wall_ms": [
+            9.160480248101521,
+            9.269967621366959,
+            9.109280178381596,
+            9.514318822766654,
+            9.105083404574543,
+            9.294744678481948,
+            9.124654196784832,
+            9.330744779435918,
+            9.206978148722555,
+            9.144516667583957,
+            9.13050314411521,
+            9.121132268046495,
+            9.1852187004406,
+            9.112644824199378,
+            9.11879907216644
+          ],
+          "cpu_ms": [
+            9.089474999999991,
+            9.19942500000008,
+            9.043375000000072,
+            9.090349999999928,
+            9.038900000000048,
+            9.229524999999985,
+            9.058624999999989,
+            9.255774999999987,
+            9.139500000000051,
+            9.077500000000047,
+            9.064250000000008,
+            9.055999999999951,
+            9.118950000000135,
+            9.045625000000044,
+            9.052050000000062
+          ],
+          "median_wall_ms": 9.144516667583957,
+          "median_cpu_ms": 9.077500000000047
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": 0.32218583252048294,
+          "bootstrap_95_percent": [
+            -0.7024580595268337,
+            1.4859825627863366
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": 0.3531377435383565,
+          "bootstrap_95_percent": [
+            0.19648819935023099,
+            1.5201958314712716
+          ]
+        },
+        "observation_wall": {
+          "median_percent": 2.5191234827568687,
+          "bootstrap_95_percent": [
+            1.5390923847112603,
+            3.43026726909772
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "ab28c59206035faebb1eef74f3264d87f6aca5fe705e75308cb12a50693f4ee7",
+        "resources": "d8bf8f33c6b5fd7ac084690c507854a8ac5bfded96bc369d5b11c6cf0f215c3a"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "easy",
+          "--outfile",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed-easy-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed-easy-baseline-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/tuple-build/simulator",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "easy",
+          "--outfile",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed-easy-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed-easy-model-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/tuple-hooks-build/simulator",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed.csv",
+          "--total_nodes",
+          "756",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "easy",
+          "--outfile",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed-easy-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/tuple-easy-recheck/mixed-easy-hooks-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "64",
+          "--reservation_depth",
+          "32"
+        ]
+      }
+    }
+  },
+  "comparison": "Reservation-record elision; baseline is the standalone CountModel before this optimization.",
+  "before_scheduler_source_sha256": "1168ff2b307ff051af2e3acb2da480bfb2cadb0f8532ea012ebb99ad8803aa4b",
+  "candidate_source_sha256": {
+    "src/sim/scheduler_fcfs_pass_hybrid_circular.cpp": "c6bce3a862cdc638d7d7339f42d333a7fbfae86677969b0fddf44897cb58c053",
+    "tests/test_placement_pass_accounting.cpp": "62dfa88abfda3a6d77ba4d4b0b9267c179ec3e832d6f86b37a8387656dd5ab52",
+    "validation/performance/simulation/benchmark_reservation_records.cpp": "4e1d4f36eeed9390940b082757e52204eff7eaa195b163b55623b1c794a7e135"
+  }
+}

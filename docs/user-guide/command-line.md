@@ -22,6 +22,7 @@ Complete reference for all DR_EVT command-line options for the `simulator` binar
 | Scheduling | `--num_max_candidates COUNT` | Cap feasible jobs offered to the experimental custom-EASY selector. |
 | Scheduling | `--backfill_queue_depth N` | Limit counted waiting-job examinations during backfill; accounting depends on trigger mode and policy. |
 | Scheduling | `--diagnostic_no_reservations` | Diagnostic current-capacity dispatch without future reservations; requires the periodic hybrid/conservative configuration. |
+| Diagnostics | `--resource_model_diagnostics` | Select per-simulation resource operation counters at construction (default OFF); print them with simulation statistics. |
 | Scheduling | `--per_pass_accounting` | Use event-driven FCFS placement passes with per-pass Q/R counters and guarded reservation-only restarts. |
 | Scheduling | `--dispatch_interval SECONDS` | Set aligned FCFS/backfill ticks; optional arrival wakes. |
 | Scheduling | `--dispatch_queue_depth COUNT` | Limit the full candidate prefix examined per dispatch wake. |
@@ -1048,3 +1049,17 @@ ${CMAKE_INSTALL_PREFIX}/bin/simulator --help
 [cpp-simulation-get-nodes-releasing]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4NK6dr_evt15BasicSimulation19get_nodes_releasingEv
 [cpp-tdiff-t]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/src.html#_CPPv47tdiff_t
 [cpp-trace-flush-completed-jobs]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/trace-replay.html#_CPPv4N6dr_evt10BasicTrace20flush_completed_jobsE10sim_time_t
+
+### `--resource_model_diagnostics`
+
+Enable resource operation counters for this simulation. Selection happens at
+construction; the resource operations use a compile-time observer specialization.
+Counters report calls, requested quantities, and failed fits. Fitting and
+reservations are observed for per-pass FCFS and the OpenPBS one-second forecast;
+committed start, completion, and release accounting is observed for all policies.
+Counts can include warm-start setup and exclude standalone forecast queries that
+do not use the selected live scheduler. Reading counters does not run planning.
+
+This replaces the removed `DR_EVT_RESOURCE_MODEL_DIAGNOSTICS` CMake option.
+See [Resource diagnostics](../dev/RESOURCE_DIAGNOSTICS.md) for API access and
+lifetime details.
