@@ -27,7 +27,7 @@ def compare(driver, fixture):
         order = 'low' if case['match_policy'] == 'lonodex' else 'high'
         header = f"{case['total_nodes']} {slots} {int(case['policy'] == 'fcfs')} {order} {len(case['jobs'])}"
         request = header + '\n' + '\n'.join(' '.join(map(str, job)) for job in case['jobs']) + '\n'
-        for mode, arguments in (('coarse', []), ('exact-only', ['--exact-only'])):
+        for mode, arguments in (('exact-only', []), ('coarse', ['--coarse-filter'])):
             result = subprocess.run([str(driver), *arguments], input=request, text=True, capture_output=True, check=True)
             records = [json.loads(line) for line in result.stdout.splitlines()]
             actual = {**case,

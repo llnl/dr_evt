@@ -106,7 +106,7 @@ static void bitmap_checks() {
  * @tparam CoarseFilter Compile-time lambda selecting coarse filtering.
  * @throws std::runtime_error if fit, ordering, or coarse rejection is wrong. */
 template <NodeOrder Order, num_nodes_t Capacity = 9,
-          auto CoarseFilter = EnableCoarseFilter>
+          auto CoarseFilter = DisableCoarseFilter>
 static void timeline_oracle() {
   constexpr int horizon = 48;
   constexpr num_nodes_t capacity = Capacity;
@@ -185,9 +185,13 @@ using ExactModel = PlacementModel<NoResourceObserver, NodeOrder::HighIdFirst,
                                   [] { return false; }>;
 static_assert(!ExactTimeline::coarse_filter_enabled);
 static_assert(!ExactModel::Timeline::coarse_filter_enabled);
-static_assert(PlacementTimeline::coarse_filter_enabled);
+static_assert(!PlacementTimeline::coarse_filter_enabled);
+static_assert(!PlacementModel<>::Timeline::coarse_filter_enabled);
+static_assert(std::is_same_v<PlacementModel<>::Timeline, PlacementTimeline>);
 static_assert(std::is_empty_v<detail::PlacementFilterStorage<false>>);
-static_assert(sizeof(ExactTimeline) < sizeof(PlacementTimeline));
+static_assert(sizeof(ExactTimeline) == sizeof(PlacementTimeline));
+static_assert(sizeof(PlacementTimeline) <
+              sizeof(BasicPlacementTimeline<EnableCoarseFilter>));
 static_assert(std::is_empty_v<ExactModel>);
 static_assert(std::is_empty_v<PlacementModel<>>);
 static_assert(std::is_empty_v<PlacementModel<Observer>>);
@@ -199,7 +203,7 @@ static_assert(
  * observations.
  * @tparam CoarseFilter Compile-time lambda selecting coarse filtering.
  * @throws std::runtime_error if an invariant fails. */
-template <auto CoarseFilter = EnableCoarseFilter>
+template <auto CoarseFilter = DisableCoarseFilter>
 static void lifecycle_checks() {
   using Model = PlacementModel<Observer, NodeOrder::LowIdFirst, CoarseFilter>;
   using Timeline = typename Model::Timeline;
@@ -295,12 +299,12 @@ int main() {
     timeline_oracle<NodeOrder::HighIdFirst>();
     timeline_oracle<NodeOrder::LowIdFirst, 129>();
     timeline_oracle<NodeOrder::HighIdFirst, 129>();
-    timeline_oracle<NodeOrder::LowIdFirst, 9, DisableCoarseFilter>();
-    timeline_oracle<NodeOrder::HighIdFirst, 9, DisableCoarseFilter>();
-    timeline_oracle<NodeOrder::LowIdFirst, 129, DisableCoarseFilter>();
-    timeline_oracle<NodeOrder::HighIdFirst, 129, DisableCoarseFilter>();
+    timeline_oracle<NodeOrder::LowIdFirst, 9, EnableCoarseFilter>();
+    timeline_oracle<NodeOrder::HighIdFirst, 9, EnableCoarseFilter>();
+    timeline_oracle<NodeOrder::LowIdFirst, 129, EnableCoarseFilter>();
+    timeline_oracle<NodeOrder::HighIdFirst, 129, EnableCoarseFilter>();
     lifecycle_checks<>();
-    lifecycle_checks<DisableCoarseFilter>();
+    lifecycle_checks<EnableCoarseFilter>();
     std::cout << "Placement model checks passed\n";
     return 0;
   } catch (const std::exception &e) {

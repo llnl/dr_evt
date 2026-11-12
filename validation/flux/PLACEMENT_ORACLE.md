@@ -105,8 +105,9 @@ job starts and quiescent snapshots. It assumes unlimited queue examination and
 the whole-node conditions above. The checked fixture's native decisions remain
 the reference; the driver does not generate or rewrite expected results.
 
-The driver's `--exact-only` argument selects the disabled template specialization
-once before processing jobs. Both specializations use the same exact planner;
+The driver defaults to exact-only search. Its `--coarse-filter` argument selects
+the enabled template specialization once before processing jobs; `--exact-only`
+explicitly keeps the default. Both specializations use the same exact planner;
 there is no per-query runtime filter switch. `compare_placement_model.py`
 checks both automatically. This argument belongs only to the validation driver,
 not the simulator CLI.

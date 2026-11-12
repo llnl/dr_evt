@@ -111,8 +111,9 @@ fixed allocation. Earliest-fit candidates are the requested time and exact
 interval ends; accepted starts are never rounded to bucket boundaries.
 
 The `CoarseFilter` template argument is a captureless constexpr lambda returning
-`bool`. The default `EnableCoarseFilter` selects the grid; `DisableCoarseFilter`
-or a custom `[] { return false; }` selects exact-only searches:
+`bool`. The default `DisableCoarseFilter` selects exact-only searches and omits
+the grid. Opt in with `EnableCoarseFilter` or a custom `[] { return true; }`.
+An explicit exact-only selection also works:
 
 ```cpp
 using ExactModel = dr_evt::PlacementModel<
@@ -126,7 +127,7 @@ auto placement = ExactModel::find_fit(plan, 4, 60, 0);
 The disabled storage specialization is empty; `[[no_unique_address]]` removes
 its storage cost, and `if constexpr` omits grid filtering, invalidation, and
 rebuilding. Both modes share the exact search and ownership rules.
-`PlacementTimeline` remains an alias for the default enabled timeline. No
+`PlacementTimeline` remains an alias for the default exact-only timeline. No
 runtime switch or preprocessor flag is stored in the resource model.
 
 The enabled grid belongs to the pass-local timeline, is invalidated on insertion,
@@ -139,7 +140,8 @@ because they may rebuild its cache.
 Both models use `if constexpr` to omit disabled observer work. Placement order
 also specializes at compile time. No speedup is claimed for the coarse filter:
 its rebuild and storage costs must be measured against exact-only search for
-representative workloads. This implementation provides CPU word parallelism;
+representative workloads. Exact-only search is the default because rebuilding
+the coarse cache can cost more than the exact searches it avoids. This implementation provides CPU word parallelism;
 it does not implement GPU execution.
 
 ## Placement validation and integration scope

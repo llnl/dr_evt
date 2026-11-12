@@ -25,11 +25,12 @@ struct BitmapPlacement {
   BitmapAllocation allocation; ///< Selected resource identities.
 };
 
-/** @brief Compile-time selector for the default coarse-filter specialization.
+/** @brief Compile-time selector for the opt-in coarse-filter specialization.
  * @hideinitializer
  */
 inline constexpr auto EnableCoarseFilter = [] { return true; };
-/** @brief Compile-time selector for exact-only searches without grid storage.
+/** @brief Default compile-time selector for exact-only searches without grid
+ * storage.
  * @hideinitializer
  */
 inline constexpr auto DisableCoarseFilter = [] { return false; };
@@ -50,7 +51,8 @@ template <> struct PlacementFilterStorage<true> {
  * @brief Exact reservation owner with an optional optimistic dense coarse
  * filter.
  * @tparam CoarseFilter Captureless constexpr lambda returning bool; evaluated
- * at compile time to select filtering behavior and cache storage.
+ * at compile time to select filtering behavior and cache storage; exact-only
+ * searches are the default.
  * @details Exact intervals are authoritative. Future reservations own their
  * dense masks; live allocations are borrowed from the caller's existing owner.
  * The caller must keep borrowed allocations immutable and alive throughout the
@@ -63,7 +65,8 @@ template <> struct PlacementFilterStorage<true> {
  * mutate the enabled cache and are not thread-safe on one shared instance.
  * Disabled timelines omit the cache and its invalidation/rebuild operations.
  */
-template <auto CoarseFilter = EnableCoarseFilter> class BasicPlacementTimeline {
+template <auto CoarseFilter = DisableCoarseFilter>
+class BasicPlacementTimeline {
   static_assert(std::is_same_v<decltype(CoarseFilter()), bool>,
                 "coarse filter selector must return bool");
 
@@ -489,7 +492,7 @@ public:
   std::span<const Interval> intervals() const noexcept { return m_intervals; }
 };
 
-/// Default timeline retains the enabled coarse filter.
+/// Default timeline performs exact-only searches without coarse grid storage.
 using PlacementTimeline = BasicPlacementTimeline<>;
 
 } // namespace dr_evt

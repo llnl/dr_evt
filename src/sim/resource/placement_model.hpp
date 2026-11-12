@@ -23,7 +23,7 @@ namespace dr_evt {
  * @tparam Order Compile-time low-ID or high-ID selection, independent of
  * storage.
  * @tparam CoarseFilter Captureless constexpr lambda returning bool; selects
- * timeline filtering and cache storage at compile time.
+ * timeline filtering and cache storage at compile time; defaults to exact-only.
  * @details Requests are quantities, but placements and committed allocations
  * retain exact identities. This model is separate from scalar CapacityModel.
  * Planning and live accounting states remain distinct and caller-owned. Neither
@@ -31,7 +31,7 @@ namespace dr_evt {
  */
 template <typename Observer = NoResourceObserver,
           NodeOrder Order = NodeOrder::LowIdFirst,
-          auto CoarseFilter = EnableCoarseFilter>
+          auto CoarseFilter = DisableCoarseFilter>
 class PlacementModel {
 public:
   /// Number of interchangeable whole nodes requested.

@@ -57,7 +57,7 @@ static void write_ids(const BitmapAllocation &mask, std::ostream &out) {
  * @throws std::invalid_argument if resource accounting or planning is invalid.
  * @throws std::bad_alloc if planner or allocation storage cannot be allocated.
  */
-template <NodeOrder Order, auto CoarseFilter = EnableCoarseFilter>
+template <NodeOrder Order, auto CoarseFilter = DisableCoarseFilter>
 static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
                 bool strict, std::ostream &out) {
   using Model = PlacementModel<NoResourceObserver, Order, CoarseFilter>;
@@ -159,14 +159,18 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
 
 /** @brief Read a narrow fixture protocol and run the validation driver.
  * @param[in] argc Number of command-line arguments.
- * @param[in] argv Optional --exact-only selects the disabled specialization
- * once, before processing the fixture.
+ * @param[in] argv Optional --coarse-filter enables the coarse specialization
+ * once, before processing the fixture; --exact-only explicitly keeps the
+ * default.
  * @return Zero on success, one for invalid input or a scheduling error. */
 int main(int argc, char **argv) {
   try {
-    if (argc > 2 || (argc == 2 && std::string(argv[1]) != "--exact-only"))
-      throw std::invalid_argument("only --exact-only is accepted");
-    const bool exact_only = argc == 2;
+    if (argc > 2 || (argc == 2 && std::string(argv[1]) != "--exact-only" &&
+                     std::string(argv[1]) != "--coarse-filter"))
+      throw std::invalid_argument(
+          "only --coarse-filter or --exact-only is accepted");
+    const bool use_coarse_filter =
+        argc == 2 && std::string(argv[1]) == "--coarse-filter";
     num_nodes_t capacity;
     size_t slots, count;
     int strict;
@@ -192,13 +196,13 @@ int main(int argc, char **argv) {
       jobs.push_back(std::move(job));
     }
     std::cout << std::setprecision(17);
-    if (exact_only) {
+    if (use_coarse_filter) {
       if (order == "low")
-        run<NodeOrder::LowIdFirst, DisableCoarseFilter>(jobs, capacity, slots,
-                                                        strict, std::cout);
+        run<NodeOrder::LowIdFirst, EnableCoarseFilter>(jobs, capacity, slots,
+                                                       strict, std::cout);
       else
-        run<NodeOrder::HighIdFirst, DisableCoarseFilter>(jobs, capacity, slots,
-                                                         strict, std::cout);
+        run<NodeOrder::HighIdFirst, EnableCoarseFilter>(jobs, capacity, slots,
+                                                        strict, std::cout);
     } else {
       if (order == "low")
         run<NodeOrder::LowIdFirst>(jobs, capacity, slots, strict, std::cout);
