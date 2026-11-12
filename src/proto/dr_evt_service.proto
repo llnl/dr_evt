@@ -170,6 +170,9 @@ message InitRequest {
     // Diagnostic periodic model: no future capacity reservations.
     // CLI: --diagnostic_no_reservations.
     bool diagnostic_no_reservations = 32;
+    // Select per-simulation resource operation counters at construction.
+    // Default false. CLI: --resource_model_diagnostics.
+    bool resource_model_diagnostics = 33;
 
     // Planning time-limit grid for scheduler projections; zero is exact.
     // CLI: --planning_time_resolution.
@@ -470,6 +473,18 @@ message GetBackfillWindowResponse {
     repeated ResourceRelease releases = 4;
 }
 
+// Counts since construction or the last successful checkpoint load.
+// Entries use fit_now, find_fit, reserve, projected_start, allocate, release, hold.
+message ResourceOperationCounter {
+    string operation = 1;
+    uint64 calls = 2;
+    uint64 quantity = 3;
+}
+message ResourceModelDiagnostics {
+    repeated ResourceOperationCounter operations = 1;
+    uint64 failed_fits = 2;
+}
+
 message GetStatisticsResponse {
     uint64 jobs_submitted = 1;
     uint64 jobs_completed = 2;
@@ -492,6 +507,8 @@ message GetStatisticsResponse {
     // Jobs that have begun execution. jobs_submitted counts jobs accepted
     // into the wait queue; before this field existed it counted starts.
     uint64 jobs_started = 16;
+    // Absent when resource_model_diagnostics was disabled at construction.
+    ResourceModelDiagnostics resource_model_diagnostics = 17;
 }
 
 message GetTraceSizeResponse {

@@ -3,6 +3,8 @@
 These reports describe the first count-model snapshot, before the later
 [reservation-record optimization](reservation-record-elision.md). Their source
 hashes identify that earlier snapshot rather than the current working tree.
+Whole-simulation observer selection in those builds used a CMake flag that has
+since been removed; current code selects observer types explicitly.
 
 The first count-model milestone meets the proposed 2% wall-time regression
 threshold on these six workloads: every upper bound of the paired bootstrap

@@ -9,6 +9,8 @@ maintainer-facing build guidance. It is separate from the user documentation.
   and the circular and block queue guides.
 - [Simulation Pipeline and Job Lifecycle](JOB_LIFECYCLE.md) — How input moves
   through the job store, scheduler, event loop, resource accounting, and output.
+- [Resource Diagnostics](RESOURCE_DIAGNOSTICS.md) — Runtime observer selection,
+  counter ownership, coverage, and dispatch costs.
 - [Performance Analysis](PERFORMANCE_ANALYSIS.md) — Current simulator timings, reproduction instructions,
   and a short optimization history.
 - [Scheduling Predictions and Reservations](SCHEDULING_PREDICTIONS.md) —

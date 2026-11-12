@@ -65,8 +65,8 @@ timeout_t checked_streaming_limit(tdiff_t limit_time) {
 constexpr std::array<char, 8> checkpoint_magic{'D', 'R', 'E', 'V',
                                                'T', 'C', 'K', 'P'};
 constexpr std::uint32_t checkpoint_version =
-    20; // 20: diagnostic reservation policy; 19: placement-pass accounting;
-        // 18: arrival dispatch wakes;
+    21; // 21: runtime resource diagnostics setting; 20: diagnostic reservation
+        // policy; 19: placement-pass accounting; 18: arrival dispatch wakes;
         // 17: dispatch controls; 16: periodic dirty flag; 15: periodic
         // deadline; 14: backfill_queue_depth; 13: scalar event/sample times;
         // 12: release delay; 11: reservation_depth
@@ -370,7 +370,8 @@ template <typename TraceType>
 BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
     : m_params(std::move(params)),
       m_trace(m_params.m_infile, m_params.m_trace_format,
-              m_params.m_timestamp_format, m_params.m_timezone),
+              m_params.m_timestamp_format, m_params.m_timezone,
+              m_params.m_resource_model_diagnostics),
       m_scheduler(create_scheduler(
           m_params.m_total_nodes, m_trace.data().size(),
           m_params.m_backfill_policy, m_params.m_priority_policy,
@@ -379,8 +380,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params)
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
           m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting,
-          m_params.m_diagnostic_no_reservations)),
+          m_params.m_per_pass_accounting, m_params.m_diagnostic_no_reservations,
+          m_trace.m_resource_diagnostics.get())),
       m_custom_scheduler(nullptr), m_current_time(0.0),
       m_next_backfill_evaluation(std::numeric_limits<sim_time_t>::max()),
       m_periodic_backfill_dirty(true),
@@ -411,7 +412,8 @@ BasicSimulation<TraceType>::BasicSimulation(Sim_Params params,
                                             backfill_selector_t selector)
     : m_params(std::move(params)),
       m_trace(m_params.m_infile, m_params.m_trace_format,
-              m_params.m_timestamp_format, m_params.m_timezone),
+              m_params.m_timestamp_format, m_params.m_timezone,
+              m_params.m_resource_model_diagnostics),
       m_scheduler(std::make_unique<FCFSEasyCustomScheduler>(
           m_params.m_total_nodes, m_trace.data().size(),
           m_params.m_backfill_policy, m_params.m_num_max_candidates,
@@ -449,7 +451,8 @@ BasicSimulation<TraceType>::BasicSimulation(
     Sim_Params params, std::unique_ptr<FCFSEasyCustomScheduler> scheduler)
     : m_params(std::move(params)),
       m_trace(m_params.m_infile, m_params.m_trace_format,
-              m_params.m_timestamp_format, m_params.m_timezone),
+              m_params.m_timestamp_format, m_params.m_timezone,
+              m_params.m_resource_model_diagnostics),
       m_scheduler(std::move(scheduler)),
       m_custom_scheduler(
           static_cast<FCFSEasyCustomScheduler *>(m_scheduler.get())),
@@ -640,6 +643,17 @@ template <typename TraceType> void BasicSimulation<TraceType>::run() {
 template <typename TraceType>
 void BasicSimulation<TraceType>::print_stats(std::ostream &os) const {
   os << "=== Simulation Statistics ===" << std::endl;
+  if (const auto diagnostics = get_resource_diagnostics()) {
+    os << "Resource operation counters (calls, requested quantities):\n";
+    constexpr const char *names[] = {
+        "fit_now",  "find_fit", "reserve", "projected_start",
+        "allocate", "release",  "hold"};
+    for (size_t i = 0; i < ResourceDiagnostics::operation_count; ++i) {
+      os << "  " << names[i] << ": " << diagnostics->calls[i] << ", "
+         << diagnostics->quantities[i] << '\n';
+    }
+    os << "  failed_fits: " << diagnostics->failed_fits << '\n';
+  }
   os << "Total jobs: ";
   if (m_params.m_sim_start_time != 0.0) {
     os << m_jobs_submitted;
@@ -2000,8 +2014,8 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
           m_params.m_reservation_depth, m_params.m_backfill_queue_depth,
           m_params.m_backfill_interval, m_params.m_dispatch_interval,
           m_params.m_dispatch_queue_depth, m_params.m_dispatch_on_events,
-          m_params.m_per_pass_accounting,
-          m_params.m_diagnostic_no_reservations);
+          m_params.m_per_pass_accounting, m_params.m_diagnostic_no_reservations,
+          m_trace.m_resource_diagnostics.get());
       m_scheduler->set_planning_time_resolution(
           m_params.m_planning_time_resolution);
       m_scheduler->set_planning_horizon(m_params.m_planning_horizon);
@@ -2050,6 +2064,9 @@ void BasicSimulation<TraceType>::load_checkpoint_impl(std::istream &input,
       const auto filename = m_params.get_resource_trace();
       start_restart_output_segment(filename, resource_output_bytes,
                                    m_trace.m_resource_trace_ofs);
+    }
+    if (m_trace.m_resource_diagnostics) {
+      m_trace.m_resource_diagnostics->reset();
     }
   } else {
     static_assert(std::is_same_v<TraceType, Trace> ||

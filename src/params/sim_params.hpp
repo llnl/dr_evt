@@ -108,6 +108,7 @@ private:
     visit("dispatch_queue_depth", self.m_dispatch_queue_depth);
     visit("dispatch_on_events", self.m_dispatch_on_events);
     visit("per_pass_accounting", self.m_per_pass_accounting);
+    visit("resource_model_diagnostics", self.m_resource_model_diagnostics);
     visit("diagnostic_no_reservations", self.m_diagnostic_no_reservations);
     visit("planning_time_resolution", self.m_planning_time_resolution);
     visit("planning_horizon", self.m_planning_horizon);
@@ -233,6 +234,8 @@ public:
   bool m_dispatch_on_events;
   /// Event-driven placement passes with Q/R reset per pass and guarded retries.
   bool m_per_pass_accounting;
+  /// Select resource observation once at simulation construction; default OFF.
+  bool m_resource_model_diagnostics;
   /// Diagnostic periodic model: consider later fitting jobs without
   /// reservations.
   bool m_diagnostic_no_reservations;

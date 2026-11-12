@@ -52,6 +52,7 @@ field. Detailed scheduling behavior is defined in
 | `block_size` | Unsigned integer / `128` | `4`, `8`, `16`, `32`, `64`, `128`, `256`; used by the block queue. |
 | `reservation_depth` | Unsigned integer / `0` | Protected waiting-job count R for hybrid; must be positive with hybrid. EASY uses R=1 and conservative has no R limit. |
 | `backfill_queue_depth` | Unsigned integer / `0` | Examination count Q; zero is unlimited. Placement-pass modes include immediate starts. Keep zero with fixed dispatch. |
+| `resource_model_diagnostics` | Boolean / `false` | Select per-simulation resource operation counters at construction, equivalent to `--resource_model_diagnostics`. |
 | `per_pass_accounting` | Boolean / `false` | Flux-style event-driven placement passes with fresh Q/R. Supports all four backfill policies. |
 | `backfill_interval` | Seconds / `0` | Nonnegative finite interval; positive values select separate periodic backfill with event-driven FCFS dispatch. |
 | `dispatch_interval` | Seconds / `0` | Nonnegative finite interval; positive values select aligned combined dispatch/backfill ticks. |

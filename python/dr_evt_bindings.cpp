@@ -33,6 +33,17 @@ PYBIND11_MODULE(dr_evt, m) {
   m.doc() = "DR_EVT: HPC Job Scheduler Simulator - Python API";
   m.attr("legacy_queue_input") = py::bool_(DR_EVT_LEGACY_QUEUE_INPUT != 0);
 
+  py::class_<ResourceDiagnostics>(
+      m, "ResourceDiagnostics",
+      "Per-simulation resource operation counters; snapshots own their values.")
+      .def_readonly("calls", &ResourceDiagnostics::calls,
+                    "Counts ordered as fit_now, find_fit, reserve, "
+                    "projected_start, allocate, release, hold.")
+      .def_readonly("quantities", &ResourceDiagnostics::quantities,
+                    "Total requested quantities in the same operation order.")
+      .def_readonly("failed_fits", &ResourceDiagnostics::failed_fits,
+                    "Number of failed immediate or future fit queries.");
+
   // Scheduler policies exported as Python enum classes.
   py::enum_<RunTimeMode>(m, "RunTimeMode",
                          "Controls how a job's actual run time is selected; "
@@ -150,6 +161,10 @@ PYBIND11_MODULE(dr_evt, m) {
       .def_readwrite("per_pass_accounting", &Sim_Params::m_per_pass_accounting,
                      "bool: Event-driven placement passes with per-pass Q/R "
                      "accounting and guarded reservation-only retries.")
+      .def_readwrite(
+          "resource_model_diagnostics",
+          &Sim_Params::m_resource_model_diagnostics,
+          "Select resource operation counters at construction (default False).")
       .def_readwrite("diagnostic_no_reservations",
                      &Sim_Params::m_diagnostic_no_reservations,
                      "bool: Diagnostic periodic license-off model without "
@@ -467,6 +482,10 @@ PYBIND11_MODULE(dr_evt, m) {
       .def("get_nodes_releasing", &Simulation::get_nodes_releasing,
            "Return the number of nodes whose job has ended but which are not "
            "yet reusable (node release delay) as int.")
+
+      .def("get_resource_diagnostics", &Simulation::get_resource_diagnostics,
+           "Return a ResourceDiagnostics snapshot, or None when disabled at "
+           "construction.")
 
       // Monitoring - Queue status
       .def("get_active_job_count", &Simulation::get_active_job_count,

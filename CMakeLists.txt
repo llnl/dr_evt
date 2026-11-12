@@ -237,8 +237,6 @@ option(DR_EVT_INSTALL_FETCHED_GRPC
 option(DR_EVT_LEGACY_QUEUE_INPUT "Read legacy queue-name trace columns instead of q_id" OFF)
 option(DR_EVT_LEGACY_RESERVATION_BARRIER
   "Require backfill jobs to finish before protected reservations" OFF)
-option(DR_EVT_RESOURCE_MODEL_DIAGNOSTICS
-  "Enable compile-time resource operation counters (currently CountModel)" OFF)
 
 if (DR_EVT_ENABLE_GRPC)
   if (NOT DR_EVT_ENABLE_PROTOBUF)

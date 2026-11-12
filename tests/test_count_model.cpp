@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 
@@ -147,7 +148,45 @@ static void observation_checks() {
           "empty inventory must not fit");
 }
 
-static void integrated_accounting() {
+/** @brief Check explicit counting-observer selection and failed-fit accounting.
+ */
+static void counting_observer_checks() {
+  using Model = CountModel<CountingResourceObserver>;
+  CountingResourceObserver::reset();
+  Model::Timeline plan(std::map<sim_time_t, num_nodes_t>{{0, 2}, {10, 4}});
+  require(!Model::can_fit(plan, 3, 5, 0),
+          "counting observer must preserve immediate fit failure");
+  const auto placement = Model::find_fit(plan, 3, 5, 0);
+  require(placement && *placement == 10,
+          "counting observer must preserve future fit result");
+  Model::reserve(plan, *placement, 3, 5);
+  require(!Model::can_fit(plan, 2, 1, 10),
+          "observed reservation must consume future capacity");
+  require(!Model::find_fit(plan, 5, 1, 0),
+          "impossible demand must fail with observation enabled");
+  const auto fit_now = static_cast<size_t>(ResourceOperation::FitNow);
+  const auto find_fit = static_cast<size_t>(ResourceOperation::FindFit);
+  const auto reserve = static_cast<size_t>(ResourceOperation::Reserve);
+  require(CountingResourceObserver::calls[fit_now] == 2 &&
+              CountingResourceObserver::quantities[fit_now] == 5 &&
+              CountingResourceObserver::calls[find_fit] == 2 &&
+              CountingResourceObserver::quantities[find_fit] == 8 &&
+              CountingResourceObserver::calls[reserve] == 1 &&
+              CountingResourceObserver::quantities[reserve] == 3 &&
+              CountingResourceObserver::failed_fits == 3,
+          "explicit observer must count operations, demand, and failed fits");
+  CountingResourceObserver::reset();
+  for (auto calls : CountingResourceObserver::calls) {
+    require(calls == 0, "reset must clear operation counts");
+  }
+  for (auto quantity : CountingResourceObserver::quantities) {
+    require(quantity == 0, "reset must clear quantity totals");
+  }
+  require(CountingResourceObserver::failed_fits == 0,
+          "reset must clear failed fits");
+}
+
+static void integrated_accounting(bool diagnostics, PriorityPolicy priority) {
   const auto directory = std::filesystem::temp_directory_path() /
                          ("dr-evt-count-model-" + std::to_string(
                              std::random_device{}()));
@@ -163,9 +202,19 @@ static void integrated_accounting() {
   params.m_timestamp_format = "epoch";
   params.m_backfill_policy = BackfillPolicy::HYBRID;
   params.m_reservation_depth = 1;
-  params.m_per_pass_accounting = true;
+  params.m_per_pass_accounting = priority != PriorityPolicy::FCFS_1S_EVT_GROUP;
+  params.m_priority_policy = priority;
+  params.m_resource_model_diagnostics = diagnostics;
   params.m_node_release_delay = 3;
   Simulation simulation(params);
+  const auto initial = simulation.get_resource_diagnostics();
+  require(initial.has_value() == diagnostics,
+          "construction must select diagnostics from runtime configuration");
+  if (initial) {
+    for (auto calls : initial->calls) {
+      require(calls == 0, "new simulation must start with empty counters");
+    }
+  }
 #if DR_EVT_LEGACY_QUEUE_INPUT
   const char *queue = "pbatch";
 #else
@@ -178,27 +227,62 @@ static void integrated_accounting() {
   require(status[0].start_time == 0 && status[1].start_time == 13 &&
               status[1].end_time == 18,
           "live allocation must respect delayed release");
-#if DR_EVT_RESOURCE_MODEL_DIAGNOSTICS
-  const auto calls = [](ResourceOperation operation) {
-    return CountingResourceObserver::calls[static_cast<size_t>(operation)];
-  };
-  require(calls(ResourceOperation::Allocate) == 2 &&
-              calls(ResourceOperation::ProjectedStart) == 2 &&
-              calls(ResourceOperation::Hold) == 2 &&
-              calls(ResourceOperation::Release) == 4 &&
-              calls(ResourceOperation::Reserve) >= 2,
-          "resource diagnostics must observe each start/release exactly once");
-#else
   for (auto calls : CountingResourceObserver::calls) {
-    require(calls == 0, "disabled diagnostics must leave observer counters untouched");
+    require(calls == 0, "default model must leave observer counters untouched");
   }
+  if (diagnostics) {
+    const auto snapshot = simulation.get_resource_diagnostics();
+    const auto calls = [&snapshot](ResourceOperation operation) {
+      return snapshot->calls[static_cast<size_t>(operation)];
+    };
+    require(
+        calls(ResourceOperation::Allocate) == 2 &&
+            calls(ResourceOperation::ProjectedStart) == 2 &&
+            calls(ResourceOperation::Hold) == 2 &&
+            calls(ResourceOperation::Release) == 4 &&
+            calls(ResourceOperation::Reserve) >= 2,
+        "runtime observer must cover planning and committed delayed release");
+    params.set_outfile((directory / "second.csv").string());
+    Simulation other(params);
+    other.append_job(0, 4, queue, 2);
+    other.advance_to(10);
+    require(other.get_resource_diagnostics()
+                    ->calls[static_cast<size_t>(ResourceOperation::Allocate)] ==
+                1,
+            "each simulation must own its counters");
+    require(simulation.get_resource_diagnostics()->calls == snapshot->calls,
+            "another simulation must not change existing counters");
+    std::ostringstream report;
+    simulation.print_stats(report);
+    require(report.str().find("Resource operation counters") !=
+                std::string::npos,
+            "enabled diagnostics must be available in reports");
+#if defined(DR_EVT_HAS_SER20)
+    std::stringstream checkpoint(std::ios::in | std::ios::out |
+                                 std::ios::binary);
+    simulation.save_checkpoint(checkpoint);
+    checkpoint.seekg(0);
+    simulation.load_checkpoint(checkpoint);
+    const auto restored = simulation.get_resource_diagnostics();
+    for (auto count : restored->calls) {
+      require(count == 0,
+              "successful restore must restart diagnostic counters");
+    }
 #endif
+  }
   std::filesystem::remove_all(directory);
 }
 
 int main() {
   interval_oracle();
   observation_checks();
-  integrated_accounting();
+  counting_observer_checks();
+  require(!Sim_Params{}.m_resource_model_diagnostics,
+          "runtime diagnostics must default to disabled");
+  for (auto priority :
+       {PriorityPolicy::FCFS, PriorityPolicy::FCFS_1S_EVT_GROUP}) {
+    integrated_accounting(false, priority);
+    integrated_accounting(true, priority);
+  }
   std::cout << "count-model oracle, hook, and event accounting checks passed\n";
 }

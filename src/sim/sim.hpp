@@ -191,6 +191,18 @@ public:
    */
   void print_stats(std::ostream &os) const;
 
+  /** @brief Snapshot this simulation's resource operation counters.
+   * @return Counters since construction or last successful checkpoint load;
+   * std::nullopt when diagnostics were disabled at construction.
+   * @details Reading counters does not advance time or perform planning. */
+  std::optional<ResourceDiagnostics> get_resource_diagnostics() const {
+    const auto *diagnostics = m_trace.resource_diagnostics();
+    if (diagnostics == nullptr) {
+      return std::nullopt;
+    }
+    return *diagnostics;
+  }
+
   /**
    * @brief Write the simulated job trace to the configured output file.
    * @details

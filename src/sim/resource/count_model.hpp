@@ -19,6 +19,13 @@
 
 namespace dr_evt {
 
+/**
+ * @brief Scalar capacity operations with a compile-time observer selection.
+ * @tparam Observer Observer with static enabled and, when enabled, observe().
+ * Defaults to NoResourceObserver, which removes observation code at compile
+ * time.
+ * @details State belongs to the caller's timeline or live accounting records.
+ */
 template <typename Observer = NoResourceObserver> struct CountModel {
   using Request = num_nodes_t;
   using State = num_nodes_t;
@@ -110,14 +117,6 @@ template <typename Observer = NoResourceObserver> struct CountModel {
     }
   }
 };
-
-// Resource diagnostics select the observer, not the resource model.
-// Currently CountModel is the only model wired to this build option.
-#if DR_EVT_RESOURCE_MODEL_DIAGNOSTICS
-using ActiveCountModel = CountModel<CountingResourceObserver>;
-#else
-using ActiveCountModel = CountModel<>;
-#endif
 
 } // namespace dr_evt
 #endif

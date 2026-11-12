@@ -85,10 +85,12 @@ private:
 // InitializeTraceRequest is ever sent, so the server never loads any
 // job data of its own) on an already-constructed client.
 void connect_and_init(SimulationClient &client, const std::string &trace_file,
-                      const char *backfill_policy = "easy") {
+                      const char *backfill_policy = "easy",
+                      bool resource_model_diagnostics = false) {
   ClientMessage init_req;
   auto *init = init_req.mutable_init();
   init->set_total_nodes(100);
+  init->set_resource_model_diagnostics(resource_model_diagnostics);
   init->set_trace_format("simple");
   init->set_timestamp_format("epoch");
   init->set_backfill_policy(backfill_policy);
@@ -118,7 +120,7 @@ bool test_single_append(const std::string &server_address,
       grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
 
   try {
-    connect_and_init(client, trace_file);
+    connect_and_init(client, trace_file, "easy", true);
 
     ClientMessage append_req1;
     auto *a1 = append_req1.mutable_append_job();
@@ -148,6 +150,20 @@ bool test_single_append(const std::string &server_address,
     stats_req.mutable_get_statistics();
     auto stats_resp = client.call(stats_req);
     const auto &stats = stats_resp.get_statistics();
+    if (!stats.has_resource_model_diagnostics() ||
+        stats.resource_model_diagnostics().operations_size() != 7) {
+      throw std::runtime_error("enabled diagnostics missing from statistics");
+    }
+    bool found_allocations = false;
+    for (const auto &counter :
+         stats.resource_model_diagnostics().operations()) {
+      if (counter.operation() == "allocate") {
+        found_allocations = counter.calls() == 2;
+      }
+    }
+    if (!found_allocations) {
+      throw std::runtime_error("runtime observer did not count job starts");
+    }
 
     std::cout << "  submitted=" << stats.jobs_submitted()
               << " completed=" << stats.jobs_completed()
@@ -268,6 +284,10 @@ bool test_batch_append(const std::string &server_address,
     stats_req.mutable_get_statistics();
     auto stats_resp = client.call(stats_req);
     const auto &stats = stats_resp.get_statistics();
+    if (stats.has_resource_model_diagnostics()) {
+      throw std::runtime_error(
+          "disabled session must not share diagnostic counters");
+    }
 
     std::cout << "  submitted=" << stats.jobs_submitted()
               << " completed=" << stats.jobs_completed()

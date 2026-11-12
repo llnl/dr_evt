@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare original, standalone count, and hook-enabled Release simulators."""
+"""Compare baseline and count-model simulators, optionally with observation."""
 
 import argparse
 import csv
@@ -53,7 +53,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--model", type=Path, required=True)
-    parser.add_argument("--hooks", type=Path, required=True)
+    parser.add_argument("--hooks", type=Path,
+                        help="Optional explicitly instrumented or historical binary")
+    parser.add_argument("--runtime-diagnostics", action="store_true",
+                        help="Enable runtime diagnostics only for the --hooks variant")
     parser.add_argument("--outdir", type=Path, required=True)
     parser.add_argument("--revision", required=True,
                         help="Baseline revision; candidate changes stay uncommitted")
@@ -71,10 +74,14 @@ def main():
     if (args.runs < 3 or args.batch_size < 1 or args.stress_jobs < 1 or
             args.per_pass_jobs < 1):
         parser.error("use at least three measured runs and one stress job")
+    if args.runtime_diagnostics and args.hooks is None:
+        parser.error("--runtime-diagnostics requires --hooks")
     root = args.outdir.resolve()
     root.mkdir(parents=True, exist_ok=True)
     binaries = {name: getattr(args, name).resolve()
-                for name in ("baseline", "model", "hooks")}
+                for name in ("baseline", "model")}
+    if args.hooks is not None:
+        binaries["hooks"] = args.hooks.resolve()
     inputs = {}
     # Both fixtures are deterministic; the stress fixture matches the existing
     # fixed conservative profile's input generation.
@@ -142,6 +149,8 @@ def main():
                            "--run_time_mode", "limit", "--queue_impl", "circular",
                            "--backfill_policy", policy, "--outfile", str(output),
                            "--resource_trace", str(history)] + extra
+                if variant == "hooks" and args.runtime_diagnostics:
+                    command += ["--resource_model_diagnostics"]
                 commands[variant] = command
                 elapsed = cpu = 0
                 for _ in range(args.batch_size):
@@ -172,9 +181,10 @@ def main():
                                                timings["model"]["wall_ms"]),
             "abstraction_cpu": paired_change(timings["baseline"]["cpu_ms"],
                                               timings["model"]["cpu_ms"]),
-            "observation_wall": paired_change(timings["model"]["wall_ms"],
-                                               timings["hooks"]["wall_ms"]),
         }
+        if "hooks" in timings:
+            changes["observation_wall"] = paired_change(
+                timings["model"]["wall_ms"], timings["hooks"]["wall_ms"])
         report["cases"][name] = {"timings": timings, "changes": changes,
                                   "output_hashes": expected_hashes,
                                   "commands": commands}

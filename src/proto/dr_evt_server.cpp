@@ -82,9 +82,12 @@ std::string make_session_id(const std::string &session_name) {
 
 /** @brief Copy simulator statistics into a protobuf response.
  * @param[in] statistics Source statistics snapshot.
+ * @param[in] diagnostics Optional per-simulation resource counters.
  * @param[out] response Destination protobuf response. */
-void copy_statistics(const dr_evt::Simulation::Statistics &statistics,
-                     GetStatisticsResponse *response) {
+void copy_statistics(
+    const dr_evt::Simulation::Statistics &statistics,
+    GetStatisticsResponse *response,
+    const std::optional<dr_evt::ResourceDiagnostics> &diagnostics) {
   response->set_jobs_submitted(statistics.jobs_submitted);
   response->set_jobs_started(statistics.jobs_started);
   response->set_jobs_completed(statistics.jobs_completed);
@@ -101,6 +104,19 @@ void copy_statistics(const dr_evt::Simulation::Statistics &statistics,
   response->set_avg_bounded_slowdown(statistics.avg_bounded_slowdown);
   response->set_makespan(statistics.makespan);
   response->set_resource_area(statistics.resource_area);
+  if (diagnostics) {
+    auto *out = response->mutable_resource_model_diagnostics();
+    constexpr const char *names[] = {
+        "fit_now",  "find_fit", "reserve", "projected_start",
+        "allocate", "release",  "hold"};
+    for (size_t i = 0; i < dr_evt::ResourceDiagnostics::operation_count; ++i) {
+      auto *counter = out->add_operations();
+      counter->set_operation(names[i]);
+      counter->set_calls(diagnostics->calls[i]);
+      counter->set_quantity(diagnostics->quantities[i]);
+    }
+    out->set_failed_fits(diagnostics->failed_fits);
+  }
 }
 
 /** @brief Write one statistics snapshot as JSON.
@@ -314,6 +330,7 @@ public:
           sp.m_dispatch_queue_depth = r.dispatch_queue_depth();
           sp.m_dispatch_on_events = r.dispatch_on_events();
           sp.m_per_pass_accounting = r.per_pass_accounting();
+          sp.m_resource_model_diagnostics = r.resource_model_diagnostics();
           sp.m_diagnostic_no_reservations = r.diagnostic_no_reservations();
           if (!std::isfinite(r.planning_time_resolution()) ||
               r.planning_time_resolution() < 0.0) {
@@ -557,7 +574,8 @@ public:
         case ClientMessage::kGetStatistics: {
           require_init(sim);
           auto stats = sim->get_statistics();
-          copy_statistics(stats, resp.mutable_get_statistics());
+          copy_statistics(stats, resp.mutable_get_statistics(),
+                          sim->get_resource_diagnostics());
           break;
         }
         case ClientMessage::kGetTraceSize: {
@@ -600,7 +618,8 @@ public:
           write_statistics_file(statistics_file, stats);
 
           auto *out = resp.mutable_finish_simulation();
-          copy_statistics(stats, out->mutable_statistics());
+          copy_statistics(stats, out->mutable_statistics(),
+                          sim->get_resource_diagnostics());
           out->set_session_id(session_id);
           out->set_simulated_trace_file(simulated_trace_file);
           out->set_resource_trace_file(resource_trace_file);

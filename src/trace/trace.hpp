@@ -18,12 +18,14 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "common.hpp"
 #include "params/sim_params.hpp" // CircularOverflowPolicy
+#include "sim/resource/count_model.hpp"
 #include "trace/data_columns.hpp"
 #include "trace/dr_event.hpp"
 #include "trace/job_record.hpp"
@@ -205,6 +207,15 @@ protected:
   /// to keep a separate Context in sync with the right Trace.
   Context m_ctx;
 
+  /// Optional counter owner; allocated once only when diagnostics are enabled.
+  std::unique_ptr<ResourceDiagnostics> m_resource_diagnostics;
+  /// Event-entry dispatch selected once at construction; operations stay
+  /// inline.
+  void (BasicTrace::*m_process_events)(sim_time_t) =
+      &BasicTrace::template process_events_until_impl<CountModel<>>;
+  bool (BasicTrace::*m_process_event)() =
+      &BasicTrace::template process_single_event_impl<CountModel<>>;
+
   /// Requested capacity for m_ctx.m_resource_history (0 = auto-size to
   /// the job trace once loaded - see resolve_resource_history_capacity()).
   /// Set via set_resource_history_capacity()/start_resource_trace(),
@@ -274,10 +285,23 @@ public:
    * @param[in] format Trace format name.
    * @param[in] timestamp_format Retained epoch/iso compatibility setting;
    * input timestamp encoding is auto-detected.
-   * @param[in] timezone Default timezone for timestamps without offsets. */
+   * @param[in] timezone Default timezone for timestamps without offsets.
+   * @param[in] resource_model_diagnostics Enable per-trace resource counters.
+   * @details Selects event-processing specialization once. Counters belong to
+   * this trace and are not shared with other simulations.
+   * @throws std::runtime_error if the input header cannot be initialized. */
   BasicTrace(const std::string &fname, const std::string &format,
-             const std::string &timestamp_format, const std::string &timezone);
+             const std::string &timestamp_format, const std::string &timezone,
+             bool resource_model_diagnostics = false);
   ~BasicTrace();
+
+  /** @brief Return the counters allocated for this trace.
+   * @return Read-only pointer valid until trace destruction, or nullptr when
+   * diagnostics are disabled. Counters restart at a successful checkpoint load.
+   */
+  const ResourceDiagnostics *resource_diagnostics() const {
+    return m_resource_diagnostics.get();
+  }
 
   /// @brief Allow access to the header information and column filter.
   /// @return Read-only reference to the Data_Columns mapping.
@@ -841,6 +865,15 @@ protected:
    * handled. */
   void process_events_until(sim_time_t t_sub);
 
+  /** @brief Process an event batch using the construction-selected observer.
+   * @tparam Model Compile-time resource operations and observer.
+   * @param[in] t_sub Inclusive event-processing timestamp. */
+  template <typename Model> void process_events_until_impl(sim_time_t t_sub);
+  /** @brief Process one event using the construction-selected observer.
+   * @tparam Model Compile-time resource operations and observer.
+   * @return true if an event was processed; false for an empty event queue. */
+  template <typename Model> bool process_single_event_impl();
+
   /// Resolve m_resource_history_capacity (0 -> sized from m_data) and
   /// call m_ctx.m_resource_history.set_capacity() - once, the first time
   /// any sample is recorded. A no-op on every call after the first.
@@ -887,6 +920,12 @@ protected:
   /// Account for a departed job's nodes: free them now, or move them to the
   /// releasing pool and queue their node-release event when a delay is
   /// active. Shared by both event-processing paths.
+  /** @brief Free departed capacity or hold it until its release event.
+   * @tparam Model Resource operations and compile-time observer.
+   * @param[in] job_idx Departing job identity.
+   * @param[in] end_time Actual departure time.
+   * @param[in] nodes Departing job's allocated quantity. */
+  template <typename Model>
   void finish_job_nodes(job_no_t job_idx, sim_time_t end_time,
                         num_nodes_t nodes);
 

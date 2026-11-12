@@ -217,6 +217,9 @@ message DR_EVT_Params {
         string node_release_delay_model = 50;
         // Half-width of the uniform per-node cleanup time; ignored otherwise.
         double node_release_delay_spread = 51;
+        // Count resource operations using an observer selected at construction.
+        // Default false. CLI: --resource_model_diagnostics.
+        bool resource_model_diagnostics = 52;
     }
 
     message Tracing_Params {

@@ -53,6 +53,7 @@ static constexpr int OPT_NODE_RELEASE_DELAY_MODEL = 1020;
 static constexpr int OPT_NODE_RELEASE_DELAY_SPREAD = 1021;
 static constexpr int OPT_PER_PASS_ACCOUNTING = 1022;
 static constexpr int OPT_DIAGNOSTIC_NO_RESERVATIONS = 1023;
+static constexpr int OPT_RESOURCE_MODEL_DIAGNOSTICS = 1024;
 
 /** @brief getopt short-option specification for the simulator CLI. */
 #define OPTIONS "hi:j:n:o:s:t:b:p:q:Q:A:G:r:f:T:z:D:S:V:vc:R:MK:W:H:L:m:"
@@ -78,6 +79,8 @@ static const struct option sim_longopts[] = {
     {"dispatch_queue_depth", required_argument, 0, OPT_DISPATCH_QUEUE_DEPTH},
     {"dispatch_on_events", no_argument, 0, OPT_DISPATCH_ON_EVENTS},
     {"per_pass_accounting", no_argument, 0, OPT_PER_PASS_ACCOUNTING},
+    {"resource_model_diagnostics", no_argument, 0,
+     OPT_RESOURCE_MODEL_DIAGNOSTICS},
     {"diagnostic_no_reservations", no_argument, 0,
      OPT_DIAGNOSTIC_NO_RESERVATIONS},
     {"planning_time_resolution", required_argument, 0,
@@ -127,7 +130,8 @@ Sim_Params::Sim_Params()
       m_backfill_queue_depth(0), m_backfill_interval(0.0),
       m_dispatch_interval(0.0), m_dispatch_queue_depth(0),
       m_dispatch_on_events(false), m_per_pass_accounting(false),
-      m_diagnostic_no_reservations(false), m_planning_time_resolution(0.0),
+      m_resource_model_diagnostics(false), m_diagnostic_no_reservations(false),
+      m_planning_time_resolution(0.0),
       m_planning_horizon(std::numeric_limits<tdiff_t>::max()),
       m_warm_start_wait_queue(WarmStartWaitQueuePolicy::INHERIT),
       m_priority_policy(PriorityPolicy::FCFS),
@@ -348,6 +352,9 @@ void Sim_Params::getopt(int &argc, char **&argv) {
                   << std::endl;
         print_usage(argv[0], 1);
       }
+      break;
+    case OPT_RESOURCE_MODEL_DIAGNOSTICS:
+      m_resource_model_diagnostics = true;
       break;
     case OPT_PER_PASS_ACCOUNTING:
       m_per_pass_accounting = true;
@@ -924,6 +931,9 @@ void Sim_Params::print_usage(const std::string exec, int code) {
          "        backfill pass by every scheduler (easy, conservative,\n"
          "        hybrid; FCFS, SJF, LJF; custom EASY); 0 means unlimited.\n"
          "\n"
+         "    --resource_model_diagnostics\n"
+         "        Count resource operations per simulation (default: "
+         "disabled).\n"
          "    --per_pass_accounting\n"
          "        Event-driven placement passes: immediate starts and future\n"
          "        reservations share --backfill_queue_depth; Q/R reset per "
@@ -1221,6 +1231,8 @@ void Sim_Params::print() const {
   msg += " - reservation_depth: " + to_string(m_reservation_depth) + "\n";
   msg += " - backfill_queue_depth: " + to_string(m_backfill_queue_depth) + "\n";
   msg += " - backfill_interval: " + to_string(m_backfill_interval) + "\n";
+  msg += " - resource_model_diagnostics: " +
+         std::string(m_resource_model_diagnostics ? "true" : "false") + "\n";
   msg += " - per_pass_accounting: " +
          std::string(m_per_pass_accounting ? "true" : "false") + "\n";
   msg += " - diagnostic_no_reservations: " +

@@ -309,3 +309,14 @@ of the Test Suite README. The test implementation is
 [cpp-simulation-simulation]: https://dr-evt.readthedocs.io/en/latest/api/cpp/source/sim.html#_CPPv4N6dr_evt15BasicSimulation15BasicSimulationE10Sim_Params19job_cost_function_t19backfill_selector_t
 [cpp-simulation-statistics]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation10StatisticsE
 [cpp-simulation-write-simulated-trace]: https://dr-evt.readthedocs.io/en/latest/api/cpp/topics/simulator.html#_CPPv4N6dr_evt15BasicSimulation21write_simulated_traceEv
+
+## Resource model diagnostics
+
+Set `params.resource_model_diagnostics = True` before constructing
+`dr_evt.Simulation(params)` to select per-simulation operation counters.
+`sim.get_resource_diagnostics()` returns a `ResourceDiagnostics` snapshot, or
+`None` when disabled. Its `calls` and `quantities` arrays are ordered as
+`fit_now`, `find_fit`, `reserve`, `projected_start`, `allocate`, `release`, and
+`hold`; `failed_fits` counts failed immediate and future fit queries. Snapshots
+own their values, so advancing or destroying the simulation does not change them.
+See [Resource diagnostics](../dev/RESOURCE_DIAGNOSTICS.md) for coverage and lifetime.

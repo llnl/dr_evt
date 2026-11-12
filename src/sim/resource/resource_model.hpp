@@ -25,12 +25,15 @@ enum class ResourceOperation {
 };
 enum class ResourceScope { Timeline, Available, Allocated, Releasing };
 
+struct ResourceDiagnostics;
+
 /// Context supplied by the caller; timeline identity is valid during the call.
 struct ResourceContext {
   job_no_t job = std::numeric_limits<job_no_t>::max();
   sim_time_t time = 0;
   size_t pass = 0;
   const void *timeline = nullptr;
+  ResourceDiagnostics *diagnostics = nullptr; ///< Non-owning counter owner.
 };
 
 /// Scalar snapshots apply to Available/Allocated/Releasing, not Timeline.
@@ -44,6 +47,40 @@ struct ResourceObservation {
   sim_time_t start = 0;
   tdiff_t duration = 0;
   bool success = true;
+};
+
+/** @brief Counters owned by one diagnostic simulation or trace. */
+struct ResourceDiagnostics {
+  static constexpr size_t operation_count =
+      static_cast<size_t>(ResourceOperation::Count);
+  std::array<std::uint64_t, operation_count> calls{};
+  std::array<std::uint64_t, operation_count> quantities{};
+  std::uint64_t failed_fits = 0;
+
+  /** @brief Clear all counters without altering resource state. */
+  void reset() { *this = {}; }
+  /** @brief Accumulate an observation without retaining its context.
+   * @param[in] event Resource operation to count. */
+  void observe(const ResourceObservation &event) {
+    const auto index = static_cast<size_t>(event.operation);
+    ++calls[index];
+    quantities[index] += event.quantity;
+    if (!event.success) {
+      ++failed_fits;
+    }
+  }
+};
+
+/** @brief Observe into the counter owner carried by the operation context. */
+struct SimulationResourceObserver {
+  static constexpr bool enabled = true;
+  /** @brief Count an operation in its simulation-owned counters.
+   * @param[in] event Observation whose context has a valid diagnostics owner.
+   * @details The owner must outlive this synchronous call. No context is saved.
+   */
+  static void observe(const ResourceObservation &event) {
+    event.context.diagnostics->observe(event);
+  }
 };
 
 struct NoResourceObserver {

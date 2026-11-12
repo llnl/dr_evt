@@ -34,7 +34,7 @@ namespace dr_evt {
 template <typename Timeline, typename Model>
 std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
-    sim_time_t current_time) {
+    sim_time_t current_time, ResourceDiagnostics *diagnostics) {
   if (m_planning_horizon != std::numeric_limits<tdiff_t>::max()) {
     throw std::invalid_argument(
         "per_pass_accounting requires an unlimited planning_horizon");
@@ -101,7 +101,8 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
       const tdiff_t duration =
           release_estimate(current_time, job.run_time_estimate);
       const bool try_reserve = reservation_count < reservation_limit;
-      const ResourceContext context{job.job_id, current_time, pass};
+      const ResourceContext context{job.job_id, current_time, pass, nullptr,
+                                    diagnostics};
       // Once R reservations exist, later candidates only need admission now.
       // A future fit cannot be used and need not be calculated.
       const auto at =
@@ -192,5 +193,15 @@ std::vector<job_no_t> FCFSOneSecondEventGroupCircularScheduler::schedule(
   return schedule_with_forecast<OneSecondEventGroupTimeline>(
       free_nodes, running_jobs, current_time);
 }
+
+// Observed factory specializations share the same queue traversal.
+template std::vector<job_no_t>
+FCFSPassHybridCircularScheduler::schedule_with_forecast<
+    CountTimeline, CountModel<SimulationResourceObserver>>(
+    num_nodes_t, const running_jobs_t &, sim_time_t, ResourceDiagnostics *);
+template std::vector<job_no_t>
+FCFSPassHybridCircularScheduler::schedule_with_forecast<
+    OneSecondEventGroupTimeline, CountModel<SimulationResourceObserver>>(
+    num_nodes_t, const running_jobs_t &, sim_time_t, ResourceDiagnostics *);
 
 } // namespace dr_evt

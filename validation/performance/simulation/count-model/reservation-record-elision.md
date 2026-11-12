@@ -83,7 +83,9 @@ experiments.
 - [Whole-simulation driver instructions](../README.md#standalone-count-model-comparison)
 
 For this comparison, pass the previous CountModel simulator as `--baseline`,
-the optimized simulator as `--model`, and its diagnostic build as `--hooks`.
+the optimized simulator as `--model`, and its historical diagnostic build as
+`--hooks`. The CMake observer-selection flag used for those snapshots has since
+been removed; omit `--hooks` when comparing current unobserved production builds.
 The reused driver's `abstraction_wall` and `abstraction_cpu` fields represent
 this optimization's candidate/baseline change in these reports.
 
