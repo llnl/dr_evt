@@ -13,6 +13,7 @@
  */
 
 #include "trace/trace.hpp"
+#include "sim/resource/count_model.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
 #include "utils/system_memory.hpp" // get_available_memory_bytes() - check_memory_pressure()
@@ -187,8 +188,10 @@ void BasicTrace<Policy>::finish_job_nodes(job_no_t job_idx, sim_time_t end_time,
       // The nodes leave the allocated pool now but stay unavailable until
       // the release event.
       const sim_time_t release = end_time + m_release_delay.sample(nodes);
-      m_ctx.m_n_nodes_in_use -= nodes;
-      m_ctx.m_n_nodes_releasing += nodes;
+      ActiveCountModel::release(m_ctx.m_n_nodes_in_use, nodes,
+                                {job_idx, end_time});
+      ActiveCountModel::hold(m_ctx.m_n_nodes_releasing, nodes,
+                             {job_idx, end_time});
       m_ctx.m_evtq.insert(DR_Event::release(job_idx, release, nodes));
       m_last_release_time = release;
       m_last_departure_delayed = true;
@@ -196,7 +199,7 @@ void BasicTrace<Policy>::finish_job_nodes(job_no_t job_idx, sim_time_t end_time,
     }
     m_last_departure_delayed = false;
   }
-  m_ctx.m_n_nodes_in_use -= nodes;
+  ActiveCountModel::release(m_ctx.m_n_nodes_in_use, nodes, {job_idx, end_time});
 }
 
 template <typename Policy>
@@ -224,7 +227,9 @@ void BasicTrace<Policy>::process_events_until(sim_time_t t_sub) {
     }
     if (cur->is_release()) {
       // Carries its own node count; its job record may be gone already.
-      m_ctx.m_n_nodes_releasing -= cur->get_nodes();
+      ActiveCountModel::release(m_ctx.m_n_nodes_releasing, cur->get_nodes(),
+                                {cur->get_job_idx(), t},
+                                ResourceScope::Releasing);
       m_ctx.m_evtq.erase(cur);
       record_resource_sample(t, m_ctx.m_n_nodes_in_use);
       continue;
@@ -252,10 +257,14 @@ void BasicTrace<Policy>::process_events_until(sim_time_t t_sub) {
         job_at(cur->get_job_idx()).set_busy_nodes(total_nodes, true);
         m_ctx.m_pAll_cnt++;
       } else {
-        m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
+        ActiveCountModel::allocate(m_ctx.m_n_nodes_in_use,
+                                   job_of_evt.get_num_nodes(),
+                                   {cur->get_job_idx(), t});
       }
 #else
-      m_ctx.m_n_nodes_in_use += job_of_evt.get_num_nodes();
+      ActiveCountModel::allocate(m_ctx.m_n_nodes_in_use,
+                                 job_of_evt.get_num_nodes(),
+                                 {cur->get_job_idx(), t});
 #endif
     } else {
       this->on_finish(static_cast<const trace_record_t<Policy> &>(job_of_evt));
@@ -683,14 +692,17 @@ template <typename Policy> bool BasicTrace<Policy>::process_single_event() {
   if (event.is_release()) {
     // RELEASE event: the ended job's nodes become reusable. The event carries
     // its node count; the job record may already have been reclaimed.
-    m_ctx.m_n_nodes_releasing -= event.get_nodes();
+    ActiveCountModel::release(m_ctx.m_n_nodes_releasing, event.get_nodes(),
+                              {event.get_job_idx(), event.get_time()},
+                              ResourceScope::Releasing);
   } else {
     // Process this event using replay engine's accounting logic
     const auto &job = job_at(event.get_job_idx());
     if (event.is_arrival()) {
       this->on_start(static_cast<const trace_record_t<Policy> &>(job));
       // START event: allocate nodes (same logic as process_events_until)
-      m_ctx.m_n_nodes_in_use += job.get_num_nodes();
+      ActiveCountModel::allocate(m_ctx.m_n_nodes_in_use, job.get_num_nodes(),
+                                 {event.get_job_idx(), event.get_time()});
     } else {
       this->on_finish(static_cast<const trace_record_t<Policy> &>(job));
       // END event: free nodes, or hold them until their release event

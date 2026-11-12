@@ -28,6 +28,7 @@
 #define DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_CIRCULAR_HPP
 
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/resource/count_model.hpp"
 #include <unordered_set>
 
 namespace dr_evt {
@@ -71,7 +72,7 @@ protected:
    * @param[in] current_time Actual scheduling time, unchanged by forecasting.
    * @return Jobs selected for immediate execution.
    */
-  template <typename Timeline>
+  template <typename Timeline, typename Model = ActiveCountModel>
   std::vector<job_no_t>
   schedule_with_forecast(num_nodes_t free_nodes,
                          const running_jobs_t &running_jobs,

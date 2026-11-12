@@ -31,7 +31,7 @@
 
 namespace dr_evt {
 
-template <typename Timeline>
+template <typename Timeline, typename Model>
 std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
@@ -98,31 +98,35 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
       const tdiff_t duration =
           release_estimate(current_time, job.run_time_estimate);
       const bool try_reserve = reservations.size() < reservation_limit;
+      const ResourceContext context{job.job_id, current_time, pass};
       // Once R reservations exist, later candidates only need admission now.
       // A future fit cannot be used and need not be calculated.
       const auto at =
           try_reserve
-              ? plan.earliest_fit(job.nodes_requested, duration, current_time)
-              : (plan.can_fit(current_time, job.nodes_requested, duration)
-                     ? std::optional<sim_time_t>(current_time)
+              ? Model::find_fit(plan, job.nodes_requested, duration,
+                                current_time, context)
+              : (Model::can_fit(plan, job.nodes_requested, duration,
+                                current_time, context)
+                     ? std::optional<typename Model::Placement>(current_time)
                      : std::nullopt);
-      if (at && *at == current_time) {
+      if (at && Model::start_time(*at) == current_time) {
         starts.push_back(job.job_id);
-        free_nodes -= job.nodes_requested;
+        Model::consume_available(free_nodes, job.nodes_requested, context);
         projected.push_back({current_time, duration, job.nodes_requested});
-        plan.reserve(current_time, job.nodes_requested, duration);
+        Model::reserve(plan, *at, job.nodes_requested, duration, context);
         job.removed = true;
         ++m_removed_count;
         ++tested;
         dirty = true;
       } else if (try_reserve && at) {
         const tdiff_t reserved_duration =
-            release_estimate(*at, job.run_time_estimate);
-        plan.reserve(*at, job.nodes_requested, reserved_duration);
-        reservations.emplace_back(job.job_id, *at, reserved_duration);
-        record_estimated_start(job.job_id, *at, true);
+            release_estimate(Model::start_time(*at), job.run_time_estimate);
+        Model::reserve(plan, *at, job.nodes_requested, reserved_duration, context);
+        reservations.emplace_back(job.job_id, Model::start_time(*at),
+                                  reserved_duration);
+        record_estimated_start(job.job_id, Model::start_time(*at), true);
         if (reservations.size() == 1) {
-          m_fcfs_reservation_time = *at;
+          m_fcfs_reservation_time = Model::start_time(*at);
         }
         ++tested;
         dirty = true;

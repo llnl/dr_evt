@@ -1,0 +1,427 @@
+{
+  "baseline_revision": "d3794773563c0f92c9c1b05d294bd5f505a93314",
+  "compiler": "GCC 13.3.0 Linux arm64",
+  "build_settings": "Release -O3 -g; static; LTO off; ser20/python/protobuf/grpc off; hooks off/off/on",
+  "platform": "Linux-7.0.12-linuxkit-aarch64-with-glibc2.39",
+  "machine": "aarch64",
+  "runs": 9,
+  "batch_size": 1,
+  "warmups": 1,
+  "binaries": {
+    "baseline": {
+      "path": "/tmp/dr-evt-count/baseline-build/simulator",
+      "sha256": "23eacc8a4ead8680b17f67e39877c433053a1ec6e2c84a8d140d59b0d22cc5b8"
+    },
+    "model": {
+      "path": "/tmp/dr-evt-count/model-build/simulator",
+      "sha256": "461c5103cd83429a62b356542c7f06d27d92e821668af90763a9703f5a0b7190"
+    },
+    "hooks": {
+      "path": "/tmp/dr-evt-count/hooks-build/simulator",
+      "sha256": "bf2f2dd3bd62e36d73f8c8fa396af690f4ce3f64be71e93d79a6dbac2f9df625"
+    }
+  },
+  "inputs": {
+    "mixed": {
+      "path": "/tmp/dr-evt-count/final-long/mixed.csv",
+      "capacity": 756,
+      "sha256": "9d8a7a93784fa4f63015dc20e5096ee2f4443e5bda1faa708fc2a33cdcc1ffa3",
+      "jobs": 2000,
+      "seed": 7351
+    },
+    "stress": {
+      "path": "/tmp/dr-evt-count/final-long/stress.csv",
+      "capacity": 128,
+      "sha256": "235c1fa1e259081dc207dea32f9cbecf6c723ac2c914a25b92220f91e4e17508",
+      "jobs": 20000,
+      "seed": 2718
+    },
+    "per-pass-stress": {
+      "path": "/tmp/dr-evt-count/final-long/per-pass-stress.csv",
+      "capacity": 128,
+      "sha256": "fd52b7fc71e16574451282beeb3dda57bd3ec756e5b2fcf361d475675740e24f",
+      "jobs": 8000,
+      "seed": 2718
+    }
+  },
+  "cases": {
+    "stress-per-pass-conservative": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            4395.62104397919,
+            4357.5254189781845,
+            4412.47854399262,
+            4397.047918988392,
+            4437.735919025727,
+            4418.820460035931,
+            4419.630502001382,
+            4342.866085993592,
+            4602.999627997633
+          ],
+          "cpu_ms": [
+            4395.26,
+            4356.188999999998,
+            4412.074000000001,
+            4396.634999999989,
+            4437.347000000005,
+            4418.488000000005,
+            4419.289000000018,
+            4342.434000000005,
+            4602.643000000003
+          ],
+          "median_wall_ms": 4412.47854399262,
+          "median_cpu_ms": 4412.074000000001
+        },
+        "model": {
+          "wall_ms": [
+            4421.725377032999,
+            4332.7523350017145,
+            4437.207835027948,
+            4460.710918996483,
+            4392.449126986321,
+            4359.816502023023,
+            4346.675585024059,
+            4302.144335000776,
+            4263.256044010632
+          ],
+          "cpu_ms": [
+            4421.378,
+            4332.287999999995,
+            4436.786999999996,
+            4460.2839999999915,
+            4392.090999999994,
+            4359.44500000001,
+            4345.368999999997,
+            4301.75400000001,
+            4262.828999999999
+          ],
+          "median_wall_ms": 4359.816502023023,
+          "median_cpu_ms": 4359.44500000001
+        },
+        "hooks": {
+          "wall_ms": [
+            4771.030709962361,
+            4631.877086008899,
+            4641.61295897793,
+            4647.989044024143,
+            4661.058918980416,
+            4590.252919006161,
+            4580.996378033888,
+            4641.45458501298,
+            4473.322751990054
+          ],
+          "cpu_ms": [
+            4770.606999999998,
+            4631.4450000000015,
+            4641.217000000002,
+            4647.607000000005,
+            4660.682999999999,
+            4589.857000000001,
+            4580.587999999989,
+            4641.077000000003,
+            4472.905999999987
+          ],
+          "median_wall_ms": 4641.45458501298,
+          "median_cpu_ms": 4641.077000000003
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": -0.937669966940724,
+          "bootstrap_95_percent": [
+            -1.6507017259539403,
+            0.5604399157701501
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": -0.9368018028597547,
+          "bootstrap_95_percent": [
+            -1.6726672548462163,
+            0.5601220650423011
+          ]
+        },
+        "observation_wall": {
+          "median_percent": 5.390804729415577,
+          "bootstrap_95_percent": [
+            4.6066159519592365,
+            7.887002935993848
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "317fa712f1b33863b280c58576ab52e41bb2baa9900fc429bb51cf05da4fab20",
+        "resources": "f4d7602df76d79dfbd6a22877d997e76bbcd70ea87e8e2074957550724df12dd"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/baseline-build/simulator",
+          "/tmp/dr-evt-count/final-long/per-pass-stress.csv",
+          "--total_nodes",
+          "128",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-long/stress-per-pass-conservative-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-long/stress-per-pass-conservative-baseline-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "0"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/final-long/per-pass-stress.csv",
+          "--total_nodes",
+          "128",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-long/stress-per-pass-conservative-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-long/stress-per-pass-conservative-model-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "0"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/hooks-build/simulator",
+          "/tmp/dr-evt-count/final-long/per-pass-stress.csv",
+          "--total_nodes",
+          "128",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-long/stress-per-pass-conservative-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-long/stress-per-pass-conservative-hooks-resources.csv",
+          "--per_pass_accounting",
+          "--backfill_queue_depth",
+          "0"
+        ]
+      }
+    },
+    "stress-cached-conservative": {
+      "timings": {
+        "baseline": {
+          "wall_ms": [
+            4060.575292969588,
+            4223.098376998678,
+            4147.203586006071,
+            4099.7022940428,
+            4039.604959951248,
+            3969.0057520056143,
+            4022.960375994444,
+            4105.8856270392425,
+            4006.181335018482
+          ],
+          "cpu_ms": [
+            4059.1659999999915,
+            4222.749000000009,
+            4146.8139999999985,
+            4099.369000000022,
+            4039.255000000005,
+            3968.6949999999697,
+            4022.625999999983,
+            4105.521999999984,
+            4005.84
+          ],
+          "median_wall_ms": 4060.575292969588,
+          "median_cpu_ms": 4059.1659999999915
+        },
+        "model": {
+          "wall_ms": [
+            4064.0429179766215,
+            4164.389042998664,
+            3998.5170860309154,
+            4133.945751993451,
+            4043.8863349845633,
+            3953.95296002971,
+            4017.3879180219956,
+            4029.5960860094056,
+            3990.3852100251243
+          ],
+          "cpu_ms": [
+            4063.7060000000256,
+            4164.0129999999945,
+            3998.133999999995,
+            4133.580000000012,
+            4043.5630000000097,
+            3953.6230000000137,
+            4017.054000000022,
+            4029.2019999999934,
+            3990.057000000025
+          ],
+          "median_wall_ms": 4029.5960860094056,
+          "median_cpu_ms": 4029.2019999999934
+        },
+        "hooks": {
+          "wall_ms": [
+            4048.5402929480188,
+            4129.908127011731,
+            4211.207210028078,
+            4118.784710997716,
+            3985.023500979878,
+            4027.963585976977,
+            4020.2039610012434,
+            3974.044293980114,
+            4027.550377009902
+          ],
+          "cpu_ms": [
+            4048.129999999997,
+            4129.493000000003,
+            4210.771999999986,
+            4118.449999999974,
+            3984.7360000000103,
+            4026.5729999999867,
+            4019.8790000000145,
+            3973.7109999999966,
+            4027.1819999999943
+          ],
+          "median_wall_ms": 4027.963585976977,
+          "median_cpu_ms": 4027.1819999999943
+        }
+      },
+      "changes": {
+        "abstraction_wall": {
+          "median_percent": -0.3792585074561261,
+          "bootstrap_95_percent": [
+            -1.8580532425802043,
+            0.08539738231272409
+          ]
+        },
+        "abstraction_cpu": {
+          "median_percent": -0.3797721921174668,
+          "bootstrap_95_percent": [
+            -1.8589597132834812,
+            0.10665333087425122
+          ]
+        },
+        "observation_wall": {
+          "median_percent": -0.36674503985507645,
+          "bootstrap_95_percent": [
+            -1.378594550013712,
+            1.871813516636034
+          ]
+        }
+      },
+      "output_hashes": {
+        "schedule": "b38f715d5af8c74b6a54ce37a8cbf1e4eebaf89be60886ce495b05d64952b852",
+        "resources": "446de8a69a4c8aa81a52d97eabe4d5468a61f4f4ac937ae482509d5f010c5251"
+      },
+      "commands": {
+        "baseline": [
+          "/tmp/dr-evt-count/baseline-build/simulator",
+          "/tmp/dr-evt-count/final-long/stress.csv",
+          "--total_nodes",
+          "128",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-long/stress-cached-conservative-baseline-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-long/stress-cached-conservative-baseline-resources.csv",
+          "--dispatch_interval",
+          "1",
+          "--dispatch_queue_depth",
+          "10000"
+        ],
+        "model": [
+          "/tmp/dr-evt-count/model-build/simulator",
+          "/tmp/dr-evt-count/final-long/stress.csv",
+          "--total_nodes",
+          "128",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-long/stress-cached-conservative-model-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-long/stress-cached-conservative-model-resources.csv",
+          "--dispatch_interval",
+          "1",
+          "--dispatch_queue_depth",
+          "10000"
+        ],
+        "hooks": [
+          "/tmp/dr-evt-count/hooks-build/simulator",
+          "/tmp/dr-evt-count/final-long/stress.csv",
+          "--total_nodes",
+          "128",
+          "--trace_format",
+          "simple",
+          "--timestamp_format",
+          "epoch",
+          "--run_time_mode",
+          "limit",
+          "--queue_impl",
+          "circular",
+          "--backfill_policy",
+          "conservative",
+          "--outfile",
+          "/tmp/dr-evt-count/final-long/stress-cached-conservative-hooks-schedule.csv",
+          "--resource_trace",
+          "/tmp/dr-evt-count/final-long/stress-cached-conservative-hooks-resources.csv",
+          "--dispatch_interval",
+          "1",
+          "--dispatch_queue_depth",
+          "10000"
+        ]
+      }
+    }
+  },
+  "candidate_source_sha256": {
+    "src/sim/resource/count_model.hpp": "5f8b181aa0d7931db1242fc3284bd61e676f5238c212e0a4e74c1531fdfedeb5",
+    "src/sim/resource/count_timeline.hpp": "3a611e0cc3b64b5d9fa758c0c5c6552dfe5793e04d5949f445ed02b4062fc185",
+    "src/sim/resource/resource_model.hpp": "5add65baa807eb20c5b6f951f7a1bc3c10a1490bbc490e5e57583a3b8d04431e",
+    "src/sim/scheduler_base.hpp": "af8a98d7f15c5c195d5a855f7ec5db61a9224d6435997bb399f10f0c1014d7f4",
+    "src/sim/scheduler_fcfs_pass_hybrid_circular.hpp": "6ae3ed86e4aff8a3b5abb87c306298ff679981729f7e8f0a10b8c6d1abd5175a",
+    "src/sim/scheduler_fcfs_pass_hybrid_circular.cpp": "1168ff2b307ff051af2e3acb2da480bfb2cadb0f8532ea012ebb99ad8803aa4b",
+    "src/trace/trace.cpp": "9a9ea7982a18cbbaf29ff0f3124464ab622a93802cdc0559083ed0f0bc0880fc",
+    "src/sim/CMakeLists.txt": "ecbba5f55287e7b0dfc4a91487a9080fe1b0f2f35e9a1a3c34cb00f2bbad0043",
+    "CMakeLists.txt": "3e6b78de21872743df83b6e54d312ab0defb926eaa2648f6daf903f7a74f7e3d",
+    "cmake/configure_files/dr_evt_config.hpp.in": "57853255fe8e3970ccccd48dc85c9912320440a738e7d78eb712fe4371a41053",
+    "tests/test_count_model.cpp": "2648073eb01be47be61bcfa8d4b79469cfc9dd7304616ad353c30ae51a5915d5",
+    "validation/performance/simulation/compare_count_model.py": "f23acdc932c6f9aa0d38f0bd02c15afbc661749e06b414aa5a97db3e0bab76dd"
+  },
+  "hardware": "Apple M3 Max, Linux arm64 Docker"
+}

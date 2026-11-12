@@ -4,6 +4,9 @@ set_full_path(THIS_DIR_HEADERS
     job_submit_model.hpp
     multi_platform_runs.hpp
     capacity_schedule.hpp
+    resource/resource_model.hpp
+    resource/count_model.hpp
+    resource/count_timeline.hpp
     scheduler_policies.hpp
     schedule_windows.hpp
     scheduler_base.hpp
