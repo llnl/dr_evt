@@ -61,7 +61,14 @@ registered with arrival and retired on completion; each can serve only its
 associated job. This reduces the snapshot size without changing available
 capacity or any other job's placement choices.
 
-The equivalent native administrative settings are:
+The default campaign now writes separate `capacity/` and `placement/` result
+trees. The capacity tree refreshes the historical shared-resource comparison.
+The placement tree gives OpenPBS a shared pool of 756 exclusive one-CPU vnodes,
+gives each job a `select=N:ncpus=1` request, and compares native vnode IDs with
+DR_EVT `--resource_model placement` allocations. Both trees record native and
+DR_EVT process times from the same campaign host.
+
+The equivalent native administrative settings for capacity mode are:
 
 ```text
 qmgr: create resource capacity type=long,flag=q

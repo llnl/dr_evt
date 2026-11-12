@@ -1,8 +1,9 @@
 # Performance Analysis
 
 These measurements use DR_EVT revision `f680afd`, including protected-only
-start-prediction cache reuse. They measure complete simulator runs; prediction
-queries are covered in [Scheduling Predictions and Reservations](SCHEDULING_PREDICTIONS.md#performance-and-accuracy-comparison).
+start-prediction cache reuse. They measure complete simulator runs. Start-time
+prediction query costs are summarized separately below and covered in detail in
+[Scheduling Predictions and Reservations](SCHEDULING_PREDICTIONS.md#performance-and-accuracy-comparison).
 
 ## Current simulation timings
 
@@ -85,6 +86,103 @@ complete symbol table. One short synthetic capture identifies broad targets,
 not production-wide percentages or expected speedups. The
 [profile summary](https://github.com/LLNL/dr_evt/blob/main/validation/performance/simulation/profile.json)
 records the workload, samples, hashes, and build settings.
+
+## Integrated placement bottlenecks
+
+A separate whole-simulator study measured the placement feature variants on a
+Dane x86_64 compute node. The Release binary used GCC 13.3.1, disabled optional
+serialization/Python/RPC components and observers, and ran every variant
+serially. Each result is the median of three measured processes after one
+warmup. Timings include parsing, scheduling, events, CSV output, process startup,
+and shutdown.
+
+| Workload and policy | No placement optimizations (ms) | Immediate fast path (ms) | Batch seeding (ms) | Scratch reuse (ms) | Boolean fit (ms) | All (ms) | All + coarse filter (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Contended 10K, EASY | 18,717.60 | 18,699.69 | 18,683.34 | 17,448.99 | 16,814.69 | **16,634.36** | 26,187.42 |
+| Contended 10K, HYBRID R32/Q32 | 1,526.48 | 1,524.10 | 1,517.70 | 1,312.84 | 1,525.72 | **1,311.23** | 2,981.35 |
+| Seeded low-load 20K, EASY | 300.90 | 106.66 | 174.66 | 300.11 | 299.99 | 102.14 | **100.63** |
+| Seeded low-load 20K, HYBRID R32/Q32 | 304.21 | 102.13 | 181.30 | 304.25 | 305.47 | 107.71 | **98.20** |
+
+The two workloads expose different limiting work:
+
+- The seeded 20K trace never creates a future reservation. Its untimed
+  diagnostics contain only 20,000 immediate-fit, allocation, and release calls.
+  The immediate fast path cuts whole-process time by about 65%, identifying
+  avoidable planner/timeline setup as the low-load bottleneck. Scratch reuse and
+  boolean fitting have no material effect because their future-query paths do
+  not run.
+- The contended EASY trace performs 116,697,287 immediate-fit checks. Boolean
+  fitting improves the unoptimized run by 10.2%, scratch reuse by 6.8%, and all
+  changes together by 11.1%; immediate setup and batch seeding alone are within
+  0.2%. Repeated exact bitmap fit work, rather than planner construction, is the
+  principal target on this trace.
+- The contended HYBRID trace performs 638,058 earliest-fit searches and 629,028
+  reservation updates. Scratch reuse accounts for essentially all of the 14.1%
+  combined improvement. Repeated future-fit scratch/mask handling and timeline
+  reservation work are therefore the next HYBRID targets.
+- The coarse capacity prefilter does not reduce the recorded exact operation
+  counts. With all other optimizations enabled, it makes the contended EASY run
+  57% slower and the HYBRID run 127% slower. It should remain disabled unless a
+  different workload demonstrates enough rejected exact queries to repay its
+  duplicate accounting cost.
+
+All placement variants produced identical schedule and resource-history hashes
+within each case, and every output passed job, duration, and capacity audits.
+The aggregate-capacity runs are not equality or speedup baselines for placement:
+on the contended trace they make different scheduling decisions.
+
+The study has three measured rounds, and some low-load wall samples contain
+multi-second system-noise outliers even though their CPU samples remain near
+85–355 ms. Medians support the large feature effects above, but not small
+percentage claims. The source tree was dirty because it contained the placement
+integration under test. The
+[curated measurement record](../../validation/performance/simulation/placement-model/integrated-dane-20261112.json)
+retains report hashes, medians, ranges, diagnostics, and binary/input hashes;
+the full local reports remain under `results/dane-20261112/`.
+
+## Start-time prediction performance
+
+The current accuracy study queries an event-driven HYBRID R32/Q64 run with
+2,000 jobs. Its reported cost is summed mean query time divided by the number of
+finite predictions, so methods with different coverage must not be compared as
+if they returned identical results.
+
+| Prediction method | Actual-duration coverage | Actual-duration cost (µs/prediction) | Limit-duration coverage | Limit-duration cost (µs/prediction) |
+| --- | ---: | ---: | ---: | ---: |
+| Cached lookup | 6.13% | **0.138** | 1.58% | 0.420 |
+| Forecast without backfill | 100% | 0.258 | 100% | **0.236** |
+| Cache-first extension | 100% | 0.271 | 100% | 0.254 |
+| Side simulation | 100% | 8.754 | 100% | 6.237 |
+
+Cached lookup is cheapest only because it returns the starts already produced
+by scheduling. Forecast and cache-first provide full coverage at similar cost.
+Side simulation is about 24–34× more expensive per finite prediction than the
+two full-coverage forecast methods because it prepares and runs a checkpoint
+continuation; use that cost only when duration estimates and replay fidelity
+justify it. Accuracy, not cost alone, determines the choice: with execution
+durations equal to time limits, side simulation's own-set MAE is 0.003 minutes,
+versus roughly 112–113 minutes for the inexpensive full-coverage methods.
+
+Historical scale microbenchmarks identify two implementation costs behind the
+cached API:
+
+- Recording planned starts initially increased a 10K-job bounded-HYBRID loop by
+  5.1%. Inlining the recording helper reduced that to about 2.4%; EASY remained
+  indistinguishable from its baseline. Recording inside the hybrid planning
+  loop is therefore measurable, but no longer the dominant whole-run cost.
+- Cached lookup over a 10K-entry queue took 116.61 µs/query while a complete
+  forecast took 843.05 µs/query. Sorting only finite results later reduced the
+  sparse 64-result cached case from 115.61 to 72.93 µs/query and the zero-result
+  case from 91.68 to 45.72 µs/query. The full-coverage case improved only from
+  317.09 to 310.37 µs/query. Scanning is still linear, but sorting unknown
+  entries was the avoidable bottleneck for sparse results.
+
+These measurements were collected on Apple arm64 with different historical
+source snapshots and must not be numerically combined with the Dane placement
+study. See the [cached-start report](https://github.com/LLNL/dr_evt/blob/main/validation/performance/estimated-starts/REPORT.md),
+[query-sort experiment](https://github.com/LLNL/dr_evt/blob/main/validation/performance/estimated-starts/QUERY_SORT_OPTIMIZATION.md),
+and [accuracy/cost methodology](SCHEDULING_PREDICTIONS.md#performance-and-accuracy-comparison)
+for hashes, run counts, prediction errors, and reproduction scope.
 
 ## Reproduce or collect a new profile
 

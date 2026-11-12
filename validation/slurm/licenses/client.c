@@ -25,7 +25,7 @@ struct cached_job {
   int initialized;
   uint32_t state;
   time_t start, end;
-  char nodes[128], licenses[64];
+  char nodes[8192], licenses[64];
 };
 static struct cached_job cached[4096];
 #endif
@@ -38,7 +38,10 @@ static struct cached_job cached[4096];
  */
 int main(int argc, char **argv) {
   slurm_init(argv[1]);
-  char line[256], command[32], node[64];
+  const int placement = getenv("SLURM_VALIDATION_RESOURCE_MODEL") &&
+                        !strcmp(getenv("SLURM_VALIDATION_RESOURCE_MODEL"),
+                                "placement");
+  char line[16384], command[32], node[8192];
   unsigned int value, tokens, minutes;
   while (fgets(line, sizeof(line), stdin)) {
     sscanf(line, "%31s", command);
@@ -90,20 +93,20 @@ int main(int argc, char **argv) {
       }
       puts("{}");
     } else if (!strcmp(command, "SUBMIT")) {
-      sscanf(line, "%*s %u %u %63s", &tokens, &minutes, node);
+      sscanf(line, "%*s %u %u %8191s", &tokens, &minutes, node);
       job_desc_msg_t job;
       resource_allocation_response_msg_t *response = NULL;
       slurm_init_job_desc_msg(&job);
       job.alloc_node = "localhost";
       job.work_dir = "/tmp";
       job.name = node;
-      job.req_nodes = node;
-      job.min_nodes = job.max_nodes = 1;
-      job.num_tasks = job.min_cpus = 1;
+      job.req_nodes = placement ? NULL : node;
+      job.min_nodes = job.max_nodes = placement ? tokens : 1;
+      job.num_tasks = job.min_cpus = placement ? tokens : 1;
       job.time_limit = minutes;
       char licenses[64];
       snprintf(licenses, sizeof(licenses), "capacity:%u", tokens);
-      job.licenses = licenses;
+      job.licenses = placement ? NULL : licenses;
       rc = slurm_allocate_resources(&job, &response);
       if (rc || !response) {
         fprintf(stderr, "submit: %s\n", slurm_strerror(errno));
@@ -112,7 +115,7 @@ int main(int argc, char **argv) {
       printf("{\"id\":%u}\n", response->step_id.job_id);
       slurm_free_resource_allocation_response_msg(response);
     } else if (!strcmp(command, "COMPLETE")) {
-      sscanf(line, "%*s %u %63s", &value, node);
+      sscanf(line, "%*s %u %8191s", &value, node);
       slurm_step_id_t step = SLURM_STEP_ID_INITIALIZER;
       step.job_id = value;
       rc = slurm_complete_job(&step, 0);
@@ -120,17 +123,28 @@ int main(int argc, char **argv) {
         fprintf(stderr, "complete: %s\n", slurm_strerror(errno));
         return 1;
       }
-      epilog_complete_msg_t epilog = {.step_id = step, .node_name = node};
-      slurm_msg_t msg;
-      slurm_msg_t_init(&msg);
-      msg.msg_type = MESSAGE_EPILOG_COMPLETE;
-      msg.data = &epilog;
-      int remote_rc = 0;
-      rc = slurm_send_recv_controller_rc_msg(&msg, &remote_rc, NULL);
-      if (rc || remote_rc) {
-        fprintf(stderr, "epilog completion failed\n");
+      hostlist_t *nodes = slurm_hostlist_create(node);
+      if (!nodes) {
+        fprintf(stderr, "invalid completion node list: %s\n", node);
         return 1;
       }
+      char *member = NULL;
+      while ((member = slurm_hostlist_shift(nodes))) {
+        epilog_complete_msg_t epilog = {.step_id = step, .node_name = member};
+        slurm_msg_t msg;
+        slurm_msg_t_init(&msg);
+        msg.msg_type = MESSAGE_EPILOG_COMPLETE;
+        msg.data = &epilog;
+        int remote_rc = 0;
+        rc = slurm_send_recv_controller_rc_msg(&msg, &remote_rc, NULL);
+        free(member);
+        if (rc || remote_rc) {
+          fprintf(stderr, "epilog completion failed\n");
+          slurm_hostlist_destroy(nodes);
+          return 1;
+        }
+      }
+      slurm_hostlist_destroy(nodes);
       puts("{}");
     } else if (!strcmp(command, "DUMP")) {
 #ifdef VALIDATION_STATE_CACHE
@@ -187,13 +201,17 @@ int main(int argc, char **argv) {
       }
       slurm_free_job_info_msg(response);
 #endif
-      license_info_msg_t *licenses = NULL;
-      rc = slurm_load_licenses(0, &licenses, SHOW_ALL);
-      if (rc || licenses->num_lic != 1)
-        return 1;
-      printf("],\"license_total\":%u,\"license_used\":%u}\n",
-             licenses->lic_array[0].total, licenses->lic_array[0].in_use);
-      slurm_free_license_info_msg(licenses);
+      if (placement) {
+        printf("],\"license_total\":0,\"license_used\":0}\n");
+      } else {
+        license_info_msg_t *licenses = NULL;
+        rc = slurm_load_licenses(0, &licenses, SHOW_ALL);
+        if (rc || licenses->num_lic != 1)
+          return 1;
+        printf("],\"license_total\":%u,\"license_used\":%u}\n",
+               licenses->lic_array[0].total, licenses->lic_array[0].in_use);
+        slurm_free_license_info_msg(licenses);
+      }
     } else
       return 2;
     fflush(stdout);

@@ -158,5 +158,9 @@ explicit recording/counting observers, and delayed-release integration.
 wait-queue benchmark input and add comparisons of capacity and each compiled
 placement strategy. The seeded 20K input is available through an explicit
 `--generate-trace` invocation of `benchmark_placement.py`; it does not replace
-existing benchmark inputs. Whole-simulator results remain to be measured on the
-target platform.
+existing benchmark inputs. The
+[Dane integrated record](placement-model/integrated-dane-20261112.json) measures
+both that low-load input and the existing contended 10K input. The
+[performance page](../../../docs/dev/PERFORMANCE_ANALYSIS.md#integrated-placement-bottlenecks)
+uses their feature ablations and untimed operation counts to identify the
+workload-dependent bottlenecks.

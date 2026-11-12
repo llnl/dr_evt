@@ -57,7 +57,14 @@ queue traversal, reservations, event handling, and identical decision hashes.
 It excludes CSV parsing, initial owning job-record construction, output, and
 final audits. This is a validation harness, not whole-simulator wall time.
 These historical numbers predate CLI/API integration. Whole-simulator placement
-measurements remain pending; these numbers do not measure the integrated simulator.
+measurements are now available in the
+[Dane integrated record](integrated-dane-20261112.json). They confirm the setup
+fast path on the low-load trace, but show that repeated exact fit and reservation
+queries dominate the existing contended 10K trace. See
+[Integrated placement bottlenecks](../../../../docs/dev/PERFORMANCE_ANALYSIS.md#integrated-placement-bottlenecks)
+for the whole-process timings, limitations, and optimization targets. The table
+above remains a focused historical harness and should not be compared directly
+with those end-to-end times.
 
 ## Reproduce
 

@@ -28,7 +28,8 @@ if working_tree:
         names = set(git('ls-files', '-z').decode().split('\0'))
         names.update(git('ls-files', '-z', '--others', '--exclude-standard',
                          '--', 'src', 'tests', 'python',
-                         'validation/flux/placement_driver.cpp').decode().split('\0'))
+                         'validation/flux/placement_driver.cpp',
+                         'validation/placement_comparison.py').decode().split('\0'))
         for name in sorted(names):
             if not name or not (SOURCE / name).is_file():
                 continue
@@ -47,11 +48,16 @@ flags = ['-DCMAKE_BUILD_TYPE=Release', '-DDR_EVT_WITH_SER20=OFF',
          '-DDR_EVT_ENABLE_PROTOBUF=OFF', '-DDR_EVT_ENABLE_GRPC=OFF',
          '-DDR_EVT_LEGACY_RESERVATION_BARRIER=OFF']
 subprocess.run(['cmake', '-S', str(source), '-B', str(build), *flags], check=True)
-subprocess.run(['cmake', '--build', str(build), '--target', 'sim-bin', '-j4'], check=True)
+subprocess.run(['cmake', '--build', str(build), '--target', 'sim-bin',
+                'test_flux_placement_driver-bin', '-j4'], check=True)
 binary = build / 'simulator'
+placement_driver = build / 'test_flux_placement_driver'
 manifest = {'revision': revision, 'tree': git('rev-parse', 'HEAD^{tree}').decode().strip(),
             'working_tree_snapshot': working_tree, 'source_sha256': source_hashes,
             'configure_flags': flags, 'binary': str(binary),
-            'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+            'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+            'placement_driver': str(placement_driver),
+            'placement_driver_sha256': hashlib.sha256(placement_driver.read_bytes()).hexdigest()}
 Path('/results/dr_evt-sources.json').write_text(json.dumps(manifest, indent=2) + '\n')
 Path('/workspace/dr_evt-simulator').write_text(str(binary) + '\n')
+Path('/workspace/dr_evt-placement-driver').write_text(str(placement_driver) + '\n')

@@ -9,6 +9,10 @@ import random
 import subprocess
 import time
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from placement_comparison import audit_schedule, run_dr_evt_placement
+
 
 def dump(path, value):
     path.write_text(json.dumps(value, indent=2) + '\n')
@@ -69,7 +73,8 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
     for filename in ('dedicated_time', 'resource_group'):
         (directory / filename).write_text('')
     native_command = [str(args.native), str(native_input), str(capacity), str(reservations),
-                      str(directory / 'native.csv'), str(directory / 'native-events.csv')]
+                      str(directory / 'native.csv'), str(directory / 'native-events.csv'),
+                      args.resource_model]
     started = time.monotonic()
     with (directory / 'native-stdout.log').open('w') as log:
         subprocess.run(native_command, cwd=directory, stdout=log, stderr=subprocess.STDOUT,
@@ -79,6 +84,13 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
         rows = list(csv.DictReader(stream))
     assert [int(r['job_id']) for r in rows] == list(range(1, len(jobs) + 1))
     native = [[int(r['start']), int(r['end'])] for r in rows]
+    native_nodes = ([sorted(int(node) for node in r['assignment'].split(';'))
+                     for r in rows] if args.resource_model == 'placement' else None)
+    if native_nodes is not None:
+        audit_schedule(jobs, [{'job': index, 'start': interval[0],
+                               'finish': interval[1], 'node_ids': nodes}
+                              for index, (interval, nodes) in
+                              enumerate(zip(native, native_nodes))], capacity)
     dr_input = directory / 'jobs.csv'
     with dr_input.open('w') as stream:
         writer = csv.writer(stream)
@@ -93,30 +105,40 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
                   '--dispatch_interval', '0', '--msec_output',
                   '--outfile', str(directory / 'dr_evt.csv'),
                   '--resource_trace', str(directory / 'dr_evt-resources.csv')]
-    dump(directory / 'commands.json', {'openpbs': native_command, 'dr_evt': dr_command})
-    started = time.monotonic()
-    with (directory / 'dr_evt-stdout.log').open('w') as log:
-        subprocess.run(dr_command, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=900)
-    dr_elapsed = time.monotonic() - started
-    with (directory / 'dr_evt.csv').open() as stream:
-        rows = list(csv.DictReader(stream))
-    assert len(rows) == len(jobs)
-    for row, job in zip(rows, jobs):
-        assert [float(row['job_submit_time']), int(row['num_nodes']), float(row['time_limit'])] == list(job[:3])
-    dr_evt = [[float(r['begin_time']), float(r['end_time'])] for r in rows]
+    dump(directory / 'commands.json', {'openpbs': native_command, 'dr_evt': dr_command,
+                                       'resource_model': args.resource_model})
+    dr_nodes = None
+    if args.resource_model == 'placement':
+        placed, snapshots, dr_elapsed = run_dr_evt_placement(
+            directory / 'dr_evt-placement', jobs, args.placement_driver,
+            capacity, 'hybrid', reservations, args.placement_order)
+        dr_evt = [[row['start'], row['end']] for row in placed]
+        dr_nodes = [row['node_ids'] for row in placed]
+    else:
+        started = time.monotonic()
+        with (directory / 'dr_evt-stdout.log').open('w') as log:
+            subprocess.run(dr_command, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=900)
+        dr_elapsed = time.monotonic() - started
+        with (directory / 'dr_evt.csv').open() as stream:
+            rows = list(csv.DictReader(stream))
+        assert len(rows) == len(jobs)
+        for row, job in zip(rows, jobs):
+            assert [float(row['job_submit_time']), int(row['num_nodes']), float(row['time_limit'])] == list(job[:3])
+        dr_evt = [[float(r['begin_time']), float(r['end_time'])] for r in rows]
     native_profile = audit(jobs, native, capacity)
     dr_profile = audit(jobs, dr_evt, capacity)
-    with (directory / 'dr_evt-resources.csv').open() as stream:
-        dr_snapshots = {}
-        for row in csv.DictReader(stream):
-            timestamp, used = float(row['time']), int(row['allocated_nodes'])
-            assert used + int(row['free_nodes']) == capacity
-            dr_snapshots[timestamp] = used
-    dr_observed = []
-    for timestamp, used in sorted(dr_snapshots.items()):
-        if not dr_observed or used != dr_observed[-1][1]:
-            dr_observed.append([timestamp, used])
-    assert dr_observed == dr_profile
+    if args.resource_model == 'capacity':
+        with (directory / 'dr_evt-resources.csv').open() as stream:
+            dr_snapshots = {}
+            for row in csv.DictReader(stream):
+                timestamp, used = float(row['time']), int(row['allocated_nodes'])
+                assert used + int(row['free_nodes']) == capacity
+                dr_snapshots[timestamp] = used
+        dr_observed = []
+        for timestamp, used in sorted(dr_snapshots.items()):
+            if not dr_observed or used != dr_observed[-1][1]:
+                dr_observed.append([timestamp, used])
+        assert dr_observed == dr_profile
     # Verify adapter observations independently of the reconstructed schedule.
     active, snapshots = {}, {}
     with (directory / 'native-events.csv').open() as stream:
@@ -145,7 +167,12 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
         assert [s[0] for s in native] == expected, (name, native, expected)
     differences = [{'job_id': i + 1, 'openpbs': n, 'dr_evt': d}
                    for i, (n, d) in enumerate(zip(native, dr_evt)) if n != d]
+    allocation_differences = ([] if native_nodes is None else
+        [{'job_id': i + 1, 'openpbs': native_node, 'dr_evt': dr_node}
+         for i, (native_node, dr_node) in enumerate(zip(native_nodes, dr_nodes))
+         if native_node != dr_node])
     report = {'name': name, 'jobs': len(jobs), 'capacity': capacity,
+              'resource_model': args.resource_model,
               'priority_policy': args.priority_policy,
               'reservation_depth': reservations, 'exact_match': not differences,
               'different_jobs': len(differences), 'differences': differences,
@@ -154,7 +181,13 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
               'openpbs_metrics': metrics(jobs, native, capacity),
               'dr_evt_metrics': metrics(jobs, dr_evt, capacity),
               'openpbs_wall_seconds': native_elapsed, 'dr_evt_wall_seconds': dr_elapsed,
-              'capacity_and_ownership_audit_passed': True}
+              'capacity_and_ownership_audit_passed': True,
+              'exact_allocation_match': not allocation_differences,
+              'different_allocations': len(allocation_differences),
+              'allocation_differences': allocation_differences}
+    if native_nodes is not None:
+        report['openpbs_node_ids'] = native_nodes
+        report['dr_evt_node_ids'] = dr_nodes
     dump(directory / 'report.json', report)
     print(f'{name}: {len(jobs)} jobs, {len(differences)} differ', flush=True)
     return report
@@ -183,10 +216,16 @@ def main():
     parser.add_argument('--max-jobs', type=int, default=2000)
     parser.add_argument('--priority_policy', choices=('fcfs', 'fcfs_1s_evt_group'), default='fcfs_1s_evt_group',
                         help='Original FCFS or the opt-in OpenPBS forecast policy')
+    parser.add_argument('--resource-model', choices=('capacity', 'placement'), default='capacity')
+    parser.add_argument('--placement-driver', type=Path,
+                        help='Main-simulator exact-placement driver (required for placement)')
+    parser.add_argument('--placement-order', choices=('low', 'high'), default='low')
     parser.add_argument('--outdir', type=Path, required=True)
     args = parser.parse_args()
     if args.max_jobs < 0:
         parser.error('--max-jobs must be nonnegative')
+    if args.resource_model == 'placement' and not args.placement_driver:
+        parser.error('--placement-driver is required with --resource-model placement')
     args.outdir = args.outdir.resolve()
     args.outdir.mkdir(parents=True, exist_ok=True)
     cases = [
@@ -205,18 +244,21 @@ def main():
                        for _ in range(30)])
         jobs = [(a, n, limit, rng.randrange(1, limit + 1)) for a, n, limit in jobs]
         reports.append(experiment(args, f'random-{index:02d}', jobs, 8, (1, 2, 32)[index % 3]))
-    assert all(r['exact_match'] for r in reports), 'A matching control changed'
+    if args.resource_model == 'capacity':
+        assert all(r['exact_match'] for r in reports), 'A matching control changed'
     adjacent = [(0, 1, 10, 10), (0, 1, 11, 11), (0, 2, 2, 2), (0, 1, 11, 11)]
     diagnostic = experiment(args, 'adjacent-release-calendar', adjacent, 3, 1, [0, 0, 11, 0])
     mimic = args.priority_policy == 'fcfs_1s_evt_group'
-    assert [s[0] for s in diagnostic['dr_evt_schedule']] == (
-        [0, 0, 11, 0] if mimic else [0, 0, 10, 11])
+    if args.resource_model == 'capacity':
+        assert [s[0] for s in diagnostic['dr_evt_schedule']] == (
+            [0, 0, 11, 0] if mimic else [0, 0, 10, 11])
     diagnostic['expected_difference'] = not mimic
     dump(args.outdir / diagnostic['name'] / 'report.json', diagnostic)
     reports.append(diagnostic)
     separated = [(0, 1, 10, 10), (0, 1, 12, 12), (0, 2, 2, 2), (0, 1, 12, 12)]
     spacing = experiment(args, 'separated-release-calendar', separated, 3, 1, [0, 0, 10, 12])
-    assert spacing['exact_match']
+    if args.resource_model == 'capacity':
+        assert spacing['exact_match']
     reports.append(spacing)
     if args.trace is not None:
         jobs = lassen(args.trace, args.max_jobs)
@@ -227,15 +269,18 @@ def main():
             'initial_state': 'empty', 'capacity': 756})
         name = f'lassen-prefix{len(jobs)}-r32'
         reports.append(experiment(args, name, jobs, 756, 32))
-        if mimic:
+        if mimic and args.resource_model == 'capacity':
             assert reports[-1]['exact_match'], 'OpenPBS forecast policy differs from native'
         from plot import plot
         plot(args.outdir / name / 'report.json')
         from diagnose import diagnose
         if not reports[-1]['exact_match']:
             diagnose(args.outdir / name / 'report.json')
-    summary = [{k: r[k] for k in ('name', 'jobs', 'exact_match', 'different_jobs',
-                                'capacity_and_ownership_audit_passed', 'openpbs_metrics', 'dr_evt_metrics')}
+    summary = [{k: r[k] for k in ('name', 'jobs', 'resource_model', 'exact_match',
+                                'different_jobs', 'exact_allocation_match',
+                                'different_allocations',
+                                'capacity_and_ownership_audit_passed',
+                                'openpbs_metrics', 'dr_evt_metrics')}
                for r in reports]
     dump(args.outdir / 'summary.json', summary)
     # The primary trace records measured differences. Matching controls and the

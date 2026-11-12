@@ -20,6 +20,7 @@ exec docker run --rm --hostname localhost \
      python3 /dr_evt_source/validation/slurm/licenses/audit_event.py /results/controls &&
      python3 /dr_evt_source/validation/slurm/licenses/event_trace.py --batch-main-dispatch --outdir /results/paired --trace /dr_evt_source/lassen_traces/lassen-756-01.csv &&
      python3 /dr_evt_source/validation/slurm/licenses/audit_event.py /results/paired/lassen-prefix2000-hybrid-r32-q64 &&
+     python3 /dr_evt_source/validation/slurm/licenses/event_trace.py --batch-main-dispatch --resource-model placement --outdir /results/placement --trace /dr_evt_source/lassen_traces/lassen-756-01.csv &&
      python3 /dr_evt_source/validation/slurm/licenses/event_trace.py --batch-main-dispatch --bf-licenses off --outdir /results/paired-license-off --trace /dr_evt_source/lassen_traces/lassen-756-01.csv &&
      python3 /dr_evt_source/validation/slurm/licenses/audit_event.py /results/paired-license-off/lassen-prefix2000-hybrid-r32-q64 &&
      python3 /dr_evt_source/validation/slurm/licenses/summarize_licenses.py /results/paired/lassen-prefix2000-hybrid-r32-q64 /results/paired-license-off/lassen-prefix2000-hybrid-r32-q64 /results'

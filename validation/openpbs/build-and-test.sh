@@ -29,4 +29,12 @@ python3 /dr_evt_source/validation/openpbs/compare.py \
     --native /workspace/openpbs-reference \
     --simulator "$(cat /workspace/dr_evt-simulator)" \
     --trace /dr_evt_source/lassen_traces/lassen-756-01.csv \
-    --max-jobs "${OPENPBS_VALIDATION_MAX_JOBS:-2000}" --outdir /results "$@"
+    --max-jobs "${OPENPBS_VALIDATION_MAX_JOBS:-2000}" \
+    --resource-model capacity --outdir /results/capacity "$@"
+python3 /dr_evt_source/validation/openpbs/compare.py \
+    --native /workspace/openpbs-reference \
+    --simulator "$(cat /workspace/dr_evt-simulator)" \
+    --placement-driver "$(cat /workspace/dr_evt-placement-driver)" \
+    --trace /dr_evt_source/lassen_traces/lassen-756-01.csv \
+    --max-jobs "${OPENPBS_VALIDATION_MAX_JOBS:-2000}" \
+    --resource-model placement --outdir /results/placement "$@"

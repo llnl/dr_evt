@@ -75,7 +75,7 @@ struct System_Spec {
   num_nodes_t capacity; ///< Schedulable node count.
 };
 
-/** @brief Parse a systems table (`#machine,size[,...]`, '#' lines ignored).
+/** @brief Parse a systems table with a machine,size header and comment lines.
  * @param[in] filename Path of the table.
  * @return Systems in file order.
  * @throws std::runtime_error when the file cannot be read or is malformed. */

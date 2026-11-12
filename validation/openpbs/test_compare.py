@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from compare import audit, lassen
+from compare import audit, audit_schedule, lassen
 from diagnose import feasible
 
 
@@ -38,6 +38,19 @@ class ValidationAuditTests(unittest.TestCase):
                             '100.2,101,104.1,4,2\n')
             self.assertEqual(lassen(path, 0), [(0, 3, 1, 1), (1, 2, 6, 2), (1, 4, 4, 4)])
             self.assertEqual(lassen(path, 2), [(0, 3, 1, 1), (1, 2, 6, 2)])
+
+    def test_exact_placement_audit_rejects_overlap_and_wrong_count(self):
+        jobs = [(0, 2, 10, 10), (0, 1, 20, 20)]
+        valid = [{'job': 0, 'start': 0, 'finish': 10, 'node_ids': [0, 1]},
+                 {'job': 1, 'start': 0, 'finish': 20, 'node_ids': [2]}]
+        self.assertEqual([row['node_ids'] for row in audit_schedule(jobs, valid, 3)],
+                         [[0, 1], [2]])
+        invalid = [dict(valid[0]), dict(valid[1], node_ids=[1])]
+        with self.assertRaises(AssertionError):
+            audit_schedule(jobs, invalid, 3)
+        invalid = [dict(valid[0], node_ids=[0]), valid[1]]
+        with self.assertRaises(AssertionError):
+            audit_schedule(jobs, invalid, 3)
 
 
 if __name__ == '__main__':

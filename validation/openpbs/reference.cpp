@@ -4,7 +4,9 @@
  *
  * Linker wrappers emulate server I/O, job execution, and time. Native job
  * selection, vnode placement, and future-capacity planning remain unchanged.
- * Each job owns a private vnode and consumes units from a shared server pool.
+ * Capacity mode gives each job a private vnode and charges a shared server
+ * resource. Placement mode instead requests exclusive nodes from one shared
+ * homogeneous vnode pool and records the native identities selected.
  * The input CSV contains id, arrival, units, actual duration, and time limit;
  * times are integer seconds relative to the replay's fixed epoch.
  */
@@ -47,6 +49,7 @@ static long now =
 static long epoch = 1700000000; ///< Absolute origin for relative input times.
 static long capacity;           ///< Total server-wide capacity.
 static int protection;          ///< Native backfill protection depth.
+static bool placement_mode;     ///< Select shared exact-node resources.
 static std::ofstream
     events; ///< Launch, completion, forecast, and capacity log.
 
@@ -54,12 +57,49 @@ static std::ofstream
 static std::string vnode(const InputJob &job) {
   return "private" + std::to_string(job.id);
 }
+/** @brief Name a shared physical vnode.
+ * @param[in] id Zero-based node identity.
+ * @return Stable native vnode name. */
+static std::string physical_vnode(long id) {
+  std::ostringstream name;
+  name << "node";
+  name.width(4);
+  name.fill('0');
+  name << id;
+  return name.str();
+}
 /** @brief Construct a native PBS identifier. @param job Input job. */
 static std::string jobid(const InputJob &job) {
   return std::to_string(job.id) + ".validation";
 }
 /** @brief Check live occupancy. @param job Job whose state is examined. */
 static bool running(const InputJob &job) { return job.start >= 0 && !job.done; }
+/** @brief Test whether an exec_vnode expression owns a named vnode.
+ * @param[in] assignment Native exec_vnode expression.
+ * @param[in] name Exact vnode name.
+ * @return True when one parenthesized chunk names @p name. */
+static bool owns_vnode(const std::string &assignment, const std::string &name) {
+  return assignment.find("(" + name + ":") != std::string::npos;
+}
+/** @brief Extract sorted physical node identities from exec_vnode.
+ * @param[in] assignment Native exec_vnode expression.
+ * @return Zero-based identities; private vnode names are rejected.
+ * @throws std::runtime_error if a chunk is malformed or not physical. */
+static std::vector<long> placement_ids(const std::string &assignment) {
+  std::vector<long> result;
+  size_t cursor = 0;
+  while ((cursor = assignment.find('(', cursor)) != std::string::npos) {
+    const auto colon = assignment.find(':', ++cursor);
+    if (colon == std::string::npos || assignment.compare(cursor, 4, "node"))
+      throw std::runtime_error("malformed physical exec_vnode: " + assignment);
+    result.push_back(std::stol(assignment.substr(cursor + 4, colon - cursor - 4)));
+    cursor = colon;
+  }
+  std::sort(result.begin(), result.end());
+  if (std::adjacent_find(result.begin(), result.end()) != result.end())
+    throw std::runtime_error("duplicate physical vnode in assignment");
+  return result;
+}
 /** @brief Sum capacity consumed by all currently running jobs. */
 static long allocated() {
   long used = 0;
@@ -111,8 +151,10 @@ extern "C" time_t __wrap_time(time_t *out) {
  */
 extern "C" batch_status *__wrap_pbs_statserver(int, attrl *, const char *) {
   auto *s = object("validation");
-  attr(s, ATTR_rescavail, std::to_string(capacity), "capacity");
-  attr(s, ATTR_rescassn, std::to_string(allocated()), "capacity");
+  if (!placement_mode) {
+    attr(s, ATTR_rescavail, std::to_string(capacity), "capacity");
+    attr(s, ATTR_rescassn, std::to_string(allocated()), "capacity");
+  }
   attr(s, ATTR_backfill_depth, std::to_string(protection));
   return s;
 }
@@ -125,11 +167,39 @@ extern "C" batch_status *__wrap_pbs_statque(int, const char *, attrl *,
   attr(q, ATTR_start, "True");
   return q;
 }
-/** @brief Supply private vnodes for arrived jobs that have not completed. */
+/** @brief Supply either private capacity-control vnodes or shared physical vnodes. */
 extern "C" batch_status *__wrap_pbs_statvnode(int, const char *, attrl *,
                                               const char *) {
   batch_status *head = nullptr;
   auto **tail = &head;
+  if (placement_mode) {
+    for (long id = 0; id < capacity; ++id) {
+      const auto name = physical_vnode(id);
+      const InputJob *owner = nullptr;
+      for (const auto &job : jobs)
+        if (running(job) && owns_vnode(job.assignment, name)) {
+          if (owner)
+            throw std::runtime_error("physical vnode has multiple owners");
+          owner = &job;
+        }
+      auto *n = object(name);
+      attr(n, ATTR_NODE_state, "free");
+      attr(n, ATTR_NODE_Mom, name);
+      attr(n, ATTR_NODE_ntype, "PBS");
+      attr(n, ATTR_NODE_Sharing, "default_excl");
+      attr(n, ATTR_NODE_License, "l");
+      attr(n, ATTR_rescavail, "1", "ncpus");
+      attr(n, ATTR_rescavail, "1gb", "mem");
+      attr(n, ATTR_rescavail, name, "host");
+      attr(n, ATTR_rescavail, name, "vnode");
+      attr(n, ATTR_rescavail, "linux", "arch");
+      attr(n, ATTR_rescassn, owner ? "1" : "0", "ncpus");
+      if (owner)
+        attr(n, ATTR_NODE_jobs, jobid(*owner));
+      append(tail, n);
+    }
+    return head;
+  }
   for (const auto &job : jobs) {
     // Future/finished private vnodes cannot serve any other job. Register
     // them with arrival and retire them after completion to bound snapshots.
@@ -171,12 +241,16 @@ extern "C" batch_status *__wrap_pbs_selstat(int, attropl *, attrl *,
     attr(j, ATTR_egroup, "validation");
     attr(j, ATTR_qrank, std::to_string(job.id));
     attr(j, ATTR_etime, std::to_string(epoch + job.submit));
-    attr(j, ATTR_SchedSelect, "1:ncpus=1:vnode=" + vnode(job));
-    attr(j, ATTR_l, "1:ncpus=1:vnode=" + vnode(job), "select");
-    attr(j, ATTR_l, "free", "place");
-    attr(j, ATTR_l, "1", "ncpus");
+    const auto select = placement_mode
+                            ? std::to_string(job.units) + ":ncpus=1"
+                            : "1:ncpus=1:vnode=" + vnode(job);
+    attr(j, ATTR_SchedSelect, select);
+    attr(j, ATTR_l, select, "select");
+    attr(j, ATTR_l, placement_mode ? "scatter:excl" : "free", "place");
+    attr(j, ATTR_l, std::to_string(placement_mode ? job.units : 1), "ncpus");
     attr(j, ATTR_l, std::to_string(job.limit), "walltime");
-    attr(j, ATTR_l, std::to_string(job.units), "capacity");
+    if (!placement_mode)
+      attr(j, ATTR_l, std::to_string(job.units), "capacity");
     if (running(job)) {
       attr(j, ATTR_stime, std::to_string(epoch + job.start));
       attr(j, ATTR_execvnode, job.assignment);
@@ -213,10 +287,12 @@ extern "C" batch_status *__wrap_pbs_statrsc(int, const char *, attrl *,
     attr(r, ATTR_RESC_FLAG, std::to_string(definition.flags));
     append(tail, r);
   }
-  auto *r = object("capacity");
-  attr(r, ATTR_RESC_TYPE, std::to_string(ATR_TYPE_LONG));
-  attr(r, ATTR_RESC_FLAG, std::to_string(ATR_DFLAG_RASSN));
-  append(tail, r);
+  if (!placement_mode) {
+    auto *r = object("capacity");
+    attr(r, ATTR_RESC_TYPE, std::to_string(ATR_TYPE_LONG));
+    attr(r, ATTR_RESC_FLAG, std::to_string(ATR_DFLAG_RASSN));
+    append(tail, r);
+  }
   return head;
 }
 /**
@@ -236,9 +312,20 @@ extern "C" int __wrap_pbs_asyrunjob(int, const char *id, const char *exec,
           allocated() + job.units > capacity)
         throw std::runtime_error("invalid or over-capacity native launch");
       job.assignment = exec;
-      if (job.assignment != "(" + vnode(job) + ":ncpus=1)")
+      if (placement_mode) {
+        const auto ids = placement_ids(job.assignment);
+        if (ids.size() != static_cast<size_t>(job.units) ||
+            (!ids.empty() && ids.back() >= capacity))
+          throw std::runtime_error("native launch has invalid physical vnode count");
+        for (const auto &other : jobs)
+          if (&other != &job && running(other))
+            for (auto node : ids)
+              if (owns_vnode(other.assignment, physical_vnode(node)))
+                throw std::runtime_error("native launch overlaps a live allocation");
+      } else if (job.assignment != "(" + vnode(job) + ":ncpus=1)") {
         throw std::runtime_error(
             "native launch did not use its private vnode: " + job.assignment);
+      }
       job.start = now - epoch;
       events << "start," << now - epoch << ',' << job.id << ',' << allocated()
              << '\n';
@@ -271,9 +358,9 @@ extern "C" int __wrap__Z19get_sched_cmd_noblkiP9sched_cmd(int, sched_cmd *) {
 /**
  * @brief Replay arrivals and actual completions through native scheduling
  * cycles.
- * @param argc Must be six, including the executable name.
+ * @param argc Must be seven, including the executable name.
  * @param argv Executable, input CSV, total capacity, protection depth, schedule
- *             output CSV, and event output CSV.
+ *             output CSV, event output CSV, and capacity|placement mode.
  * @return Zero after all jobs complete; one after a reported validation error.
  *
  * All arrivals and completions at one timestamp precede its scheduling cycle.
@@ -282,11 +369,15 @@ extern "C" int __wrap__Z19get_sched_cmd_noblkiP9sched_cmd(int, sched_cmd *) {
  */
 int main(int argc, char **argv) {
   try {
-    if (argc != 6)
+    if (argc != 7)
       throw std::runtime_error(
-          "usage: reference input capacity R output events");
+          "usage: reference input capacity R output events capacity|placement");
     capacity = std::stol(argv[2]);
     protection = std::stoi(argv[3]);
+    const std::string resource_model = argv[6];
+    if (resource_model != "capacity" && resource_model != "placement")
+      throw std::runtime_error("resource model must be capacity or placement");
+    placement_mode = resource_model == "placement";
     std::ifstream input(argv[1]);
     if (!input)
       throw std::runtime_error("cannot open input");
@@ -361,10 +452,17 @@ int main(int argc, char **argv) {
       now = next;
     }
     std::ofstream output(argv[4]);
-    output << "job_id,start,end\n";
-    for (const auto &job : jobs)
+    output << "job_id,start,end,assignment\n";
+    for (const auto &job : jobs) {
       output << job.id << ',' << job.start << ',' << job.start + job.duration
-             << '\n';
+             << ',';
+      if (placement_mode) {
+        const auto ids = placement_ids(job.assignment);
+        for (size_t i = 0; i < ids.size(); ++i)
+          output << (i ? ";" : "") << ids[i];
+      }
+      output << '\n';
+    }
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

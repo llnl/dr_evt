@@ -13,6 +13,8 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from compare import load_lassen, metrics, profile, run_dr_evt
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from placement_comparison import audit_schedule, run_dr_evt_placement
 
 PREFIX = Path('/workspace/slurm-modern-install')
 EVENT = Path('/workspace/slurm-event')
@@ -20,7 +22,36 @@ CLIENT = EVENT / ('client_state' if os.environ.get('SLURM_LICENSE_STATE_ONLY') =
 EPOCH = 1597836579
 
 
-def run_case(directory, jobs, capacity, enabled=True, batch_main_dispatch=False):
+def expand_nodes(expression):
+    """Expand the n0001/n[0001-0003,0005] forms used by this harness."""
+    import re
+    if not expression:
+        return []
+    if '[' not in expression:
+        match = re.fullmatch(r'n(\d+)', expression)
+        if not match:
+            raise ValueError('unexpected Slurm node list: ' + expression)
+        return [int(match.group(1))]
+    match = re.fullmatch(r'n\[([^]]+)\]', expression)
+    if not match:
+        raise ValueError('unexpected Slurm node list: ' + expression)
+    result = []
+    for part in match.group(1).split(','):
+        if '-' in part:
+            first, last = map(int, part.split('-', 1))
+            if first > last:
+                raise ValueError('reversed Slurm node range: ' + part)
+            result.extend(range(first, last + 1))
+        else:
+            result.append(int(part))
+    result.sort()
+    if len(result) != len(set(result)):
+        raise ValueError('duplicate Slurm node in list: ' + expression)
+    return result
+
+
+def run_case(directory, jobs, capacity, enabled=True, batch_main_dispatch=False,
+             resource_model='capacity'):
     """Run native scheduling with independently controlled license planning and batching.
 
     batch_main_dispatch defers submission-time allocation and gates main dispatch
@@ -44,6 +75,11 @@ def run_case(directory, jobs, capacity, enabled=True, batch_main_dispatch=False)
         # Queue submissions until the complete equal-time event batch is applied.
         params += ',defer'
     config = directory / 'slurm.conf'
+    placement = resource_model == 'placement'
+    if resource_model not in ('capacity', 'placement'):
+        raise ValueError('resource model must be capacity or placement')
+    licenses = '' if placement else f'Licenses=capacity:{capacity}\n'
+    node_count = capacity if placement else len(jobs)
     config.write_text(f'''ClusterName=licenseevents
 SlurmctldHost=localhost
 SlurmctldPort=17900
@@ -73,8 +109,7 @@ SlurmdTimeout=0
 SlurmctldTimeout=0
 MessageTimeout=10
 MailProg=/bin/true
-Licenses=capacity:{capacity}
-NodeName=n[0000-{len(jobs)-1:04d}] NodeHostname=localhost NodeAddr=127.0.0.1 Port=18000 CPUs=1 RealMemory=128 State=IDLE
+{licenses}NodeName=n[0000-{node_count-1:04d}] NodeHostname=localhost NodeAddr=127.0.0.1 Port=18000 CPUs=1 RealMemory=128 State=IDLE
 PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscribe=EXCLUSIVE
 ''')
     with (directory / 'jobs.csv').open('w') as stream:
@@ -98,6 +133,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
         if source.exists():
             shutil.copyfile(source, directory / name)
     manifest = {'scheduler': 'Slurm 26.11.0-0rc2, select/cons_tres',
+                'resource_model': resource_model,
                 'bf_licenses': enabled,
                 'clock': 'virtual integer seconds; monotonic/RPC time remains real',
                 'compute_adapter': 'native allocation requests, node registration, '
@@ -108,8 +144,10 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                                   for path in (PREFIX / 'sbin/slurmctld', EVENT / 'sched_backfill.so',
                                                CLIENT, EVENT / 'libvalidation_clock.so')},
                 'observer': 'job-state RPC with details on transitions' if CLIENT.name == 'client_state' else 'full job-info RPC'}
-    manifest['dr_evt_scheduler'] = ('FCFSPeriodicHybridCircularScheduler' if enabled
-                                  else 'FCFSPeriodicNoReservationCircularScheduler')
+    manifest['dr_evt_scheduler'] = (
+        'Simulation exact-placement hybrid scheduler' if placement else
+        ('FCFSPeriodicHybridCircularScheduler' if enabled
+         else 'FCFSPeriodicNoReservationCircularScheduler'))
     manifest['diagnostic_no_reservations'] = not enabled
     manifest['main_dispatch_acknowledgement'] = batch_main_dispatch
     manifest['same_time_clock_monotonic'] = True
@@ -118,6 +156,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
     (directory / 'provenance.json').write_text(json.dumps(manifest, indent=2) + '\n')
     env = dict(os.environ, SLURM_CONF=str(config), SLURM_VALIDATION_CLOCK_FILE=str(clock_file),
                LD_PRELOAD=str(EVENT / 'libvalidation_clock.so'),
+               SLURM_VALIDATION_RESOURCE_MODEL=resource_model,
                SLURM_VALIDATION_BATCH_DISPATCH='1' if batch_main_dispatch else '0')
     log = (directory / 'daemon.log').open('w')
     started = time.monotonic()
@@ -151,7 +190,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
         command(f'TIME {EPOCH}')
         time.sleep(1)
         # Register each virtual node through the same RPC as a compute daemon.
-        for index in range(len(jobs)):
+        for index in range(node_count):
             command(f'REGISTER n{index:04d}')
         command('RELEASE')
 
@@ -166,12 +205,12 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
             state_changed = False
             for index, row in list(schedule.items()):
                 if index not in completed and row['end'] == now:
-                    command(f'COMPLETE {ids[index]} n{index:04d}')
+                    command(f'COMPLETE {ids[index]} {row["assignment"]}')
                     completed.add(index)
                     state_changed = True
             while cursor < len(jobs) and jobs[cursor][0] <= now:
                 _, tokens, limit, _ = jobs[cursor]
-                ids[cursor] = command(f'SUBMIT {tokens} {limit // 60} n{cursor:04d}')['id']
+                ids[cursor] = command(f'SUBMIT {tokens} {limit // 60} job{cursor:04d}')['id']
                 cursor += 1
                 state_changed = True
             command('RELEASE')
@@ -201,9 +240,10 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                 assert state in (0, 1, 3), row  # pending, running, completed
                 if state == 1:
                     allocated += jobs[index][1]
-                    assert row['assignment'] == f'n{index:04d}'
-                    assert row['assignment'] not in owned_nodes
-                    owned_nodes.add(row['assignment'])
+                    assigned = expand_nodes(row['assignment']) if placement else [index]
+                    assert len(assigned) == jobs[index][1] if placement else row['assignment'] == f'n{index:04d}'
+                    assert not owned_nodes.intersection(assigned)
+                    owned_nodes.update(assigned)
                     if index not in schedule:
                         begin = row['start'] - EPOCH
                         assert begin == now, (now, row)
@@ -212,8 +252,11 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                 if index in completed:
                     assert state == 3 and row['end'] == EPOCH + schedule[index]['end'], row
             assert allocated <= capacity
-            assert snapshot['license_total'] == capacity and snapshot['license_used'] == allocated
-            if not enabled:
+            if placement:
+                assert snapshot['license_total'] == snapshot['license_used'] == 0
+            else:
+                assert snapshot['license_total'] == capacity and snapshot['license_used'] == allocated
+            if not enabled and not placement:
                 assert not any(row['state'] & 255 == 0 and
                                int(row['licenses'].split(':')[1]) <= capacity - allocated
                                for row in snapshot['jobs']), ('Fitting job left waiting after dispatch', now)
@@ -243,10 +286,16 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
         snapshot_stream.close()
         native_elapsed = time.monotonic() - started
         native = [schedule[i] for i in range(len(jobs))]
-        dr, dr_elapsed = run_dr_evt(directory / 'dr_evt', jobs,
-                                    Path('/workspace/dr_evt-simulator').read_text().strip(),
-                                    capacity, 30, 32, 64, 1, 259200,
-                                    diagnostic_no_reservations=not enabled)
+        if placement:
+            dr, _, dr_elapsed = run_dr_evt_placement(
+                directory / 'dr_evt', jobs,
+                Path('/workspace/dr_evt-placement-driver').read_text().strip(),
+                capacity, 'hybrid', 32, 'low')
+        else:
+            dr, dr_elapsed = run_dr_evt(directory / 'dr_evt', jobs,
+                                        Path('/workspace/dr_evt-simulator').read_text().strip(),
+                                        capacity, 30, 32, 64, 1, 259200,
+                                        diagnostic_no_reservations=not enabled)
         protected_control = None
         if not enabled and len(jobs) > 4:
             protected, protected_elapsed = run_dr_evt(
@@ -257,21 +306,44 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                 'label': 'DR_EVT (protected control)', 'schedule': protected,
                 'metrics': metrics(jobs, protected, capacity, protected_elapsed),
                 'different_start_times': sum(a['start'] != b['start'] for a, b in zip(native, protected))}
-        report = {'jobs': jobs, 'capacity': capacity, 'slurm_schedule': native, 'dr_evt_schedule': dr,
-                  'slurm_label': f'Slurm (license pool, bf_licenses {"on" if enabled else "off"})',
+        allocation_differences = []
+        if placement:
+            native_allocations = [expand_nodes(row['assignment']) for row in native]
+            audit_schedule(jobs, [{'job': i, 'start': row['start'], 'finish': row['end'],
+                                   'node_ids': nodes}
+                                  for i, (row, nodes) in enumerate(zip(native, native_allocations))],
+                           capacity)
+            allocation_differences = [
+                {'job_id': i + 1, 'slurm': native_nodes, 'dr_evt': dr_row['node_ids']}
+                for i, (native_nodes, dr_row) in enumerate(zip(native_allocations, dr))
+                if native_nodes != dr_row['node_ids']]
+        report = {'jobs': jobs, 'capacity': capacity, 'resource_model': resource_model,
+                  'slurm_schedule': native, 'dr_evt_schedule': dr,
+                  'slurm_label': ('Slurm (exclusive whole-node placement)' if placement else
+                                  f'Slurm (license pool, bf_licenses {"on" if enabled else "off"})'),
                   'capacity_label': 'node equivalents',
                   'dr_evt_label': 'DR_EVT (protected)' if enabled else 'DR_EVT (no-reservation diagnostic)',
                   'diagnostic_no_reservations': not enabled,
                   'batch_main_dispatch': batch_main_dispatch,
                   'main_dispatch_acknowledgement': batch_main_dispatch,
-                  'reservation_depth': 32, 'backfill_queue_depth': 64, 'backfill_interval_seconds': 30,
+                  'reservation_depth': 32,
+                  'backfill_queue_depth': None if placement else 64,
+                  'backfill_interval_seconds': 0 if placement else 30,
+                  'comparison_loop_note': ('DR_EVT placement is event-driven with unlimited examination; '
+                                           'native Slurm retains periodic backfill' if placement else None),
                   'plot_note': 'Native scheduling; trace-driven virtual time and completion RPCs',
                   'bf_licenses': enabled, 'resource_curves': {'slurm': profile(native), 'dr_evt': profile(dr)},
                   'slurm_metrics': metrics(jobs, native, capacity, native_elapsed),
                   'dr_evt_metrics': metrics(jobs, dr, capacity, dr_elapsed),
                   'different_start_times': sum(a['start'] != b['start'] for a, b in zip(native, dr)),
-                  'audits': {'runtime_and_capacity': 'passed', 'private_node_assignments': 'passed',
-                             'completed_jobs': len(completed), 'snapshots': frames},
+                  'exact_allocation_match': not allocation_differences,
+                  'different_allocations': len(allocation_differences),
+                  'allocation_differences': allocation_differences,
+                  'audits': {
+                      'runtime_and_capacity': 'passed',
+                      'private_node_assignments': 'not_applicable' if placement else 'passed',
+                      'exact_node_ownership': 'passed' if placement else 'not_applicable',
+                      'completed_jobs': len(completed), 'snapshots': frames},
                   'clock': ('integer virtual seconds; main dispatch and backfill gated during equal-time RPC batches'
                             if batch_main_dispatch else 'integer virtual seconds; main dispatch may run between RPCs')}
         if protected_control is not None:
@@ -327,6 +399,7 @@ def main():
                         help='Defer submissions and gate main dispatch until the equal-time RPC batch is complete')
     parser.add_argument('--bf-licenses', choices=('on', 'off'), default='on',
                         help='License reservation planning for the Lassen run; controls exercise both settings')
+    parser.add_argument('--resource-model', choices=('capacity', 'placement'), default='capacity')
     args = parser.parse_args()
     if args.trace:
         jobs, provenance = load_lassen(args.trace, 2000, 756)
@@ -334,7 +407,8 @@ def main():
         directory.mkdir(parents=True, exist_ok=True)
         (directory / 'workload.json').write_text(json.dumps(provenance, indent=2) + '\n')
         report = run_case(directory, jobs, 756, enabled=args.bf_licenses == 'on',
-                          batch_main_dispatch=args.batch_main_dispatch)
+                          batch_main_dispatch=args.batch_main_dispatch,
+                          resource_model=args.resource_model)
     else:
         cases = [
             ('four-job-pooled', [(0, 2, 120, 120), (0, 2, 180, 180),
