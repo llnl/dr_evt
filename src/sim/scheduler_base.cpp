@@ -228,7 +228,16 @@ public:
   ObservedPassScheduler(ResourceDiagnostics &diagnostics, Args &&...args)
       : FCFSPassHybridCircularScheduler(std::forward<Args>(args)...),
         m_diagnostics(diagnostics) {}
-  /** @copydoc SchedulerBase::schedule */
+  /**
+   * @brief Run placement passes with simulation-owned resource observation.
+   * @param[in] free_nodes Capacity available for immediate starts.
+   * @param[in] running_jobs Running jobs and their projected release estimates.
+   * @param[in] current_time Actual scheduling time, unchanged by forecasting.
+   * @return Job identifiers selected for immediate execution.
+   * @throws std::invalid_argument if the planning horizon is bounded.
+   * @details Uses Forecast for reservation timing and updates the borrowed
+   * diagnostic counters without changing allocation or reservation decisions.
+   */
   std::vector<job_no_t> schedule(num_nodes_t free_nodes,
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override {
