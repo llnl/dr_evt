@@ -63,7 +63,8 @@ aggregate resource counts remain correct. They check validity of the capture;
 Fluxion supplies the expected scheduling and placement decisions.
 
 The reusable C++ `PlacementModel` is compared with these exact starts, finishes,
-node IDs, and reservation snapshots by `compare_placement_model.py`. The
+node IDs, and reservation snapshots by `compare_placement_model.py`, which
+runs both coarse-filter and exact-only compile-time specializations. The
 validation-only driver groups arrivals and completions at each timestamp,
 rebuilds the pass-local plan from borrowed running allocations, and uses the
 same queue policies and reservation limits. Each job owns its live bitmap until
@@ -103,3 +104,9 @@ The driver reads a narrow fixture protocol from stdin and emits JSON lines for
 job starts and quiescent snapshots. It assumes unlimited queue examination and
 the whole-node conditions above. The checked fixture's native decisions remain
 the reference; the driver does not generate or rewrite expected results.
+
+The driver's `--exact-only` argument selects the disabled template specialization
+once before processing jobs. Both specializations use the same exact planner;
+there is no per-query runtime filter switch. `compare_placement_model.py`
+checks both automatically. This argument belongs only to the validation driver,
+not the simulator CLI.

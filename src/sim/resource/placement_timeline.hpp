@@ -14,6 +14,7 @@
 #include "sim/resource/bitmap.hpp"
 #include <cmath>
 #include <functional>
+#include <type_traits>
 #include <variant>
 
 namespace dr_evt {
@@ -24,8 +25,32 @@ struct BitmapPlacement {
   BitmapAllocation allocation; ///< Selected resource identities.
 };
 
+/** @brief Compile-time selector for the default coarse-filter specialization.
+ * @hideinitializer
+ */
+inline constexpr auto EnableCoarseFilter = [] { return true; };
+/** @brief Compile-time selector for exact-only searches without grid storage.
+ * @hideinitializer
+ */
+inline constexpr auto DisableCoarseFilter = [] { return false; };
+
+namespace detail {
+/** @brief Empty storage when the coarse filter is disabled.
+ * @tparam Enabled Whether the selected timeline needs a coarse cache. */
+template <bool Enabled> struct PlacementFilterStorage {};
+
+/** @brief Timeline-owned cache only for the enabled specialization. */
+template <> struct PlacementFilterStorage<true> {
+  std::vector<std::uint64_t> words; ///< Row-major derived free unions.
+  bool dirty = true; ///< Invalidated after successful exact interval insertion.
+};
+} // namespace detail
+
 /**
- * @brief Exact reservation owner with an optimistic dense coarse filter.
+ * @brief Exact reservation owner with an optional optimistic dense coarse
+ * filter.
+ * @tparam CoarseFilter Captureless constexpr lambda returning bool; evaluated
+ * at compile time to select filtering behavior and cache storage.
  * @details Exact intervals are authoritative. Future reservations own their
  * dense masks; live allocations are borrowed from the caller's existing owner.
  * The caller must keep borrowed allocations immutable and alive throughout the
@@ -35,10 +60,17 @@ struct BitmapPlacement {
  * but cannot prove a fit. Every accepted fit uses the exact intervals.
  * Successful interval changes invalidate the grid; the next query rebuilds it.
  * The grid and exact intervals share this timeline's lifetime. Queries may
- * mutate the cache and are not thread-safe on one shared instance.
+ * mutate the enabled cache and are not thread-safe on one shared instance.
+ * Disabled timelines omit the cache and its invalidation/rebuild operations.
  */
-class PlacementTimeline {
+template <auto CoarseFilter = EnableCoarseFilter> class BasicPlacementTimeline {
+  static_assert(std::is_same_v<decltype(CoarseFilter()), bool>,
+                "coarse filter selector must return bool");
+
 public:
+  /// Compile-time filter choice; no runtime flag is stored.
+  static constexpr bool coarse_filter_enabled = CoarseFilter();
+
   /** @brief Exact half-open interval and its allocation ownership. */
   struct Interval {
     sim_time_t start;  ///< Inclusive blocked start.
@@ -66,8 +98,8 @@ private:
   Bitmap m_pool;
   sim_time_t m_origin;
   std::vector<Interval> m_intervals; // Ordered by finish; owns future masks.
-  mutable std::vector<std::uint64_t> m_coarse; // Row-major derived free unions.
-  mutable bool m_coarse_dirty = true;
+  [[no_unique_address]] mutable detail::PlacementFilterStorage<
+      coarse_filter_enabled> m_filter;
 
   /** @brief Validate an exact query and compute its endpoint.
    * @param[in] start Exact start within the timeline domain.
@@ -118,56 +150,58 @@ private:
    * All equal-time releases/starts are applied before observing the next state.
    * A failed rebuild leaves the cache dirty and exact state unchanged. */
   void rebuild_coarse() const {
-    if (!m_coarse_dirty || m_intervals.empty())
-      return;
-    struct Event {
-      sim_time_t time;
-      const BitmapAllocation *allocation;
-      bool release;
-    };
-    std::vector<Event> events;
-    events.reserve(m_intervals.size() * 2);
-    for (const auto &interval : m_intervals) {
-      events.push_back({interval.start, &interval.allocation(), false});
-      events.push_back({interval.finish, &interval.allocation(), true});
-    }
-    std::sort(events.begin(), events.end(),
-              [](const Event &left, const Event &right) {
-                return left.time != right.time ? left.time < right.time
-                                               : left.release > right.release;
-              });
-    const size_t width = m_pool.words().size();
-    m_coarse.assign(buckets * width, 0);
-    Bitmap free = m_pool;
-    size_t cursor = 0;
-    const auto advance = [&]() {
-      const auto time = events[cursor].time;
-      do {
-        const auto &event = events[cursor++];
-        if (event.release)
-          free.add(*event.allocation);
-        else
-          free.remove(*event.allocation);
-      } while (cursor < events.size() && events[cursor].time == time);
-    };
-    for (size_t bucket = 0; bucket < buckets; ++bucket) {
-      const auto left = boundary(bucket), right = boundary(bucket + 1);
-      while (cursor < events.size() && events[cursor].time <= left)
-        advance();
-      if (left == right)
-        continue; // Rounded empty buckets must not reject fits.
-      const auto merge = [&]() {
-        auto row = m_coarse.data() + bucket * width;
-        for (size_t word = 0; word < width; ++word)
-          row[word] |= free.words()[word];
+    if constexpr (coarse_filter_enabled) {
+      if (!m_filter.dirty || m_intervals.empty())
+        return;
+      struct Event {
+        sim_time_t time;
+        const BitmapAllocation *allocation;
+        bool release;
       };
-      merge();
-      while (cursor < events.size() && events[cursor].time < right) {
-        advance();
-        merge();
+      std::vector<Event> events;
+      events.reserve(m_intervals.size() * 2);
+      for (const auto &interval : m_intervals) {
+        events.push_back({interval.start, &interval.allocation(), false});
+        events.push_back({interval.finish, &interval.allocation(), true});
       }
+      std::sort(events.begin(), events.end(),
+                [](const Event &left, const Event &right) {
+                  return left.time != right.time ? left.time < right.time
+                                                 : left.release > right.release;
+                });
+      const size_t width = m_pool.words().size();
+      m_filter.words.assign(buckets * width, 0);
+      Bitmap free = m_pool;
+      size_t cursor = 0;
+      const auto advance = [&]() {
+        const auto time = events[cursor].time;
+        do {
+          const auto &event = events[cursor++];
+          if (event.release)
+            free.add(*event.allocation);
+          else
+            free.remove(*event.allocation);
+        } while (cursor < events.size() && events[cursor].time == time);
+      };
+      for (size_t bucket = 0; bucket < buckets; ++bucket) {
+        const auto left = boundary(bucket), right = boundary(bucket + 1);
+        while (cursor < events.size() && events[cursor].time <= left)
+          advance();
+        if (left == right)
+          continue; // Rounded empty buckets must not reject fits.
+        const auto merge = [&]() {
+          auto row = m_filter.words.data() + bucket * width;
+          for (size_t word = 0; word < width; ++word)
+            row[word] |= free.words()[word];
+        };
+        merge();
+        while (cursor < events.size() && events[cursor].time < right) {
+          advance();
+          merge();
+        }
+      }
+      m_filter.dirty = false;
     }
-    m_coarse_dirty = false;
   }
 
   /** @brief Intersect optimistic free unions for all touched coarse buckets.
@@ -178,18 +212,20 @@ private:
    * @details Times beyond the last interval require no coarse row. No time
    * rounding is used to accept or reject an exact placement. */
   void filter(Bitmap &candidates, sim_time_t start, sim_time_t end) const {
-    if (m_intervals.empty())
-      return;
-    rebuild_coarse();
-    const size_t width = m_pool.words().size();
-    for (size_t bucket = 0; bucket < buckets; ++bucket) {
-      const auto left = boundary(bucket), right = boundary(bucket + 1);
-      const bool touched =
-          left < right && (start == end ? left <= start && start < right
-                                        : start < right && left < end);
-      if (touched) {
-        candidates.intersect_words(
-            std::span(m_coarse).subspan(bucket * width, width));
+    if constexpr (coarse_filter_enabled) {
+      if (m_intervals.empty())
+        return;
+      rebuild_coarse();
+      const size_t width = m_pool.words().size();
+      for (size_t bucket = 0; bucket < buckets; ++bucket) {
+        const auto left = boundary(bucket), right = boundary(bucket + 1);
+        const bool touched =
+            left < right && (start == end ? left <= start && start < right
+                                          : start < right && left < end);
+        if (touched) {
+          candidates.intersect_words(
+              std::span(m_filter.words).subspan(bucket * width, width));
+        }
       }
     }
   }
@@ -236,7 +272,8 @@ private:
                          m_intervals.end());
       m_intervals[index] = std::move(appended);
     }
-    m_coarse_dirty = true;
+    if constexpr (coarse_filter_enabled)
+      m_filter.dirty = true;
   }
 
   /** @brief Check specific identities against exact interval commitments.
@@ -263,7 +300,7 @@ public:
    * planner.
    * @param[in] origin Earliest supported query time.
    * @throws std::invalid_argument if origin is nonfinite. */
-  PlacementTimeline(Bitmap pool, sim_time_t origin)
+  BasicPlacementTimeline(Bitmap pool, sim_time_t origin)
       : m_pool(std::move(pool)), m_origin(origin) {
     if (!std::isfinite(origin))
       throw std::invalid_argument("nonfinite timeline origin");
@@ -273,16 +310,17 @@ public:
    * @param[in] other Planner to copy. Borrowed live owners must outlive both
    * copies.
    * @throws std::bad_alloc if exact state cannot be copied. */
-  PlacementTimeline(const PlacementTimeline &other)
+  BasicPlacementTimeline(const BasicPlacementTimeline &other)
       : m_pool(other.m_pool), m_origin(other.m_origin),
         m_intervals(other.m_intervals) {}
   /** @brief Transfer exact state, borrowed views, and cache ownership.
    * @param[in] other Planner to move; it must not be queried afterward. */
-  PlacementTimeline(PlacementTimeline &&other) noexcept = default;
+  BasicPlacementTimeline(BasicPlacementTimeline &&other) noexcept = default;
   /** @brief Disallow assignment that could obscure borrowed-owner lifetimes.
    * @param[in] other Unused source; assignment is deleted.
    * @return No result because this operation is deleted. */
-  PlacementTimeline &operator=(const PlacementTimeline &other) = delete;
+  BasicPlacementTimeline &
+  operator=(const BasicPlacementTimeline &other) = delete;
 
   /** @brief Borrow an existing running allocation for this planning pass.
    * @param[in] allocation Immutable live allocation; caller retains ownership.
@@ -317,15 +355,20 @@ public:
    * @param[in] quantity Number of resources required.
    * @param[in] duration Requested duration; nonpositive means a point query.
    * @param[in] start Exact query start.
-   * @return false proves infeasibility; true requires exact refinement.
+   * @return false proves infeasibility; true requires exact refinement. When
+   * disabled, only pool cardinality is checked and no cache is accessed.
    * @throws std::invalid_argument for invalid query timing.
    * @throws std::bad_alloc if scratch or filter storage cannot be allocated. */
   bool coarse_possible(num_nodes_t quantity, tdiff_t duration,
                        sim_time_t start) const {
     const auto end = endpoint(start, duration);
-    Bitmap candidates = m_pool;
-    filter(candidates, start, end);
-    return candidates.count() >= quantity;
+    if constexpr (coarse_filter_enabled) {
+      Bitmap candidates = m_pool;
+      filter(candidates, start, end);
+      return candidates.count() >= quantity;
+    } else {
+      return m_pool.count() >= quantity;
+    }
   }
 
   /** @brief Find selected identities at an exact start, without changing the
@@ -343,7 +386,8 @@ public:
                                          sim_time_t start) const {
     const auto end = endpoint(start, duration);
     Bitmap candidates = m_pool;
-    filter(candidates, start, end);
+    if constexpr (coarse_filter_enabled)
+      filter(candidates, start, end);
     if (candidates.count() < quantity)
       return std::nullopt;
     refine(candidates, start, end);
@@ -444,6 +488,9 @@ public:
    * @details Borrowed live allocation owners must additionally remain valid. */
   std::span<const Interval> intervals() const noexcept { return m_intervals; }
 };
+
+/// Default timeline retains the enabled coarse filter.
+using PlacementTimeline = BasicPlacementTimeline<>;
 
 } // namespace dr_evt
 #endif

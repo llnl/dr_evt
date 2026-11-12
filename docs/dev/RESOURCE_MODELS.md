@@ -75,7 +75,7 @@ and checkpoint tests exercise CapacityModel through the scheduler and trace.
 
 ## Whole-node placement
 
-`PlacementModel<Observer, NodeOrder>` is a concrete, stateless model. Requests
+`PlacementModel<Observer, NodeOrder, CoarseFilter>` is a concrete, stateless model. Requests
 remain node quantities; allocations contain exact node identities. Its
 `Bitmap` uses contiguous 64-bit words with zero padding bits. Selection takes
 whole words at once and scans bits only in the final partial word. The default
@@ -110,8 +110,27 @@ removes every node blocked anywhere in the requested interval and returns one
 fixed allocation. Earliest-fit candidates are the requested time and exact
 interval ends; accepted starts are never rounded to bucket boundaries.
 
-The grid belongs to the pass-local timeline, is invalidated on insertion, and
-is rebuilt lazily from temporary interval references. Copying a timeline copies
+The `CoarseFilter` template argument is a captureless constexpr lambda returning
+`bool`. The default `EnableCoarseFilter` selects the grid; `DisableCoarseFilter`
+or a custom `[] { return false; }` selects exact-only searches:
+
+```cpp
+using ExactModel = dr_evt::PlacementModel<
+    dr_evt::NoResourceObserver, dr_evt::NodeOrder::LowIdFirst,
+    [] { return false; }>;
+ExactModel::Timeline plan(dr_evt::Bitmap(128, true), 0);
+auto placement = ExactModel::find_fit(plan, 4, 60, 0);
+```
+
+`BasicPlacementTimeline<CoarseFilter>` evaluates the selector at compile time.
+The disabled storage specialization is empty; `[[no_unique_address]]` removes
+its storage cost, and `if constexpr` omits grid filtering, invalidation, and
+rebuilding. Both modes share the exact search and ownership rules.
+`PlacementTimeline` remains an alias for the default enabled timeline. No
+runtime switch or preprocessor flag is stored in the resource model.
+
+The enabled grid belongs to the pass-local timeline, is invalidated on insertion,
+and is rebuilt lazily from temporary interval references. Copying a timeline copies
 exact state and preserves borrowed owners, but drops the derived grid. Empty
 allocations add no intervals. Nonpositive durations query an instant; reserving
 such a duration is a no-op. Queries on a shared timeline are not thread-safe
@@ -127,13 +146,13 @@ it does not implement GPU execution.
 
 `test_placement_model` checks bitmap word boundaries and selection, invalid
 updates, observer metadata, borrowed-owner lifetime, exact release boundaries,
-fractional times, and randomized placement against an independent dense
-node-by-time oracle. Every valid exact fit must pass the coarse filter.
+fractional times, and randomized placement for both filter specializations against an independent
+dense node-by-time oracle. Every valid exact fit must pass the coarse filter.
 
 The validation-only `test_flux_placement_driver` uses this model for FCFS,
 EASY, HYBRID, and conservative queue traversal. Each job record owns its live
 allocation; the planner borrows it until the pass ends, and completion releases
-and clears that same allocation. The comparison checks exact IDs, execution
+and clears that same allocation. The comparison runs both filter specializations and checks exact IDs, execution
 times, and future reservations against all 60 captured native Fluxion cases.
 CapacityModel is not an equality reference. See the
 [Fluxion placement oracle](https://github.com/LLNL/dr_evt/blob/main/validation/flux/PLACEMENT_ORACLE.md).

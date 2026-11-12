@@ -27,19 +27,20 @@ def compare(driver, fixture):
         order = 'low' if case['match_policy'] == 'lonodex' else 'high'
         header = f"{case['total_nodes']} {slots} {int(case['policy'] == 'fcfs')} {order} {len(case['jobs'])}"
         request = header + '\n' + '\n'.join(' '.join(map(str, job)) for job in case['jobs']) + '\n'
-        result = subprocess.run([str(driver)], input=request, text=True, capture_output=True, check=True)
-        records = [json.loads(line) for line in result.stdout.splitlines()]
-        actual = {**case,
-                  'schedule': sorted((r['schedule'] for r in records if 'schedule' in r),
-                                     key=lambda job: job['job']),
-                  'snapshots': [r['snapshot'] for r in records if 'snapshot' in r]}
-        audit_case(actual)
-        label = f"{case['match_policy']}/{case['policy']}/R{slots}/{case['name']}"
-        require(actual['schedule'] == case['schedule'],
-                f"{label}: schedule mismatch\nexpected={case['schedule']}\nactual={actual['schedule']}")
-        require(actual['snapshots'] == case['snapshots'],
-                f"{label}: reservation snapshot mismatch\nexpected={case['snapshots']}\nactual={actual['snapshots']}")
-    print(f"Matched allocations, execution times, and reservations for {len(document['cases'])} native Fluxion cases")
+        for mode, arguments in (('coarse', []), ('exact-only', ['--exact-only'])):
+            result = subprocess.run([str(driver), *arguments], input=request, text=True, capture_output=True, check=True)
+            records = [json.loads(line) for line in result.stdout.splitlines()]
+            actual = {**case,
+                      'schedule': sorted((r['schedule'] for r in records if 'schedule' in r),
+                                         key=lambda job: job['job']),
+                      'snapshots': [r['snapshot'] for r in records if 'snapshot' in r]}
+            audit_case(actual)
+            label = f"{mode}/{case['match_policy']}/{case['policy']}/R{slots}/{case['name']}"
+            require(actual['schedule'] == case['schedule'],
+                    f"{label}: schedule mismatch\nexpected={case['schedule']}\nactual={actual['schedule']}")
+            require(actual['snapshots'] == case['snapshots'],
+                    f"{label}: reservation snapshot mismatch\nexpected={case['snapshots']}\nactual={actual['snapshots']}")
+    print(f"Matched allocations, execution times, and reservations for {len(document['cases'])} native Fluxion cases with both filter specializations")
 
 
 def main():

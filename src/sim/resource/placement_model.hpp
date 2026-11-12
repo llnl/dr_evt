@@ -22,13 +22,16 @@ namespace dr_evt {
  * time.
  * @tparam Order Compile-time low-ID or high-ID selection, independent of
  * storage.
+ * @tparam CoarseFilter Captureless constexpr lambda returning bool; selects
+ * timeline filtering and cache storage at compile time.
  * @details Requests are quantities, but placements and committed allocations
  * retain exact identities. This model is separate from scalar CapacityModel.
  * Planning and live accounting states remain distinct and caller-owned. Neither
  * resource inventory nor per-job state is stored in a model instance.
  */
 template <typename Observer = NoResourceObserver,
-          NodeOrder Order = NodeOrder::LowIdFirst>
+          NodeOrder Order = NodeOrder::LowIdFirst,
+          auto CoarseFilter = EnableCoarseFilter>
 class PlacementModel {
 public:
   /// Number of interchangeable whole nodes requested.
@@ -39,8 +42,8 @@ public:
   using Allocation = BitmapAllocation;
   /// Exact start and owning selected identities.
   using Placement = BitmapPlacement;
-  /// Exact sparse intervals with a derived coarse dense rejection filter.
-  using Timeline = PlacementTimeline;
+  /// Exact sparse intervals with the selected optional coarse dense filter.
+  using Timeline = BasicPlacementTimeline<CoarseFilter>;
 
   /** @brief Return a placement's exact start.
    * @param[in] placement Borrowed placement result.

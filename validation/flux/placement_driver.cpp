@@ -47,6 +47,7 @@ static void write_ids(const BitmapAllocation &mask, std::ostream &out) {
 
 /** @brief Run a grouped-event FCFS/backfill traversal and emit exact decisions.
  * @tparam Order Compile-time node matching order.
+ * @tparam CoarseFilter Compile-time lambda selecting coarse filtering.
  * @param[in,out] jobs Stable owning records, fully populated before borrowing.
  * @param[in] capacity Whole-node pool size.
  * @param[in] slots Maximum future reservations per scheduling pass.
@@ -56,10 +57,10 @@ static void write_ids(const BitmapAllocation &mask, std::ostream &out) {
  * @throws std::invalid_argument if resource accounting or planning is invalid.
  * @throws std::bad_alloc if planner or allocation storage cannot be allocated.
  */
-template <NodeOrder Order>
+template <NodeOrder Order, auto CoarseFilter = EnableCoarseFilter>
 static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
                 bool strict, std::ostream &out) {
-  using Model = PlacementModel<NoResourceObserver, Order>;
+  using Model = PlacementModel<NoResourceObserver, Order, CoarseFilter>;
   Bitmap occupied(capacity);
   sim_time_t time = jobs.empty() ? 0 : jobs.front().submit;
   size_t completed = 0;
@@ -74,7 +75,7 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     }
     // This planner dies before any job-owned allocation changes at the next
     // event.
-    PlacementTimeline plan(Bitmap(capacity, true), time);
+    typename Model::Timeline plan(Bitmap(capacity, true), time);
     for (size_t index = 0; index < jobs.size(); ++index) {
       const auto &job = jobs[index];
       if (job.launched && job.finish > time)
@@ -157,9 +158,15 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
 }
 
 /** @brief Read a narrow fixture protocol and run the validation driver.
+ * @param[in] argc Number of command-line arguments.
+ * @param[in] argv Optional --exact-only selects the disabled specialization
+ * once, before processing the fixture.
  * @return Zero on success, one for invalid input or a scheduling error. */
-int main() {
+int main(int argc, char **argv) {
   try {
+    if (argc > 2 || (argc == 2 && std::string(argv[1]) != "--exact-only"))
+      throw std::invalid_argument("only --exact-only is accepted");
+    const bool exact_only = argc == 2;
     num_nodes_t capacity;
     size_t slots, count;
     int strict;
@@ -185,10 +192,19 @@ int main() {
       jobs.push_back(std::move(job));
     }
     std::cout << std::setprecision(17);
-    if (order == "low")
-      run<NodeOrder::LowIdFirst>(jobs, capacity, slots, strict, std::cout);
-    else
-      run<NodeOrder::HighIdFirst>(jobs, capacity, slots, strict, std::cout);
+    if (exact_only) {
+      if (order == "low")
+        run<NodeOrder::LowIdFirst, DisableCoarseFilter>(jobs, capacity, slots,
+                                                        strict, std::cout);
+      else
+        run<NodeOrder::HighIdFirst, DisableCoarseFilter>(jobs, capacity, slots,
+                                                         strict, std::cout);
+    } else {
+      if (order == "low")
+        run<NodeOrder::LowIdFirst>(jobs, capacity, slots, strict, std::cout);
+      else
+        run<NodeOrder::HighIdFirst>(jobs, capacity, slots, strict, std::cout);
+    }
     return 0;
   } catch (const std::exception &e) {
     std::cerr << e.what() << '\n';
