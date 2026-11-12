@@ -151,3 +151,12 @@ stress-cached-conservative`. This avoids repeating long runs unnecessarily.
 
 Build/run `test_capacity_model-bin` to check the independent interval oracle,
 explicit recording/counting observers, and delayed-release integration.
+
+## Integrated placement benchmark
+
+[Placement simulator scripts](placement-model/SIMULATOR.md) preserve the existing
+wait-queue benchmark input and add comparisons of capacity and each compiled
+placement strategy. The seeded 20K input is available through an explicit
+`--generate-trace` invocation of `benchmark_placement.py`; it does not replace
+existing benchmark inputs. Whole-simulator results remain to be measured on the
+target platform.

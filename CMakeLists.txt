@@ -965,6 +965,9 @@ if(DR_EVT_WITH_UNIT_TESTING)
     LABELS "unit;native" RUN_SERIAL TRUE
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   if(Python3_Interpreter_FOUND)
+    add_test(NAME test_placement_scripts
+      COMMAND ${Python3_EXECUTABLE} -m unittest discover
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/tests -p test_placement_scripts.py -v)
     add_test(
       NAME test_python_periodic_reference
       COMMAND ${Python3_EXECUTABLE}

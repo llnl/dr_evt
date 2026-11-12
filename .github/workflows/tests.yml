@@ -184,7 +184,8 @@ jobs:
           $GITHUB_WORKSPACE/install/bin/tests/test_placement_model
           $GITHUB_WORKSPACE/install/bin/tests/test_placement_integration
           python3 validation/flux/compare_placement_model.py \
-            "$GITHUB_WORKSPACE/install/bin/tests/test_flux_placement_driver"
+            "$GITHUB_WORKSPACE/install/bin/tests/test_flux_placement_driver" --all-optimizations
+          python3 -m unittest discover -s tests -p test_placement_scripts.py -v
 
       - name: Run Flux Placement Oracle Audits
         id: flux-placement-audits

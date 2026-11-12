@@ -109,7 +109,9 @@ def observed_profile(path, capacity=CAPACITY):
     return samples
 
 
-def simulator_case(case, jobs, binary, policy, depth, reservations, total_nodes=CAPACITY):
+def simulator_case(case, jobs, binary, policy, depth, reservations, total_nodes=CAPACITY,
+                   resource_model='capacity', placement_optimizations='all',
+                   placement_order='low', coarse_filter=False, timeout=30):
     trace, output, resources = (case / filename for filename in
                                ('dr_evt-input.csv', 'dr_evt-output.csv', 'dr_evt-resources.csv'))
     with trace.open('w', newline='') as stream:
@@ -126,12 +128,20 @@ def simulator_case(case, jobs, binary, policy, depth, reservations, total_nodes=
                '--trace_format', 'simple', '--timestamp_format', 'epoch',
                '--run_time_mode', 'actual', '--msec_output', '--max_jobs', str(len(jobs)),
                '--outfile', str(output), '--resource_trace', str(resources)]
+    if resource_model == 'placement':
+        command.remove('--per_pass_accounting')
+        command.extend(['--resource_model', 'placement', '--placement_optimizations',
+                        placement_optimizations, '--placement_order', placement_order])
+        if coarse_filter:
+            command.append('--placement_coarse_filter')
+    elif resource_model != 'capacity':
+        raise ValueError('unknown resource model: ' + resource_model)
     if policy == 'hybrid':
         command.extend(['--reservation_depth', str(reservations)])
     (case / 'dr_evt-command.json').write_text(json.dumps(command, indent=2) + '\n')
     with (case / 'dr_evt.log').open('w') as log:
         started = time.perf_counter()
-        subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT, timeout=30)
+        subprocess.run(command, check=True, stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
         (case / 'dr_evt-process-timing.json').write_text(json.dumps({
             'elapsed_seconds': time.perf_counter() - started,
             'scope': 'simulator process launch through exit',

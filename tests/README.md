@@ -423,3 +423,8 @@ examination, 65-node bitmap boundaries, ordering, diagnostics and invalid
 configuration/requests. Python and gRPC API suites also exercise live and
 reserved node-ID reporting. The Fluxion comparator drives the same simulator,
 rather than a standalone scheduling loop.
+
+`test_placement_scripts.py` checks input preservation in the existing benchmark,
+seeded-input reproducibility, output conservation and capacity audits, failure
+reports, filter/strategy selection, and unchanged recorded workloads in the
+native placement adapter. It is registered with CTest when Python is available.

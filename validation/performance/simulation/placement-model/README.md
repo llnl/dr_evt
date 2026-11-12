@@ -103,3 +103,11 @@ validation, not a claim that the entire CI matrix ran.
 
 Local Doxygen 1.18 produces four Sphinx warnings for a pre-existing `BasicTrace`
 member-pointer declaration; the CI Doxygen version builds without that issue.
+
+## Whole-simulator scripts
+
+[SIMULATOR.md](SIMULATOR.md) gives cross-platform build, validation and benchmark
+commands. `benchmark_placement.py` measures the integrated simulator with
+independent output audits and persistent reports. The existing
+`tests/benchmark_wait_queues.sh` keeps its original input; generated 20K traces
+require an explicit separate invocation.

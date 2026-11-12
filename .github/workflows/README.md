@@ -79,7 +79,9 @@ This directory contains GitHub Actions workflows for automated testing.
 - OpenPBS harness audit tests (5) -
   `python3 -m unittest discover -s validation/openpbs -p test_compare.py -v`
 - Bitmap placement model and real simulator lifecycle/checkpoint integration tests, and all 60 native Fluxion allocation/reservation
-  comparisons (`test_placement_model`, `compare_placement_model.py`)
+  comparisons across all six strategies and both filters (`test_placement_model`,
+  `compare_placement_model.py --all-optimizations`), plus portable script
+  regression checks (`test_placement_scripts.py`)
 - Flux placement oracle and identity audits -
   `python3 -m unittest discover -s validation/flux -p test_placement_oracle.py -v`
 - OpenPBS forecast policy - installed `test_openpbs_forecast`
