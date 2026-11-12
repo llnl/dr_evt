@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 /** @file common.hpp
- * @brief Project-wide compile-time feature and trace-processing macros.
+ * @brief Project-wide compiler, feature, and trace-processing macros.
  */
 
 #ifndef DR_EVT_COMMON_HPP
@@ -16,6 +16,23 @@
 #include "dr_evt_config.hpp"
 #else
 #error "no config"
+#endif
+
+/**
+ * @brief Compiler-specific restrict qualifier for pointer declarations.
+ * @details Expands to __restrict__ on GCC, Clang (including Apple Clang), and
+ * Intel compilers, and nothing on other compilers. Use only where accessed
+ * storage satisfies the compiler's restrict aliasing contract
+ * throughout the pointer's scope; violating that contract can miscompile code.
+ * This macro provides syntax portability, not an aliasing check. Restrict is
+ * not standard C++; restrict-qualified references and member functions are
+ * outside this macro's portability contract.
+ */
+#if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER) ||    \
+    defined(__INTEL_LLVM_COMPILER)
+#define DR_EVT_RESTRICT __restrict__
+#else
+#define DR_EVT_RESTRICT
 #endif
 
 /**

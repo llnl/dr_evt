@@ -175,7 +175,7 @@ public:
    * @param[in] selector Callback that chooses one of the reported candidates.
    * @details Configuration and callbacks are owned by the simulation. Resource
    * diagnostics are selected once and observe trace event accounting; this
-   * custom scheduler does not use the CountModel fit/reservation operations.
+   * custom scheduler does not use the CapacityModel fit/reservation operations.
    * @throws std::runtime_error if the input trace cannot be initialized.
    */
   BasicSimulation(Sim_Params params, job_cost_function_t cost_function,

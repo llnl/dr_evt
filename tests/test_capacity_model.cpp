@@ -5,11 +5,11 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file test_count_model.cpp
+/** @file test_capacity_model.cpp
  * @brief Independent interval oracle, observation, and event accounting checks.
  */
 #define DR_EVT_HAS_CONFIG 1
-#include "sim/resource/count_model.hpp"
+#include "sim/resource/capacity_model.hpp"
 #include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
 #include "sim/sim.hpp"
 #include <filesystem>
@@ -35,14 +35,23 @@ struct RecordingObserver {
     events.push_back(event);
   }
 };
-using ObservedCount = CountModel<RecordingObserver>;
-static_assert(sizeof(CountModel<>::State) == sizeof(num_nodes_t));
-static_assert(sizeof(CountModel<>::Allocation) == sizeof(num_nodes_t));
-static_assert(sizeof(CountModel<>::Placement) == sizeof(sim_time_t));
-static_assert(std::is_empty_v<CountModel<>>);
-static_assert(std::is_same_v<Reservation_Timeline, CountModel<>::Timeline>);
+static_assert(sizeof(CapacityModel<>::State) == sizeof(num_nodes_t));
+static_assert(sizeof(CapacityModel<>::Allocation) == sizeof(num_nodes_t));
+static_assert(sizeof(CapacityModel<>::Placement) == sizeof(sim_time_t));
+static_assert(std::is_same_v<Reservation_Timeline, CapacityModel<>::Timeline>);
+static_assert(std::is_default_constructible_v<CapacityModel<>>);
+static_assert(std::is_trivially_default_constructible_v<CapacityModel<>>);
+static_assert(!std::is_abstract_v<CapacityModel<>>);
+static_assert(!std::is_polymorphic_v<CapacityModel<>>);
+static_assert(std::is_empty_v<CapacityModel<>>);
+static_assert(std::is_empty_v<CapacityModel<RecordingObserver>>);
 
-static void interval_oracle() {
+/** @brief Compare a directly instantiated model with a dense interval oracle.
+ * @tparam Model Concrete scalar capacity model, without observation.
+ * @throws std::runtime_error if a fit or reservation disagrees with the oracle.
+ */
+template <typename Model> static void interval_oracle() {
+  Model model;
   // A dense, independent integer-time oracle; reservations are selected only
   // when every second fits. Compare every fit against the compressed timeline.
   constexpr int horizon = 64;
@@ -56,7 +65,7 @@ static void interval_oracle() {
     }
     // Beyond the oracle horizon, no positive request fits.
     segments.emplace(horizon, 0);
-    ObservedCount::Timeline plan(segments);
+    typename Model::Timeline plan(segments);
     const auto fits = [&free](int start, unsigned quantity, int duration) {
       if (start >= horizon || start + duration > horizon) {
         return false;
@@ -79,21 +88,21 @@ static void interval_oracle() {
       const ResourceContext context{static_cast<job_no_t>(step),
                                     static_cast<sim_time_t>(start),
                                     static_cast<size_t>(trial)};
-      const auto placement = ObservedCount::find_fit(
-          plan, quantity, duration, start, context);
+      const auto placement =
+          model.find_fit(plan, quantity, duration, start, context);
       require(placement.has_value() == (expected != horizon),
               "earliest fit disagrees with independent oracle");
       if (placement) {
-        require(ObservedCount::start_time(*placement) == expected,
+        require(model.start_time(*placement) == expected,
                 "placement must retain earliest start");
-        ObservedCount::reserve(plan, *placement, quantity, duration, context);
+        model.reserve(plan, *placement, quantity, duration, context);
         for (int t = expected; t < expected + duration; ++t) {
           free[t] -= quantity;
         }
       }
       for (int t = 0; t < horizon; ++t) {
         for (unsigned q = 1; q <= 9; ++q) {
-          require(CountModel<>::can_fit(plan, q, 1, t) == fits(t, q, 1),
+          require(model.can_fit(plan, q, 1, t) == fits(t, q, 1),
                   "reservation changed capacity outside its interval");
         }
       }
@@ -101,25 +110,30 @@ static void interval_oracle() {
   }
 }
 
-static void observation_checks() {
+/** @brief Check observer metadata and independent planning/live accounting.
+ * @tparam Model Capacity model using RecordingObserver.
+ * @throws std::runtime_error if observation or accounting behavior is
+ * incorrect.
+ */
+template <typename Model> static void observation_checks() {
   RecordingObserver::events.clear();
-  ObservedCount::Timeline plan(
+  typename Model::Timeline plan(
       std::map<sim_time_t, num_nodes_t>{{0, 2}, {10, 4}});
   const ResourceContext context{7, 0, 3};
-  require(!ObservedCount::can_fit(plan, 3, 5, 0, context),
+  require(!Model::can_fit(plan, 3, 5, 0, context),
           "insufficient immediate capacity must fail");
-  auto placement = ObservedCount::find_fit(plan, 3, 5, 0, context);
-  require(placement && ObservedCount::start_time(*placement) == 10,
+  auto placement = Model::find_fit(plan, 3, 5, 0, context);
+  require(placement && Model::start_time(*placement) == 10,
           "future fit missing");
-  ObservedCount::reserve(plan, *placement, 3, 5, context);
+  Model::reserve(plan, *placement, 3, 5, context);
   unsigned available = 4, allocated = 0, releasing = 0;
-  ObservedCount::consume_available(available, 3, {7, 10, 4});
-  ObservedCount::allocate(allocated, 3, {7, 10});
-  ObservedCount::release(allocated, 3, {7, 15});
-  ObservedCount::hold(releasing, 3, {7, 15});
+  Model::consume_available(available, 3, {7, 10, 4});
+  Model::allocate(allocated, 3, {7, 10});
+  Model::release(allocated, 3, {7, 15});
+  Model::hold(releasing, 3, {7, 15});
   require(allocated == 0 && releasing == 3,
           "completion with delay must keep resources occupied");
-  ObservedCount::release(releasing, 3, {7, 20}, ResourceScope::Releasing);
+  Model::release(releasing, 3, {7, 20}, ResourceScope::Releasing);
   require(available == 1 && allocated == 0 && releasing == 0,
           "planning and committed state must stay independent");
   const auto &events = RecordingObserver::events;
@@ -143,15 +157,15 @@ static void observation_checks() {
               endpoints.earliest_fit<true>(2, 10, 0) == 20,
           "extraction must preserve endpoint-sensitive forecast behavior");
   CountTimeline empty(std::map<sim_time_t, num_nodes_t>{});
-  require(!CountModel<>::find_fit(empty, 1, 1, 0) &&
-              !CountModel<>::can_fit(empty, 1, 1, 0),
+  require(!CapacityModel<>::find_fit(empty, 1, 1, 0) &&
+              !CapacityModel<>::can_fit(empty, 1, 1, 0),
           "empty inventory must not fit");
 }
 
 /** @brief Check explicit counting-observer selection and failed-fit accounting.
  */
 static void counting_observer_checks() {
-  using Model = CountModel<CountingResourceObserver>;
+  using Model = CapacityModel<CountingResourceObserver>;
   CountingResourceObserver::reset();
   Model::Timeline plan(std::map<sim_time_t, num_nodes_t>{{0, 2}, {10, 4}});
   require(!Model::can_fit(plan, 3, 5, 0),
@@ -187,15 +201,16 @@ static void counting_observer_checks() {
 }
 
 /**
- * @brief Check runtime observer selection, delayed release, and counter isolation.
+ * @brief Check runtime observer selection, delayed release, and counter
+ * isolation.
  * @param[in] diagnostics Whether this test simulation enables observation.
  * @param[in] priority Shared placement-pass or OpenPBS forecast policy to test.
  * @throws std::runtime_error if an accounting or observer invariant fails.
  */
 static void integrated_accounting(bool diagnostics, PriorityPolicy priority) {
-  const auto directory = std::filesystem::temp_directory_path() /
-                         ("dr-evt-count-model-" + std::to_string(
-                             std::random_device{}()));
+  const auto directory =
+      std::filesystem::temp_directory_path() /
+      ("dr-evt-capacity-model-" + std::to_string(std::random_device{}()));
   std::filesystem::create_directory(directory);
   const auto input = directory / "empty.csv";
   std::ofstream(input) << "job_submit_time,num_nodes,time_limit\n";
@@ -280,8 +295,8 @@ static void integrated_accounting(bool diagnostics, PriorityPolicy priority) {
 }
 
 int main() {
-  interval_oracle();
-  observation_checks();
+  interval_oracle<CapacityModel<>>();
+  observation_checks<CapacityModel<RecordingObserver>>();
   counting_observer_checks();
   require(!Sim_Params{}.m_resource_model_diagnostics,
           "runtime diagnostics must default to disabled");
@@ -290,5 +305,6 @@ int main() {
     integrated_accounting(false, priority);
     integrated_accounting(true, priority);
   }
-  std::cout << "count-model oracle, hook, and event accounting checks passed\n";
+  std::cout
+      << "capacity-model oracle, hook, and event accounting checks passed\n";
 }

@@ -25,7 +25,7 @@
 
 #include "common.hpp"
 #include "params/sim_params.hpp" // CircularOverflowPolicy
-#include "sim/resource/count_model.hpp"
+#include "sim/resource/capacity_model.hpp"
 #include "trace/data_columns.hpp"
 #include "trace/dr_event.hpp"
 #include "trace/job_record.hpp"
@@ -217,9 +217,9 @@ protected:
   /// Event-entry dispatch selected once at construction; operations stay
   /// inline.
   void (BasicTrace::*m_process_events)(sim_time_t) =
-      &BasicTrace::template process_events_until_impl<CountModel<>>;
+      &BasicTrace::template process_events_until_impl<CapacityModel<>>;
   bool (BasicTrace::*m_process_event)() =
-      &BasicTrace::template process_single_event_impl<CountModel<>>;
+      &BasicTrace::template process_single_event_impl<CapacityModel<>>;
 
   /// Requested capacity for m_ctx.m_resource_history (0 = auto-size to
   /// the job trace once loaded - see resolve_resource_history_capacity()).

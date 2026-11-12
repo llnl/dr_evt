@@ -197,11 +197,11 @@ std::vector<job_no_t> FCFSOneSecondEventGroupCircularScheduler::schedule(
 // Observed factory specializations share the same queue traversal.
 template std::vector<job_no_t>
 FCFSPassHybridCircularScheduler::schedule_with_forecast<
-    CountTimeline, CountModel<SimulationResourceObserver>>(
+    CountTimeline, CapacityModel<SimulationResourceObserver>>(
     num_nodes_t, const running_jobs_t &, sim_time_t, ResourceDiagnostics *);
 template std::vector<job_no_t>
 FCFSPassHybridCircularScheduler::schedule_with_forecast<
-    OneSecondEventGroupTimeline, CountModel<SimulationResourceObserver>>(
+    OneSecondEventGroupTimeline, CapacityModel<SimulationResourceObserver>>(
     num_nodes_t, const running_jobs_t &, sim_time_t, ResourceDiagnostics *);
 
 } // namespace dr_evt

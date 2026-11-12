@@ -24,6 +24,18 @@ function, enum, or file name.
 .. doxygenfile:: scheduler_fcfs_periodic_hybrid_circular.hpp
    :project: dr_evt
 
+Resource models
+~~~~~~~~~~~~~~~
+
+.. doxygenfile:: capacity_model.hpp
+   :project: dr_evt
+
+.. doxygenfile:: count_timeline.hpp
+   :project: dr_evt
+
+.. doxygenfile:: resource_model.hpp
+   :project: dr_evt
+
 Experimental multi-cluster scheduling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

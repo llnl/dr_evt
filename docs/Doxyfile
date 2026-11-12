@@ -15,6 +15,7 @@ INPUT                  = src/ \
                          src/params/ \
                          src/proto/ \
                          src/sim/ \
+                         src/sim/resource/ \
                          src/trace/ \
                          src/utils/ \
                          python/dr_evt_bindings.cpp \
