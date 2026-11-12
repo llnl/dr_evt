@@ -242,7 +242,7 @@ public:
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override {
     return schedule_with_forecast<Forecast,
-                                  CountModel<SimulationResourceObserver>>(
+                                  CapacityModel<SimulationResourceObserver>>(
         free_nodes, running_jobs, current_time, &m_diagnostics);
   }
 };

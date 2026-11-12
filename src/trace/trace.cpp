@@ -13,7 +13,7 @@
  */
 
 #include "trace/trace.hpp"
-#include "sim/resource/count_model.hpp"
+#include "sim/resource/capacity_model.hpp"
 #include "trace/job_io.hpp"
 #include "trace/parse_utils.hpp"
 #include "utils/system_memory.hpp" // get_available_memory_bytes() - check_memory_pressure()
@@ -99,14 +99,14 @@ BasicTrace<Policy>::BasicTrace(const std::string &fname,
   if (resource_model_diagnostics) {
     m_resource_diagnostics = std::make_unique<ResourceDiagnostics>();
     m_process_events = &BasicTrace::template process_events_until_impl<
-        CountModel<SimulationResourceObserver>>;
+        CapacityModel<SimulationResourceObserver>>;
     m_process_event = &BasicTrace::template process_single_event_impl<
-        CountModel<SimulationResourceObserver>>;
+        CapacityModel<SimulationResourceObserver>>;
   } else {
     m_process_events =
-        &BasicTrace::template process_events_until_impl<CountModel<>>;
+        &BasicTrace::template process_events_until_impl<CapacityModel<>>;
     m_process_event =
-        &BasicTrace::template process_single_event_impl<CountModel<>>;
+        &BasicTrace::template process_single_event_impl<CapacityModel<>>;
   }
   if (!m_dcols.check_header(fname)) {
     std::string err = "Failed to initialize data columns";

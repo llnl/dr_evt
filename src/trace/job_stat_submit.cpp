@@ -206,14 +206,17 @@ Job_Stat_Submit::summary_week_t Job_Stat_Submit::get_summary() const {
 
   const size_t num_weeks = m_tsubmit.size();
 
+  // History and the local summary occupy separate storage. Restricted pointers
+  // are scoped to each accumulation pass; all element accesses use them there.
   // sum for average
   for (size_t i = 0ul; i < num_weeks; ++i) {
-    const auto &week = m_tsubmit[i];
+    const Hour_Slot *DR_EVT_RESTRICT slots = m_tsubmit[i].data();
+    Summary *DR_EVT_RESTRICT sums = summary.data();
     size_t j = 0ul;
     for (size_t wd = 0ul; wd < 7ul; ++wd) {
       for (size_t hr = 0ul; hr < 24ul; ++hr) {
-        auto &sum = summary[j];
-        const auto &slot = week[j++];
+        auto &sum = sums[j];
+        const auto &slot = slots[j++];
         const auto nj = slot.num_jobs();
         const auto av = slot.availability();
         sum.m_tot_submit += nj;
@@ -253,12 +256,13 @@ Job_Stat_Submit::summary_week_t Job_Stat_Submit::get_summary() const {
 
   // sum of square of differences for std
   for (size_t i = 0ul; i < num_weeks; ++i) {
-    const auto &week = m_tsubmit[i];
+    const Hour_Slot *DR_EVT_RESTRICT slots = m_tsubmit[i].data();
+    Summary *DR_EVT_RESTRICT sums = summary.data();
     size_t j = 0ul;
     for (size_t wd = 0ul; wd < 7ul; ++wd) {
       for (size_t hr = 0ul; hr < 24ul; ++hr) {
-        auto &sum = summary[j];
-        const auto &slot = week[j++];
+        auto &sum = sums[j];
+        const auto &slot = slots[j++];
         const auto nj = slot.num_jobs();
         const auto av = slot.availability();
 

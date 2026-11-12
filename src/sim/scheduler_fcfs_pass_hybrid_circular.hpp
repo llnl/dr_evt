@@ -27,8 +27,8 @@
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_CIRCULAR_HPP
 #define DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_CIRCULAR_HPP
 
+#include "sim/resource/capacity_model.hpp"
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
-#include "sim/resource/count_model.hpp"
 #include <unordered_set>
 
 namespace dr_evt {
@@ -75,7 +75,7 @@ protected:
    * SimulationResourceObserver and owned by the simulation trace.
    * @return Jobs selected for immediate execution.
    */
-  template <typename Timeline, typename Model = CountModel<>>
+  template <typename Timeline, typename Model = CapacityModel<>>
   std::vector<job_no_t> schedule_with_forecast(
       num_nodes_t free_nodes, const running_jobs_t &running_jobs,
       sim_time_t current_time, ResourceDiagnostics *diagnostics = nullptr);

@@ -541,7 +541,7 @@ protected:
  * @param[in] diagnostic_no_reservations Select the diagnostic periodic model
  * that considers later fitting jobs without protecting future capacity.
  * @param[in,out] resource_diagnostics Optional counter owner, which must
- * outlive the returned scheduler. Only CountModel-enabled traversals observe
+ * outlive the returned scheduler. Only CapacityModel-enabled traversals observe
  * fitting/reservations; other policies retain their existing resource calls.
  * @return Owning pointer to a SchedulerBase implementation.
  * @throws std::invalid_argument if HYBRID is requested with a zero depth or

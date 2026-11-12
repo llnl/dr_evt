@@ -55,7 +55,8 @@ simultaneous starts/completions never exceed the 128-node capacity.
 ## Standalone count-model comparison
 
 The [first milestone results](count-model/README.md) record the correctness
-checks, measured overhead, and decision to retain the standalone count model.
+checks and measured overhead of the original standalone count model. Current
+code uses CapacityModel directly; the redundant CountModel wrapper was removed.
 
 `compare_count_model.py` compares baseline and candidate binaries, with an
 optional explicitly instrumented or historical binary supplied via `--hooks`.
@@ -77,11 +78,11 @@ cmake -S SOURCE -B BUILD \
 cmake --build BUILD --target sim-bin -j4
 ```
 
-By default, production resource operations use `CountModel<>`, with
+By default, production resource operations use `CapacityModel<>`, with
 `NoResourceObserver`. Enable per-simulation counters at runtime with
 `--resource_model_diagnostics` (or the corresponding SimParams/protobuf field).
-Construction selects `CountModel<SimulationResourceObserver>` for event
-accounting and for the two CountModel-based scheduling traversals. Tests can
+Construction selects `CapacityModel<SimulationResourceObserver>` for event
+accounting and for the two CapacityModel-based scheduling traversals. Tests can
 still select counting or custom recording observers explicitly. `if constexpr`
 removes observation code for the default specialization.
 
@@ -122,7 +123,7 @@ The four 2,000-job mixed cases exercise per-pass FCFS, EASY, HYBRID R32/Q64,
 and conservative scheduling. A separate 8,000-job conservative case stresses
 the per-pass traversal with unlimited Q. The existing 20,000-job fixed-dispatch
 conservative profile remains a separate case; its scheduler calls are not yet
-migrated to `CountModel`, while it exercises the extracted shared timeline and
+migrated to `CapacityModel`, while it exercises the extracted shared timeline and
 committed resource accounting. `--per-pass-jobs` and `--stress-jobs` can change
 these sizes independently.
 
@@ -140,5 +141,5 @@ still receives the output-hash checks. Run the two stress cases separately with
 the default batch size: `--cases stress-per-pass-conservative
 stress-cached-conservative`. This avoids repeating long runs unnecessarily.
 
-Build/run `test_count_model-bin` to check the independent interval oracle,
+Build/run `test_capacity_model-bin` to check the independent interval oracle,
 explicit recording/counting observers, and delayed-release integration.

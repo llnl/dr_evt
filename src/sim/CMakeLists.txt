@@ -5,7 +5,7 @@ set_full_path(THIS_DIR_HEADERS
     multi_platform_runs.hpp
     capacity_schedule.hpp
     resource/resource_model.hpp
-    resource/count_model.hpp
+    resource/capacity_model.hpp
     resource/count_timeline.hpp
     scheduler_policies.hpp
     schedule_windows.hpp

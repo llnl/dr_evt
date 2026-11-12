@@ -205,7 +205,10 @@ public:
    * @return Week count as num_jobs_t. */
   num_jobs_t get_num_weeks() const;
   /** @brief Aggregate hour-slot history across all weeks.
-   * @return Per-hour weekly summary array. */
+   * @details Reads existing history into a separate local summary. Accumulation
+   * uses non-aliasing pointer views confined to each pass; no view is retained
+   * and history remains unchanged.
+   * @return Owning per-hour weekly summary array. */
   summary_week_t get_summary() const;
   /** @brief Write detailed submission history to a stream.
    * @param[in,out] os Destination stream.

@@ -5,14 +5,14 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file count_model.hpp
- * @brief Scalar consumable capacity with compile-time observation hooks.
+/** @file capacity_model.hpp
+ * @brief Concrete scalar capacity base with compile-time observation hooks.
  * @details Planning consumes free capacity; committed events charge occupied
  * capacity. These are separate states, never two charges to the same state.
  */
 
-#ifndef DR_EVT_SIM_RESOURCE_COUNT_MODEL_HPP
-#define DR_EVT_SIM_RESOURCE_COUNT_MODEL_HPP
+#ifndef DR_EVT_SIM_RESOURCE_CAPACITY_MODEL_HPP
+#define DR_EVT_SIM_RESOURCE_CAPACITY_MODEL_HPP
 
 #include "sim/resource/count_timeline.hpp"
 #include "sim/resource/resource_model.hpp"
@@ -20,16 +20,27 @@
 namespace dr_evt {
 
 /**
- * @brief Scalar capacity operations with a compile-time observer selection.
+ * @brief Instantiable, nonvirtual base for one aggregate capacity quantity.
  * @tparam Observer Observer with static enabled and, when enabled, observe().
  * Defaults to NoResourceObserver, which removes observation code at compile
  * time.
  * @details State belongs to the caller's timeline or live accounting records.
+ * Instances own no resource state or observer storage. Operations may be called
+ * through an instance or statically. Derived models are selected at compile
+ * time; this class does not provide runtime polymorphic ownership.
+ * The initial representation retains the simulator's scalar node-count type.
+ * Resource identities, placement constraints, and multiple quantities require
+ * their own representation; this base implements only a single aggregate pool.
  */
-template <typename Observer = NoResourceObserver> struct CountModel {
+template <typename Observer = NoResourceObserver> class CapacityModel {
+public:
+  /// Demand for the single aggregate pool.
   using Request = num_nodes_t;
+  /// Caller-owned scalar planning or live accounting state.
   using State = num_nodes_t;
+  /// Committed quantity whose lifetime is owned by a job or release event.
   using Allocation = num_nodes_t;
+  /// Existing compressed scalar forecast; no resource identities.
   using Timeline = CountTimeline;
   /// Aggregate placement needs only time; the job retains its scalar request.
   using Placement = sim_time_t;
@@ -48,7 +59,8 @@ template <typename Observer = NoResourceObserver> struct CountModel {
    * @param[in] quantity Requested capacity.
    * @param[in] duration Planned interval duration; CountTimeline treats a
    * nonpositive duration as a point-in-time capacity query.
-   * @param[in] start Requested start within the planner's supported time domain.
+   * @param[in] start Requested start within the planner's supported time
+   * domain.
    * @param[in] context Synchronous observation metadata. Any diagnostic owner
    * required by Observer must remain valid throughout this call.
    * @return true when the planner admits this interval; otherwise false.
@@ -74,7 +86,8 @@ template <typename Observer = NoResourceObserver> struct CountModel {
    * @param[in] quantity Requested capacity.
    * @param[in] duration Planned interval duration; CountTimeline treats a
    * nonpositive duration as a point-in-time capacity query.
-   * @param[in] start Earliest requested start in the planner's supported domain.
+   * @param[in] start Earliest requested start in the planner's supported
+   * domain.
    * @param[in] context Synchronous observation metadata with any counter owner
    * required by Observer valid for the duration of this call.
    * @return A scalar placement when the planner finds a fit, or std::nullopt.
@@ -118,7 +131,8 @@ template <typename Observer = NoResourceObserver> struct CountModel {
     if constexpr (Observer::enabled) {
       context.timeline = &plan;
       Observer::observe({ResourceOperation::Reserve, ResourceScope::Timeline,
-                         context, quantity, 0, 0, start_time(placement), duration});
+                         context, quantity, 0, 0, start_time(placement),
+                         duration});
     }
   }
 
@@ -147,7 +161,8 @@ template <typename Observer = NoResourceObserver> struct CountModel {
    * @param[in] quantity Capacity committed to the starting job.
    * @param[in] context Synchronous metadata with any required observer owner.
    * @pre The sum must be representable by State. Admission is the caller's
-   * responsibility; this operation neither validates fit nor updates a timeline.
+   * responsibility; this operation neither validates fit nor updates a
+   * timeline.
    */
   static void allocate(State &allocated, Allocation quantity,
                        ResourceContext context = {}) {
@@ -165,7 +180,8 @@ template <typename Observer = NoResourceObserver> struct CountModel {
    * @param[in] quantity Capacity leaving that accounting scope.
    * @param[in] context Synchronous metadata with any required observer owner.
    * @param[in] scope Accounting scope reported to the observer.
-   * @pre quantity must not exceed occupied, and scope must describe that counter.
+   * @pre quantity must not exceed occupied, and scope must describe that
+   * counter.
    * @details The caller owns event timing and must release each charge once.
    * This operation does not modify speculative reservation timelines.
    */
