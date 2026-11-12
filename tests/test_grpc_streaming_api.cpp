@@ -81,9 +81,16 @@ private:
   uint64_t m_next_request_id;
 };
 
-// Sends Init (with infile only used for its header - no
-// InitializeTraceRequest is ever sent, so the server never loads any
-// job data of its own) on an already-constructed client.
+/**
+ * @brief Initialize a client session and load its header-only input trace.
+ * @param[in,out] client Connected client receiving initialization responses.
+ * @param[in] trace_file Valid input trace containing a header and no job rows.
+ * @param[in] backfill_policy Backfill policy requested for this session.
+ * @param[in] resource_model_diagnostics Enable session-owned operation counters.
+ * @throws std::runtime_error if a request fails or the trace contains jobs.
+ * @details Sends Init followed by InitializeTrace; the empty trace establishes
+ * the input schema while subsequent append requests supply the actual jobs.
+ */
 void connect_and_init(SimulationClient &client, const std::string &trace_file,
                       const char *backfill_policy = "easy",
                       bool resource_model_diagnostics = false) {

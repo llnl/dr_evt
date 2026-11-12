@@ -59,7 +59,12 @@ struct Job_Append_Request {
       std::nullopt; ///< Known execution time, if any.
 };
 
-/** @brief Job store, event queue, and output-trace state for one workload. */
+/**
+ * @brief Own job storage, event accounting, and output state for one workload.
+ * @tparam Policy Trace policy defining record storage and resource samples.
+ * @details Optional diagnostic counters share this trace's lifetime. Resource
+ * event-processing specialization is selected once at construction.
+ */
 template <typename Policy> class BasicTrace : private Policy {
   template <typename TraceType> friend class BasicSimulation;
 
@@ -581,9 +586,10 @@ public:
   void run_until_inclusive(sim_time_t target_time);
 
   /**
-   * NEW SIMULATION API: Process exactly one event from the replay queue
-   * Processes the earliest event in the queue, regardless of its time
-   * @return true if an event was processed, false if queue was empty
+   * @brief Process exactly one earliest event, regardless of its time.
+   * @return true if an event was processed; false for an empty event queue.
+   * @details Dispatches to the event-processing specialization selected at
+   * construction. Enabled observation updates this trace's counter owner.
    */
   bool process_single_event();
 
@@ -861,8 +867,10 @@ public:
 
 protected:
   /** @brief Process queued resource events through a submission timestamp.
-   * @param[in] t_sub Inclusive simulation time through which events are
-   * handled. */
+   * @param[in] t_sub Inclusive simulation time through which events are handled.
+   * @details Dispatches once for the batch to the specialization selected at
+   * construction; individual resource operations use compile-time observation.
+   */
   void process_events_until(sim_time_t t_sub);
 
   /** @brief Process an event batch using the construction-selected observer.

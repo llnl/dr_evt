@@ -27,7 +27,12 @@ enum class ResourceScope { Timeline, Available, Allocated, Releasing };
 
 struct ResourceDiagnostics;
 
-/// Context supplied by the caller; timeline identity is valid during the call.
+/**
+ * @brief Borrowed job, pass, timeline, and counter context for an observation.
+ * @details Timeline and diagnostic-owner pointers are valid during the
+ * synchronous observation call. They transfer no ownership. A simulation
+ * observer requires a non-null diagnostics owner; other observers may ignore it.
+ */
 struct ResourceContext {
   job_no_t job = std::numeric_limits<job_no_t>::max();
   sim_time_t time = 0;
@@ -60,7 +65,9 @@ struct ResourceDiagnostics {
   /** @brief Clear all counters without altering resource state. */
   void reset() { *this = {}; }
   /** @brief Accumulate an observation without retaining its context.
-   * @param[in] event Resource operation to count. */
+   * @param[in] event Resource operation to count.
+   * @pre event.operation must identify an operation, not the Count sentinel.
+   */
   void observe(const ResourceObservation &event) {
     const auto index = static_cast<size_t>(event.operation);
     ++calls[index];
@@ -83,11 +90,16 @@ struct SimulationResourceObserver {
   }
 };
 
+/** @brief Disable observation without requiring an observe() implementation. */
 struct NoResourceObserver {
   static constexpr bool enabled = false;
 };
 
-/// Optional diagnostic observer. Single-threaded, no per-event heap allocation.
+/**
+ * @brief Explicit test observer with shared static operation counters.
+ * @details Intended for single-threaded tests; it does not own per-simulation
+ * counters and performs no per-event heap allocation.
+ */
 struct CountingResourceObserver {
   static constexpr bool enabled = true;
   static constexpr size_t operation_count =
@@ -96,11 +108,15 @@ struct CountingResourceObserver {
   inline static std::array<std::uint64_t, operation_count> quantities{};
   inline static std::uint64_t failed_fits = 0;
 
+  /** @brief Clear this test observer's shared counters. */
   static void reset() {
     calls.fill(0);
     quantities.fill(0);
     failed_fits = 0;
   }
+  /** @brief Count an operation without retaining its metadata.
+   * @param[in] event Resource operation to count.
+   * @pre event.operation must identify an operation, not the Count sentinel. */
   static void observe(const ResourceObservation &event) {
     const auto index = static_cast<size_t>(event.operation);
     ++calls[index];

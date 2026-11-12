@@ -186,6 +186,12 @@ static void counting_observer_checks() {
           "reset must clear failed fits");
 }
 
+/**
+ * @brief Check runtime observer selection, delayed release, and counter isolation.
+ * @param[in] diagnostics Whether this test simulation enables observation.
+ * @param[in] priority Shared placement-pass or OpenPBS forecast policy to test.
+ * @throws std::runtime_error if an accounting or observer invariant fails.
+ */
 static void integrated_accounting(bool diagnostics, PriorityPolicy priority) {
   const auto directory = std::filesystem::temp_directory_path() /
                          ("dr-evt-count-model-" + std::to_string(

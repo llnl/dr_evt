@@ -47,8 +47,10 @@ class SchedulerBase;
  *  @{ */
 
 /**
- * Main simulation class that orchestrates job scheduling simulation
- * with backfilling using discrete event simulation
+ * @brief Orchestrate scheduling and accounting through discrete-event simulation.
+ * @tparam TraceType Trace implementation owning job records and event accounting.
+ * @details Configuration, trace, and scheduler belong to this simulation.
+ * Diagnostic selection is fixed at construction; counters belong to its trace.
  */
 template <typename TraceType> class BasicSimulation {
 protected:
@@ -158,7 +160,11 @@ protected:
 public:
   /**
    * @brief Construct a simulation from immutable configuration.
-   * @param[in] params Immutable simulation configuration.
+   * @param[in] params Configuration transferred into this simulation.
+   * @details Selects resource observation from resource_model_diagnostics once
+   * at construction. The trace owns counters borrowed by an enabled scheduler.
+   * @throws std::invalid_argument if scheduler configuration is invalid.
+   * @throws std::runtime_error if the input trace cannot be initialized.
    */
   BasicSimulation(Sim_Params params);
 
@@ -167,11 +173,23 @@ public:
    * @param[in] params Immutable simulation configuration.
    * @param[in] cost_function Callback that computes a job's cost at insertion.
    * @param[in] selector Callback that chooses one of the reported candidates.
+   * @details Configuration and callbacks are owned by the simulation. Resource
+   * diagnostics are selected once and observe trace event accounting; this
+   * custom scheduler does not use the CountModel fit/reservation operations.
+   * @throws std::runtime_error if the input trace cannot be initialized.
    */
   BasicSimulation(Sim_Params params, job_cost_function_t cost_function,
                   backfill_selector_t selector);
 
-  /** Construct a simulation with a configured Custom-FCFS subclass. */
+  /**
+   * @brief Construct a simulation owning a configured Custom-FCFS scheduler.
+   * @param[in] params Configuration transferred into this simulation.
+   * @param[in] scheduler Non-null scheduler whose ownership is transferred.
+   * @details Diagnostics are selected once from params and observe the trace's
+   * event accounting. The scheduler is destroyed before the trace counter owner.
+   * @throws std::invalid_argument if scheduler is null.
+   * @throws std::runtime_error if the input trace cannot be initialized.
+   */
   BasicSimulation(Sim_Params params,
                   std::unique_ptr<FCFSEasyCustomScheduler> scheduler);
 
@@ -188,6 +206,8 @@ public:
   /**
    * @brief Write a human-readable statistics report.
    * @param[in,out] os Destination stream receiving the report.
+   * @details Includes resource operation counters when enabled at construction.
+   * Reading the counters neither advances time nor performs planning.
    */
   void print_stats(std::ostream &os) const;
 
@@ -243,7 +263,9 @@ public:
    * and output paths must match those used to create the checkpoint. A Custom
    * FCFS destination must be constructed with equivalent callbacks. Existing
    * file outputs are archived as pre-restart segments, and fresh output
-   * segments are opened at the configured paths.
+   * segments are opened at the configured paths. Diagnostic counters restart
+   * at zero after a successful load; the destination's construction-time
+   * observer selection is retained and may differ from the recorded setting.
    * @param[in,out] input Binary checkpoint source stream.
    */
   void load_checkpoint(std::istream &input);
@@ -251,6 +273,8 @@ public:
   /**
    * @brief Restore an exact continuation checkpoint from a file.
    * @param[in] filename Existing checkpoint path.
+   * @details Uses the stream overload's restoration semantics, including
+   * resetting counters while retaining construction-time observer selection.
    */
   void load_checkpoint(const std::string &filename);
 #endif
