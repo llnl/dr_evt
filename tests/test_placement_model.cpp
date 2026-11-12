@@ -58,8 +58,20 @@ static void bitmap_checks() {
                 "low selection feasibility");
         require(high.has_value() == low.has_value(),
                 "high selection feasibility");
-        if (!low)
+        auto retained_low = source, retained_high = source;
+        require(retained_low.retain_first<NodeOrder::LowIdFirst>(n) ==
+                    low.has_value(),
+                "in-place low feasibility");
+        require(retained_high.retain_first<NodeOrder::HighIdFirst>(n) ==
+                    high.has_value(),
+                "in-place high feasibility");
+        if (!low) {
+          require(retained_low == source && retained_high == source,
+                  "failed in-place selection changed source");
           continue;
+        }
+        require(retained_low == *low && retained_high == *high,
+                "in-place selection differs from owning selection");
         require(low->ids() ==
                     std::vector<num_nodes_t>(ids.begin(), ids.begin() + n),
                 "low ID ordering");
@@ -74,6 +86,30 @@ static void bitmap_checks() {
         state.toggle(*low);
         require(state == full, "batch toggle");
       }
+      std::vector<num_nodes_t> blocked_ids, free_ids;
+      for (auto id : ids)
+        (id % 2 ? free_ids : blocked_ids).push_back(id);
+      const auto blocked = Bitmap::from_ids(capacity, blocked_ids);
+      for (num_nodes_t n = 0; n <= free_ids.size() + 1; ++n) {
+        const auto low =
+            source.select_excluding<NodeOrder::LowIdFirst>(blocked, n);
+        const auto high =
+            source.select_excluding<NodeOrder::HighIdFirst>(blocked, n);
+        require(low.has_value() == (n <= free_ids.size()) &&
+                    high.has_value() == low.has_value(),
+                "excluded selection feasibility");
+        if (low) {
+          require(low->ids() == std::vector<num_nodes_t>(free_ids.begin(),
+                                                         free_ids.begin() + n),
+                  "excluded low identities");
+          require(high->ids() == std::vector<num_nodes_t>(free_ids.end() - n,
+                                                          free_ids.end()),
+                  "excluded high identities");
+        }
+      }
+      rejects<std::invalid_argument>(
+          [&] { source.select_excluding(Bitmap(capacity + 1), 0); });
+      require(blocked.ids() == blocked_ids, "selection mutated blocked mask");
       require(source.ids() == ids, "selection mutated source");
       auto state = source;
       rejects<std::invalid_argument>([&] { state.add(Bitmap(capacity + 1)); });
@@ -93,6 +129,14 @@ static void bitmap_checks() {
   require(movable.count() == 65 && moved.capacity() == 0 &&
               moved.words().empty(),
           "move assignment left invalid source");
+  const auto *storage = movable.words().data();
+  const auto replacement = Bitmap::from_ids(64, std::array<num_nodes_t, 1>{63});
+  movable = replacement;
+  require(movable == replacement && movable.words().data() == storage,
+          "copy assignment did not reuse sufficient storage");
+  const auto &self = movable;
+  movable = self;
+  require(movable == replacement, "self copy changed membership");
   const std::array<num_nodes_t, 2> duplicates{1, 1};
   rejects<std::invalid_argument>([&] { Bitmap::from_ids(2, duplicates); });
   const std::array<num_nodes_t, 1> outside{2};
@@ -151,6 +195,8 @@ static void timeline_oracle() {
         auto actual = plan.template find_at<Order>(n, length, at);
         require(actual.has_value() == want.has_value(),
                 "exact feasibility differs from dense oracle");
+        require(plan.can_fit(at, n, length) == want.has_value(),
+                "boolean feasibility differs from dense oracle");
         if (actual) {
           require(actual->allocation.ids() == *want,
                   "exact identities differ from dense oracle");
@@ -223,6 +269,15 @@ static void lifecycle_checks() {
   Model::reserve(plan, *p, 4, 1, {7, 0, 3});
   require(!plan.find_at(4, 1, 10), "coarse cache not invalidated");
   require(copy.find_at(4, 1, 10).has_value(), "copy changed with source");
+  const auto before_query = Observer::events.size();
+  require(!Model::can_fit(plan, 4, 1, 10, {8, 10, 3}),
+          "boolean query ignored reservation");
+  require(Observer::events.size() == before_query + 1 &&
+              Observer::events.back().operation == ResourceOperation::FitNow &&
+              Observer::events.back().context.timeline == &plan &&
+              !Observer::events.back().success,
+          "boolean observer snapshot");
+  rejects<std::invalid_argument>([&] { Model::can_fit(plan, 1, INFINITY, 0); });
   const auto size = plan.intervals().size();
   rejects<std::invalid_argument>([&] { plan.reserve(*p, 1); });
   require(plan.intervals().size() == size,
@@ -290,11 +345,116 @@ static void lifecycle_checks() {
           "negative duration point semantics");
 }
 
+/** @brief Check immediate selection and atomic batch seeding over borrowed
+ * owners.
+ * @tparam CoarseFilter Compile-time lambda selecting coarse filtering.
+ * @throws std::runtime_error if selection, admission, or ownership is
+ * incorrect. */
+template <auto CoarseFilter = DisableCoarseFilter>
+static void optimized_lifecycle_checks() {
+  using Model = PlacementModel<Observer, NodeOrder::LowIdFirst, CoarseFilter>;
+  using Timeline = typename Model::Timeline;
+  using Interval = typename Timeline::Interval;
+  const auto low = Bitmap::from_ids(129, std::array<num_nodes_t, 2>{0, 64});
+  const auto high = Bitmap::from_ids(129, std::array<num_nodes_t, 2>{63, 128});
+  const Bitmap inventory(129, true), empty(129);
+  const auto occupied = low;
+  auto immediate = Model::find_available(inventory, occupied, 3, 10, 0, {9, 0});
+  require(immediate && immediate->allocation.ids() ==
+                           std::vector<num_nodes_t>({1, 2, 3}),
+          "immediate selection identities");
+  require(Observer::events.back().scope == ResourceScope::Available &&
+              Observer::events.back().before == 127 &&
+              Observer::events.back().after == 127,
+          "immediate observer snapshots");
+  require(!Model::find_available(inventory, occupied, 128, 10, 0),
+          "immediate over-allocation");
+  require(Model::find_available(inventory, occupied, 0, -1, 0)
+                  ->allocation.count() == 0,
+          "zero immediate request");
+  rejects<std::invalid_argument>(
+      [&] { Model::find_available(inventory, Bitmap(128), 0, 1, 0); });
+  rejects<std::invalid_argument>(
+      [&] { Model::find_available(inventory, occupied, 1, INFINITY, 0); });
+  rejects<std::invalid_argument>(
+      [&] { Model::find_available(inventory, occupied, 1, 1, NAN); });
+  rejects<std::invalid_argument>(
+      [&] { Model::find_available(inventory, occupied, 1, 0.1, 1e16); });
+  rejects<std::invalid_argument>(
+      [&] { Model::find_available(inventory, occupied, 1, 1e308, 1e308); });
+  require(occupied == low, "immediate selection mutated live accounting");
+  std::array<Interval, 3> records{{{0, 20, 2, std::cref(high)},
+                                   {0, 10, 1, std::cref(low)},
+                                   {0, 30, 3, std::cref(empty)}}};
+  const auto describe = [](const Interval &interval) { return interval; };
+  Timeline batch(inventory, 0), scalar(inventory, 0);
+  batch.seed_running(records, describe);
+  for (const auto &record : records)
+    scalar.borrow_running(record.allocation(), record.finish, record.job);
+  require(batch.intervals().size() == 2 &&
+              &batch.intervals()[0].allocation() == &low &&
+              &batch.intervals()[1].allocation() == &high,
+          "batch lost release ordering or borrowed ownership");
+  for (int t = 0; t <= 30; ++t) {
+    auto want = scalar.earliest_fit(128, 5, t);
+    auto actual = batch.earliest_fit(128, 5, t);
+    require(want && actual && want->start == actual->start &&
+                want->allocation == actual->allocation,
+            "batch differs from scalar seed");
+  }
+  auto copy = batch;
+  require(&copy.intervals()[0].allocation() == &low, "batch copy lost owner");
+  rejects<std::invalid_argument>(
+      [&] { batch.seed_running(records, describe); });
+  Timeline failed(inventory, 0);
+  auto invalid = records;
+  invalid[1].masks = std::cref(high);
+  rejects<std::invalid_argument>(
+      [&] { failed.seed_running(invalid, describe); });
+  require(failed.intervals().empty(), "overlap partially seeded planner");
+  invalid = records;
+  invalid[1].masks = low;
+  rejects<std::invalid_argument>(
+      [&] { failed.seed_running(invalid, describe); });
+  invalid = records;
+  invalid[1].finish = 0;
+  rejects<std::invalid_argument>(
+      [&] { failed.seed_running(invalid, describe); });
+  invalid[1].finish = INFINITY;
+  rejects<std::invalid_argument>(
+      [&] { failed.seed_running(invalid, describe); });
+  invalid = records;
+  invalid[1].start = 1;
+  rejects<std::invalid_argument>(
+      [&] { failed.seed_running(invalid, describe); });
+  const Bitmap other_domain(128);
+  invalid = records;
+  invalid[1].masks = std::cref(other_domain);
+  rejects<std::invalid_argument>(
+      [&] { failed.seed_running(invalid, describe); });
+  rejects<std::runtime_error>([&] {
+    failed.seed_running(records, [&](const Interval &interval) {
+      if (interval.job == 1)
+        throw std::runtime_error("descriptor failed");
+      return interval;
+    });
+  });
+  require(failed.intervals().empty(),
+          "failed descriptor partially seeded planner");
+  failed.seed_running(std::array<Interval, 0>{}, describe);
+  require(failed.intervals().empty(), "empty batch seeded intervals");
+  Timeline subset(low, 0);
+  rejects<std::invalid_argument>(
+      [&] { subset.seed_running(records, describe); });
+}
+
 /** @brief Run the focused placement checks.
  * @return Zero on success, one on failure. */
 int main() {
   try {
     bitmap_checks();
+    optimized_lifecycle_checks<>();
+    optimized_lifecycle_checks<EnableCoarseFilter>();
     timeline_oracle<NodeOrder::LowIdFirst>();
     timeline_oracle<NodeOrder::HighIdFirst>();
     timeline_oracle<NodeOrder::LowIdFirst, 129>();

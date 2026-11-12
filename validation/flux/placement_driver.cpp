@@ -10,6 +10,7 @@
 #include "sim/resource/placement_model.hpp"
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <string>
 
 using namespace dr_evt;
@@ -62,6 +63,7 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
                 bool strict, std::ostream &out) {
   using Model = PlacementModel<NoResourceObserver, Order, CoarseFilter>;
   Bitmap occupied(capacity);
+  const Bitmap inventory(capacity, true);
   sim_time_t time = jobs.empty() ? 0 : jobs.front().submit;
   size_t completed = 0;
   while (completed < jobs.size()) {
@@ -75,29 +77,43 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     }
     // This planner dies before any job-owned allocation changes at the next
     // event.
-    typename Model::Timeline plan(Bitmap(capacity, true), time);
-    for (size_t index = 0; index < jobs.size(); ++index) {
-      const auto &job = jobs[index];
-      if (job.launched && job.finish > time)
-        plan.borrow_running(job.allocation,
-                            job.finish + job.limit - job.runtime, index);
-    }
+    std::optional<typename Model::Timeline> plan;
+    const auto ensure_plan = [&]() {
+      if (plan)
+        return;
+      plan.emplace(inventory, time);
+      auto live = jobs | std::views::filter([time](const Job &job) {
+                    return job.launched && job.finish > time;
+                  });
+      plan->seed_running(live, [&](const Job &job) {
+        return typename Model::Timeline::Interval{
+            time, job.finish + job.limit - job.runtime,
+            static_cast<job_no_t>(&job - jobs.data()),
+            std::cref(job.allocation)};
+      });
+    };
     size_t reserved = 0;
     for (size_t index = 0; index < jobs.size(); ++index) {
       auto &job = jobs[index];
       if (job.launched || job.submit > time)
         continue;
-      auto placement =
-          reserved < slots
-              ? Model::find_fit(plan, job.quantity, job.limit, time)
-              : Model::find_at(plan, job.quantity, job.limit, time);
+      std::optional<typename Model::Placement> placement;
+      if (!plan)
+        placement = Model::find_available(inventory, occupied, job.quantity,
+                                          job.limit, time);
+      if (!placement && (plan || reserved < slots)) {
+        ensure_plan();
+        placement = reserved < slots
+                        ? Model::find_fit(*plan, job.quantity, job.limit, time)
+                        : Model::find_at(*plan, job.quantity, job.limit, time);
+      }
       if (!placement) {
         if (strict)
           break;
         continue;
       }
       if (placement->start > time) {
-        Model::reserve(plan, std::move(*placement), job.quantity, job.limit,
+        Model::reserve(*plan, std::move(*placement), job.quantity, job.limit,
                        {index, time});
         ++reserved;
         continue;
@@ -106,7 +122,8 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
       job.allocation = std::move(placement->allocation);
       job.launched = true;
       job.finish = time + job.runtime;
-      plan.borrow_running(job.allocation, time + job.limit, index);
+      if (plan)
+        plan->borrow_running(job.allocation, time + job.limit, index);
       out << "{\"schedule\":{\"job\":" << index << ",\"start\":" << time
           << ",\"finish\":" << job.finish << ",\"node_ids\":";
       write_ids(job.allocation, out);
@@ -129,7 +146,9 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     first = true;
     // Queue order, independent of the planner's temporal storage order.
     for (size_t index = 0; index < jobs.size(); ++index) {
-      for (const auto &interval : plan.intervals()) {
+      for (const auto &interval :
+           plan ? plan->intervals()
+                : std::span<const typename Model::Timeline::Interval>{}) {
         if (interval.job != index || interval.start <= time)
           continue;
         if (!first)

@@ -101,6 +101,25 @@ metadata. Borrowed allocations must stay immutable and alive until the planning
 pass and its copies finish. A committed allocation must remain with its owner
 through completion and any delayed release. No job-ID side map is introduced.
 
+`seed_running(records, describe)` admits a whole existing running-record range
+into an empty timeline. The descriptor returns an interval borrowing each live
+allocation. A temporary union checks disjointness, and the final interval
+metadata sorts once. Invalid input or a failed descriptor leaves the timeline
+unchanged; no additional running collection survives initialization.
+
+Before any future reservation or outage exists, `find_available()` selects
+directly from eligible nodes excluding live occupied nodes. The validation
+driver constructs its timeline lazily when an immediate request fails and can
+receive a reservation. Once constructed, the timeline governs all later queries
+in that pass. This fast path requires the caller to enforce that precondition.
+Earliest-fit queries reuse one local bitmap across candidate starts and transfer
+it into the successful result. Boolean feasibility queries refine candidates
+without constructing an allocation result.
+
+The [placement optimization trials](https://github.com/LLNL/dr_evt/blob/main/validation/performance/simulation/placement-model/README.md)
+measure these changes independently, including the low-load 20K-job trace and
+focused reservation queries.
+
 A derived, contiguous 64-row grid provides the coarse early filter. Each row
 unions the nodes free at any point in its bucket. Intersecting touched rows
 produces an optimistic candidate set: failure proves infeasibility, while

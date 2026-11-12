@@ -116,11 +116,12 @@ public:
    * @param[in] other Bitmap to copy.
    * @return This bitmap after assignment.
    * @throws std::bad_alloc if word storage cannot be allocated.
-   * @details Failure leaves the original membership unchanged. */
+   * @details Existing word capacity is reused when sufficient. With integral
+   * words, allocation failure leaves the original membership unchanged. */
   Bitmap &operator=(const Bitmap &other) {
     if (this != &other) {
-      Bitmap copy(other);
-      *this = std::move(copy);
+      m_words = other.m_words;
+      m_capacity = other.m_capacity;
     }
     return *this;
   }
@@ -313,6 +314,73 @@ public:
     if (remaining) {
       return std::nullopt;
     }
+    return selected;
+  }
+
+  /** @brief Retain the first N members in an already-owned scratch bitmap.
+   * @tparam Order Compile-time selection order.
+   * @param[in] quantity Members to keep; zero clears membership.
+   * @return true after complete selection; false when insufficient.
+   * @details Feasibility precedes mutation, so failure leaves membership
+   * unchanged. Selection reuses word storage and performs no allocation. */
+  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  bool retain_first(num_nodes_t quantity) noexcept {
+    size_t available = 0;
+    for (size_t cursor = 0; cursor < m_words.size() && available < quantity;
+         ++cursor) {
+      const auto index =
+          Order == NodeOrder::LowIdFirst ? cursor : m_words.size() - cursor - 1;
+      available += std::popcount(m_words[index]);
+    }
+    if (available < quantity)
+      return false;
+    size_t remaining = quantity;
+    for (size_t cursor = 0; cursor < m_words.size(); ++cursor) {
+      const auto index =
+          Order == NodeOrder::LowIdFirst ? cursor : m_words.size() - cursor - 1;
+      if (!remaining) {
+        m_words[index] = 0;
+        continue;
+      }
+      const auto bits = m_words[index];
+      const auto population = static_cast<size_t>(std::popcount(bits));
+      const auto taken = std::min(remaining, population);
+      m_words[index] =
+          taken == population ? bits : partial_word<Order>(bits, taken);
+      remaining -= taken;
+    }
+    return true;
+  }
+
+  /** @brief Select eligible members excluding a borrowed blocked mask.
+   * @tparam Order Compile-time selection order.
+   * @param[in] blocked Unavailable identities in the same domain; not retained.
+   * @param[in] quantity Requested members; zero selects an empty set.
+   * @return Owning selection or std::nullopt when insufficient.
+   * @throws std::invalid_argument if domains differ.
+   * @throws std::bad_alloc if result storage cannot be allocated.
+   * @details Sources are unchanged; no intermediate exclusion mask is
+   * allocated. */
+  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  std::optional<Bitmap> select_excluding(const Bitmap &blocked,
+                                         num_nodes_t quantity) const {
+    same_domain(blocked);
+    if (quantity > m_capacity)
+      return std::nullopt;
+    Bitmap selected(m_capacity);
+    size_t remaining = quantity;
+    for (size_t cursor = 0; cursor < m_words.size() && remaining; ++cursor) {
+      const size_t index =
+          Order == NodeOrder::LowIdFirst ? cursor : m_words.size() - cursor - 1;
+      const auto bits = m_words[index] & ~blocked.m_words[index];
+      const auto available = static_cast<size_t>(std::popcount(bits));
+      const auto taken = std::min(remaining, available);
+      selected.m_words[index] =
+          taken == available ? bits : partial_word<Order>(bits, taken);
+      remaining -= taken;
+    }
+    if (remaining)
+      return std::nullopt;
     return selected;
   }
 

@@ -58,6 +58,14 @@ The [first milestone results](count-model/README.md) record the correctness
 checks and measured overhead of the original standalone count model. Current
 code uses CapacityModel directly; the redundant CountModel wrapper was removed.
 
+## Bitmap placement optimization trials
+
+The [placement trials](placement-model/README.md) measure immediate selection,
+batch running-allocation seeding, reusable query scratch, and boolean fitting
+independently and together. They use the same 500-node EASY/HYBRID settings as
+`tests/benchmark_wait_queues.sh`, a reproducible seeded 20K-job trace, and focused
+reservation-query workloads.
+
 `compare_count_model.py` compares baseline and candidate binaries, with an
 optional explicitly instrumented or historical binary supplied via `--hooks`.
 It checks exact schedule/resource-history hashes on every run

@@ -250,6 +250,29 @@ private:
     }
   }
 
+  /** @brief Refine and select using a caller-local reusable candidate buffer.
+   * @tparam Order Compile-time selection order.
+   * @param[in,out] candidates Owned query scratch; refreshed from inventory.
+   * @param[in] quantity Requested identities.
+   * @param[in] duration Requested duration; nonpositive means a point query.
+   * @param[in] start Exact candidate start.
+   * @return true with selected membership, false when no fit exists.
+   * @throws std::invalid_argument for invalid query timing.
+   * @throws std::bad_alloc if scratch or filter storage cannot be allocated.
+   * @details Scratch never survives this public query or becomes a cache. */
+  template <NodeOrder Order>
+  bool select_at(Bitmap &candidates, num_nodes_t quantity, tdiff_t duration,
+                 sim_time_t start) const {
+    const auto end = endpoint(start, duration);
+    candidates = m_pool;
+    if constexpr (coarse_filter_enabled)
+      filter(candidates, start, end);
+    if (candidates.count() < quantity)
+      return false;
+    refine(candidates, start, end);
+    return candidates.template retain_first<Order>(quantity);
+  }
+
   /** @brief Append and order an exact interval after admission.
    * @tparam Masks Owning bitmap or borrowed bitmap reference wrapper.
    * @param[in] start Inclusive blocked start.
@@ -325,6 +348,60 @@ public:
   BasicPlacementTimeline &
   operator=(const BasicPlacementTimeline &other) = delete;
 
+  /** @brief Seed an empty planner from an existing running-record range.
+   * @tparam Range Borrowed iterable of existing running records.
+   * @tparam Describe Callable returning an Interval with a borrowed mask.
+   * @param[in] records Existing records; the range itself is not retained.
+   * @param[in] describe Maps a record to its exact release and borrowed
+   * allocation.
+   * @throws std::invalid_argument if the planner is nonempty, a mask is owned,
+   * timing or domains are invalid, or live allocations overlap.
+   * @throws std::bad_alloc if interval or temporary validation storage cannot
+   * be allocated.
+   * @details Each interval must begin at this planner's origin. Allocations
+   * must remain immutable and alive through this planner and its copies. A
+   * temporary union validates disjointness; interval metadata sorts once and
+   * transfers into the planner only after the complete batch is admitted.
+   * Failure leaves it unchanged. Exceptions from the descriptor propagate
+   * before ownership transfer. */
+  template <typename Range, typename Describe>
+  void seed_running(Range &&records, Describe describe) {
+    if (!m_intervals.empty())
+      throw std::invalid_argument("batch seed requires an empty timeline");
+    std::vector<Interval> initial;
+    if constexpr (requires { records.size(); })
+      initial.reserve(records.size());
+    Bitmap occupied(m_pool.capacity());
+    for (const auto &record : records) {
+      auto interval = describe(record);
+      if (interval.start != m_origin ||
+          !std::holds_alternative<
+              std::reference_wrapper<const BitmapAllocation>>(interval.masks))
+        throw std::invalid_argument(
+            "batch interval must borrow a live allocation at the origin");
+      const auto end = endpoint(m_origin, interval.finish - m_origin);
+      if (end <= m_origin)
+        throw std::invalid_argument("running release must be in the future");
+      interval.finish = end;
+      const auto &allocation = interval.allocation();
+      if (!m_pool.contains(allocation) || occupied.intersects(allocation))
+        throw std::invalid_argument(
+            "invalid or overlapping running allocation");
+      if (allocation.count() == 0)
+        continue;
+      occupied.add(allocation);
+      initial.push_back(std::move(interval));
+    }
+    std::sort(initial.begin(), initial.end(),
+              [](const Interval &left, const Interval &right) {
+                return left.finish != right.finish ? left.finish < right.finish
+                                                   : left.job < right.job;
+              });
+    m_intervals = std::move(initial);
+    if constexpr (coarse_filter_enabled)
+      m_filter.dirty = true;
+  }
+
   /** @brief Borrow an existing running allocation for this planning pass.
    * @param[in] allocation Immutable live allocation; caller retains ownership.
    * @param[in] finish Forecast release strictly later than the origin.
@@ -387,17 +464,10 @@ public:
   template <NodeOrder Order = NodeOrder::LowIdFirst>
   std::optional<BitmapPlacement> find_at(num_nodes_t quantity, tdiff_t duration,
                                          sim_time_t start) const {
-    const auto end = endpoint(start, duration);
-    Bitmap candidates = m_pool;
-    if constexpr (coarse_filter_enabled)
-      filter(candidates, start, end);
-    if (candidates.count() < quantity)
+    Bitmap candidates;
+    if (!select_at<Order>(candidates, quantity, duration, start))
       return std::nullopt;
-    refine(candidates, start, end);
-    auto allocation = candidates.template select<Order>(quantity);
-    if (!allocation)
-      return std::nullopt;
-    return BitmapPlacement{start, std::move(*allocation)};
+    return BitmapPlacement{start, std::move(candidates)};
   }
 
   /** @brief Find the earliest exact placement after a requested start.
@@ -419,17 +489,16 @@ public:
     endpoint(start, duration);
     if (quantity > m_pool.count())
       return std::nullopt;
-    auto placement = find_at<Order>(quantity, duration, start);
-    if (placement)
-      return placement;
+    Bitmap candidates;
+    if (select_at<Order>(candidates, quantity, duration, start))
+      return BitmapPlacement{start, std::move(candidates)};
     sim_time_t previous = start;
     for (const auto &interval : m_intervals) {
       if (interval.finish <= previous)
         continue;
       previous = interval.finish;
-      placement = find_at<Order>(quantity, duration, previous);
-      if (placement)
-        return placement;
+      if (select_at<Order>(candidates, quantity, duration, previous))
+        return BitmapPlacement{previous, std::move(candidates)};
     }
     return std::nullopt;
   }
@@ -442,7 +511,14 @@ public:
    * @throws std::invalid_argument for invalid query timing.
    * @throws std::bad_alloc if scratch or filter storage cannot be allocated. */
   bool can_fit(sim_time_t start, num_nodes_t quantity, tdiff_t duration) const {
-    return find_at(quantity, duration, start).has_value();
+    const auto end = endpoint(start, duration);
+    Bitmap candidates = m_pool;
+    if constexpr (coarse_filter_enabled)
+      filter(candidates, start, end);
+    if (candidates.count() < quantity)
+      return false;
+    refine(candidates, start, end);
+    return candidates.count() >= quantity;
   }
 
   /** @brief Copy an admitted future reservation into exact planning state.

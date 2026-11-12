@@ -1,0 +1,91 @@
+--- a/src/sim/resource/placement_timeline.hpp
++++ b/src/sim/resource/placement_timeline.hpp
+@@ -252,0 +253,21 @@
++  /** @brief Refine and select using a caller-local reusable candidate buffer.
++   * @tparam Order Compile-time selection order.
++   * @param[in,out] candidates Owned query scratch; refreshed from inventory.
++   * @param[in] quantity Requested identities.
++   * @param[in] duration Requested duration; nonpositive means a point query.
++   * @param[in] start Exact candidate start.
++   * @return true with selected membership, false when no fit exists.
++   * @throws std::invalid_argument for invalid query timing.
++   * @throws std::bad_alloc if scratch or filter storage cannot be allocated.
++   * @details Scratch never survives this public query or becomes a cache. */
++  template <NodeOrder Order>
++  bool select_at(Bitmap &candidates, num_nodes_t quantity, tdiff_t duration,
++                 sim_time_t start) const {
++    const auto end = endpoint(start, duration);
++    candidates = m_pool;
++    if constexpr (coarse_filter_enabled) filter(candidates, start, end);
++    if (candidates.count() < quantity) return false;
++    refine(candidates, start, end);
++    return candidates.template retain_first<Order>(quantity);
++  }
++
+@@ -390,11 +411,3 @@
+-    const auto end = endpoint(start, duration);
+-    Bitmap candidates = m_pool;
+-    if constexpr (coarse_filter_enabled)
+-      filter(candidates, start, end);
+-    if (candidates.count() < quantity)
+-      return std::nullopt;
+-    refine(candidates, start, end);
+-    auto allocation = candidates.template select<Order>(quantity);
+-    if (!allocation)
+-      return std::nullopt;
+-    return BitmapPlacement{start, std::move(*allocation)};
++    Bitmap candidates;
++    if (!select_at<Order>(candidates, quantity, duration, start)) return std::nullopt;
++    return BitmapPlacement{start, std::move(candidates)};
+@@ -422,3 +435,3 @@
+-    auto placement = find_at<Order>(quantity, duration, start);
+-    if (placement)
+-      return placement;
++    Bitmap candidates;
++    if (select_at<Order>(candidates, quantity, duration, start))
++      return BitmapPlacement{start, std::move(candidates)};
+@@ -430,3 +443,2 @@
+-      placement = find_at<Order>(quantity, duration, previous);
+-      if (placement)
+-        return placement;
++      if (select_at<Order>(candidates, quantity, duration, previous))
++        return BitmapPlacement{previous, std::move(candidates)};
+--- a/src/sim/resource/bitmap.hpp
++++ b/src/sim/resource/bitmap.hpp
+@@ -119 +119,2 @@
+-   * @details Failure leaves the original membership unchanged. */
++   * @details Existing word capacity is reused when sufficient. With integral
++   * words, allocation failure leaves the original membership unchanged. */
+@@ -122,2 +123,2 @@
+-      Bitmap copy(other);
+-      *this = std::move(copy);
++      m_words = other.m_words;
++      m_capacity = other.m_capacity;
+@@ -318,0 +320,27 @@
++  /** @brief Retain the first N members in an already-owned scratch bitmap.
++   * @tparam Order Compile-time selection order.
++   * @param[in] quantity Members to keep; zero clears membership.
++   * @return true after complete selection; false when insufficient.
++   * @details Feasibility precedes mutation, so failure leaves membership
++   * unchanged. Selection reuses word storage and performs no allocation. */
++  template <NodeOrder Order = NodeOrder::LowIdFirst>
++  bool retain_first(num_nodes_t quantity) noexcept {
++    size_t available = 0;
++    for (size_t cursor=0; cursor<m_words.size() && available<quantity; ++cursor) {
++      const auto index = Order == NodeOrder::LowIdFirst ? cursor : m_words.size()-cursor-1;
++      available += std::popcount(m_words[index]);
++    }
++    if (available < quantity) return false;
++    size_t remaining = quantity;
++    for (size_t cursor=0; cursor<m_words.size(); ++cursor) {
++      const auto index = Order == NodeOrder::LowIdFirst ? cursor : m_words.size()-cursor-1;
++      if (!remaining) { m_words[index]=0; continue; }
++      const auto bits = m_words[index];
++      const auto population = static_cast<size_t>(std::popcount(bits));
++      const auto taken = std::min(remaining, population);
++      m_words[index] = taken == population ? bits : partial_word<Order>(bits, taken);
++      remaining -= taken;
++    }
++    return true;
++  }
++

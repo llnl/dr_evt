@@ -52,6 +52,44 @@ public:
     return placement.start;
   }
 
+  /** @brief Select an immediate allocation before future commitments exist.
+   * @param[in] eligible Caller-owned inventory, not retained.
+   * @param[in] occupied Caller-owned allocation and cleanup union, not
+   * retained.
+   * @param[in] quantity Requested identities.
+   * @param[in] duration Planned duration; nonpositive means a point query.
+   * @param[in] start Exact immediate start.
+   * @param[in] context Synchronous observation metadata, not retained.
+   * @return Owning placement or std::nullopt when insufficient.
+   * @throws std::invalid_argument for mismatched domains or invalid timing.
+   * @throws std::bad_alloc if result or diagnostic storage cannot be allocated.
+   * @pre No future reservation or resource outage constrains these resources.
+   * @details Currently free nodes remain available; after future commitments
+   * exist, use the timeline fitting operations. */
+  static std::optional<Placement>
+  find_available(const State &eligible, const State &occupied, Request quantity,
+                 tdiff_t duration, sim_time_t start,
+                 ResourceContext context = {}) {
+    const auto end = duration > 0 ? start + duration : start;
+    if (!std::isfinite(start) || !std::isfinite(duration) ||
+        !std::isfinite(end) || !std::isfinite(end - start) ||
+        (duration > 0 && end <= start))
+      throw std::invalid_argument("invalid placement interval");
+    auto allocation =
+        eligible.template select_excluding<Order>(occupied, quantity);
+    if constexpr (Observer::enabled) {
+      auto free = eligible;
+      free.remove(occupied);
+      const auto count = static_cast<num_nodes_t>(free.count());
+      Observer::observe({ResourceOperation::FitNow, ResourceScope::Available,
+                         context, quantity, count, count, start, duration,
+                         allocation.has_value()});
+    }
+    if (!allocation)
+      return std::nullopt;
+    return Placement{start, std::move(*allocation)};
+  }
+
   /** @brief Test immediate exact interval feasibility.
    * @param[in] plan Borrowed caller-owned planner.
    * @param[in] quantity Number of resources requested.
@@ -60,11 +98,17 @@ public:
    * @param[in] context Synchronous observation context, not retained.
    * @return true when exact identities fit throughout the interval.
    * @throws std::invalid_argument for invalid timing.
-   * @throws std::bad_alloc if planner scratch or result storage cannot be
+   * @throws std::bad_alloc if planner scratch or filter storage cannot be
    * allocated. */
   static bool can_fit(const Timeline &plan, Request quantity, tdiff_t duration,
                       sim_time_t start, ResourceContext context = {}) {
-    return find_at(plan, quantity, duration, start, context).has_value();
+    const bool result = plan.can_fit(start, quantity, duration);
+    if constexpr (Observer::enabled) {
+      context.timeline = &plan;
+      Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
+                         context, quantity, 0, 0, start, duration, result});
+    }
+    return result;
   }
 
   /** @brief Select identities at an exact immediate start.
