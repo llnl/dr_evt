@@ -1,5 +1,9 @@
 # Standalone count-model measurements
 
+These reports describe the first count-model snapshot, before the later
+[reservation-record optimization](reservation-record-elision.md). Their source
+hashes identify that earlier snapshot rather than the current working tree.
+
 The first count-model milestone meets the proposed 2% wall-time regression
 threshold on these six workloads: every upper bound of the paired bootstrap
 interval is below 2%. Keep count as a standalone model; these results do not
@@ -66,4 +70,3 @@ interfaces or scheduler paths change.
 - [Batched mixed-case report](batched-comparison.json)
 - [Stress-case report](stress-comparison.json)
 - [Build and benchmark instructions](../README.md#standalone-count-model-comparison)
-- [Implementation and future milestones](../../../../docs/dev/RESOURCE_MODEL_PLAN.md)

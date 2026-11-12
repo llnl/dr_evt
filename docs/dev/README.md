@@ -11,8 +11,6 @@ maintainer-facing build guidance. It is separate from the user documentation.
   through the job store, scheduler, event loop, resource accounting, and output.
 - [Performance Analysis](PERFORMANCE_ANALYSIS.md) — Current simulator timings, reproduction instructions,
   and a short optimization history.
-- [Compile-time Resource Model Plan](RESOURCE_MODEL_PLAN.md) — Standalone count
-  model, correctness hooks, overhead measurements, and future resource models.
 - [Scheduling Predictions and Reservations](SCHEDULING_PREDICTIONS.md) —
   Reservation reporting, lookahead, and queue-drain estimates, including
   [performance and accuracy results](SCHEDULING_PREDICTIONS.md#performance-and-accuracy-comparison).

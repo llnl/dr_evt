@@ -23,6 +23,20 @@ static void require(bool condition, const char *message) {
   }
 }
 
+class InspectionScheduler : public FCFSPassHybridCircularScheduler {
+public:
+  using FCFSPassHybridCircularScheduler::FCFSPassHybridCircularScheduler;
+  std::vector<job_no_t> reserved_jobs() const {
+    std::vector<job_no_t> jobs;
+    for (const auto &prediction : m_estimated_starts) {
+      if (prediction.reserved) {
+        jobs.push_back(prediction.job_id);
+      }
+    }
+    return jobs;
+  }
+};
+
 int main() {
   // Immediate starts consume Q, and a fresh pass receives a fresh Q at the
   // same timestamp. Selected starts remain committed across those passes.
@@ -75,6 +89,34 @@ int main() {
   require(interleaved.schedule(2, {{0, {0, 10, 2}}}, 0) ==
               std::vector<job_no_t>{2},
           "backfill must be attempted before creating all R reservations");
+
+  // Unlimited Q needs no retry-plan records, but R must still limit future
+  // reservations. A short job starts around the first full-machine reservation;
+  // later waiting jobs remain pending, with predictions only when R permits.
+  for (auto policy : {BackfillPolicy::EASY, BackfillPolicy::HYBRID,
+                      BackfillPolicy::CONSERVATIVE}) {
+    InspectionScheduler scheduler(4, 4, policy, 0,
+                                   CircularOverflowPolicy::GROW, 2, 0);
+    scheduler.insert_job(1, 0, 5, 4);
+    scheduler.insert_job(2, 0, 20, 1);
+    scheduler.insert_job(3, 0, 2, 1);
+    scheduler.insert_job(4, 0, 5, 3);
+    require(scheduler.schedule(2, {{0, {0, 10, 2}}}, 0) ==
+                std::vector<job_no_t>{3},
+            "unlimited Q must allow immediate backfill around reservations");
+    const auto expected = policy == BackfillPolicy::EASY
+                              ? std::vector<job_no_t>{1}
+                          : policy == BackfillPolicy::HYBRID
+                              ? std::vector<job_no_t>{1, 2}
+                              : std::vector<job_no_t>{1, 2, 4};
+    require(scheduler.reserved_jobs() == expected,
+            "unlimited Q must retain reservation depth and prediction results");
+    require(scheduler.last_pass_count() == 1 &&
+                !scheduler.last_retry_stopped() &&
+                scheduler.active_job_count() == 3 &&
+                scheduler.get_fcfs_reservation_time() == 10,
+            "unlimited Q must finish one pass without launching reservations");
+  }
 
   // A permanently insufficient capacity outlook cannot reserve job 1.
   // It consumes no Q and does not prevent job 2 from using the only slot.

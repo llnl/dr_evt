@@ -63,6 +63,8 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
   std::vector<job_no_t> starts;
   projected_starts_t projected;
   using reservation_t = std::tuple<job_no_t, sim_time_t, tdiff_t>;
+  // Only a bounded Q can request another pass and compare reservation plans.
+  const bool record_reservations = m_backfill_queue_depth != 0;
   std::vector<reservation_t> previous_plan;
   bool have_previous_plan = false;
   m_last_pass_count = 0;
@@ -81,6 +83,7 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
     Timeline plan(reservation_timeline(free_nodes, running_jobs, current_time,
                                        projected));
     std::vector<reservation_t> reservations;
+    size_t reservation_count = 0;
     size_t tested = 0;
     size_t cursor = 0;
     size_t blocked_before = m_blocked.size();
@@ -97,7 +100,7 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
       }
       const tdiff_t duration =
           release_estimate(current_time, job.run_time_estimate);
-      const bool try_reserve = reservations.size() < reservation_limit;
+      const bool try_reserve = reservation_count < reservation_limit;
       const ResourceContext context{job.job_id, current_time, pass};
       // Once R reservations exist, later candidates only need admission now.
       // A future fit cannot be used and need not be calculated.
@@ -122,10 +125,13 @@ std::vector<job_no_t> FCFSPassHybridCircularScheduler::schedule_with_forecast(
         const tdiff_t reserved_duration =
             release_estimate(Model::start_time(*at), job.run_time_estimate);
         Model::reserve(plan, *at, job.nodes_requested, reserved_duration, context);
-        reservations.emplace_back(job.job_id, Model::start_time(*at),
-                                  reserved_duration);
+        ++reservation_count;
+        if (record_reservations) {
+          reservations.emplace_back(job.job_id, Model::start_time(*at),
+                                    reserved_duration);
+        }
         record_estimated_start(job.job_id, Model::start_time(*at), true);
-        if (reservations.size() == 1) {
+        if (reservation_count == 1) {
           m_fcfs_reservation_time = Model::start_time(*at);
         }
         ++tested;

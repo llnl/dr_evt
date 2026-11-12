@@ -1,0 +1,80 @@
+{
+  "jobs": 20000,
+  "scope": "ordinary operator new calls during one unlimited-Q conservative reservation-only pass; setup/warmup/validation/output excluded",
+  "variants": {
+    "before": {
+      "wall_ms": [
+        0.780834,
+        0.75025,
+        0.7405,
+        0.766208,
+        0.743375,
+        0.669875,
+        0.663083,
+        0.669334,
+        0.686875
+      ],
+      "median_wall_ms": 0.7405,
+      "new_calls": [
+        19,
+        19,
+        19,
+        19,
+        19,
+        19,
+        19,
+        19,
+        19
+      ],
+      "new_requested_bytes": [
+        1572952,
+        1572952,
+        1572952,
+        1572952,
+        1572952,
+        1572952,
+        1572952,
+        1572952,
+        1572952
+      ]
+    },
+    "after": {
+      "wall_ms": [
+        0.190917,
+        0.189292,
+        0.189375,
+        0.189209,
+        0.207458,
+        0.198625,
+        0.190542,
+        0.189375,
+        0.189584
+      ],
+      "median_wall_ms": 0.189584,
+      "new_calls": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "new_requested_bytes": [
+        112,
+        112,
+        112,
+        112,
+        112,
+        112,
+        112,
+        112,
+        112
+      ]
+    }
+  },
+  "benchmark_source_sha256": "4e1d4f36eeed9390940b082757e52204eff7eaa195b163b55623b1c794a7e135",
+  "measurement_order": "all baseline samples, then all candidate samples; timing is illustrative, allocation counts are deterministic"
+}

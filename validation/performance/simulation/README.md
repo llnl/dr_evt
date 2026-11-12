@@ -122,6 +122,4 @@ the default batch size: `--cases stress-per-pass-conservative
 stress-cached-conservative`. This avoids repeating long runs unnecessarily.
 
 Build/run `test_count_model-bin` in both candidate configurations to check the
-independent interval oracle and integrated start/release hook counts. See
-[the resource model plan](../../../docs/dev/RESOURCE_MODEL_PLAN.md) for the
-specialization decision and later identity/multi-resource milestones.
+independent interval oracle and integrated start/release hook counts.
