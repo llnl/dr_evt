@@ -19,12 +19,18 @@ for comparison, testing, and research.
 
 ## Benchmark record
 
-This record was collected on LLNL's `dane` system (Intel(R) Xeon(R) Platinum
+The November 12, 2026 record was collected from the current `main` build on
+LLNL's `dane` system (Intel(R) Xeon(R) Platinum
 8480+ CPUs; 112 cores and 256 GB memory) using
 [`tests/test_traces/scale/huge_10000jobs.csv`](https://github.com/LLNL/dr_evt/blob/main/tests/test_traces/scale/huge_10000jobs.csv)
 (10,001 jobs), 500 nodes, and
 FCFS with EASY backfilling. Values are the mean of 10 end-to-end runs; `±` is
 the population standard deviation.
+
+The [captured samples and summary](../_static/wait-queue-benchmark-2026-11-12.json)
+retain each run's timing and workload settings. The contributor confirmed the
+machine and branch; the logs do not record the exact revision, compiler, or
+build flags. Times were recorded to 0.001-second precision.
 
 **Benchmark script:** [`tests/benchmark_wait_queues.sh`](../../tests/benchmark_wait_queues.sh)
 
@@ -46,19 +52,22 @@ should not be compared numerically.
 
 | Implementation | Time (s) | vs deque | Change | Peak queue | Correctness |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `deque` | 0.4210 ± 0.0074 | 1.00× | baseline | 8,586 | baseline |
-| `multimap` | 5.7169 ± 0.0593 | 13.58× | +1,258% | 8,586 | PASS |
-| **`circular`** | **0.3944 ± 0.0064** | **0.94×** | **−6.3%** | **8,586** | **PASS** |
-| Python reference | 12.5440 ± 0.0647 | 29.80× | +2,880% | N/A | PASS |
-| `block`-4 | 1.4777 ± 0.0084 | 3.51× | +251% | 8,586 | PASS |
-| `block`-8 | 1.5217 ± 0.0076 | 3.61× | +261% | 8,586 | PASS |
-| `block`-16 | 1.6745 ± 0.0062 | 3.98× | +298% | 8,586 | PASS |
-| `block`-32 | 1.8957 ± 0.0075 | 4.50× | +350% | 8,586 | PASS |
-| `block`-64 | 2.7071 ± 0.0095 | 6.43× | +543% | 8,586 | PASS |
-| `block`-128 | 4.4143 ± 0.0073 | 10.49× | +949% | 8,586 | PASS |
-| `block`-256 | 7.5033 ± 0.0952 | 17.82× | +1,682% | 8,586 | PASS |
+| `deque` | 0.3546 ± 0.0009 | 1.00× | baseline | 8,586 | baseline |
+| `multimap` | 4.3524 ± 0.0060 | 12.27× | +1,127.4% | 8,586 | PASS |
+| **`circular`** | **0.3303 ± 0.0033** | **0.93×** | **−6.9%** | **8,586** | **PASS** |
+| Python reference | 12.4554 ± 0.0199 | 35.13× | +3,412.5% | N/A | PASS |
+| `block`-4 | 1.3667 ± 0.0025 | 3.85× | +285.4% | 8,586 | PASS |
+| `block`-8 | 1.4145 ± 0.0023 | 3.99× | +298.9% | 8,586 | PASS |
+| `block`-16 | 1.5071 ± 0.0018 | 4.25× | +325.0% | 8,586 | PASS |
+| `block`-32 | 1.7656 ± 0.0022 | 4.98× | +397.9% | 8,586 | PASS |
+| `block`-64 | 2.5954 ± 0.0014 | 7.32× | +631.9% | 8,586 | PASS |
+| `block`-128 | 4.3110 ± 0.0023 | 12.16× | +1,115.7% | 8,586 | PASS |
+| `block`-256 | 7.3226 ± 0.0044 | 20.65× | +1,965.0% | 8,586 | PASS |
 
-`circular` was fastest overall, and `block`-4 was the fastest block size.
+`circular` was fastest overall, and `block`-4 was the fastest block size. Compared
+with the previously published means, EASY deque and circular runtimes fell
+15.8% and 16.3%, respectively; multimap fell 23.9%. Circular
+uses 6.9% less time than deque, so the default queue recommendation is unchanged.
 
 The 10 runs produced identical simulated-job output across every measured C++
 queue variant, including `multimap`. The Python reference is an end-to-end
@@ -67,45 +76,57 @@ are compared with the C++ `deque` schedule using a `0.001` tolerance.
 
 ### Conservative backfill result
 
-Ten end-to-end runs of `huge_2000jobs.csv` with 500 nodes, full conservative
-backfilling, and `run_time_mode=limit` produced identical C++ schedules. This
-is a separate workload from the EASY table above. Values are means; `±` is the
+Five end-to-end runs on November 12 of `huge_2000jobs.csv` with 500 nodes,
+full conservative backfilling (queue depth 2,000), and `run_time_mode=limit`
+produced identical C++ schedules and matching Python schedules. This is a
+separate workload from the EASY table above. Values are means; `±` is the
 population standard deviation.
 
 | Implementation | Time (s) | vs deque | Change | Correctness |
 | --- | ---: | ---: | ---: | --- |
-| `deque` | 1.2346 ± 0.0777 | 1.00× | baseline | baseline |
-| **`circular`** | **1.1845 ± 0.0059** | **0.96×** | **−4.1%** | **PASS** |
-| Python hybrid reference | 57.5219 ± 0.3340 | 46.59× | +4,559% | PASS |
+| `deque` | 1.2064 ± 0.0020 | 1.00× | baseline | baseline |
+| **`circular`** | **1.1468 ± 0.0031** | **0.95×** | **−4.9%** | **PASS** |
+| Python hybrid reference | 59.6378 ± 0.0535 | 49.43× | +4,843.5% | PASS |
 
 ### Hybrid backfill result
 
-Ten end-to-end runs of `huge_10000jobs.csv` with 500 nodes,
+Ten end-to-end runs on November 12 of `huge_10000jobs.csv` with 500 nodes,
 `run_time_mode=limit`, reservation depth 32, and queue depth 32 produced
 matching C++ and Python schedules. Values are means; `±` is the population
 standard deviation.
 
 | Implementation | Time (s) | vs deque | Change | Correctness |
 | --- | ---: | ---: | ---: | --- |
-| `deque` | 0.0872 ± 0.0064 | 1.00× | baseline | baseline |
-| **`circular`** | **0.0842 ± 0.0030** | **0.97×** | **−3.4%** | **PASS** |
-| Python hybrid reference | 2.9251 ± 0.0066 | 33.54× | +3,255% | PASS |
+| `deque` | 0.0896 ± 0.0012 | 1.00× | baseline | baseline |
+| **`circular`** | **0.0863 ± 0.0013** | **0.96×** | **−3.7%** | **PASS** |
+| Python hybrid reference | 2.9752 ± 0.0095 | 33.21× | +3,220.5% | PASS |
+
+The new circular mean is 2.5% above the previously published 0.0842 s;
+it still uses 3.7% less time than deque in the same capture.
 
 ### Periodic hybrid backfill result
 
-Ten end-to-end runs of `huge_10000jobs.csv` with 500 nodes,
+Ten end-to-end runs on November 12 of `huge_10000jobs.csv` with 500 nodes,
 `run_time_mode=limit`, a 30-second backfill interval, reservation depth 32,
-and queue depth 32 measured the periodic circular scheduler and Python hybrid
-reference below. There is no periodic deque variant, so this is not a
-queue-to-queue speedup comparison.
+and queue depth 500 measured the periodic circular scheduler below. The Python
+reference was intentionally skipped. There is no periodic deque variant, so
+this is not a queue-to-queue speedup comparison.
+
+| Implementation | Time (s) | Correctness |
+| --- | ---: | --- |
+| `circular` | 0.2858 ± 0.0018 | periodic scheduler only; Python SKIP |
+
+This is 33.0% slower than the previously published queue-depth-500 mean of
+0.2149 ± 0.0046 s. The captures do not isolate the cause of the difference.
+
+The earlier queue-depth-32 capture below is retained as a separate Python
+comparison. It used ten runs, the same trace and node count, a 30-second
+interval, and reservation depth 32; it was not rerun on November 12.
 
 | Implementation | Time (s) | vs circular | Correctness |
 | --- | ---: | ---: | --- |
 | `circular` | 0.2455 ± 0.0866 | 1.00× | periodic scheduler only |
 | Python hybrid reference | 77.7686 ± 0.4932 | 316.78× | PASS |
-
-A separate circular-only ten-run measurement at queue depth 500, with the
-Python reference intentionally skipped, measured **0.2149 ± 0.0046 s**.
 
 Reproduce the current benchmark modes with:
 
