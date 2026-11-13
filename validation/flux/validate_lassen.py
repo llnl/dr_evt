@@ -110,6 +110,10 @@ def main():
     case = root / label
     case.mkdir(exist_ok=True)
     os.environ['DR_EVT_OBSERVE_RESOURCES'] = '1'
+    if args.resource_model == 'placement':
+        os.environ['DR_EVT_OBSERVE_RESERVATIONS'] = '1'
+    else:
+        os.environ.pop('DR_EVT_OBSERVE_RESERVATIONS', None)
     observer = Path(__file__).with_name('resource_observer')
     os.environ['PYTHONPATH'] = str(observer) + ':' + os.environ.get('PYTHONPATH', '')
     observed = simulator_case(case, jobs, args.simulator, args.policy, args.queue_depth,

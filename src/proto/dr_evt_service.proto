@@ -91,7 +91,8 @@ message ClientMessage {
 // capacity event-driven conservative implementation use per_pass_accounting: true,
 // priority_policy: "fcfs", backfill_policy: "conservative" and a circular queue.
 // Placement supports all four policies with priority_policy: "fcfs" and
-// per_pass_accounting: false; periodic dispatch and capacity schedules are rejected.
+// per_pass_accounting: false; separate periodic backfill is supported, while
+// fixed periodic dispatch and capacity schedules are rejected.
 message InitRequest {
     // CLI: --total_nodes.
     uint32 total_nodes = 1;
@@ -175,7 +176,7 @@ message InitRequest {
     // Select per-simulation resource operation counters at construction.
     // Default false. CLI: --resource_model_diagnostics.
     bool resource_model_diagnostics = 33;
-    // "capacity" (default) or "placement"; placement requires event-driven FCFS/circular.
+    // "capacity" (default) or "placement"; placement requires FCFS/circular.
     string resource_model = 34;
     // "low" (default) or "high"; template selection occurs at construction.
     string placement_order = 35;

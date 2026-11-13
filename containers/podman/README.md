@@ -558,6 +558,149 @@ Two references do not yet have complete automatic build support:
   revision and any Rust version or ROCm dependencies required by that revision;
   those external components are not vendored into this image.
 
+### Run placement-enabled production-scheduler comparisons
+
+Run this campaign from an allocated LC compute-node shell after
+`enable-podman`, not from a login node or another containerized development
+shell. The full server image contains the pinned Flux/Fiction, Slurm, and
+OpenPBS builds. These commands compare their native placement schedules with
+DR_EVT using the same 2,000-job prefix and record process elapsed times.
+
+From the repository root, copy the private trace into the input directory and
+make a unique result directory:
+
+```bash
+mkdir -p data results
+cp lassen-756-01.csv data/lassen-756-01.csv
+test -s data/lassen-756-01.csv
+RUN_STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+SCHED_RESULTS="$PWD/results/scheduler-placement-$RUN_STAMP"
+mkdir -p "$SCHED_RESULTS"
+```
+
+Start one shell and keep it open for all three measurements. `/workspace-host`
+is the writable host checkout; it deliberately does not replace the image's
+`/workspace`, which contains the installed scheduler builds. Input is mounted
+read-only at `/input`, and all persistent output is written through `/data`:
+
+```bash
+podman run --interactive --tty --rm \
+  --volume "$PWD:/workspace-host:rw" \
+  --volume "$PWD/data:/input:ro" \
+  --volume "$SCHED_RESULTS:/data" \
+  --entrypoint /bin/bash \
+  localhost/dr-evt-server:local
+```
+
+Inside the container, preflight the full image and publish the installed
+placement driver at the path used by the Slurm harness:
+
+```bash
+set -euo pipefail
+TRACE=/input/lassen-756-01.csv
+PLACEMENT_DRIVER=/opt/dr-evt/bin/tests/test_flux_placement_driver
+VALIDATION_ROOT=/workspace-host/validation
+test -s "$TRACE"
+test -x /opt/dr-evt/bin/simulator
+test -x "$PLACEMENT_DRIVER"
+test -x /workspace/install/bin/flux
+test -f /workspace/fiction-build/src/emu-jobtap.so
+test -x /workspace/slurm-modern-install/sbin/slurmctld
+test -x /workspace/openpbs-reference
+test -f "$VALIDATION_ROOT/flux/validate_lassen.py"
+test -f "$VALIDATION_ROOT/slurm/licenses/event_trace.py"
+test -f "$VALIDATION_ROOT/openpbs/compare.py"
+/usr/bin/python3 -c 'import matplotlib'
+# Export Flux's installed Python and module search paths for Fiction subprocesses.
+eval "$(/workspace/install/bin/flux env)"
+/usr/bin/python3 -c 'import flux'
+printf '%s\n' /opt/dr-evt/bin/simulator > /workspace/dr_evt-simulator
+printf '%s\n' "$PLACEMENT_DRIVER" > /workspace/dr_evt-placement-driver
+# Rebuild the small API client from the mounted checkout so adapter fixes and
+# the campaign harness come from the same source revision.
+DR_EVT_SOURCE_ROOT=/workspace-host \
+  bash "$VALIDATION_ROOT/slurm/licenses/build_event.sh"
+DR_EVT_SOURCE_ROOT=/workspace-host \
+  bash "$VALIDATION_ROOT/slurm/licenses/build_state_client.sh"
+```
+
+Before the full Slurm trace, verify that the validation-only liveness hook
+survives more than the native node-ping threshold:
+
+```bash
+/usr/bin/python3 "$VALIDATION_ROOT/slurm/licenses/event_trace.py" \
+  --liveness-smoke --outdir /data/slurm-liveness-smoke
+test -s /data/slurm-liveness-smoke/liveness-smoke.complete
+! grep -qi 'not responding' \
+  /data/slurm-liveness-smoke/node-liveness-smoke/controller.log
+```
+
+Run Fluxion through Fiction with exact placement enabled:
+
+```bash
+/usr/bin/python3 "$VALIDATION_ROOT/flux/validate_lassen.py" \
+  "$TRACE" /opt/dr-evt/bin/simulator \
+  --policy hybrid --scheduler-backend fluxion \
+  --reservation-depth 32 --queue-depth 64 --max-jobs 2000 \
+  --resource-model placement --placement-order low \
+  --timeout 900 --outdir /data/fluxion
+```
+
+The harness intentionally refuses to reuse an output directory. If a run
+fails, preserve it and retry with a new path such as `/data/fluxion-retry1`;
+use that new path for the completion checks below.
+
+Run native Slurm's exclusive whole-node placement comparison. `auth/none` is
+used by this trace-driven harness, so neither `munged` nor compute daemons are
+started:
+
+```bash
+export SLURM_LICENSE_STATE_ONLY=1
+/usr/bin/python3 "$VALIDATION_ROOT/slurm/licenses/event_trace.py" \
+  --batch-main-dispatch --resource-model placement \
+  --trace "$TRACE" --outdir /data/slurm
+```
+
+Run the native OpenPBS scheduler-library placement comparison:
+
+```bash
+/usr/bin/python3 "$VALIDATION_ROOT/openpbs/compare.py" \
+  --native /workspace/openpbs-reference \
+  --simulator /opt/dr-evt/bin/simulator \
+  --placement-driver "$PLACEMENT_DRIVER" \
+  --trace "$TRACE" --max-jobs 2000 \
+  --priority_policy fcfs_1s_evt_group \
+  --resource-model placement --placement-order low \
+  --outdir /data/openpbs
+```
+
+Each command must exit successfully. Before leaving the container, verify the
+three final reports and print a compact timing/placement summary:
+
+```bash
+test "$(jq -r .status /data/fluxion/workload.json)" = completed
+test -s /data/fluxion/comparison-metrics.json
+test -s /data/slurm/lassen-prefix2000-hybrid-r32-q64/report.json
+test -s /data/openpbs/lassen-prefix2000-r32/report.json
+
+jq -s '{scheduler:"Fluxion/Fiction",
+        differing_jobs:.[0].differing_jobs,
+        process_runtime_seconds:.[1].process_runtime_seconds}' \
+  /data/fluxion/workload.json /data/fluxion/comparison-metrics.json
+jq '{scheduler:"Slurm", different_start_times, different_allocations,
+     slurm_seconds:.slurm_metrics.process_elapsed_seconds,
+     dr_evt_seconds:.dr_evt_metrics.process_elapsed_seconds}' \
+  /data/slurm/lassen-prefix2000-hybrid-r32-q64/report.json
+jq '{scheduler:"OpenPBS", different_jobs, different_allocations,
+     openpbs_wall_seconds, dr_evt_wall_seconds}' \
+  /data/openpbs/lassen-prefix2000-r32/report.json
+```
+
+These elapsed-time scopes are scheduler-specific and are recorded in the
+reports; compare them as end-to-end harness costs, not as identical
+microbenchmark regions. Exit the container and retain the complete unique
+result directory for audit.
+
 ## Run the client/server containers
 
 Start Redis on the private network. Its port is published only on host

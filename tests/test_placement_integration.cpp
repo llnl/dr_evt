@@ -226,6 +226,67 @@ void restart_budget(const std::string &input, const std::string &model) {
   (void)model;
 #endif
 }
+/** @brief Check Slurm-style periodic planning protects currently idle nodes.
+ * @param[in] input Header-only input trace.
+ * @throws std::runtime_error if an arrival backfills or a timer pass consumes
+ * an identity retained for the blocked FCFS head.
+ */
+void periodic_placement(const std::string &input) {
+  auto params = params_for(input, "all");
+  params.m_backfill_policy = BackfillPolicy::HYBRID;
+  params.m_reservation_depth = 1;
+  params.m_backfill_queue_depth = 64;
+  params.m_backfill_interval = 30;
+  Simulation simulation(params);
+  simulation.append_job(0, 1, queue, 100, 40);
+  const auto head = simulation.append_job(1, 2, queue, 100);
+  const auto backfill = simulation.append_job(2, 1, queue, 80);
+  simulation.advance_to(29);
+  auto statuses = simulation.get_job_statuses({head, backfill});
+  require(!statuses[0].start_time && !statuses[1].start_time,
+          "placement backfilled on an arrival before its timer");
+  simulation.advance_to(30);
+  statuses = simulation.get_job_statuses({head, backfill});
+  require(!statuses[0].start_time,
+          "periodic placement started the blocked FCFS head");
+  require(!statuses[1].start_time,
+          "periodic placement consumed a node retained for the FCFS head");
+  simulation.advance_to(40);
+  statuses = simulation.get_job_statuses({head, backfill});
+  require(statuses[0].start_time == 40 &&
+              statuses[0].node_ids == std::vector<num_nodes_t>({0, 1}) &&
+              !statuses[1].start_time,
+          "event dispatch did not honor the retained periodic plan");
+}
+/** @brief Check OpenPBS event grouping with exact node identities.
+ * @param[in] input Header-only input trace.
+ * @throws std::runtime_error if adjacent or separated releases use the wrong
+ * forecast endpoint. */
+void grouped_placement(const std::string &input) {
+  const auto run = [&](tdiff_t second_release) {
+    auto params = params_for(input, "all");
+    params.m_total_nodes = 3;
+    params.m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
+    params.m_backfill_policy = BackfillPolicy::EASY;
+    Simulation simulation(params);
+    simulation.append_job(0, 1, queue, 10);
+    simulation.append_job(0, 1, queue, second_release);
+    const auto head = simulation.append_job(0, 2, queue, 2);
+    simulation.append_job(0, 1, queue, second_release);
+    simulation.advance_to(10);
+    if (!simulation.get_job_statuses({head})[0].start_time)
+      simulation.advance_to(second_release);
+    return simulation.get_job_statuses({head})[0];
+  };
+  const auto adjacent = run(11);
+  require(adjacent.start_time == 11 &&
+              adjacent.node_ids == std::vector<num_nodes_t>({0, 1}),
+          "placement did not use the inclusive one-second event group");
+  const auto separated = run(12);
+  require(separated.start_time == 10 &&
+              separated.node_ids == std::vector<num_nodes_t>({0, 2}),
+          "placement grouped releases more than one second apart");
+}
 /** @brief Regress capacity cleanup restoration after trace record reclamation.
  * @param[in] input Header-only input trace.
  * @param[in] output Temporary simulated trace path.
@@ -281,13 +342,18 @@ void invalid_options(const std::string &input) {
   params.m_placement_optimizations = "unknown";
   rejects([&] { Simulation simulation(params); });
   params.m_placement_optimizations = "all";
-  params.m_backfill_interval = 1;
+  params.m_backfill_interval = std::numeric_limits<tdiff_t>::quiet_NaN();
   rejects([&] { Simulation simulation(params); });
   params.m_backfill_interval = 0;
   params.m_per_pass_accounting = true;
   rejects([&] { Simulation simulation(params); });
   params.m_per_pass_accounting = false;
   params.m_queue_impl = QueueImplementation::DEQUE;
+  rejects([&] { Simulation simulation(params); });
+  params.m_queue_impl = QueueImplementation::CIRCULAR;
+  params.m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
+  params.m_backfill_policy = BackfillPolicy::EASY;
+  params.m_backfill_interval = 1;
   rejects([&] { Simulation simulation(params); });
 }
 } // namespace
@@ -315,6 +381,8 @@ int main() {
     expired_forecast(input);
     restart_budget(input, "placement");
     restart_budget(input, "capacity");
+    periodic_placement(input);
+    grouped_placement(input);
     capacity_cleanup(input, (directory / "capacity.csv").string());
     invalid_options(input);
     std::filesystem::remove_all(directory);

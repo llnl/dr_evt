@@ -141,6 +141,21 @@ static void bitmap_checks() {
   rejects<std::invalid_argument>([&] { Bitmap::from_ids(2, duplicates); });
   const std::array<num_nodes_t, 1> outside{2};
   rejects<std::out_of_range>([&] { Bitmap::from_ids(2, outside); });
+  std::vector<num_nodes_t> fragmented_ids{3, 4, 5, 6};
+  for (num_nodes_t id = 12; id <= 21; ++id)
+    fragmented_ids.push_back(id);
+  fragmented_ids.push_back(58);
+  for (num_nodes_t id = 252; id <= 755; ++id)
+    fragmented_ids.push_back(id);
+  const auto fragmented = Bitmap::from_ids(756, fragmented_ids);
+  auto slurm_flat = fragmented.select_best_fit_runs<NodeOrder::LowIdFirst>(512);
+  std::vector<num_nodes_t> expected;
+  for (num_nodes_t id = 12; id <= 19; ++id)
+    expected.push_back(id);
+  for (num_nodes_t id = 252; id <= 755; ++id)
+    expected.push_back(id);
+  require(slurm_flat && slurm_flat->ids() == expected,
+          "flat-topology run best fit differs from Slurm ordering");
 }
 
 /** @brief Compare exact identities against an independent dense node-time

@@ -74,13 +74,25 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
         (directory / filename).write_text('')
     native_command = [str(args.native), str(native_input), str(capacity), str(reservations),
                       str(directory / 'native.csv'), str(directory / 'native-events.csv'),
-                      args.resource_model]
-    started = time.monotonic()
-    with (directory / 'native-stdout.log').open('w') as log:
-        subprocess.run(native_command, cwd=directory, stdout=log, stderr=subprocess.STDOUT,
-                       check=True, timeout=1800)
-    native_elapsed = time.monotonic() - started
-    with (directory / 'native.csv').open() as stream:
+                      args.resource_model] if args.native else None
+    native_directory = directory
+    if args.native_results:
+        native_directory = args.native_results / name
+        saved = json.loads((native_directory / 'report.json').read_text())
+        saved_workload = json.loads((native_directory / 'workload.json').read_text())
+        if (saved['resource_model'] != args.resource_model or
+                saved['capacity'] != capacity or
+                saved_workload != [list(job) for job in jobs]):
+            raise ValueError(f'{name}: saved native inputs differ')
+        native_elapsed = saved['openpbs_wall_seconds']
+        native_command = json.loads((native_directory / 'commands.json').read_text())['openpbs']
+    else:
+        started = time.monotonic()
+        with (directory / 'native-stdout.log').open('w') as log:
+            subprocess.run(native_command, cwd=directory, stdout=log,
+                           stderr=subprocess.STDOUT, check=True, timeout=1800)
+        native_elapsed = time.monotonic() - started
+    with (native_directory / 'native.csv').open() as stream:
         rows = list(csv.DictReader(stream))
     assert [int(r['job_id']) for r in rows] == list(range(1, len(jobs) + 1))
     native = [[int(r['start']), int(r['end'])] for r in rows]
@@ -111,7 +123,8 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
     if args.resource_model == 'placement':
         placed, snapshots, dr_elapsed = run_dr_evt_placement(
             directory / 'dr_evt-placement', jobs, args.placement_driver,
-            capacity, 'hybrid', reservations, args.placement_order)
+            capacity, 'hybrid', reservations, args.placement_order,
+            priority_policy=args.priority_policy)
         dr_evt = [[row['start'], row['end']] for row in placed]
         dr_nodes = [row['node_ids'] for row in placed]
     else:
@@ -141,7 +154,7 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
         assert dr_observed == dr_profile
     # Verify adapter observations independently of the reconstructed schedule.
     active, snapshots = {}, {}
-    with (directory / 'native-events.csv').open() as stream:
+    with (native_directory / 'native-events.csv').open() as stream:
         for kind, timestamp, identity, value in csv.reader(stream):
             timestamp, value = int(timestamp), int(value)
             if kind in ('start', 'end'):
@@ -210,7 +223,10 @@ def lassen(path, count):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--native', type=Path, required=True)
+    parser.add_argument('--native', type=Path,
+                        help='Native OpenPBS adapter; required unless --native-results is used')
+    parser.add_argument('--native-results', type=Path,
+                        help='Reuse completed native case directories and run only DR_EVT')
     parser.add_argument('--simulator', type=Path, required=True)
     parser.add_argument('--trace', type=Path)
     parser.add_argument('--max-jobs', type=int, default=2000)
@@ -222,6 +238,8 @@ def main():
     parser.add_argument('--placement-order', choices=('low', 'high'), default='low')
     parser.add_argument('--outdir', type=Path, required=True)
     args = parser.parse_args()
+    if bool(args.native) == bool(args.native_results):
+        parser.error('provide exactly one of --native or --native-results')
     if args.max_jobs < 0:
         parser.error('--max-jobs must be nonnegative')
     if args.resource_model == 'placement' and not args.placement_driver:

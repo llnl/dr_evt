@@ -330,6 +330,33 @@ Historical EPFL simulator results remain in `results/controlled/` and
 `evidence/`. Their setup is preserved in [EPFL_REFERENCE.md](EPFL_REFERENCE.md)
 and `run_epfl.sh`; the default runner uses native Slurm.
 
+## Exact-placement divergence
+
+The exclusive whole-node comparison must use Slurm's actual loop settings:
+event-driven FCFS dispatch plus a 30-second backfill timer, hybrid reservation
+depth R=32, and the effective one-partition examination limit Q=64. The earlier
+DR_EVT placement run used an interval of zero and was not a valid comparison.
+The retained-plan implementation rebuilds exact reservations at each periodic
+cycle, prefers nodes idle at that cycle when it constructs future placements,
+and retains those planned identities for event-driven FCFS dispatch until the
+next cycle. Against the saved native 2,000-job run, a freshly installed replay
+has 1,736 different start times and 1,931 different allocations. The saved
+pre-fix DR_EVT schedule has 1,879 and 1,935, respectively. The first start-time
+difference moves from zero-based job index 56 to index 66; jobs 56--60 now
+start at the same times as Slurm.
+
+At that point Slurm has run its backfill cycles at 30 and 60 seconds but does
+not start the one-node tail jobs. Protecting the nodes idle at the cycle fixes
+that scheduling error. Slurm later places the preceding 512-node job at 68 on
+`n[0012-0019,0252-0755]`; DR_EVT starts it at the same time but selects
+`n[0003-0006,0012-0015,0252-0755]`. DR_EVT's retained periodic reservation for
+that job was projected at 609 seconds from requested time limits, so the node
+choice made after the actual release at 68 is an event-driven main-dispatch
+selection difference, outside this periodic-backfill lifecycle fix. Exact
+agreement still requires reproducing that separate Slurm node-choice behavior;
+it is not implied by matching the 30-second timer, R, Q, or retained periodic
+reservations.
+
 To archive a completed gated run before publishing its figures, use the
 validation image (which includes matplotlib):
 

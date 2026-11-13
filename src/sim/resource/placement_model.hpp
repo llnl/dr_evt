@@ -111,6 +111,40 @@ public:
     return Placement{start, std::move(*allocation)};
   }
 
+  /** @brief Select an immediate allocation by contiguous-run best fit.
+   * @param[in] eligible Caller-owned inventory, not retained.
+   * @param[in] occupied Caller-owned unavailable identities, not retained.
+   * @param[in] quantity Requested identities.
+   * @param[in] duration Planned duration; nonpositive means a point query.
+   * @param[in] start Exact immediate start.
+   * @param[in] context Synchronous observation metadata, not retained.
+   * @return Owning placement or std::nullopt when insufficient.
+   * @throws std::invalid_argument for mismatched domains or invalid timing.
+   * @throws std::bad_alloc if scratch, result, or diagnostics cannot be
+   * allocated. */
+  static std::optional<Placement>
+  find_available_best_fit(const State &eligible, const State &occupied,
+                          Request quantity, tdiff_t duration, sim_time_t start,
+                          ResourceContext context = {}) {
+    const auto end = duration > 0 ? start + duration : start;
+    if (!std::isfinite(start) || !std::isfinite(duration) ||
+        !std::isfinite(end) || !std::isfinite(end - start) ||
+        (duration > 0 && end <= start))
+      throw std::invalid_argument("invalid placement interval");
+    auto free = eligible;
+    free.remove(occupied);
+    auto allocation = free.template select_best_fit_runs<Order>(quantity);
+    if constexpr (Observer::enabled) {
+      const auto count = static_cast<num_nodes_t>(free.count());
+      Observer::observe({ResourceOperation::FitNow, ResourceScope::Available,
+                         context, quantity, count, count, start, duration,
+                         allocation.has_value()});
+    }
+    if (!allocation)
+      return std::nullopt;
+    return Placement{start, std::move(*allocation)};
+  }
+
   /** @brief Test immediate exact interval feasibility.
    * @param[in] plan Borrowed caller-owned planner.
    * @param[in] quantity Number of resources requested.
@@ -158,6 +192,30 @@ public:
     return result;
   }
 
+  /** @brief Select now by contiguous-run best fit.
+   * @param[in] plan Borrowed caller-owned planner.
+   * @param[in] quantity Number of resources requested.
+   * @param[in] duration Duration; nonpositive means a point query.
+   * @param[in] start Requested exact start within the planner's domain.
+   * @param[in] context Synchronous observation context, not retained.
+   * @return Owning placement, or std::nullopt when it cannot start here.
+   * @throws std::invalid_argument for invalid timing.
+   * @throws std::bad_alloc if planner scratch or result storage cannot be
+   * allocated. */
+  static std::optional<Placement>
+  find_at_best_fit(const Timeline &plan, Request quantity, tdiff_t duration,
+                   sim_time_t start, ResourceContext context = {}) {
+    auto result =
+        plan.template find_at_best_fit<Order>(quantity, duration, start);
+    if constexpr (Observer::enabled) {
+      context.timeline = &plan;
+      Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
+                         context, quantity, 0, 0, start, duration,
+                         result.has_value()});
+    }
+    return result;
+  }
+
   /** @brief Find the earliest exact identity-and-time placement.
    * @param[in] plan Borrowed caller-owned planner.
    * @param[in] quantity Number of resources requested.
@@ -175,6 +233,84 @@ public:
                                            ResourceContext context = {}) {
     auto result = plan.template earliest_fit<Order, reusable_scratch>(
         quantity, duration, start);
+    if constexpr (Observer::enabled) {
+      context.timeline = &plan;
+      Observer::observe({ResourceOperation::FindFit, ResourceScope::Timeline,
+                         context, quantity, 0, 0,
+                         result ? result->start : start, duration,
+                         result.has_value()});
+    }
+    return result;
+  }
+
+  /** @brief Find an exact placement while preferring supplied identities.
+   * @param[in] plan Borrowed caller-owned planner.
+   * @param[in] preferred Identities selected before other feasible resources.
+   * @param[in] quantity Number of resources requested.
+   * @param[in] duration Requested duration.
+   * @param[in] start Earliest requested start.
+   * @param[in] context Synchronous observation metadata, not retained.
+   * @return Owning placement, or std::nullopt when unsatisfiable.
+   * @throws std::invalid_argument for mismatched domains or invalid timing.
+   * @throws std::bad_alloc if planner or result storage cannot be allocated. */
+  static std::optional<Placement>
+  find_fit_preferred(const Timeline &plan, const State &preferred,
+                     Request quantity, tdiff_t duration, sim_time_t start,
+                     ResourceContext context = {}) {
+    auto result = plan.template earliest_fit_preferred<Order>(
+        quantity, duration, start, preferred);
+    if constexpr (Observer::enabled) {
+      context.timeline = &plan;
+      Observer::observe({ResourceOperation::FindFit, ResourceScope::Timeline,
+                         context, quantity, 0, 0,
+                         result ? result->start : start, duration,
+                         result.has_value()});
+    }
+    return result;
+  }
+
+  /** @brief Select now while preferring identities retained by a prior plan.
+   * @param[in] plan Borrowed caller-owned planner.
+   * @param[in] preferred Identities selected before other feasible resources.
+   * @param[in] quantity Number of resources requested.
+   * @param[in] duration Requested duration.
+   * @param[in] start Exact requested start.
+   * @param[in] context Synchronous observation metadata, not retained.
+   * @return Owning placement, or std::nullopt when no exact fit exists.
+   * @throws std::invalid_argument for mismatched domains or invalid timing.
+   * @throws std::bad_alloc if planner or result storage cannot be allocated. */
+  static std::optional<Placement>
+  find_at_preferred(const Timeline &plan, const State &preferred,
+                    Request quantity, tdiff_t duration, sim_time_t start,
+                    ResourceContext context = {}) {
+    auto result = plan.template find_at_preferred<Order>(quantity, duration,
+                                                         start, preferred);
+    if constexpr (Observer::enabled) {
+      context.timeline = &plan;
+      Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
+                         context, quantity, 0, 0, start, duration,
+                         result.has_value()});
+    }
+    return result;
+  }
+
+  /** @brief Find an exact placement using OpenPBS one-second forecast groups.
+   * @param[in] plan Borrowed caller-owned planner.
+   * @param[in] quantity Number of resources requested.
+   * @param[in] duration Duration; nonpositive means a point query.
+   * @param[in] start Current time, checked before grouped future events.
+   * @param[in] context Synchronous observation metadata, not retained.
+   * @return Owning placement, or std::nullopt when no grouped endpoint fits.
+   * @throws std::invalid_argument for invalid timing.
+   * @throws std::bad_alloc if planner or temporary event storage cannot be
+   * allocated. */
+  static std::optional<Placement>
+  find_fit_1s_event_group(const Timeline &plan, Request quantity,
+                          tdiff_t duration, sim_time_t start,
+                          ResourceContext context = {}) {
+    auto result =
+        plan.template earliest_fit_1s_event_group<Order, reusable_scratch>(
+            quantity, duration, start);
     if constexpr (Observer::enabled) {
       context.timeline = &plan;
       Observer::observe({ResourceOperation::FindFit, ResourceScope::Timeline,

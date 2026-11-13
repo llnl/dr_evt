@@ -3364,9 +3364,13 @@ void BasicSimulation<TraceType>::advance_to_impl(
       num_nodes_t free_nodes = get_available_nodes();
       publish_capacity_outlook();
       auto jobs_to_run = [&]() -> Scheduling_Decisions {
-        if (m_running_jobs.placement())
+        if (m_running_jobs.placement()) {
+          if constexpr (PeriodicBackfill && !FixedPeriodicDispatch)
+            return m_scheduler->schedule_placements_event(
+                free_nodes, m_running_jobs, m_current_time);
           return m_scheduler->schedule_placements(free_nodes, m_running_jobs,
                                                   m_current_time);
+        }
         if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
           return periodic_scheduler->schedule_event(free_nodes, m_running_jobs,
                                                     m_current_time);
@@ -3713,9 +3717,16 @@ void BasicSimulation<TraceType>::advance_to_impl(
         publish_capacity_outlook();
 
         auto jobs_to_run = [&]() -> Scheduling_Decisions {
-          if (m_running_jobs.placement())
+          if (m_running_jobs.placement()) {
+            if constexpr (PeriodicBackfill && !FixedPeriodicDispatch)
+              return periodic_evaluation
+                         ? m_scheduler->schedule_placements(
+                               free_nodes, m_running_jobs, m_current_time)
+                         : m_scheduler->schedule_placements_event(
+                               free_nodes, m_running_jobs, m_current_time);
             return m_scheduler->schedule_placements(free_nodes, m_running_jobs,
                                                     m_current_time);
+          }
           if constexpr (PeriodicBackfill && !FixedPeriodicDispatch) {
             return periodic_evaluation
                        ? m_scheduler->schedule(free_nodes, m_running_jobs,

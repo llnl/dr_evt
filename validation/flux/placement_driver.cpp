@@ -50,13 +50,32 @@ static void write_ids(const BitmapAllocation &mask, std::ostream &out) {
   out << ']';
 }
 
+/** @brief Write resource IDs retained by a public job-status snapshot.
+ * @param[in] ids Exact resource membership in deterministic order.
+ * @param[in,out] out JSON output stream. */
+static void write_ids(std::span<const num_nodes_t> ids, std::ostream &out) {
+  out << '[';
+  for (size_t index = 0; index < ids.size(); ++index) {
+    if (index != 0)
+      out << ',';
+    out << ids[index];
+  }
+  out << ']';
+}
+
 /** @brief Run a grouped-event FCFS/backfill traversal and emit exact decisions.
  * @tparam Order Compile-time node matching order.
  * @tparam CoarseFilter Compile-time lambda selecting coarse filtering.
  * @param[in,out] jobs Stable owning records, fully populated before borrowing.
  * @param[in] capacity Whole-node pool size.
  * @param[in] slots Maximum future reservations per scheduling pass.
+ * @param[in] queue_depth Maximum candidates examined at one timestamp; zero
+ * is unlimited.
+ * @param[in] backfill_interval Periodic backfill interval; zero is
+ * event-driven.
  * @param[in] strict Whether a failed immediate head blocks later examination.
+ * @param[in] one_second_event_groups Whether future exact fits use OpenPBS
+ * one-second event grouping.
  * @param[in,out] out Schedule and quiescent snapshot JSON-lines stream.
  * @throws std::runtime_error if scheduling makes no progress.
  * @throws std::invalid_argument if resource accounting or planning is invalid.
@@ -64,7 +83,8 @@ static void write_ids(const BitmapAllocation &mask, std::ostream &out) {
  */
 template <NodeOrder Order, auto CoarseFilter = DisableCoarseFilter>
 static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
-                bool strict, std::ostream &out) {
+                size_t queue_depth, tdiff_t backfill_interval, bool strict,
+                bool one_second_event_groups, std::ostream &out) {
   // Each process owns one header-only input; appended jobs use the normal API.
   char filename[] = "/tmp/dr-evt-placement-fixture-XXXXXX";
   const int descriptor = mkstemp(filename);
@@ -95,6 +115,10 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
                                  ? BackfillPolicy::CONSERVATIVE
                                  : BackfillPolicy::HYBRID;
   params.m_reservation_depth = slots;
+  params.m_backfill_queue_depth = queue_depth;
+  params.m_backfill_interval = backfill_interval;
+  if (one_second_event_groups)
+    params.m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
   Simulation simulation(params);
   std::vector<job_no_t> ids;
   ids.reserve(jobs.size());
@@ -110,7 +134,18 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
   sim_time_t time = jobs.empty() ? 0 : jobs.front().submit;
   size_t completed = 0;
   while (completed < jobs.size()) {
-    simulation.advance_to(time);
+    // Appended-job streaming may expose another same-time scheduling pass
+    // after START events are committed. Settle those passes before borrowing
+    // live allocation owners or the latest reservation plan.
+    num_jobs_t previous_started;
+    do {
+      previous_started = simulation.get_statistics().jobs_started;
+      // The Lassen adapter subtracts a large epoch from millisecond event
+      // times, which can differ from the public status value by several ULPs.
+      // Its 1 ms input resolution leaves this 1 us inclusive tolerance safely
+      // short of the next distinct event.
+      simulation.advance_to(time + 1e-6);
+    } while (simulation.get_statistics().jobs_started != previous_started);
     const auto statuses = simulation.get_job_statuses(ids);
     completed = 0;
     for (size_t index = 0; index < jobs.size(); ++index) {
@@ -124,8 +159,7 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
         out << "{\"schedule\":{\"job\":" << index
             << ",\"start\":" << *status.start_time
             << ",\"finish\":" << job.finish << ",\"node_ids\":";
-        write_ids(simulation.placement_state()->jobs.at(ids[index]).allocation,
-                  out);
+        write_ids(status.node_ids, out);
         out << "}}\n";
       }
     }
@@ -158,6 +192,12 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     if (completed == jobs.size())
       break;
     auto next = std::numeric_limits<sim_time_t>::infinity();
+    if (backfill_interval > 0) {
+      const auto tick =
+          (std::floor(time / backfill_interval) + 1) * backfill_interval;
+      if (tick > time)
+        next = tick;
+    }
     for (size_t index = 0; index < jobs.size(); ++index) {
       if (!jobs[index].launched && jobs[index].submit > time)
         next = std::min(next, jobs[index].submit);
@@ -173,17 +213,51 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
 /** @brief Read a narrow fixture protocol and run the validation driver.
  * @param[in] argc Number of command-line arguments.
  * @param[in] argv Optional --coarse-filter enables the coarse specialization
- * once, before processing the fixture; --exact-only explicitly keeps the
- * default.
+ * once, --exact-only explicitly keeps the default, and --queue-depth N sets a
+ * finite shared examination budget for diagnostic workload captures, and
+ * --backfill-interval S selects periodic backfill at positive S seconds.
+ * --priority-policy fcfs_1s_evt_group selects the OpenPBS grouped forecast.
  * @return Zero on success, one for invalid input or a scheduling error. */
 int main(int argc, char **argv) {
   try {
-    if (argc > 2 || (argc == 2 && std::string(argv[1]) != "--exact-only" &&
-                     std::string(argv[1]) != "--coarse-filter"))
-      throw std::invalid_argument(
-          "only --coarse-filter or --exact-only is accepted");
-    const bool use_coarse_filter =
-        argc == 2 && std::string(argv[1]) == "--coarse-filter";
+    bool use_coarse_filter = false;
+    size_t queue_depth = 0;
+    tdiff_t backfill_interval = 0;
+    bool one_second_event_groups = false;
+    for (int index = 1; index < argc; ++index) {
+      const std::string option = argv[index];
+      if (option == "--coarse-filter") {
+        use_coarse_filter = true;
+      } else if (option == "--exact-only") {
+        use_coarse_filter = false;
+      } else if (option == "--queue-depth" && index + 1 < argc) {
+        const std::string value = argv[++index];
+        if (value.empty() || value.front() == '-')
+          throw std::invalid_argument("queue depth must be nonnegative");
+        size_t parsed = 0;
+        queue_depth = std::stoull(value, &parsed);
+        if (parsed != value.size())
+          throw std::invalid_argument("queue depth must be an integer");
+      } else if (option == "--backfill-interval" && index + 1 < argc) {
+        const std::string value = argv[++index];
+        size_t parsed = 0;
+        backfill_interval = std::stod(value, &parsed);
+        if (parsed != value.size() || !std::isfinite(backfill_interval) ||
+            backfill_interval < 0)
+          throw std::invalid_argument(
+              "backfill interval must be finite and nonnegative");
+      } else if (option == "--priority-policy" && index + 1 < argc) {
+        const std::string value = argv[++index];
+        if (value != "fcfs" && value != "fcfs_1s_evt_group")
+          throw std::invalid_argument(
+              "priority policy must be fcfs or fcfs_1s_evt_group");
+        one_second_event_groups = value == "fcfs_1s_evt_group";
+      } else {
+        throw std::invalid_argument(
+            "expected --coarse-filter, --exact-only, --queue-depth N, or "
+            "--backfill-interval S, or --priority-policy POLICY");
+      }
+    }
     num_nodes_t capacity;
     size_t slots, count;
     int strict;
@@ -211,16 +285,22 @@ int main(int argc, char **argv) {
     std::cout << std::setprecision(17);
     if (use_coarse_filter) {
       if (order == "low")
-        run<NodeOrder::LowIdFirst, EnableCoarseFilter>(jobs, capacity, slots,
-                                                       strict, std::cout);
+        run<NodeOrder::LowIdFirst, EnableCoarseFilter>(
+            jobs, capacity, slots, queue_depth, backfill_interval, strict,
+            one_second_event_groups, std::cout);
       else
-        run<NodeOrder::HighIdFirst, EnableCoarseFilter>(jobs, capacity, slots,
-                                                        strict, std::cout);
+        run<NodeOrder::HighIdFirst, EnableCoarseFilter>(
+            jobs, capacity, slots, queue_depth, backfill_interval, strict,
+            one_second_event_groups, std::cout);
     } else {
       if (order == "low")
-        run<NodeOrder::LowIdFirst>(jobs, capacity, slots, strict, std::cout);
+        run<NodeOrder::LowIdFirst>(jobs, capacity, slots, queue_depth,
+                                   backfill_interval, strict,
+                                   one_second_event_groups, std::cout);
       else
-        run<NodeOrder::HighIdFirst>(jobs, capacity, slots, strict, std::cout);
+        run<NodeOrder::HighIdFirst>(jobs, capacity, slots, queue_depth,
+                                    backfill_interval, strict,
+                                    one_second_event_groups, std::cout);
     }
     return 0;
   } catch (const std::exception &e) {

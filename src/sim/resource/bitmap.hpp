@@ -317,6 +317,65 @@ public:
     return selected;
   }
 
+  /** @brief Select homogeneous nodes by Slurm flat-topology run best fit.
+   * @tparam Order Compile-time tie and within-run identity order.
+   * @param[in] quantity Number requested; zero selects an empty set.
+   * @return Complete owning allocation, or std::nullopt when insufficient.
+   * @throws std::bad_alloc if scratch or result storage cannot be allocated.
+   * @details At each step the shortest contiguous run satisfying the remainder
+   * is chosen. If no run is sufficient, the longest run is consumed first.
+   * Equal-size runs follow Order. This is the equal-weight, homogeneous-node
+   * case of Slurm's flat-topology consecutive-set selection. */
+  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  std::optional<Bitmap> select_best_fit_runs(num_nodes_t quantity) const {
+    if (count() < quantity)
+      return std::nullopt;
+    Bitmap available(*this), selected(m_capacity);
+    size_t remaining = quantity;
+    while (remaining != 0) {
+      num_nodes_t best_begin = 0, best_end = 0;
+      bool have_best = false, best_sufficient = false;
+      for (num_nodes_t cursor = 0; cursor < m_capacity;) {
+        while (cursor < m_capacity && !available.test(cursor))
+          ++cursor;
+        const auto begin = cursor;
+        while (cursor < m_capacity && available.test(cursor))
+          ++cursor;
+        const auto end = cursor;
+        if (begin == end)
+          continue;
+        const auto length = static_cast<size_t>(end - begin);
+        const bool sufficient = length >= remaining;
+        const auto best_length = static_cast<size_t>(best_end - best_begin);
+        const bool better =
+            !have_best || (sufficient && !best_sufficient) ||
+            (sufficient == best_sufficient &&
+             ((sufficient && length < best_length) ||
+              (!sufficient && length > best_length))) ||
+            (sufficient == best_sufficient && length == best_length &&
+             Order == NodeOrder::HighIdFirst);
+        if (better) {
+          best_begin = begin;
+          best_end = end;
+          best_sufficient = sufficient;
+          have_best = true;
+        }
+      }
+      if (!have_best)
+        return std::nullopt;
+      const auto take = static_cast<num_nodes_t>(
+          std::min(remaining, static_cast<size_t>(best_end - best_begin)));
+      const auto first =
+          Order == NodeOrder::LowIdFirst ? best_begin : best_end - take;
+      for (num_nodes_t id = first; id < first + take; ++id) {
+        selected.m_words[id / 64] |= std::uint64_t{1} << (id % 64);
+        available.m_words[id / 64] &= ~(std::uint64_t{1} << (id % 64));
+      }
+      remaining -= take;
+    }
+    return selected;
+  }
+
   /** @brief Retain the first N members in an already-owned scratch bitmap.
    * @tparam Order Compile-time selection order.
    * @param[in] quantity Members to keep; zero clears membership.

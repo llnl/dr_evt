@@ -115,3 +115,38 @@ mapped to `--placement_coarse_filter` in the simulator CLI.
 The driver also accepts `DR_EVT_PLACEMENT_OPTIMIZATIONS=none|fast|batch|scratch|boolean|all`.
 Run the comparison for each value to check all compiled optimization strategies
 with both coarse-filter specializations against the saved Fluxion evidence.
+For finite-depth diagnostics, `--queue-depth N` applies the main simulator's
+shared per-timestamp placement budget while preserving the fixture protocol;
+the checked oracle comparison omits it and therefore remains unlimited.
+
+## Lassen finite-Q divergence
+
+The saved 2,000-job Lassen comparison uses Fluxion `lonodex` and DR_EVT
+`--placement_order low`, so both select the lowest eligible node IDs. It is not
+evidence of a low-versus-high placement-order mismatch. The unmodified batch
+DR_EVT run differs from the saved native schedule for 649 jobs; the first start
+difference is input job 345 (`10174.937` in DR_EVT and `10180.000` in
+Fluxion). Committed node assignments remain identical through job 676, showing
+that the first timing difference precedes the first live-allocation identity
+difference.
+
+At `10174.937`, the saved native snapshot has three free nodes (697, 744, and
+746), but Fluxion leaves job 345 pending and later starts it on node 746. The
+corresponding DR_EVT traversal reaches job 345 at queue cursor 68 with shared
+backfill depth 60: its first eight immediate starts do not consume the current
+post-head depth budget. Fluxion's hybrid queue policy increments its Q counter
+for every successful immediate allocation or reservation, cancels future
+reservations at the beginning of a new scheduling loop, and may request another
+asynchronous loop after reaching Q. Consequently, matching `lonodex` alone does
+not reproduce the native finite-Q reservation/pass lifecycle.
+
+Two diagnostic accounting changes were rejected rather than shipped. Charging
+all candidates to one timestamp-wide Q increased the comparison to 1,518
+differing jobs; resetting an all-candidate Q at each synchronous DR_EVT
+scheduler call increased it to 1,591 and moved the first difference earlier.
+All placement optimization and coarse-filter variants retained the original
+649 differences, while nearby finite Q values produced roughly 1,600–1,800.
+The checked 60-case placement oracle still matches because its Q=2048 covers
+each complete small workload. Full equality on the Lassen case would require a
+validated reproduction of Fluxion's graph-reservation and asynchronous
+queue-manager pass boundaries; no heuristic compatibility change is enabled.

@@ -156,6 +156,34 @@ class PlacementScriptTests(unittest.TestCase):
         self.assertEqual((self.root / 'capacity/dr_evt-input.csv').read_bytes(),
                          (self.root / 'placement/dr_evt-input.csv').read_bytes())
 
+    def test_slurm_virtual_node_liveness_overlay_is_scoped_and_restored(self):
+        script = (REPO / 'validation/slurm/licenses/build_event.sh').read_text()
+        self.assertIn("name = 'src/slurmctld/ping_nodes.c'", script)
+        self.assertIn('dlsym(RTLD_DEFAULT, "validation_clock_active")', script)
+        self.assertIn('show HEAD:src/slurmctld/ping_nodes.c', script)
+        self.assertIn("name = 'src/slurmctld/agent.c'", script)
+        self.assertIn('REQUEST_BATCH_JOB_LAUNCH', script)
+        self.assertIn('REQUEST_TERMINATE_JOB', script)
+        self.assertIn('show HEAD:src/slurmctld/agent.c', script)
+        clock = (REPO / 'validation/slurm/licenses/clock.c').read_text()
+        self.assertIn('int validation_clock_active(void)', clock)
+
+    def test_slurm_adapter_uses_compute_side_completion_rpc(self):
+        client = (REPO / 'validation/slurm/licenses/client.c').read_text()
+        self.assertIn('REQUEST_COMPLETE_BATCH_SCRIPT', client)
+        self.assertIn('MESSAGE_EPILOG_COMPLETE', client)
+        self.assertNotIn('slurm_complete_job(', client)
+
+    def test_server_images_always_install_and_verify_matplotlib(self):
+        for relative in ('containers/podman/server/Containerfile',
+                         'containers/docker/server/Dockerfile'):
+            image = (REPO / relative).read_text()
+            common, optional = image.split('&& { { [ "$WITH_SLURM"', 1)
+            self.assertIn('python3-matplotlib', common)
+            self.assertNotIn('python3-matplotlib', optional.split(
+                '&& rm -rf /var/lib/apt/lists/*', 1)[0])
+            self.assertIn("RUN python3 -c 'import matplotlib'", image)
+
     def test_existing_benchmark_keeps_its_default_input(self):
         stub = self.root / "capture.py"
         stub.write_text("import json, sys\nif sys.argv[1] == '-c':\n    exec(sys.argv[2])\nelse:\n    print(json.dumps(sys.argv[1:]))\n")

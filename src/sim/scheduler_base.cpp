@@ -558,10 +558,21 @@ std::unique_ptr<SchedulerBase>
 placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
                     ResourceDiagnostics *diagnostics) {
   constexpr auto features = [] { return Features; };
-  if (diagnostics)
+  const bool grouped =
+      params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP;
+  if (diagnostics) {
+    if (grouped)
+      return std::make_unique<PlacementCircularScheduler<
+          PlacementModel<SimulationResourceObserver, Order, Filter, features>,
+          true>>(nodes, jobs, params, diagnostics);
     return std::make_unique<PlacementCircularScheduler<
         PlacementModel<SimulationResourceObserver, Order, Filter, features>>>(
         nodes, jobs, params, diagnostics);
+  }
+  if (grouped)
+    return std::make_unique<PlacementCircularScheduler<
+        PlacementModel<NoResourceObserver, Order, Filter, features>, true>>(
+        nodes, jobs, params, nullptr);
   return std::make_unique<PlacementCircularScheduler<
       PlacementModel<NoResourceObserver, Order, Filter, features>>>(
       nodes, jobs, params, nullptr);
@@ -621,17 +632,27 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
         params.m_per_pass_accounting, params.m_diagnostic_no_reservations,
         diagnostics);
   if ((params.m_priority_policy != PriorityPolicy::FCFS &&
-       params.m_priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) ||
+       params.m_priority_policy != PriorityPolicy::FCFS_CONSERVATIVE &&
+       params.m_priority_policy != PriorityPolicy::FCFS_1S_EVT_GROUP) ||
       params.m_queue_impl != QueueImplementation::CIRCULAR ||
-      params.m_backfill_interval != 0 || params.m_dispatch_interval != 0 ||
+      !std::isfinite(params.m_backfill_interval) ||
+      params.m_backfill_interval < 0 || params.m_dispatch_interval != 0 ||
       params.m_dispatch_on_events || params.m_dispatch_queue_depth != 0 ||
       params.m_per_pass_accounting || params.m_diagnostic_no_reservations ||
       !params.m_capacity_schedule.empty() || params.m_sim_start_time != 0 ||
       params.m_planning_time_resolution != 0)
     throw std::invalid_argument(
-        "placement requires event-driven FCFS, queue_impl=circular, static "
-        "capacity, exact planning times, and no replay warm start or per-pass "
+        "placement requires FCFS, queue_impl=circular, static capacity, exact "
+        "planning times, and no fixed dispatch, replay warm start, or per-pass "
         "accounting");
+  if (params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP &&
+      params.m_backfill_interval != 0)
+    throw std::invalid_argument(
+        "fcfs_1s_evt_group placement requires event-driven backfilling");
+  if (params.m_backfill_interval > 0 &&
+      params.m_backfill_policy == BackfillPolicy::NONE)
+    throw std::invalid_argument(
+        "periodic placement backfilling requires an enabled backfill policy");
   if (params.m_backfill_policy == BackfillPolicy::HYBRID &&
       params.m_reservation_depth == 0)
     throw std::invalid_argument(
