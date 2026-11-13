@@ -1,0 +1,394 @@
+{
+  "capture_date": "2026-11-12",
+  "machine": "LLNL dane",
+  "build": "current main, as confirmed by the benchmark contributor",
+  "revision": null,
+  "compiler_and_flags": null,
+  "provenance_note": "Machine and branch were confirmed by the contributor. The logs do not identify the exact revision, compiler, or flags.",
+  "timing": "end-to-end wall-clock seconds; source logs have 0.001-second precision",
+  "correctness": "All 35 captured invocations report PASS. Periodic hybrid skips the Python reference and has no deque variant.",
+  "benchmarks": {
+    "conservative": {
+      "source_files": [
+        "conservative-1.txt",
+        "conservative-2.txt",
+        "conservative-3.txt",
+        "conservative-4.txt",
+        "conservative-5.txt"
+      ],
+      "samples_seconds": {
+        "deque": [
+          1.21,
+          1.204,
+          1.206,
+          1.206,
+          1.206
+        ],
+        "circular": [
+          1.153,
+          1.145,
+          1.145,
+          1.146,
+          1.145
+        ],
+        "python ref.": [
+          59.605,
+          59.637,
+          59.668,
+          59.561,
+          59.718
+        ]
+      },
+      "settings": {
+        "Trace": "tests/test_traces/scale/huge_2000jobs.csv",
+        "Total nodes": "500",
+        "Queue depth": "2000",
+        "Backfill interval": "0"
+      },
+      "summary": {
+        "deque": {
+          "runs": 5,
+          "mean_seconds": 1.2064,
+          "population_stddev_seconds": 0.001959591794226544
+        },
+        "circular": {
+          "runs": 5,
+          "mean_seconds": 1.1468,
+          "population_stddev_seconds": 0.0031240998703626704
+        },
+        "python ref.": {
+          "runs": 5,
+          "mean_seconds": 59.6378,
+          "population_stddev_seconds": 0.053514110288784084
+        }
+      }
+    },
+    "easy": {
+      "source_files": [
+        "easy-1.txt",
+        "easy-10.txt",
+        "easy-2.txt",
+        "easy-3.txt",
+        "easy-4.txt",
+        "easy-5.txt",
+        "easy-6.txt",
+        "easy-7.txt",
+        "easy-8.txt",
+        "easy-9.txt"
+      ],
+      "samples_seconds": {
+        "deque": [
+          0.353,
+          0.355,
+          0.354,
+          0.354,
+          0.356,
+          0.355,
+          0.354,
+          0.354,
+          0.355,
+          0.356
+        ],
+        "multimap": [
+          4.345,
+          4.364,
+          4.353,
+          4.352,
+          4.362,
+          4.349,
+          4.349,
+          4.348,
+          4.347,
+          4.355
+        ],
+        "circular": [
+          0.327,
+          0.337,
+          0.328,
+          0.331,
+          0.328,
+          0.336,
+          0.33,
+          0.329,
+          0.327,
+          0.33
+        ],
+        "python ref.": [
+          12.484,
+          12.431,
+          12.471,
+          12.429,
+          12.441,
+          12.449,
+          12.455,
+          12.491,
+          12.457,
+          12.446
+        ],
+        "block-4": [
+          1.364,
+          1.367,
+          1.367,
+          1.361,
+          1.368,
+          1.367,
+          1.371,
+          1.368,
+          1.367,
+          1.367
+        ],
+        "block-8": [
+          1.413,
+          1.415,
+          1.418,
+          1.415,
+          1.415,
+          1.41,
+          1.412,
+          1.415,
+          1.414,
+          1.418
+        ],
+        "block-16": [
+          1.506,
+          1.507,
+          1.506,
+          1.51,
+          1.507,
+          1.504,
+          1.507,
+          1.506,
+          1.51,
+          1.508
+        ],
+        "block-32": [
+          1.764,
+          1.77,
+          1.766,
+          1.762,
+          1.769,
+          1.765,
+          1.765,
+          1.764,
+          1.766,
+          1.765
+        ],
+        "block-64": [
+          2.594,
+          2.597,
+          2.598,
+          2.594,
+          2.596,
+          2.595,
+          2.595,
+          2.596,
+          2.593,
+          2.596
+        ],
+        "block-128": [
+          4.309,
+          4.308,
+          4.314,
+          4.31,
+          4.313,
+          4.309,
+          4.309,
+          4.315,
+          4.311,
+          4.312
+        ],
+        "block-256": [
+          7.322,
+          7.335,
+          7.319,
+          7.322,
+          7.324,
+          7.322,
+          7.319,
+          7.32,
+          7.321,
+          7.322
+        ]
+      },
+      "settings": {
+        "Trace": "tests/test_traces/scale/huge_10000jobs.csv",
+        "Total nodes": "500"
+      },
+      "summary": {
+        "deque": {
+          "runs": 10,
+          "mean_seconds": 0.35459999999999997,
+          "population_stddev_seconds": 0.0009165151389911689
+        },
+        "multimap": {
+          "runs": 10,
+          "mean_seconds": 4.3524,
+          "population_stddev_seconds": 0.006003332407921441
+        },
+        "circular": {
+          "runs": 10,
+          "mean_seconds": 0.33030000000000004,
+          "population_stddev_seconds": 0.0033481338085566445
+        },
+        "python ref.": {
+          "runs": 10,
+          "mean_seconds": 12.455400000000001,
+          "population_stddev_seconds": 0.019900753754569178
+        },
+        "block-4": {
+          "runs": 10,
+          "mean_seconds": 1.3667,
+          "population_stddev_seconds": 0.0024919871588754243
+        },
+        "block-8": {
+          "runs": 10,
+          "mean_seconds": 1.4144999999999999,
+          "population_stddev_seconds": 0.002334523505985755
+        },
+        "block-16": {
+          "runs": 10,
+          "mean_seconds": 1.5070999999999999,
+          "population_stddev_seconds": 0.001757839583124698
+        },
+        "block-32": {
+          "runs": 10,
+          "mean_seconds": 1.7656,
+          "population_stddev_seconds": 0.002244994432064359
+        },
+        "block-64": {
+          "runs": 10,
+          "mean_seconds": 2.5954,
+          "population_stddev_seconds": 0.0014282856857085744
+        },
+        "block-128": {
+          "runs": 10,
+          "mean_seconds": 4.311,
+          "population_stddev_seconds": 0.002280350850198336
+        },
+        "block-256": {
+          "runs": 10,
+          "mean_seconds": 7.3225999999999996,
+          "population_stddev_seconds": 0.004386342439892245
+        }
+      }
+    },
+    "hybrid": {
+      "source_files": [
+        "hybrid-1.txt",
+        "hybrid-10.txt",
+        "hybrid-2.txt",
+        "hybrid-3.txt",
+        "hybrid-4.txt",
+        "hybrid-5.txt",
+        "hybrid-6.txt",
+        "hybrid-7.txt",
+        "hybrid-8.txt",
+        "hybrid-9.txt"
+      ],
+      "samples_seconds": {
+        "deque": [
+          0.093,
+          0.089,
+          0.089,
+          0.089,
+          0.09,
+          0.089,
+          0.089,
+          0.089,
+          0.089,
+          0.09
+        ],
+        "circular": [
+          0.09,
+          0.086,
+          0.085,
+          0.086,
+          0.086,
+          0.086,
+          0.086,
+          0.086,
+          0.086,
+          0.086
+        ],
+        "python ref.": [
+          2.976,
+          2.972,
+          2.986,
+          2.97,
+          2.996,
+          2.98,
+          2.962,
+          2.967,
+          2.968,
+          2.975
+        ]
+      },
+      "settings": {
+        "Trace": "tests/test_traces/scale/huge_10000jobs.csv",
+        "Total nodes": "500",
+        "Reservation depth": "32",
+        "Queue depth": "32",
+        "Backfill interval": "0"
+      },
+      "summary": {
+        "deque": {
+          "runs": 10,
+          "mean_seconds": 0.0896,
+          "population_stddev_seconds": 0.001200000000000001
+        },
+        "circular": {
+          "runs": 10,
+          "mean_seconds": 0.08629999999999999,
+          "population_stddev_seconds": 0.0012688577540449517
+        },
+        "python ref.": {
+          "runs": 10,
+          "mean_seconds": 2.9752,
+          "population_stddev_seconds": 0.009505787710652896
+        }
+      }
+    },
+    "periodic-hybrid": {
+      "source_files": [
+        "periodic-hybrid-1.txt",
+        "periodic-hybrid-10.txt",
+        "periodic-hybrid-2.txt",
+        "periodic-hybrid-3.txt",
+        "periodic-hybrid-4.txt",
+        "periodic-hybrid-5.txt",
+        "periodic-hybrid-6.txt",
+        "periodic-hybrid-7.txt",
+        "periodic-hybrid-8.txt",
+        "periodic-hybrid-9.txt"
+      ],
+      "samples_seconds": {
+        "circular": [
+          0.291,
+          0.286,
+          0.286,
+          0.285,
+          0.285,
+          0.285,
+          0.285,
+          0.285,
+          0.285,
+          0.285
+        ]
+      },
+      "settings": {
+        "Trace": "tests/test_traces/scale/huge_10000jobs.csv",
+        "Total nodes": "500",
+        "Reservation depth": "32",
+        "Queue depth": "500",
+        "Backfill interval": "30"
+      },
+      "summary": {
+        "circular": {
+          "runs": 10,
+          "mean_seconds": 0.2858,
+          "population_stddev_seconds": 0.0017776388834631193
+        }
+      }
+    }
+  }
+}
