@@ -243,57 +243,6 @@ public:
     return result;
   }
 
-  /** @brief Find an exact placement while preferring supplied identities.
-   * @param[in] plan Borrowed caller-owned planner.
-   * @param[in] preferred Identities selected before other feasible resources.
-   * @param[in] quantity Number of resources requested.
-   * @param[in] duration Requested duration.
-   * @param[in] start Earliest requested start.
-   * @param[in] context Synchronous observation metadata, not retained.
-   * @return Owning placement, or std::nullopt when unsatisfiable.
-   * @throws std::invalid_argument for mismatched domains or invalid timing.
-   * @throws std::bad_alloc if planner or result storage cannot be allocated. */
-  static std::optional<Placement>
-  find_fit_preferred(const Timeline &plan, const State &preferred,
-                     Request quantity, tdiff_t duration, sim_time_t start,
-                     ResourceContext context = {}) {
-    auto result = plan.template earliest_fit_preferred<Order>(
-        quantity, duration, start, preferred);
-    if constexpr (Observer::enabled) {
-      context.timeline = &plan;
-      Observer::observe({ResourceOperation::FindFit, ResourceScope::Timeline,
-                         context, quantity, 0, 0,
-                         result ? result->start : start, duration,
-                         result.has_value()});
-    }
-    return result;
-  }
-
-  /** @brief Select now while preferring identities retained by a prior plan.
-   * @param[in] plan Borrowed caller-owned planner.
-   * @param[in] preferred Identities selected before other feasible resources.
-   * @param[in] quantity Number of resources requested.
-   * @param[in] duration Requested duration.
-   * @param[in] start Exact requested start.
-   * @param[in] context Synchronous observation metadata, not retained.
-   * @return Owning placement, or std::nullopt when no exact fit exists.
-   * @throws std::invalid_argument for mismatched domains or invalid timing.
-   * @throws std::bad_alloc if planner or result storage cannot be allocated. */
-  static std::optional<Placement>
-  find_at_preferred(const Timeline &plan, const State &preferred,
-                    Request quantity, tdiff_t duration, sim_time_t start,
-                    ResourceContext context = {}) {
-    auto result = plan.template find_at_preferred<Order>(quantity, duration,
-                                                         start, preferred);
-    if constexpr (Observer::enabled) {
-      context.timeline = &plan;
-      Observer::observe({ResourceOperation::FitNow, ResourceScope::Timeline,
-                         context, quantity, 0, 0, start, duration,
-                         result.has_value()});
-    }
-    return result;
-  }
-
   /** @brief Find an exact placement using OpenPBS one-second forecast groups.
    * @param[in] plan Borrowed caller-owned planner.
    * @param[in] quantity Number of resources requested.

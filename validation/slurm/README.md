@@ -330,32 +330,49 @@ Historical EPFL simulator results remain in `results/controlled/` and
 `evidence/`. Their setup is preserved in [EPFL_REFERENCE.md](EPFL_REFERENCE.md)
 and `run_epfl.sh`; the default runner uses native Slurm.
 
-## Exact-placement divergence
+## Exact-placement agreement
 
 The exclusive whole-node comparison must use Slurm's actual loop settings:
 event-driven FCFS dispatch plus a 30-second backfill timer, hybrid reservation
-depth R=32, and the effective one-partition examination limit Q=64. The earlier
-DR_EVT placement run used an interval of zero and was not a valid comparison.
-The retained-plan implementation rebuilds exact reservations at each periodic
-cycle, prefers nodes idle at that cycle when it constructs future placements,
-and retains those planned identities for event-driven FCFS dispatch until the
-next cycle. Against the saved native 2,000-job run, a freshly installed replay
-has 1,736 different start times and 1,931 different allocations. The saved
-pre-fix DR_EVT schedule has 1,879 and 1,935, respectively. The first start-time
-difference moves from zero-based job index 56 to index 66; jobs 56--60 now
-start at the same times as Slurm.
+depth R=32, and the effective one-partition examination limit Q=64. An
+interval of zero is not a valid comparison. With those settings, a replay of
+the 2,000-job Lassen prefix against native Slurm at
+`17abb848e20054009d136a2c504a23e5462f26c8` matches every start time and every
+node allocation (0 and 0 differences).
 
-At that point Slurm has run its backfill cycles at 30 and 60 seconds but does
-not start the one-node tail jobs. Protecting the nodes idle at the cycle fixes
-that scheduling error. Slurm later places the preceding 512-node job at 68 on
-`n[0012-0019,0252-0755]`; DR_EVT starts it at the same time but selects
-`n[0003-0006,0012-0015,0252-0755]`. DR_EVT's retained periodic reservation for
-that job was projected at 609 seconds from requested time limits, so the node
-choice made after the actual release at 68 is an event-driven main-dispatch
-selection difference, outside this periodic-backfill lifecycle fix. Exact
-agreement still requires reproducing that separate Slurm node-choice behavior;
-it is not implied by matching the 30-second timer, R, Q, or retained periodic
-reservations.
+Three node-selection rules are required for that agreement, all taken from
+the cited Slurm source and active only when `--backfill_interval` is positive:
+
+- Node selection uses Slurm's flat-topology consecutive-set best fit
+  (`_eval_nodes_consec` in `src/plugins/topology/common/eval_nodes.c`): take
+  the shortest free run that covers the remaining request; otherwise consume
+  the longest run; ties go to the lowest node ID. This applies to immediate
+  starts and to the nodes chosen for a future reservation.
+- A backfill reservation is chosen from the nodes free at its planned start.
+  Slurm's will-run test does not prefer nodes that are idle at the current
+  cycle. Event-driven main dispatch does not reuse the nodes that backfill
+  planned for a job; `select_nodes()` applies best fit to the nodes free when
+  the job actually starts.
+- Backfill admission and reservation placement require each node to be free at
+  the requested end time, matching Slurm's inclusive `node_space` interval
+  test. Running and reserved intervals themselves remain half-open, and
+  event-driven dispatch keeps the half-open rule.
+
+The agreement covers the configured harness only: one partition, equal node
+weights, `CPUs=1` exclusive nodes, `select/cons_tres` with flat topology, and
+no `pack_serial_at_end`, LLN, busy-node preference, GRES, or features.
+
+Reproduce the comparison with the validation image and the pinned Slurm
+revision mounted at `/slurm-modern-source`:
+
+```sh
+SLURM_LICENSE_STATE_ONLY=1 python3 validation/slurm/licenses/event_trace.py \
+  --batch-main-dispatch --resource-model placement \
+  --trace path/to/lassen-756-01.csv --outdir /results/placement
+```
+
+Set `DR_EVT_VALIDATION_WORKING_TREE=1` before `licenses/build.sh` to build
+DR_EVT from uncommitted tracked changes.
 
 To archive a completed gated run before publishing its figures, use the
 validation image (which includes matplotlib):

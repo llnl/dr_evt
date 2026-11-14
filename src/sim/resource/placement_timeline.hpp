@@ -103,6 +103,7 @@ private:
   Bitmap m_pool;
   sim_time_t m_origin;
   std::vector<Interval> m_intervals; // Ordered by finish; owns future masks.
+  bool m_inclusive_end = false; // Slurm backfill endpoint rule when true.
   [[no_unique_address]] mutable detail::PlacementFilterStorage<
       coarse_filter_enabled> m_filter;
 
@@ -128,11 +129,15 @@ private:
    * @param[in] interval Existing blocked interval.
    * @param[in] start Query start.
    * @param[in] end Query endpoint; start equals end for a point query.
+   * @param[in] inclusive_end Whether an interval beginning exactly at a
+   * positive-duration query's end also blocks it.
    * @return true when the blocked interval affects this query. */
   static bool overlaps(const Interval &interval, sim_time_t start,
-                       sim_time_t end) noexcept {
-    return end == start ? interval.start <= start && start < interval.finish
-                        : start < interval.finish && interval.start < end;
+                       sim_time_t end, bool inclusive_end = false) noexcept {
+    if (end == start)
+      return interval.start <= start && start < interval.finish;
+    return start < interval.finish &&
+           (interval.start < end || (inclusive_end && interval.start == end));
   }
 
   /** @brief Compute one coarse boundary from authoritative exact endpoints.
@@ -225,8 +230,10 @@ private:
       for (size_t bucket = 0; bucket < buckets; ++bucket) {
         const auto left = boundary(bucket), right = boundary(bucket + 1);
         const bool touched =
-            left < right && (start == end ? left <= start && start < right
-                                          : start < right && left < end);
+            left < right &&
+            (start == end ? left <= start && start < right
+                          : start < right &&
+                                (left < end || (m_inclusive_end && left == end)));
         if (touched) {
           candidates.intersect_words(
               std::span(m_filter.words).subspan(bucket * width, width));
@@ -247,7 +254,7 @@ private:
                            return time < interval.finish;
                          });
     for (; first != m_intervals.end(); ++first) {
-      if (overlaps(*first, start, end))
+      if (overlaps(*first, start, end, m_inclusive_end))
         candidates.remove(first->allocation());
     }
   }
@@ -340,7 +347,8 @@ public:
    * @throws std::bad_alloc if exact state cannot be copied. */
   BasicPlacementTimeline(const BasicPlacementTimeline &other)
       : m_pool(other.m_pool), m_origin(other.m_origin),
-        m_intervals(other.m_intervals) {}
+        m_intervals(other.m_intervals), m_inclusive_end(other.m_inclusive_end) {
+  }
   /** @brief Transfer exact state, borrowed views, and cache ownership.
    * @param[in] other Planner to move; it must not be queried afterward. */
   BasicPlacementTimeline(BasicPlacementTimeline &&other) noexcept = default;
@@ -349,6 +357,16 @@ public:
    * @return No result because this operation is deleted. */
   BasicPlacementTimeline &
   operator=(const BasicPlacementTimeline &other) = delete;
+
+  /** @brief Select whether positive-duration fits also need the endpoint.
+   * @param[in] inclusive true to reject identities whose next commitment
+   * begins exactly at a candidate's requested end, as Slurm backfill does.
+   * @details Applies to later fit and feasibility queries. Commitments remain
+   * half-open, so reservation admission and running-record seeding are
+   * unchanged. */
+  void set_inclusive_end(bool inclusive) noexcept {
+    m_inclusive_end = inclusive;
+  }
 
   /** @brief Seed an empty planner from an existing running-record range.
    * @tparam Range Borrowed iterable of existing running records.
@@ -511,81 +529,6 @@ public:
     if (!allocation)
       return std::nullopt;
     return BitmapPlacement{start, std::move(*allocation)};
-  }
-
-  /** @brief Select exact identities at one time while preferring a subset.
-   * @tparam Order Compile-time ordering within preferred and remaining sets.
-   * @param[in] quantity Resources requested.
-   * @param[in] duration Requested duration; nonpositive means a point query.
-   * @param[in] start Exact query start.
-   * @param[in] preferred Identities selected before other feasible identities.
-   * @return Owning placement, or std::nullopt when no exact fit exists.
-   * @throws std::invalid_argument for mismatched domains or invalid timing.
-   * @throws std::bad_alloc if scratch or result storage cannot be allocated.
-   * @details Preference changes selection only, never feasibility. Identities
-   * blocked anywhere in the exact interval are removed before either tier is
-   * selected. */
-  template <NodeOrder Order = NodeOrder::LowIdFirst>
-  std::optional<BitmapPlacement>
-  find_at_preferred(num_nodes_t quantity, tdiff_t duration, sim_time_t start,
-                    const Bitmap &preferred) const {
-    const auto end = endpoint(start, duration);
-    Bitmap candidates = m_pool;
-    if constexpr (coarse_filter_enabled)
-      filter(candidates, start, end);
-    if (candidates.count() < quantity)
-      return std::nullopt;
-    refine(candidates, start, end);
-    if (candidates.count() < quantity)
-      return std::nullopt;
-    Bitmap preferred_candidates = candidates;
-    preferred_candidates.intersect_with(preferred);
-    const auto preferred_count = static_cast<num_nodes_t>(
-        std::min<size_t>(quantity, preferred_candidates.count()));
-    auto selected = preferred_candidates.template select_best_fit_runs<Order>(
-        preferred_count);
-    candidates.remove(*selected);
-    if (preferred_count < quantity) {
-      auto remaining = candidates.template select_best_fit_runs<Order>(
-          quantity - preferred_count);
-      if (!remaining)
-        return std::nullopt;
-      selected->add(*remaining);
-    }
-    return BitmapPlacement{start, std::move(*selected)};
-  }
-
-  /** @brief Find the earliest exact fit while preferring identities available
-   * at the current periodic-backfill cycle.
-   * @tparam Order Compile-time ordering within preferred and remaining sets.
-   * @param[in] quantity Resources requested.
-   * @param[in] duration Requested duration; nonpositive means a point query.
-   * @param[in] start Earliest exact start.
-   * @param[in] preferred Identities selected first at every candidate time.
-   * @return Earliest owning placement, or std::nullopt.
-   * @throws std::invalid_argument for mismatched domains or invalid timing.
-   * @throws std::bad_alloc if temporary or result storage cannot be allocated.
-   */
-  template <NodeOrder Order = NodeOrder::LowIdFirst>
-  std::optional<BitmapPlacement>
-  earliest_fit_preferred(num_nodes_t quantity, tdiff_t duration,
-                         sim_time_t start, const Bitmap &preferred) const {
-    endpoint(start, duration);
-    if (quantity > m_pool.count())
-      return std::nullopt;
-    if (auto result =
-            find_at_preferred<Order>(quantity, duration, start, preferred))
-      return result;
-    sim_time_t previous = start;
-    for (const auto &interval : m_intervals) {
-      if (interval.finish <= previous)
-        continue;
-      previous = interval.finish;
-      if (auto result =
-              find_at_preferred<Order>(quantity, duration, previous, preferred))
-        return result;
-    }
-    return std::nullopt;
   }
 
   /** @brief Find the earliest exact placement after a requested start.

@@ -133,8 +133,7 @@ periodic backfill (backfill_interval > 0):
     on a backfill tick with the scheduling-state flag set:
         clear the flag; rebuild the reservation plan and run backfill with a fresh examination count
         repeat scheduler calls until none starts a job
-    retain that cycle's planned node identities for event-driven FCFS dispatch
-    replace the retained identities at the next backfill cycle
+    keep that cycle's reservation plan for status reporting until the next backfill cycle
     any job start sets the flag for the next tick's changed queue prefix
     on other ticks: advance the tick deadline without a backfill scan
 
@@ -195,11 +194,17 @@ pass and exempt only the out-of-horizon head; see
 [Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
 Reservations are rebuilt each backfill planning pass from requested time limits
-and known capacity changes. Periodic exact-placement backfill retains the most
-recent cycle's planned identities between timer ticks; event-driven FCFS
-dispatch prefers those identities when they are feasible, and the next timer
-pass replaces the retained plan. Earlier selections enter the current plan
-before later candidates are tested. Actual runtimes come from the trace or a
+and known capacity changes. Earlier selections enter the current plan before
+later candidates are tested. With `--resource_model placement` and a positive
+`--backfill_interval`, node selection follows Slurm's flat-topology best fit:
+the shortest free run that covers the remaining request, otherwise the longest
+run, lowest node ID on ties. A reservation chooses among nodes free at its
+planned start without preferring nodes idle now, and backfill requires each
+node to be free at the requested end time. Event-driven FCFS dispatch applies
+best fit to the nodes free at the actual start; it does not reuse the nodes
+planned by the previous backfill cycle, which remain visible only through
+`placement_reservations()` until the next cycle. Other placement modes keep
+first fit in `--placement_order`. Actual runtimes come from the trace or a
 sampled distribution, capped by time limits. Cleanup nodes remain unavailable
 until release; their future actual release times are hidden from planning. A
 job's nodes become reusable when its slowest node finishes cleanup. Options are
