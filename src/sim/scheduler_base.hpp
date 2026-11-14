@@ -239,6 +239,24 @@ public:
     throw std::logic_error("scheduler does not support placement");
   }
 
+  /**
+   * @brief Run exact FCFS placement dispatch without a periodic backfill scan.
+   * @details Periodic placement schedulers override this so arrivals,
+   * completions, and capacity changes start only the contiguous FCFS prefix;
+   * schedule_placements() remains the timer-driven backfill pass. Other
+   * placement schedulers retain their normal event-driven behavior.
+   * @param[in] free_nodes Nodes currently available for allocation.
+   * @param[in] running_jobs Jobs already running with exact allocations.
+   * @param[in] current_time Current simulation time.
+   * @return Exact job/allocation decisions selected for immediate execution.
+   */
+  virtual std::vector<Placement_Decision>
+  schedule_placements_event(num_nodes_t free_nodes,
+                            const running_jobs_t &running_jobs,
+                            sim_time_t current_time) {
+    return schedule_placements(free_nodes, running_jobs, current_time);
+  }
+
   /** @brief Borrow the most recent exact reservation-reporting snapshot.
    * @return Owned future intervals valid until the next schedule call or
    * destruction; empty for capacity schedulers. Live allocations are never

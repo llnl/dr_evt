@@ -128,7 +128,8 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
     shutil.copyfile(comparison, scripts / 'slurm_compare.py')
     hashes['slurm_compare.py'] = hashlib.sha256(comparison.read_bytes()).hexdigest()
     for name in ('slurm-source.json', 'slurm-revision.txt', 'slurm-version.txt',
-                 'dr_evt-sources.json', 'event-overlay.json', 'dispatch-overlay.json'):
+                 'dr_evt-sources.json', 'event-overlay.json', 'dispatch-overlay.json',
+                 'liveness-overlay.json', 'transport-overlay.json'):
         source = Path('/results') / name
         if source.exists():
             shutil.copyfile(source, directory / name)
@@ -138,6 +139,11 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                 'clock': 'virtual integer seconds; monotonic/RPC time remains real',
                 'compute_adapter': 'native allocation requests, node registration, '
                                    'completion and epilog RPCs; no actual compute daemons',
+                'node_liveness_hook': 'disable compute-daemon pings only while the '
+                                      'validation virtual clock is active',
+                'compute_transport_hook': 'suppress batch-launch and termination network '
+                                          'messages to absent slurmd processes only while '
+                                          'the validation clock is active',
                 'backfill_hook': 'serialize event batches with backfill; native placement and reservation code retained',
                 'scripts_sha256': hashes,
                 'binary_sha256': {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -186,7 +192,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
             return json.loads(reply)
 
         # Finish the controller's mandatory startup probe before registering
-        # virtual nodes. Subsequent probes are disabled by SlurmdTimeout=0.
+        # virtual nodes.
         command(f'TIME {EPOCH}')
         time.sleep(1)
         # Register each virtual node through the same RPC as a compute daemon.
@@ -290,7 +296,8 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
             dr, _, dr_elapsed = run_dr_evt_placement(
                 directory / 'dr_evt', jobs,
                 Path('/workspace/dr_evt-placement-driver').read_text().strip(),
-                capacity, 'hybrid', 32, 'low')
+                capacity, 'hybrid', 32, 'low', backfill_interval=30,
+                queue_depth=64)
         else:
             dr, dr_elapsed = run_dr_evt(directory / 'dr_evt', jobs,
                                         Path('/workspace/dr_evt-simulator').read_text().strip(),
@@ -327,10 +334,10 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                   'batch_main_dispatch': batch_main_dispatch,
                   'main_dispatch_acknowledgement': batch_main_dispatch,
                   'reservation_depth': 32,
-                  'backfill_queue_depth': None if placement else 64,
-                  'backfill_interval_seconds': 0 if placement else 30,
-                  'comparison_loop_note': ('DR_EVT placement is event-driven with unlimited examination; '
-                                           'native Slurm retains periodic backfill' if placement else None),
+                  'backfill_queue_depth': 64,
+                  'backfill_interval_seconds': 30,
+                  'comparison_loop_note': ('DR_EVT placement and native Slurm use 30-second periodic '
+                                           'backfill with R=32 and Q=64' if placement else None),
                   'plot_note': 'Native scheduling; trace-driven virtual time and completion RPCs',
                   'bf_licenses': enabled, 'resource_curves': {'slurm': profile(native), 'dr_evt': profile(dr)},
                   'slurm_metrics': metrics(jobs, native, capacity, native_elapsed),
@@ -400,8 +407,21 @@ def main():
     parser.add_argument('--bf-licenses', choices=('on', 'off'), default='on',
                         help='License reservation planning for the Lassen run; controls exercise both settings')
     parser.add_argument('--resource-model', choices=('capacity', 'placement'), default='capacity')
+    parser.add_argument('--liveness-smoke', action='store_true',
+                        help='Run a short placement case beyond the native node-ping threshold')
     args = parser.parse_args()
-    if args.trace:
+    if args.trace and args.liveness_smoke:
+        parser.error('--trace and --liveness-smoke are mutually exclusive')
+    if args.liveness_smoke:
+        directory = args.outdir / 'node-liveness-smoke'
+        jobs = [(0, 4, 900, 600), (0, 4, 60, 60)]
+        report = run_case(directory, jobs, 4, enabled=True,
+                          batch_main_dispatch=True, resource_model='placement')
+        assert [row['start'] for row in report['slurm_schedule']] == [0, 600]
+        log = (directory / 'controller.log').read_text()
+        assert 'not responding' not in log.lower(), 'Virtual node ping was not suppressed'
+        (args.outdir / 'liveness-smoke.complete').write_text('passed\n')
+    elif args.trace:
         jobs, provenance = load_lassen(args.trace, 2000, 756)
         directory = args.outdir / 'lassen-prefix2000-hybrid-r32-q64'
         directory.mkdir(parents=True, exist_ok=True)

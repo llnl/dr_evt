@@ -88,6 +88,7 @@ RUN apt-get update \
         protobuf-compiler-grpc \
         python3 \
         python3-dev \
+        python3-matplotlib \
         python3-pip \
         python3-venv \
         redis-server \
@@ -97,12 +98,11 @@ RUN apt-get update \
     && { { [ "$WITH_SLURM" = 0 ] && [ "$WITH_EPFL_SLURM" = 0 ]; } || apt-get install --yes --no-install-recommends \
         autoconf automake libcurl4-openssl-dev libedit-dev libjansson-dev \
         liblua5.1-dev liblz4-dev libmunge-dev libncurses-dev libnuma-dev \
-        libpam0g-dev libreadline-dev libsqlite3-dev libtool munge \
-        python3-matplotlib zlib1g-dev; } \
+        libpam0g-dev libreadline-dev libsqlite3-dev libtool munge zlib1g-dev; } \
     && { [ "$WITH_OPENPBS" = 0 ] || apt-get install --yes --no-install-recommends \
         autoconf automake bison flex libcjson-dev libedit-dev libexpat1-dev \
         libhwloc-dev libical-dev libncurses-dev libtool libx11-dev libxext-dev \
-        libxft-dev libxt-dev postgresql-server-dev-all python3-matplotlib swig \
+        libxft-dev libxt-dev postgresql-server-dev-all swig \
         tcl-dev tk-dev; } \
     && { [ "$WITH_FICTION" = 0 ] || apt-get install --yes --no-install-recommends \
         autoconf automake file jq libarchive-dev libboost-graph-dev \
@@ -110,7 +110,7 @@ RUN apt-get update \
         libfaketime libhwloc-dev libjansson-dev liblua5.1-dev liblz4-dev \
         libncurses-dev libsqlite3-dev libtool libyaml-cpp-dev libzmq3-dev \
         lua-posix lua5.1 meson patch python3-cffi python3-jsonschema \
-        python3-matplotlib python3-ply python3-pydantic python3-pytest \
+        python3-ply python3-pydantic python3-pytest \
         python3-setuptools python3-tqdm python3-wheel python3-yaml uuid-dev; } \
     && { [ "$WITH_FICTION" = 0 ] || python3 -m pip install --break-system-packages \
         'meson-python>=0.16,<0.19'; } \
@@ -129,14 +129,18 @@ COPY --from=build /src/validation/slurm /validation-slurm
 COPY --from=build /src/validation/flux /validation
 
 # Keep the supported Sphinx/Breathe toolchain isolated from Ubuntu's system
-# Python while making documentation builds available in interactive shells.
+# Python. Do not prepend the documentation virtualenv to PATH: validation
+# harnesses require distro-provided modules such as matplotlib.
 RUN python3 -m venv /opt/dr-evt-docs-venv \
     && /opt/dr-evt-docs-venv/bin/python -m pip install --no-cache-dir \
         -r /tmp/dr-evt-docs-requirements.txt \
     && rm -f /tmp/dr-evt-docs-requirements.txt
 
-ENV PATH="/opt/dr-evt-docs-venv/bin:${PATH}" \
-    SPHINXBUILD="/opt/dr-evt-docs-venv/bin/sphinx-build"
+ENV SPHINXBUILD="/opt/dr-evt-docs-venv/bin/sphinx-build"
+
+# Plotting is part of scheduler validation, including minimal images. Verify
+# the interpreter selected by the image's default PATH, not only /usr/bin.
+RUN python3 -c 'import matplotlib'
 
 # Clone, patch, and build the pinned native Slurm simulator used by the study.
 RUN if [ "$WITH_SLURM" = 1 ]; then \
@@ -206,6 +210,8 @@ ENV FLUX_PREFIX=/workspace/install \
 
 # Build the exact upstream revisions used by the Fiction validation study.
 # Sources remain available for audit and validation-specific overlays.
+# Explicitly use Ubuntu's Python for native scheduler builds; the documentation
+# virtualenv intentionally does not contain their distro-provided modules.
 RUN if [ "$WITH_FICTION" = 1 ]; then \
       mkdir -p /sources /workspace /results \
       && git clone https://github.com/flux-framework/flux-core.git /sources/flux-core \
@@ -214,21 +220,22 @@ RUN if [ "$WITH_FICTION" = 1 ]; then \
       && git -C /sources/flux-sched checkout --detach 9eba598b4e0940d597695e65f20f5357fc513427 \
       && git clone https://github.com/flux-framework/flux-fiction.git /sources/flux-fiction \
       && git -C /sources/flux-fiction checkout --detach 346cbd65bf7da3798e2a351b44e0f57a5b20da96 \
-      && python3 /validation/prepare.py \
+      && /usr/bin/python3 /validation/prepare.py \
       && cd /workspace/flux-core \
       && export FLUX_VERSION="$(cat /workspace/flux-core.version)" \
       && ./autogen.sh \
-      && ./configure --prefix=/workspace/install --disable-docs \
+      && PYTHON=/usr/bin/python3 ./configure --prefix=/workspace/install --disable-docs \
       && make -j4 \
       && make install \
       && eval "$(/workspace/install/bin/flux env)" \
-      && cmake -S /workspace/flux-sched -B /workspace/flux-sched-build \
+      && PATH="/workspace/install/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+        cmake -S /workspace/flux-sched -B /workspace/flux-sched-build \
         -DFLUX_SCHED_VER=0.0.0 -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/workspace/install -DCMAKE_PREFIX_PATH=/workspace/install \
-        -DENABLE_DOCS=OFF \
+        -DPython_EXECUTABLE=/usr/bin/python3 -DENABLE_DOCS=OFF \
       && cmake --build /workspace/flux-sched-build -j4 \
       && cmake --install /workspace/flux-sched-build \
-      && python3 -m pip install --break-system-packages --no-build-isolation --no-deps \
+      && /usr/bin/python3 -m pip install --break-system-packages --no-build-isolation --no-deps \
         --config-settings=setup-args=-Dflux_prefix=/workspace/install \
         --config-settings=build-dir=/workspace/fiction-build \
         -e /workspace/flux-fiction \

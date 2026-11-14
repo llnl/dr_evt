@@ -32,6 +32,9 @@ static int (*real_nanosleep)(const struct timespec *, struct timespec *);
 static int (*real_cond_wait)(pthread_cond_t *, pthread_mutex_t *,
                              const struct timespec *);
 
+/** @brief Report whether this process initialized the validation clock. */
+int validation_clock_active(void) { return shared != NULL; }
+
 __attribute__((constructor)) static void initialize(void) {
   real_clock_gettime = dlsym(RTLD_NEXT, "clock_gettime");
   real_nanosleep = dlsym(RTLD_NEXT, "nanosleep");

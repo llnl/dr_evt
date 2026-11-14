@@ -131,8 +131,10 @@ event-driven (backfill_interval = 0 and dispatch_interval = 0):
 periodic backfill (backfill_interval > 0):
     on a state-event batch: apply it, then run FCFS dispatch
     on a backfill tick with the scheduling-state flag set:
-        clear the flag; run backfill with a fresh examination count
+        clear the flag; rebuild the reservation plan and run backfill with a fresh examination count
         repeat scheduler calls until none starts a job
+    retain that cycle's planned node identities for event-driven FCFS dispatch
+    replace the retained identities at the next backfill cycle
     any job start sets the flag for the next tick's changed queue prefix
     on other ticks: advance the tick deadline without a backfill scan
 
@@ -192,13 +194,16 @@ out-of-horizon jobs use no scan slot. Event-driven EASY paths reset Q per
 pass and exempt only the out-of-horizon head; see
 [Backfill evaluation accounting](REALISM_AND_GAPS.md#backfill-evaluation-accounting).
 
-Reservations are rebuilt each pass from requested time limits and known
-capacity changes. Earlier selections enter the plan before later candidates
-are tested. Actual runtimes come from the trace or a sampled distribution,
-capped by time limits. Cleanup nodes remain unavailable until release; their
-future actual release times are hidden from planning. A job's nodes become
-reusable when its slowest node finishes cleanup. Options are defined in the
-[command-line reference](command-line.md).
+Reservations are rebuilt each backfill planning pass from requested time limits
+and known capacity changes. Periodic exact-placement backfill retains the most
+recent cycle's planned identities between timer ticks; event-driven FCFS
+dispatch prefers those identities when they are feasible, and the next timer
+pass replaces the retained plan. Earlier selections enter the current plan
+before later candidates are tested. Actual runtimes come from the trace or a
+sampled distribution, capped by time limits. Cleanup nodes remain unavailable
+until release; their future actual release times are hidden from planning. A
+job's nodes become reusable when its slowest node finishes cleanup. Options are
+defined in the [command-line reference](command-line.md).
 
 ## Supported policy combinations
 

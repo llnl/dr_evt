@@ -51,6 +51,9 @@ committed OpenPBS source without scheduling patches.
 converted input. Each native replay has a 30-minute timeout.
 Small controls can be run directly in the prepared container by omitting
 `--trace` from `compare.py`. The comparator also accepts `--priority_policy`.
+To rerun only DR_EVT against completed native case directories, pass
+`--native-results path/to/native-results` instead of `--native`; the resource
+model and case names are checked before the saved schedules are reused.
 
 ## Resource and policy model
 
@@ -178,6 +181,16 @@ wait 23,620.5925 seconds, makespan 143,232 seconds, and utilization 75.0899%.
 All 21 small cases match and all capacity/ownership audits pass. See the
 [grouped-policy evidence](evidence/openpbs-policy-20261108/README.md).
 
+The exact-placement rerun now applies that same grouped forecast to node
+identity searches instead of silently falling back to ordinary placement
+FCFS. Against the saved native placement run, all 2,000 start/completion times
+and all 2,000 low-ID node assignments match. The measured schedules have mean
+wait 24,752.046 seconds, mean turnaround 32,865.9835 seconds, makespan 143,569
+seconds, and utilization 74.9136%. DR_EVT took 12.489 seconds in the rerun;
+the reused native OpenPBS process measurement was 334.666 seconds. All 20
+small placement controls also have zero start-time differences. These are
+end-to-end harness timings, not identical internal timing regions.
+
 With ordinary `fcfs`, the same input has **1,433 differing schedules**. The
 first divergence comes from different predictions for waiting job 229:
 DR_EVT predicts 13,006 seconds; OpenPBS predicts 13,007 because it groups
@@ -203,13 +216,16 @@ adjacent predicted releases with releases farther apart. The Lassen replay
 uses R=32. With `fcfs_1s_evt_group` all cases must match; with `fcfs`, the
 adjacent-release difference is expected and the Lassen differences are recorded.
 
-`fcfs_1s_evt_group` selects a distinct DR_EVT scheduler with the grouping rule
-explained above. It reuses FCFS placement passes while keeping its forecast
-events separate from exact capacity intervals. Pending-job status predictions
+`fcfs_1s_evt_group` selects a distinct DR_EVT forecast with the grouping rule
+explained above. Capacity scheduling keeps forecast events separate from exact
+capacity intervals; placement scheduling derives the same event groups from
+its authoritative exact intervals and tests one fixed node set for the entire
+requested duration. Pending-job status predictions
 and checkpoint continuation follow the selected policy. It requires a circular
 queue, event-driven dispatch, and unlimited planning horizon. Its native
-agreement claims apply to integer-second shared-capacity inputs, not all
-OpenPBS scheduling policies or production node placement.
+agreement claims apply to the tested integer-second capacity and exclusive
+whole-node inputs, not all OpenPBS scheduling policies or heterogeneous node
+selection.
 Its [recorded native replay](evidence/openpbs-policy-20261108/README.md)
 matches all 21 small cases and every start and completion in the original
 converted 2,000-job input. All capacity and ownership audits pass. The original input needs no

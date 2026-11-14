@@ -9,6 +9,7 @@
 #include "slurm/slurm.h"
 #include "src/common/slurm_protocol_api.h"
 #include "src/common/slurm_protocol_defs.h"
+#include "src/common/xmalloc.h"
 #include "src/interfaces/gres.h"
 #include <inttypes.h>
 #include <stdio.h>
@@ -118,32 +119,50 @@ int main(int argc, char **argv) {
       sscanf(line, "%*s %u %8191s", &value, node);
       slurm_step_id_t step = SLURM_STEP_ID_INITIALIZER;
       step.job_id = value;
-      rc = slurm_complete_job(&step, 0);
-      if (rc) {
-        fprintf(stderr, "complete: %s\n", slurm_strerror(errno));
-        return 1;
-      }
+      step.step_id = SLURM_BATCH_SCRIPT;
       hostlist_t *nodes = slurm_hostlist_create(node);
       if (!nodes) {
         fprintf(stderr, "invalid completion node list: %s\n", node);
         return 1;
       }
-      char *member = NULL;
-      while ((member = slurm_hostlist_shift(nodes))) {
+      char *member = slurm_hostlist_shift(nodes);
+      if (!member) {
+        fprintf(stderr, "empty completion node list\n");
+        slurm_hostlist_destroy(nodes);
+        return 1;
+      }
+      complete_batch_script_msg_t batch = {
+          .step_id = step,
+          .node_name = member,
+          .user_id = getuid(),
+      };
+      slurm_msg_t batch_msg;
+      slurm_msg_t_init(&batch_msg);
+      batch_msg.msg_type = REQUEST_COMPLETE_BATCH_SCRIPT;
+      batch_msg.data = &batch;
+      int remote_rc = 0;
+      rc = slurm_send_recv_controller_rc_msg(&batch_msg, &remote_rc, NULL);
+      if (rc || remote_rc) {
+        fprintf(stderr, "batch completion failed: %d %d\n", rc, remote_rc);
+        xfree(member);
+        slurm_hostlist_destroy(nodes);
+        return 1;
+      }
+      do {
         epilog_complete_msg_t epilog = {.step_id = step, .node_name = member};
         slurm_msg_t msg;
         slurm_msg_t_init(&msg);
         msg.msg_type = MESSAGE_EPILOG_COMPLETE;
         msg.data = &epilog;
-        int remote_rc = 0;
+        remote_rc = 0;
         rc = slurm_send_recv_controller_rc_msg(&msg, &remote_rc, NULL);
-        free(member);
+        xfree(member);
         if (rc || remote_rc) {
           fprintf(stderr, "epilog completion failed\n");
           slurm_hostlist_destroy(nodes);
           return 1;
         }
-      }
+      } while ((member = slurm_hostlist_shift(nodes)));
       slurm_hostlist_destroy(nodes);
       puts("{}");
     } else if (!strcmp(command, "DUMP")) {

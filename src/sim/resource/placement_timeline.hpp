@@ -488,6 +488,106 @@ public:
     }
   }
 
+  /** @brief Select an exact placement by contiguous-run best fit.
+   * @tparam Order Compile-time tie and within-run identity order.
+   * @param[in] quantity Resources requested.
+   * @param[in] duration Requested duration; nonpositive means a point query.
+   * @param[in] start Exact query start.
+   * @return Owning placement, or std::nullopt when no exact fit exists.
+   * @throws std::invalid_argument for invalid timing.
+   * @throws std::bad_alloc if scratch or result storage cannot be allocated. */
+  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  std::optional<BitmapPlacement> find_at_best_fit(num_nodes_t quantity,
+                                                  tdiff_t duration,
+                                                  sim_time_t start) const {
+    const auto end = endpoint(start, duration);
+    Bitmap candidates = m_pool;
+    if constexpr (coarse_filter_enabled)
+      filter(candidates, start, end);
+    if (candidates.count() < quantity)
+      return std::nullopt;
+    refine(candidates, start, end);
+    auto allocation = candidates.template select_best_fit_runs<Order>(quantity);
+    if (!allocation)
+      return std::nullopt;
+    return BitmapPlacement{start, std::move(*allocation)};
+  }
+
+  /** @brief Select exact identities at one time while preferring a subset.
+   * @tparam Order Compile-time ordering within preferred and remaining sets.
+   * @param[in] quantity Resources requested.
+   * @param[in] duration Requested duration; nonpositive means a point query.
+   * @param[in] start Exact query start.
+   * @param[in] preferred Identities selected before other feasible identities.
+   * @return Owning placement, or std::nullopt when no exact fit exists.
+   * @throws std::invalid_argument for mismatched domains or invalid timing.
+   * @throws std::bad_alloc if scratch or result storage cannot be allocated.
+   * @details Preference changes selection only, never feasibility. Identities
+   * blocked anywhere in the exact interval are removed before either tier is
+   * selected. */
+  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  std::optional<BitmapPlacement>
+  find_at_preferred(num_nodes_t quantity, tdiff_t duration, sim_time_t start,
+                    const Bitmap &preferred) const {
+    const auto end = endpoint(start, duration);
+    Bitmap candidates = m_pool;
+    if constexpr (coarse_filter_enabled)
+      filter(candidates, start, end);
+    if (candidates.count() < quantity)
+      return std::nullopt;
+    refine(candidates, start, end);
+    if (candidates.count() < quantity)
+      return std::nullopt;
+    Bitmap preferred_candidates = candidates;
+    preferred_candidates.intersect_with(preferred);
+    const auto preferred_count = static_cast<num_nodes_t>(
+        std::min<size_t>(quantity, preferred_candidates.count()));
+    auto selected = preferred_candidates.template select_best_fit_runs<Order>(
+        preferred_count);
+    candidates.remove(*selected);
+    if (preferred_count < quantity) {
+      auto remaining = candidates.template select_best_fit_runs<Order>(
+          quantity - preferred_count);
+      if (!remaining)
+        return std::nullopt;
+      selected->add(*remaining);
+    }
+    return BitmapPlacement{start, std::move(*selected)};
+  }
+
+  /** @brief Find the earliest exact fit while preferring identities available
+   * at the current periodic-backfill cycle.
+   * @tparam Order Compile-time ordering within preferred and remaining sets.
+   * @param[in] quantity Resources requested.
+   * @param[in] duration Requested duration; nonpositive means a point query.
+   * @param[in] start Earliest exact start.
+   * @param[in] preferred Identities selected first at every candidate time.
+   * @return Earliest owning placement, or std::nullopt.
+   * @throws std::invalid_argument for mismatched domains or invalid timing.
+   * @throws std::bad_alloc if temporary or result storage cannot be allocated.
+   */
+  template <NodeOrder Order = NodeOrder::LowIdFirst>
+  std::optional<BitmapPlacement>
+  earliest_fit_preferred(num_nodes_t quantity, tdiff_t duration,
+                         sim_time_t start, const Bitmap &preferred) const {
+    endpoint(start, duration);
+    if (quantity > m_pool.count())
+      return std::nullopt;
+    if (auto result =
+            find_at_preferred<Order>(quantity, duration, start, preferred))
+      return result;
+    sim_time_t previous = start;
+    for (const auto &interval : m_intervals) {
+      if (interval.finish <= previous)
+        continue;
+      previous = interval.finish;
+      if (auto result =
+              find_at_preferred<Order>(quantity, duration, previous, preferred))
+        return result;
+    }
+    return std::nullopt;
+  }
+
   /** @brief Find the earliest exact placement after a requested start.
    * @tparam Order Compile-time resource selection order.
    * @tparam ReuseScratch Reuse and transfer one query buffer instead of
@@ -527,6 +627,69 @@ public:
       previous = interval.finish;
       if (auto result = attempt(previous))
         return result;
+    }
+    return std::nullopt;
+  }
+
+  /** @brief Find an exact placement at OpenPBS one-second event-group
+   * endpoints.
+   * @tparam Order Compile-time resource selection order.
+   * @tparam ReuseScratch Reuse and transfer one query buffer instead of
+   * allocating a separate result.
+   * @param[in] quantity Number of resources requested.
+   * @param[in] duration Requested duration; nonpositive means a point query.
+   * @param[in] start Current time, checked before future event groups.
+   * @return First fitting grouped endpoint, or std::nullopt.
+   * @throws std::invalid_argument for invalid query timing.
+   * @throws std::bad_alloc if temporary event or placement storage cannot be
+   * allocated.
+   * @details Every interval start and finish is a forecast event. Events
+   * through one second after the first event in a group are processed
+   * inclusively, and fit is tested at the last actual event only when the
+   * group contains a release. Exact identities must remain available for the
+   * complete requested interval. Event storage is query-local derived state.
+   */
+  template <NodeOrder Order = NodeOrder::LowIdFirst, bool ReuseScratch = true>
+  std::optional<BitmapPlacement>
+  earliest_fit_1s_event_group(num_nodes_t quantity, tdiff_t duration,
+                              sim_time_t start) const {
+    endpoint(start, duration);
+    if (quantity > m_pool.count())
+      return std::nullopt;
+    if (auto result = find_at<Order, ReuseScratch>(quantity, duration, start))
+      return result;
+    struct Event {
+      sim_time_t time;
+      bool release;
+    };
+    std::vector<Event> events;
+    events.reserve(m_intervals.size() * 2);
+    for (const auto &interval : m_intervals) {
+      if (interval.start > start)
+        events.push_back({interval.start, false});
+      if (interval.finish > start)
+        events.push_back({interval.finish, true});
+    }
+    std::sort(events.begin(), events.end(),
+              [](const Event &left, const Event &right) {
+                return left.time != right.time ? left.time < right.time
+                                               : left.release > right.release;
+              });
+    size_t cursor = 0;
+    while (cursor < events.size()) {
+      const sim_time_t endpoint = events[cursor].time + 1.0;
+      sim_time_t tested_time = events[cursor].time;
+      bool released = false;
+      do {
+        tested_time = events[cursor].time;
+        released = released || events[cursor].release;
+        ++cursor;
+      } while (cursor < events.size() && events[cursor].time <= endpoint);
+      if (released) {
+        if (auto result =
+                find_at<Order, ReuseScratch>(quantity, duration, tested_time))
+          return result;
+      }
     }
     return std::nullopt;
   }

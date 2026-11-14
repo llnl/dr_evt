@@ -38,7 +38,9 @@ def audit_schedule(jobs, schedule, capacity):
 
 
 def run_dr_evt_placement(directory, jobs, driver, capacity, policy='hybrid',
-                         reservations=32, order='low', timeout=900):
+                         reservations=32, order='low', timeout=900,
+                         backfill_interval=0, queue_depth=0,
+                         priority_policy='fcfs'):
     """Execute one placement run and retain its command protocol and output."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=False)
@@ -46,12 +48,16 @@ def run_dr_evt_placement(directory, jobs, driver, capacity, policy='hybrid',
         raise ValueError('unsupported placement policy: ' + policy)
     if order not in ('low', 'high'):
         raise ValueError('placement order must be low or high')
+    if priority_policy not in ('fcfs', 'fcfs_1s_evt_group'):
+        raise ValueError('unsupported placement priority: ' + priority_policy)
     slots = {'none': 0, 'easy': 1, 'hybrid': reservations,
              'conservative': len(jobs)}[policy]
     strict = int(policy == 'none')
     request = f'{capacity} {slots} {strict} {order} {len(jobs)}\n'
     request += ''.join(' '.join(map(str, job)) + '\n' for job in jobs)
-    command = [str(Path(driver).resolve()), '--exact-only']
+    command = [str(Path(driver).resolve()), '--exact-only', '--queue-depth',
+               str(queue_depth), '--backfill-interval', str(backfill_interval),
+               '--priority-policy', priority_policy]
     (directory / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
     (directory / 'request.txt').write_text(request)
     started = time.perf_counter()
@@ -69,6 +75,9 @@ def run_dr_evt_placement(directory, jobs, driver, capacity, policy='hybrid',
     normalized = audit_schedule(jobs, schedule, capacity)
     report = {'resource_model': 'placement', 'policy': policy,
               'reservation_depth': slots, 'placement_order': order,
+              'backfill_interval_seconds': backfill_interval,
+              'backfill_queue_depth': queue_depth,
+              'priority_policy': priority_policy,
               'elapsed_seconds': elapsed, 'schedule': normalized,
               'snapshots': snapshots}
     (directory / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
