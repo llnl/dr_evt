@@ -258,6 +258,100 @@ void periodic_placement(const std::string &input) {
               !statuses[1].start_time,
           "event dispatch did not honor the retained periodic plan");
 }
+/** @brief Check event dispatch after a retained periodic start uses Slurm's
+ * flat-topology contiguous-run best fit for later immediate starts.
+ * @param[in] input Header-only input trace.
+ * @param[in] features Construction-time optimization selector.
+ * @throws std::runtime_error if a later main-dispatch start uses low-ID
+ * first fit instead of the shortest sufficient free run. */
+void periodic_dispatch_best_fit(const std::string &input,
+                                const std::string &features) {
+  auto params = params_for(input, features);
+  params.m_total_nodes = 10;
+  params.m_backfill_policy = BackfillPolicy::HYBRID;
+  params.m_reservation_depth = 1;
+  params.m_backfill_queue_depth = 64;
+  params.m_backfill_interval = 30;
+  Simulation simulation(params);
+  // Initial low-ID layout: 0-2, 3, 4-5, 6, 7, 8-9.
+  for (const auto &[nodes, limit] :
+       std::initializer_list<std::pair<num_nodes_t, tdiff_t>>{
+           {3, 40}, {1, 1000}, {2, 40}, {1, 1000}, {1, 40}, {2, 1000}})
+    simulation.append_job(0, nodes, queue, limit);
+  // The timer at 30 retains the head's planned identities for time 40.
+  const auto head = simulation.append_job(5, 2, queue, 100);
+  // This job arrives after that timer, so it has no retained identities.
+  const auto later = simulation.append_job(35, 1, queue, 100);
+  simulation.advance_to(40);
+  // Free runs at 40 are {0-2}, {4-5}, and {7}.
+  const auto statuses = simulation.get_job_statuses({head, later});
+  require(statuses[0].start_time == 40 &&
+              statuses[0].node_ids == std::vector<num_nodes_t>({4, 5}),
+          "periodic head did not use the best-fit two-node run");
+  require(statuses[1].start_time == 40 &&
+              statuses[1].node_ids == std::vector<num_nodes_t>({7}),
+          "event dispatch after a retained start used low-ID first fit");
+}
+/** @brief Check Slurm-style periodic reservations and later event dispatch.
+ * @param[in] input Header-only input trace.
+ * @param[in] features Construction-time optimization selector.
+ * @throws std::runtime_error if a reservation prefers currently idle nodes
+ * over flat best fit, or event dispatch reuses the planned identities instead
+ * of best fit over the nodes free at the actual start. */
+void periodic_reservation_best_fit(const std::string &input,
+                                   const std::string &features) {
+  const auto ids = [](std::initializer_list<num_nodes_t> list) {
+    return std::vector<num_nodes_t>(list);
+  };
+  {
+    auto params = params_for(input, features);
+    params.m_total_nodes = 10;
+    params.m_backfill_policy = BackfillPolicy::HYBRID;
+    params.m_reservation_depth = 1;
+    params.m_backfill_queue_depth = 64;
+    params.m_backfill_interval = 30;
+    Simulation simulation(params);
+    simulation.append_job(0, 4, queue, 50);   // 0-3 until 50
+    simulation.append_job(0, 5, queue, 1000); // 4-8; node 9 stays idle
+    const auto head = simulation.append_job(5, 2, queue, 100);
+    simulation.advance_to(30);
+    // At 50 the free runs are {0-3} and {9}. Slurm's will-run test picks
+    // the shortest sufficient run; it does not prefer idle node 9.
+    const auto plan = simulation.placement_reservations();
+    require(plan.size() == 1 && plan[0].job == head && plan[0].start == 50 &&
+                plan[0].allocation().ids() == ids({0, 1}),
+            "periodic reservation preferred currently idle nodes");
+    simulation.advance_to(50);
+    const auto status = simulation.get_job_statuses({head})[0];
+    require(status.start_time == 50 && status.node_ids == ids({0, 1}),
+            "reserved head did not start on its best-fit nodes");
+  }
+  {
+    auto params = params_for(input, features);
+    params.m_total_nodes = 10;
+    params.m_backfill_policy = BackfillPolicy::HYBRID;
+    params.m_reservation_depth = 1;
+    params.m_backfill_queue_depth = 64;
+    params.m_backfill_interval = 30;
+    Simulation simulation(params);
+    simulation.append_job(0, 1, queue, 100, 45); // 0; limit 100, ends at 45
+    simulation.append_job(0, 3, queue, 50);      // 1-3 until 50
+    simulation.append_job(0, 6, queue, 1000);    // 4-9
+    const auto head = simulation.append_job(5, 2, queue, 100);
+    simulation.advance_to(30);
+    // Requested limits leave {1-3} at 50, so backfill plans {1, 2}.
+    const auto plan = simulation.placement_reservations();
+    require(plan.size() == 1 && plan[0].start == 50 &&
+                plan[0].allocation().ids() == ids({1, 2}),
+            "periodic reservation did not use flat best fit");
+    simulation.advance_to(50);
+    // Node 0 was released early, so {0-3} is free when main dispatch starts
+    // the head. Slurm's select_nodes() ignores backfill's planned nodes.
+    const auto status = simulation.get_job_statuses({head})[0];
+    require(status.start_time == 50 && status.node_ids == ids({0, 1}),
+            "event dispatch reused planned identities instead of best fit");
+  }
+}
 /** @brief Check OpenPBS event grouping with exact node identities.
  * @param[in] input Header-only input trace.
  * @throws std::runtime_error if adjacent or separated releases use the wrong
@@ -376,6 +470,8 @@ int main() {
                       (directory / (std::string(features) + ".csv")).string(),
                       features);
       boundaries(input, features);
+      periodic_dispatch_best_fit(input, features);
+      periodic_reservation_best_fit(input, features);
     }
     invalid_ownership();
     expired_forecast(input);

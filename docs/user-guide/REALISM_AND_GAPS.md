@@ -72,7 +72,9 @@ starts can expose new candidates in the bounded prefix. Fixed periodic
 dispatch retries every tick while jobs wait, regardless of the flag.
 
 Periodic hybrid/conservative backfill also checks capacity at each candidate's
-end timestamp, representing Slurm's endpoint rule. Event-driven and fixed
+end timestamp, representing Slurm's endpoint rule. With
+`--resource_model placement`, the same rule requires each selected node to be
+free at that timestamp. Event-driven and fixed
 periodic placement retain half-open fits, as needed for Fluxion and Spur.
 The [endpoint explanation](SCHEDULER_LOOPS.md#shared-terms) defines both rules;
 the [Slurm validation](SLURM_VALIDATION.md#sources-of-divergence-and-corrections)
@@ -141,8 +143,13 @@ The built-in model uses one homogeneous node pool with FCFS, SJF, or LJF
 ordering. It does not model multifactor priority (age, fair share, QOS),
 preemption, dependencies and arrays, per-user/account limits, partitions,
 node topology or node failures. Exact whole-node placement is available through
-`--resource_model placement` for event-driven circular FCFS; it does not model
-core/GPU topology or shared resources. Scheduled capacity changes in capacity mode
+`--resource_model placement` for circular FCFS, with event-driven or separate
+periodic backfill; it does not model core/GPU topology or shared resources.
+With periodic backfill it reproduces Slurm's flat-topology best-fit node
+choice for equal-weight, one-CPU exclusive nodes; Slurm node weights,
+`pack_serial_at_end`, least-loaded or busy-node preference, non-flat topology
+plugins, and GRES- or CPU-count-based fit are not modeled. Scheduled capacity
+changes in capacity mode
 alter the pool size; they do not model those mechanisms. Health checks, missed
 notifications, state inconsistency, and failure recovery are outside the model;
 timers used only for those purposes need no simulation equivalent.

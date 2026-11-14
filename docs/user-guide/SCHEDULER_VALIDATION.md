@@ -36,7 +36,11 @@ Slurm/OpenPBS schedule whole-node requests on one shared homogeneous node pool,
 and the reports compare exact native node identities with DR_EVT placement
 allocations as well as starts, completions, resource bounds, and process time.
 Capacity and placement results are kept in separate directories so historical
-laptop timings are not reused in a host-specific campaign.
+laptop timings are not reused in a host-specific campaign. With Slurm's
+30-second backfill timer, R=32, and Q=64, DR_EVT placement matches native
+Slurm's start times and node allocations for all 2,000 jobs; see the
+[Slurm placement agreement](https://github.com/LLNL/dr_evt/tree/main/validation/slurm#exact-placement-agreement)
+for the reproduced node-selection rules and their scope.
 
 See [Scheduling Loops](SCHEDULER_LOOPS.md) for policy rules,
 [Realism and Known Gaps](REALISM_AND_GAPS.md) for model limits, and the

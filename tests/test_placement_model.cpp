@@ -358,6 +358,28 @@ static void lifecycle_checks() {
           "point release boundary");
   require(!fractional.find_at(4, -1, 0.125),
           "negative duration point semantics");
+  // Slurm backfill also requires the identity at the requested end.
+  Timeline adjacent(Bitmap(2, true), 0);
+  const std::array<num_nodes_t, 1> first{0};
+  adjacent.reserve({10, Bitmap::from_ids(2, first)}, 5);
+  require(adjacent.find_at(2, 10, 0).has_value(),
+          "half-open end rejected an adjacent commitment");
+  adjacent.set_inclusive_end(true);
+  require(!adjacent.find_at(2, 10, 0) && !adjacent.can_fit(0, 2, 10),
+          "inclusive end admitted a commitment at the requested end");
+  auto adjacent_fit = adjacent.find_at(1, 10, 0);
+  require(adjacent_fit && adjacent_fit->allocation.ids() ==
+                              std::vector<num_nodes_t>{1},
+          "inclusive end removed an identity free at the endpoint");
+  require(adjacent.find_at(2, 0, 10 - 1e-9).has_value() &&
+              !adjacent.find_at(2, 0, 10),
+          "inclusive end changed point-query semantics");
+  auto inclusive_copy = adjacent;
+  require(!inclusive_copy.find_at(2, 10, 0), "copy lost inclusive endpoint");
+  adjacent.reserve({0, Bitmap::from_ids(2, std::array<num_nodes_t, 1>{1})},
+                   10);
+  require(adjacent.intervals().size() == 2,
+          "inclusive end changed half-open reservation admission");
 }
 
 /** @brief Check immediate selection and atomic batch seeding over borrowed

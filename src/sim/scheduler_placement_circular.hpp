@@ -25,7 +25,9 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
   std::optional<typename Model::Timeline>
       m_last_plan;                    ///< Latest owned reservation snapshot.
   ResourceDiagnostics *m_diagnostics; ///< Borrowed simulation-owned counters.
-  bool m_periodic_backfill; ///< Whether timer passes own retained plans.
+  bool m_periodic_backfill; ///< Slurm-style timer backfill: flat-topology run
+                            ///< best fit, inclusive backfill endpoints, and a
+                            ///< reported plan kept until the next timer pass.
 
   /**
    * @brief Run the shared exact-placement traversal.
@@ -42,6 +44,8 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     const auto *live = running_jobs.placement();
     if (!live || free_nodes != live->eligible.count() - live->occupied.count())
       throw std::invalid_argument("placement and trace availability disagree");
+    // Event dispatch between timer passes keeps the last backfill plan for
+    // status reporting only; selection never consults its identities.
     const bool retain_periodic_plan = m_periodic_backfill && !backfill;
     if (!retain_periodic_plan)
       m_last_plan.reset();
@@ -58,11 +62,6 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     starts.reserve(
         std::min(active_job_count(), static_cast<size_t>(free_nodes)));
     Bitmap projected_occupied = live->occupied;
-    std::optional<Bitmap> cycle_preferred;
-    if (m_periodic_backfill && backfill) {
-      cycle_preferred.emplace(live->eligible);
-      cycle_preferred->remove(projected_occupied);
-    }
     std::optional<typename Model::Timeline> plan;
     const auto ensure_plan = [&] {
       if (plan)
@@ -76,6 +75,8 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
           eligible.remove(record.allocation);
       }
       plan.emplace(std::move(eligible), current_time);
+      // Slurm backfill requires capacity at each candidate's requested end.
+      plan->set_inclusive_end(m_periodic_backfill && backfill);
       auto future = std::ranges::filter_view(
           std::views::all(live->jobs), [current_time](const auto &entry) {
             return entry.second.timing.start_time +
@@ -125,18 +126,6 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
       ResourceContext context{job.job_id, current_time, 0, nullptr,
                               m_diagnostics};
       std::optional<typename Model::Placement> placement;
-      if (retain_periodic_plan && m_last_plan) {
-        const auto retained = std::ranges::find_if(
-            m_last_plan->intervals(), [&](const PlacementInterval &interval) {
-              return interval.job == job.job_id;
-            });
-        if (retained != m_last_plan->intervals().end()) {
-          ensure_plan();
-          placement = Model::find_at_preferred(*plan, retained->allocation(),
-                                               job.nodes_requested, duration,
-                                               current_time, context);
-        }
-      }
       if constexpr (Model::immediate_fast_path) {
         if (!plan) {
           if (m_periodic_backfill)
@@ -155,13 +144,17 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
           if constexpr (OneSecondEventGroups)
             placement = Model::find_fit_1s_event_group(
                 *plan, job.nodes_requested, duration, current_time, context);
-          else if (cycle_preferred)
-            placement = Model::find_fit_preferred(*plan, *cycle_preferred,
-                                                  job.nodes_requested, duration,
-                                                  current_time, context);
-          else
+          else {
             placement = Model::find_fit(*plan, job.nodes_requested, duration,
                                         current_time, context);
+            // Slurm selects nodes free at the chosen start by flat-topology
+            // run best fit, for immediate starts and future reservations.
+            if (placement && m_periodic_backfill)
+              if (auto best = Model::find_at_best_fit(
+                      *plan, job.nodes_requested, duration, placement->start,
+                      context))
+                placement = std::move(best);
+          }
         } else if (Model::can_fit(*plan, job.nodes_requested, duration,
                                   current_time, context)) {
           if (m_periodic_backfill)
@@ -176,8 +169,6 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
         starts.push_back({job.job_id, current_time + duration,
                           std::move(placement->allocation)});
         projected_occupied.add(starts.back().allocation);
-        if (cycle_preferred)
-          cycle_preferred->remove(starts.back().allocation);
         if (plan)
           plan->borrow_running(starts.back().allocation,
                                starts.back().forecast_finish, job.job_id);
