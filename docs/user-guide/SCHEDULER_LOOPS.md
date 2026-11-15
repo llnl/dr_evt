@@ -217,7 +217,7 @@ homogeneous pool. Unless a row overrides them, use `--priority_policy fcfs`
 and `--queue_impl circular`, zero dispatch/backfill intervals and queue depths,
 an unlimited planning horizon (omit `--planning_horizon`), and the default
 resource-time rule (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`). Values are
-illustrative except the recorded Slurm license-on validation settings.
+illustrative except the recorded Slurm and OpenPBS validation settings.
 
 Each row lists options to add to those shared settings. Choose one row;
 `--dispatch_interval` and positive `--backfill_interval` are mutually exclusive.
@@ -240,6 +240,7 @@ be unlimited. For additional ordering and queue implementation choices, see
 | Event-driven FCFS + periodic hybrid backfill | `--backfill_interval 5` `--backfill_policy hybrid` `--reservation_depth 1` `--backfill_queue_depth 3` `--planning_horizon 300` `--planning_time_resolution 1`. R=1 for head protection; use any positive R for deeper protection. |
 | Event-driven FCFS + periodic conservative backfill | `--backfill_interval 5` `--backfill_policy conservative` `--backfill_queue_depth 3` `--planning_horizon 300` `--planning_time_resolution 1`. Protect all feasible earlier reservations in the examined prefix. |
 | Slurm license planning on: protected periodic backfill | `--dispatch_interval 0` `--backfill_interval 30` `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 64` `--planning_horizon 259200` `--planning_time_resolution 1`. Recorded license-on validation settings: 72-hour H, R=32, Q=64. Keep the diagnostic off. |
+| Default-Slurm exact placement | `--resource_model placement` `--dispatch_interval 0` `--backfill_interval 30` `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 64` `--planning_horizon 259200`. Waiting-job-only timer profile, clock-aligned grouped releases, contiguous-run best fit, and inclusive endpoint feasibility; do not enable `bf_licenses` in native placement validation. |
 | Slurm license planning off: no-reservation diagnostic | `--diagnostic_no_reservations` `--dispatch_interval 0` `--backfill_interval 30` `--backfill_policy hybrid` `--reservation_depth 32`. Scan all eligible jobs on events and ticks; R, Q, H, and resolution do not constrain this diagnostic. |
 | OpenPBS one-second forecast event grouping | `--priority_policy fcfs_1s_evt_group` `--backfill_policy hybrid` `--reservation_depth 32` `--backfill_queue_depth 0`. Event-driven placement passes; group future releases over one second. No per_pass_accounting flag is needed. Omit H. |
 | Fixed periodic strict FCFS | `--dispatch_interval 5` `--dispatch_queue_depth 3` `--backfill_policy none`. One total-candidate prefix per tick. |

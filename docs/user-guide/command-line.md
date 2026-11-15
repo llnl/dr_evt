@@ -447,11 +447,12 @@ Uses periodic EASY, conservative, or hybrid backfill while retaining
 event-driven FCFS dispatch. This separates the dispatch and backfill triggers
 and uses the opt-in circular scheduler; it requires an enabled
 `--backfill_policy` and `--queue_impl circular`. `0` retains the default
-event-driven backfill behavior. Ticks start one interval after loop initialization (normally
-time 0), or after the `--sim_start_time` boundary in a warm start, and keep that
-cadence whether or not a job is waiting; a tick that passes while nothing waits
-does nothing. Progressive loading (`--infile_list`) keeps the cadence across
-file boundaries.
+event-driven backfill behavior. An initially empty streaming simulation starts
+its cadence when work first exists; ordinary batch runs normally establish it
+at time 0, and warm starts establish it at the `--sim_start_time` boundary.
+Once established, the cadence is retained whether or not a job is waiting; a
+tick that passes while nothing waits does nothing. Progressive loading
+(`--infile_list`) keeps the cadence across file boundaries.
 
 **Default:** `0` (disabled)
 
@@ -521,7 +522,7 @@ Job priority/ordering policy.
   Requires a circular queue, zero dispatch/backfill intervals, and unlimited
   planning horizon. It checks predicted capacity after an inclusive one-second
   group of future events while preserving actual event timestamps. See the
-  [forecast rule and worked example](OPENPBS_VALIDATION.md#the-rule-inside-openpbss-future-start-calculation).
+  [historical forecast comparison](OPENPBS_FCFS_HISTORY.md).
   Supports `easy`, `hybrid`, `conservative`, and `none`; hybrid needs positive
   `--reservation_depth`. `--backfill_queue_depth` counts the whole placement
   pass, including immediate starts. No `--per_pass_accounting` flag is needed.
@@ -1082,12 +1083,18 @@ simulation. Nodes become reusable at RELEASE, including configured cleanup
 after END. EASY reserves one waiting job; HYBRID reserves up to its depth;
 conservative reserves each examined waiting job; `none` stops at a blocked head.
 Reservations use half-open intervals and allow a later job to start earlier
-when it does not overlap protected node/time intervals.
+when it does not overlap protected node/time intervals. Separate periodic
+backfill additionally requires selected nodes to remain free at the requested
+endpoint, matching the tested Slurm backfill rule; the reserved and running
+intervals remain half-open.
 
-Placement requires event-driven circular FCFS, static capacity and exact
-planning times. Periodic dispatch/backfill, custom schedulers, replay input/warm
-start, capacity schedules, per-pass accounting and nonzero planning resolution
-are rejected. Capacity remains the default resource model.
+Placement requires circular FCFS, static capacity, exact planning times, and
+simulation input. It supports event-driven scheduling, separate periodic
+backfill through `--backfill_interval`, and fixed-periodic scheduling through
+`--dispatch_interval`. Custom schedulers, replay input/warm start, capacity
+schedules, and nonzero planning resolution remain unsupported. Per-pass
+accounting is available only in its existing event-driven configuration.
+Capacity remains the default resource model.
 
 Optimization options select template specializations once at construction:
 `fast` uses immediate allocation before lazily creating a timeline, `batch`

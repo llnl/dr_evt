@@ -117,6 +117,7 @@ server; no pre-existing Redis service is used.
 | Warm start | 1 native binary + 9 CLI cases | CTest (`test_warm_start`, `test_warm_start_validation`) | Boundary classification, two-stage execution, runtime modes, capacity transitions, policies/queues, accounting/output, numeric/ISO simulation-start times, zero-start replay, inclusive maximum time, per-file timestamp encoding, periodic backfill anchored at the boundary, and invalid configurations |
 | Node release delay | 1 native binary + 34 differential + 3 option checks | CTest (`test_node_release_delay`, `test_node_release_delay_reference`) | Planning values and sampling of the per-job delay, streaming behavior, replay and warm-start boundaries, checkpoint continuation; the 34 scheduler-correctness workloads with a constant delay against the Python reference, plus zero-delay identity, replay exclusion, and rejected values |
 | Periodic backfill | 143 checks with default intervals | CTest (`test_periodic_backfill_reference`) | The 34 scheduler-correctness workloads under hybrid (depth 1) and conservative backfill with 7 s and 30 s ticks against the Python conservative reference, comparing schedules and settled resource traces; three bounded-prefix retry checks, two inclusive-endpoint checks, zero-interval identity, and rejected values |
+| Periodic placement backfill | 5 focused checks + 12 seeded differential workloads | CTest (`test_python_periodic_placement_reference`) | Waiting-job-only profiles, contiguous best fit, inclusive profile endpoints, event-only head dispatch, reservation depth, and C++ driver agreement with the independent default-Slurm placement reference |
 | Fixed periodic dispatch | 90 checks | CTest (`test_fixed_periodic_dispatch`) or `run_fixed_periodic_dispatch_tests.py` | Tick-only and arrival-enabled dispatch, queue limits, timer phase, reservations, capacity changes, cleanup, rejected options, randomized FCFS reference comparisons, and the distinct Spur/Slurm endpoint rules |
 | Planning horizon | 9 differential + 34 identity + 1 option check | CTest (`test_planning_horizon_reference`) | Event-driven `--planning_horizon` for easy, hybrid, conservative, and sjf against the Python references, with and without a horizon; an explicit unlimited horizon byte-identical to the default on the 34 workloads; rejected values. Periodic horizon cases live in the configuration suite. |
 | SWF input | 8 CLI cases | `run_swf_tests.sh` (CTest `test_swf`) | Standard Workload Format parsing: equivalence with simple-format CSV, header-derived and overridden cores-per-node, MaxNodes as the default machine size, skipped records, malformed lines, and option consistency |
@@ -124,6 +125,7 @@ server; no pre-existing Redis service is used.
 | Bitmap placement model | 1 native binary + 60 Fluxion cases | CTest (`test_placement_model`, `test_flux_placement_model`) | Word-parallel bitmap selection, exact identity reservations, coarse-filter safety against a dense node-time oracle, borrowed allocation lifetime, accounting errors, and native Fluxion allocation/reservation equality with the coarse filter enabled and disabled, for both ID orders and all four queue policies |
 | OpenPBS validation audits | 5 | `python3 -m unittest discover -s validation/openpbs -p test_compare.py -v` | Harness capacity, arrival, duration, trace conversion, and candidate-fit checks; quick and full CI, without a native scheduler build |
 | One-second forecast event grouping | 1 native binary + 2 CLI cases and a Protobuf-config case in placement-pass integration | CTest (`test_openpbs_forecast`, `test_placement_pass_integration`) | Inclusive predicted-event groups, separated/lone releases, exact reservation intervals, event retention, streaming starts, and checkpoint continuation; pending-status and queue-drain forecasts retain grouping while actual releases can start jobs earlier; quick CI also runs the native binary |
+| Native validation fixtures | 2 integrity checks over 5 CSVs | CTest (`test_validation_fixtures`) | Complete 2,000-job IDs, placement cardinality, LF-portable expected schedules, and the two known Slurm capacity differences without requiring native schedulers |
 
 The Python reference schedulers have no capacity schedule, so the
 capacity-aware reservations behind `--capacity_schedule` are covered by the
@@ -148,6 +150,10 @@ CTest and focused-runner rows intentionally overlap.
 - `test_traces/swf/`: Standard Workload Format fixtures and their CSV equivalents;
 - `test_traces/scale/`: larger workloads; and
 - `test_configs/`: Protobuf configuration fixtures.
+
+Portable expected schedules from native Slurm and OpenPBS campaigns are under
+`../validation/fixtures/`; their README documents regeneration from audited
+reports.
 
 The scheduler-correctness layout is described in its
 [fixture README](test_traces/scheduler_correctness/README.md). Input and output
@@ -259,7 +265,7 @@ point queries, and reservations whose durations remain half-open.
 
 ```bash
 ctest --test-dir build --output-on-failure \
-  -R '^(test_append_job_api|test_fixed_periodic_dispatch|test_periodic_backfill_reference)$'
+  -R '^(test_append_job_api|test_fixed_periodic_dispatch|test_periodic_backfill_reference|test_python_periodic_placement_reference)$'
 ```
 
 The default resource-time build (`DR_EVT_LEGACY_RESERVATION_BARRIER=OFF`) is

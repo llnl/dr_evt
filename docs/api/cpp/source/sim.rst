@@ -24,6 +24,9 @@ function, enum, or file name.
 .. doxygenfile:: scheduler_fcfs_periodic_hybrid_circular.hpp
    :project: dr_evt
 
+.. doxygenfile:: scheduler_placement_circular.hpp
+   :project: dr_evt
+
 Resource models
 ~~~~~~~~~~~~~~~
 
@@ -43,6 +46,9 @@ Resource models
    :project: dr_evt
 
 .. doxygenfile:: placement_model.hpp
+   :project: dr_evt
+
+.. doxygenfile:: reservation_profile.hpp
    :project: dr_evt
 
 Experimental multi-cluster scheduling

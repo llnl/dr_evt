@@ -24,6 +24,8 @@ Another use case is the [Fugaku Power-Usage Simulation Experiment](docs/user-gui
 
 - **Scheduling:** FCFS, SJF, and LJF priority policies with EASY, hybrid,
   conservative, or no backfilling.
+- **Resources:** interchangeable capacity or exact exclusive whole-node
+  placement in a homogeneous pool, including periodic Slurm-style placement.
 - **Execution modes:** scheduler-driven simulation and replay of historical or
   previously generated schedules.
 - **Run-time models:** recorded actual duration, requested time limit, or

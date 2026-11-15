@@ -47,6 +47,7 @@ template <typename Observer = NoResourceObserver,
           auto Features = AllPlacementOptimizations>
 class PlacementModel {
 public:
+  static constexpr NodeOrder order = Order; ///< Compile-time selection order.
   static constexpr bool immediate_fast_path =
       (Features() & 1U) != 0; ///< Immediate selection strategy.
   static constexpr bool batch_seeding =

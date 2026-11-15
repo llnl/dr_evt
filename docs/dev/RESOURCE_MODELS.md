@@ -181,9 +181,19 @@ reference. See the
 Select `--resource_model placement` in the simulator, `resource_model` in
 protobuf configuration/InitRequest, or `SimParams.resource_model` in Python.
 Capacity remains the default. Placement supports whole-node exclusive resources
-with event-driven circular FCFS queues, static inventory and exact planning
-times. Periodic/custom schedulers, replay warm start, capacity schedules,
-per-pass accounting and rounded planning times are rejected explicitly.
+with circular FCFS queues, static inventory and exact planning times.
+Event-driven scheduling, separate periodic backfill, and fixed-periodic passes
+are supported. Custom schedulers, replay warm start, capacity schedules, and
+rounded planning times are rejected explicitly; per-pass accounting remains an
+event-driven-only option.
+
+With a positive backfill interval, the placement scheduler uses a fresh
+waiting-job-only profile per timer cycle. Running allocations supply current
+occupancy and requested-limit releases in widening clock-aligned groups;
+future bookings do not reserve running jobs in the profile. Contiguous-run best
+fit and inclusive endpoint feasibility reproduce the tested default-Slurm flat
+topology. The independent Python placement reference and seeded differential
+tests exercise this path.
 
 The running-job store selects either its original count map or a placement map
 at construction. Capacity records retain their original scalar layout. Each

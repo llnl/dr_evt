@@ -25,6 +25,21 @@ Reservation-only passes can repeat; a tentative guard stops unchanged retries.
 The [per-pass loop](SCHEDULER_LOOPS.md#per-pass-placement-accounting) defines
 failure counting and the guard's assumptions.
 
+## Resource models
+
+| Model | What DR_EVT represents | Main limits |
+|---|---|---|
+| `--resource_model capacity` | Interchangeable capacity counts over time, including reservations and scheduled capacity changes | No node identities, topology, or per-resource constraints |
+| `--resource_model placement` | Exact exclusive whole-node identities in one homogeneous pool, including running allocations and waiting-job reservations | No cores, GPUs, GRES, heterogeneous node features, or shared-node allocation |
+
+Placement is integrated into circular FCFS scheduling for event-driven
+dispatch, separate periodic backfill, and fixed-periodic passes. Low- and
+high-ID ordering are available generally. Separate periodic placement also
+provides the flat-topology contiguous-run best fit used by the tested default
+Slurm configuration. Exact placement is therefore supported behavior, not only
+a validation oracle, but its agreement claims remain limited to the homogeneous
+whole-node configurations on the scheduler validation pages.
+
 ## Remaining differences
 
 ### Trigger and evaluation scope
@@ -77,8 +92,18 @@ end timestamp, representing Slurm's endpoint rule. With
 free at that timestamp. Event-driven and fixed
 periodic placement retain half-open fits, as needed for Fluxion and Spur.
 The [endpoint explanation](SCHEDULER_LOOPS.md#shared-terms) defines both rules;
-the [Slurm validation](SLURM_VALIDATION.md#sources-of-divergence-and-corrections)
+the [Slurm validation](SLURM_VALIDATION.md)
 measures their effect.
+
+Default-Slurm periodic placement builds a fresh profile from waiting-job plans
+on each timer pass; it does not insert running jobs as reservations in that
+profile. Running allocations still determine current idle nodes and their
+requested-limit releases. Future fits release those jobs in widening groups
+aligned to the simulation clock, choose contiguous runs by best fit, and retry
+at later profile boundaries after a collision. After R future bookings, later
+examined jobs may start now but receive no future booking. This represents the
+tested default configuration only. Slurm options such as `bf_licenses` can
+enable `bf_running_job_reserve` and select different planning behavior.
 
 ### PBS timing and cycle limits
 
@@ -119,9 +144,16 @@ predicted release time; the separate `fcfs_1s_evt_group` policy reproduces OpenP
 forecast grouping. A later predicted start can allow a different job to
 run ahead of the waiting job. The
 [native OpenPBS validation](OPENPBS_VALIDATION.md)
-identifies this source difference, reproduces it with four jobs, and shows
-exact agreement for all 2,000 jobs with `fcfs_1s_evt_group` on the original
-converted input.
+shows exact capacity and placement agreement for all 2,000 jobs with
+`fcfs_1s_evt_group` on the original converted input. The four-job explanation
+and ordinary-`fcfs` comparison are retained on the
+[history page](OPENPBS_FCFS_HISTORY.md).
+
+For placement, `fcfs_1s_evt_group` derives the same forecast event groups from
+exact node intervals and tests one selected node set throughout the requested
+window. This matched native OpenPBS's low-ID whole-node assignments in the
+tested homogeneous pool. It does not reproduce OpenPBS chunk placement,
+multi-resource `select` requests, vnode sharing, or heterogeneous eligibility.
 
 ### LSF admission on reserved slots
 
@@ -139,12 +171,14 @@ pool; IBM's rule concerns borrowed reserved slots.
 
 ## Out of scope
 
-The built-in model uses one homogeneous node pool with FCFS, SJF, or LJF
-ordering. It does not model multifactor priority (age, fair share, QOS),
-preemption, dependencies and arrays, per-user/account limits, partitions,
-node topology or node failures. Exact whole-node placement is available through
-`--resource_model placement` for circular FCFS, with event-driven or separate
-periodic backfill; it does not model core/GPU topology or shared resources.
+The built-in model uses one homogeneous pool with FCFS, SJF, or LJF ordering in
+capacity mode; exact placement currently uses circular FCFS. It does not model
+multifactor priority (age, fair share, QOS), preemption, dependencies and
+arrays, per-user/account limits, multiple partitions, node failures, or
+arbitrary topology. Exact whole-node placement is available through
+`--resource_model placement` with event-driven, separate-periodic, or
+fixed-periodic scheduling; it does not model core/GPU topology, GRES,
+heterogeneous features, or shared-node resources.
 With periodic backfill it reproduces Slurm's flat-topology best-fit node
 choice for equal-weight, one-CPU exclusive nodes; Slurm node weights,
 `pack_serial_at_end`, least-loaded or busy-node preference, non-flat topology
@@ -154,15 +188,18 @@ alter the pool size; they do not model those mechanisms. Health checks, missed
 notifications, state inconsistency, and failure recovery are outside the model;
 timers used only for those purposes need no simulation equivalent.
 
-DR_EVT does not model Fluxion's resource graph, node matching, or reservations
-bound to particular nodes. The Fiction validation compares schedules and
-capacity use while retaining that difference in resource models. Its FCFS
-comparison uses `sched-simple`, with Fluxion unloaded.
+DR_EVT placement retains exact node reservations, but does not model Fluxion's
+resource graph, graph matching criteria, or heterogeneous hierarchy. The
+historical 2,000-job Fiction comparison used capacity mode and therefore did
+not emit node IDs or reproduce Fluxion's node-bound reservations. The separate
+placement oracle covers a narrower homogeneous whole-node mapping. Its FCFS
+capacity comparison uses `sched-simple`, with Fluxion unloaded.
 
 PBS's explicit advance reservations (`pbs_rsub`), per-queue protection-depth
-overrides, and prime/dedicated-time eligibility windows are also outside the
-chosen global-pool mapping. Its waiting-job reservations use the existing
-hybrid protection model.
+overrides, prime/dedicated-time eligibility windows, chunk-level placement,
+and multiple consumable resource dimensions are outside the chosen global-pool
+mapping. Its waiting-job reservations use the hybrid protection model; exact
+placement adds vnode identities without adding those policy dimensions.
 
 The experimental [multi-system scheduler](multi-cluster-backfill.md)
 shares a queue across several homogeneous systems. The external EASY selector

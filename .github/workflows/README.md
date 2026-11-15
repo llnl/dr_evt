@@ -30,9 +30,10 @@ This directory contains GitHub Actions workflows for automated testing.
 - Config tests (14), including power-usage `trace_type`, capacity-schedule,
   and warm-start coverage
 - All configured CTest registrations, including fixed periodic dispatch,
-  Spur/Slurm endpoint distinctions, placement-pass accounting, planner capacity
-  queries, checkpoint/restart, batch/streaming equivalence, and optional MPI
-  and Python coverage
+  Spur/Slurm endpoint distinctions, placement-pass accounting, periodic
+  placement-reference differentials, native validation fixtures, planner
+  capacity queries, checkpoint/restart, batch/streaming equivalence, and
+  optional MPI and Python coverage
 - Ser20-disabled native serialization build and tests
 - Sphinx and Doxygen documentation build with warnings treated as errors
 - OpenPBS harness audit tests (5, Python standard library only) and adapter
@@ -81,7 +82,8 @@ This directory contains GitHub Actions workflows for automated testing.
 - Bitmap placement model and real simulator lifecycle/checkpoint integration tests, and all 60 native Fluxion allocation/reservation
   comparisons across all six strategies and both filters (`test_placement_model`,
   `compare_placement_model.py --all-optimizations`), plus portable script
-  regression checks (`test_placement_scripts.py`)
+  regression checks (`test_placement_scripts.py`), periodic placement-reference
+  differentials, placement-pass integration, and native-fixture integrity
 - Flux placement oracle and identity audits -
   `python3 -m unittest discover -s validation/flux -p test_placement_oracle.py -v`
 - OpenPBS forecast policy - installed `test_openpbs_forecast`

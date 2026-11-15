@@ -7,13 +7,39 @@ the [Test Suite README](../tests/README.md) and
 
 ## Reference schedulers
 
-- `python_reference_scheduler.py` — EASY-backfilling reference used to
-  generate and compare expected schedules.
-- `python_hybrid_scheduler.py` — hybrid/conservative-backfilling reference.
-- `python_periodic_scheduler.py` — fixed periodic FCFS reference with optional
-  arrival passes, plus tick-only EASY with strict reservation admission.
-  Regression runners import its scheduling functions; its standalone CLI reads
-  simple epoch CSV and writes a schedule CSV to stdout or `--outfile`.
+Each reference is an independent Python model of one scheduling loop. Use the
+row that matches the scheduler behavior being checked:
+
+| Script | Loop and resource model | Production behavior represented |
+|---|---|---|
+| `python_reference_scheduler.py` | Event-driven EASY backfill; capacity counts | General EASY reference for expected schedules |
+| `python_hybrid_scheduler.py` | Event-driven or periodic hybrid/conservative backfill; capacity counts | Slurm with `bf_licenses` (quantity-based license pool), using `--backfill-interval` |
+| `python_periodic_scheduler.py` | Fixed periodic dispatch: one pass per tick, optional arrival passes; capacity counts | DR_EVT's LSF model (EASY, strict admission) and the FCFS part of Spur's timer-plus-submission loop |
+| `python_periodic_backfill_placement_scheduler.py` | Event-driven FCFS dispatch plus periodic backfill; exact whole-node placement | Default Slurm (`bf_running_job_reserve` off) on exclusive, equal-weight, flat-topology nodes |
+
+| Use case | Script | Options |
+|---|---|---|
+| Event-driven EASY, capacity | `python_reference_scheduler.py` | `--nodes N` |
+| Slurm `bf_licenses`: periodic hybrid backfill, capacity | `python_hybrid_scheduler.py` | `--backfill-interval 30 --reservation-depth 32 --backfill-queue-depth 64 --planning-time-resolution 1 --planning-horizon 259200` |
+| LSF model: EASY with strict admission | `python_periodic_scheduler.py` | `--dispatch-interval S --backfill-policy easy`; compare with DR_EVT built with `-DDR_EVT_LEGACY_RESERVATION_BARRIER=ON` |
+| Fixed-tick or Spur-style FCFS | `python_periodic_scheduler.py` | `--dispatch-interval S [--dispatch-on-events] [--dispatch-queue-depth Q]` |
+| Default Slurm, exact placement | `python_periodic_backfill_placement_scheduler.py` | `--nodes 756 --backfill-interval 30 --reservation-depth 32 --backfill-queue-depth 64`, with absolute timestamps |
+
+Notes on scope:
+
+- `python_periodic_scheduler.py` models DR_EVT's LSF configuration, which is
+  derived from IBM documentation; no LSF source or native LSF run was
+  compared. Its arrival-pass mode covers Spur's wake pattern but not Spur's
+  conservative backfill. Validated OpenPBS behavior is event-driven with
+  one-second forecast grouping and is not covered by this script.
+- `python_periodic_backfill_placement_scheduler.py` uses timestamps as given.
+  Its release-grouping windows align to the input clock, so supply the
+  absolute timestamps the compared scheduler sees. It writes
+  `<trace>_periodic_backfill_placement_reference.csv`, including selected
+  node IDs, to `/tmp` by default or to `--outdir`.
+- `python_periodic_scheduler.py` regression runners import its scheduling
+  functions; its standalone CLI reads simple epoch CSV and writes a schedule
+  CSV to stdout or `--outfile`.
 
 ```bash
 python3 scripts/python_periodic_scheduler.py jobs.csv --nodes 4 \
@@ -22,8 +48,9 @@ python3 scripts/python_periodic_scheduler.py jobs.csv --nodes 4 \
 
 Use `--dispatch-on-events` for FCFS arrival passes. `--backfill-policy easy`
 uses strict completion-before-start admission and currently requires timer-only
-dispatch. The reference has constant capacity and no cleanup delay, warm start,
-planning horizon/resolution, or general hybrid/conservative protection.
+dispatch. The periodic reference has constant capacity and no cleanup delay,
+warm start, planning horizon/resolution, or general hybrid/conservative
+protection.
 
 Their algorithmic context is documented in
 [Backfilling Algorithms](../docs/BACKFILLING_ALGORITHMS.md).
