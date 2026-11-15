@@ -60,20 +60,18 @@ hashes, commands, and logs are retained under `results/`.
 
 ## Recorded Lassen comparisons
 
-Prepare the local extraction using the exact submission-time interval in the
-[parent page's workload description](../../docs/user-guide/SCHEDULER_VALIDATION.md#lassen-workload),
-and save it as `lassen_traces/lassen-756-01.csv`. Mount `lassen_traces`
-read-only at `/lassen_traces` in the prepared container.
-Run these commands inside that container:
+Use the checked-in `validation/fixtures/jobs.csv`, mounted with the repository
+at `/dr_evt_source`. Run these commands inside the prepared container:
 
 ```sh
-python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv   "$(cat /workspace/dr_evt-simulator)" --policy none   --scheduler-backend sched-simple --queue-depth 64 --max-jobs 2000   --timeout 900 --outdir /results/sched-simple-lassen-prefix2000
+python3 /validation/validate_lassen.py /dr_evt_source/validation/fixtures/jobs.csv   "$(cat /workspace/dr_evt-simulator)" --policy none   --scheduler-backend sched-simple --queue-depth 64 --max-jobs 2000   --timeout 900 --outdir /results/sched-simple-lassen-prefix2000
 
-python3 /validation/validate_lassen.py /lassen_traces/lassen-756-01.csv   "$(cat /workspace/dr_evt-simulator)" --policy hybrid   --scheduler-backend fluxion --reservation-depth 32 --queue-depth 64   --max-jobs 2000 --timeout 900 --outdir /results/lassen-hybrid-prefix2000
+python3 /validation/validate_lassen.py /dr_evt_source/validation/fixtures/jobs.csv   "$(cat /workspace/dr_evt-simulator)" --policy hybrid   --scheduler-backend fluxion --reservation-depth 32 --queue-depth 64   --max-jobs 2000 --timeout 900 --outdir /results/lassen-hybrid-prefix2000
 ```
 
-The runner accepts extracted logs with `job_submit_time,begin_time,end_time`
-and logs with `submit_time,duration`. The commands above select the
+The runner accepts extracted logs with `job_submit_time,begin_time,end_time`,
+the checked-in schema with `submit_time,actual_runtime`, and logs with
+`submit_time,duration`. The commands above select the
 2,000-job workload described on the parent page.
 
 `sched_simple.py` inherits the installed native Python sched-simple's

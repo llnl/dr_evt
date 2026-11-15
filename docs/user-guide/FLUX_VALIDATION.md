@@ -14,9 +14,9 @@ of reservations tied to specific nodes.
 
 Both recorded-workload comparisons with Fiction use the
 [common 2,000-job Lassen workload](SCHEDULER_VALIDATION.md#lassen-workload).
-Each node has one core and jobs allocate whole nodes. Arrivals, time limits,
-and actual durations are unchanged; arrival times are measured relative to
-the first submission.
+Each node has one core and jobs allocate whole nodes. The current checked-in
+fixture uses absolute Unix arrivals; time limits and actual durations are
+unchanged.
 
 Both schedulers use equal priorities, FCFS order, no system latency or node
 release delay, and an unlimited planning horizon. Fair share, usage accounting,

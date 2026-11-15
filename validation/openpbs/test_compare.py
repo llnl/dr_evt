@@ -39,6 +39,15 @@ class ValidationAuditTests(unittest.TestCase):
             self.assertEqual(lassen(path, 0), [(0, 3, 1, 1), (1, 2, 6, 2), (1, 4, 4, 4)])
             self.assertEqual(lassen(path, 2), [(0, 3, 1, 1), (1, 2, 6, 2)])
 
+    def test_absolute_fixture_schema_is_used_without_rebasing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'jobs.csv'
+            path.write_text('job_id,submit_time,nodes,time_limit,actual_runtime\n'
+                            '1,1597836579,3,60,11\n'
+                            '2,1597836580,2,120,12\n')
+            self.assertEqual(lassen(path, 0), [(1597836579, 3, 60, 11),
+                                               (1597836580, 2, 120, 12)])
+
     def test_exact_placement_audit_rejects_overlap_and_wrong_count(self):
         jobs = [(0, 2, 10, 10), (0, 1, 20, 20)]
         valid = [{'job': 0, 'start': 0, 'finish': 10, 'node_ids': [0, 1]},

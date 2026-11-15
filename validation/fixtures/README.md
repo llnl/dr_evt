@@ -1,19 +1,19 @@
 # Native validation fixtures
 
-These compact CSVs record the normalized 2,000-job Lassen workload and expected
+These compact CSVs record the 2,000-job Lassen workload and expected
 native schedules used by the current Slurm and OpenPBS validation pages.
 
 | File | Contents |
 |---|---|
-| `jobs.csv` | Relative submit time, node count, requested time limit, and actual runtime |
+| `jobs.csv` | Absolute Unix submit time, node count, requested time limit, and actual runtime |
 | `slurm-capacity.csv` | Native Slurm and DR_EVT times for the `bf_licenses` capacity comparison |
 | `slurm-placement.csv` | Native default-Slurm times and exact node IDs |
 | `openpbs-capacity.csv` | Native OpenPBS `fcfs_1s_evt_group` times |
 | `openpbs-placement.csv` | Native OpenPBS `fcfs_1s_evt_group` times and exact vnode IDs |
 
-All files use LF line endings. Job IDs are one-based; node IDs are zero-based
-and semicolon-separated. The normalized workload uses integer seconds relative
-to epoch `1597836579`.
+All files use LF line endings and absolute Unix timestamps. Job IDs are
+one-based; node IDs are zero-based and semicolon-separated. The first submission
+is `1597836579`.
 
 ## Expected differences
 
@@ -35,7 +35,7 @@ python3 validation/fixtures/export.py \
   --openpbs-placement-report path/to/openpbs-placement/report.json
 ```
 
-The original LAST extraction is not included. Its SHA-256 is
+The original LAST extraction used to create `jobs.csv` is not included. Its SHA-256 is
 `463379d4f61ba1fb75e2ec32380538bb3e44f00b9210ff67db3327aa8715dd04`.
 
 Verify fixture completeness and expected differences without native schedulers:

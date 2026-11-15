@@ -17,7 +17,7 @@ EPOCH = 1700000040
 PREFIX = Path('/workspace/slurm-install')
 
 
-def write_trace(path, jobs):
+def write_trace(path, jobs, time_base):
     """Slurm simulator 17.11.7 binary ABI: little-endian int32/int64."""
     with path.open('wb') as stream:
         def number(fmt, value):
@@ -35,7 +35,7 @@ def write_trace(path, jobs):
                 raise ValueError('Time limits must be whole minutes; normalize both inputs explicitly')
             number('i', index)
             string('root')
-            number('q', EPOCH + int(arrival))
+            number('q', time_base + int(arrival))
             number('i', int(duration))
             number('i', int(limit // 60))
             number('i', int(nodes))
@@ -55,7 +55,10 @@ def write_trace(path, jobs):
 def run_slurm(directory, jobs, capacity, interval, reservations, depth, resolution, horizon):
     directory.mkdir(parents=True, exist_ok=False)
     (directory / 'state').mkdir(exist_ok=True)
-    write_trace(directory / 'jobs.trace', jobs)
+    absolute_time = bool(jobs) and jobs[0][0] >= 1000000000
+    time_base = 0 if absolute_time else EPOCH
+    write_trace(directory / 'jobs.trace', jobs, time_base)
+    first_submit = time_base + int(jobs[0][0])
     parameters = (f'sched_min_interval=0,batch_sched_delay=0,sched_interval=60,'
                   f'default_queue_depth=100000,bf_interval={interval},bf_interval_sleep=0,'
                   f'bf_max_job_test=4096,bf_max_job_part={depth},bf_job_part_count_reserve={reservations},'
@@ -102,7 +105,7 @@ PartitionName=normal Nodes=ALL Default=YES MaxTime=INFINITE State=UP Shared=EXCL
     (directory / 'slurm.conf').write_text(config)
     (directory / 'users.sim').write_text('')
     (directory / 'sim.conf').write_text(f'''JobsTraceFile={directory}/jobs.trace
-TimeStart={EPOCH-30}
+TimeStart={first_submit-30}
 StartSecondsBeforeFirstJob=30
 TimeStop=1
 TimeStep=1
@@ -147,7 +150,8 @@ SimStats={directory}/sim-stats.txt
         if index in schedule:
             raise AssertionError('Duplicate completion record')
         def timestamp(name):
-            return datetime.fromisoformat(fields[name]).replace(tzinfo=timezone.utc).timestamp() - EPOCH
+            value = datetime.fromisoformat(fields[name]).replace(tzinfo=timezone.utc).timestamp()
+            return value - time_base
         schedule[index] = {'start': timestamp('StartTime'), 'end': timestamp('EndTime'),
                            'nodes': int(fields['NodeCnt']), 'assignment': fields['NodeList']}
     if set(schedule) != set(range(len(jobs))):
@@ -190,7 +194,7 @@ def run_dr_evt(directory, jobs, binary, capacity, interval, reservations, depth,
 
 
 def profile(schedule):
-    changes = {0: 0}
+    changes = {min((job['start'] for job in schedule), default=0): 0}
     for job in schedule:
         changes[job['start']] = changes.get(job['start'], 0) + job['nodes']
         changes[job['end']] = changes.get(job['end'], 0) - job['nodes']
@@ -235,8 +239,9 @@ def audit(directory, jobs, native, observed, capacity):
         actual_area = sum((b[0] - a[0]) * a[1] for a, b in zip(curve, curve[1:]))
         assert actual_area == expected_area
     snapshots = [json.loads(line) for line in (directory / 'slurm/snapshots.jsonl').read_text().splitlines()]
+    time_base = 0 if jobs and jobs[0][0] >= 1000000000 else EPOCH
     for snapshot in snapshots:
-        timestamp = snapshot['time'] - EPOCH
+        timestamp = snapshot['time'] - time_base
         owners = {}
         running = {}
         for row in snapshot['jobs']:
@@ -252,7 +257,8 @@ def audit(directory, jobs, native, observed, capacity):
         assert set(owners) == set(snapshot['allocated']), ('Native allocation mismatch', snapshot)
         expected = {index for index, row in enumerate(native) if row['start'] <= timestamp < row['end']}
         assert set(running) == expected, ('Snapshot/job schedule mismatch', timestamp, running, expected)
-    native_curve = compress([(max(0, row['time'] - EPOCH), len(row['allocated'])) for row in snapshots])
+    native_curve = compress([(max(jobs[0][0], row['time'] - time_base),
+                              len(row['allocated'])) for row in snapshots])
     assert native_curve == profile(native), ('Native curve mismatch', native_curve, profile(native))
     with (directory / 'dr_evt/resources.csv').open() as stream:
         resources = list(csv.DictReader(stream))
@@ -266,7 +272,8 @@ def audit(directory, jobs, native, observed, capacity):
 
 
 def metrics(jobs, schedule, capacity, elapsed):
-    makespan = max(row['end'] for row in schedule)
+    origin = min(job[0] for job in jobs)
+    makespan = max(row['end'] for row in schedule) - origin
     area = sum(row['nodes'] * (row['end'] - row['start']) for row in schedule)
     return {'mean_wait_seconds': sum(row['start'] - job[0] for row, job in zip(schedule, jobs)) / len(jobs),
             'makespan_seconds': makespan, 'resource_area_node_seconds': area,
@@ -314,24 +321,33 @@ def compare_case(directory, jobs, binary, capacity, interval, reservations, dept
 def load_lassen(path, limit, capacity):
     with path.open() as stream:
         indexed = list(enumerate(csv.DictReader(stream)))
-    indexed.sort(key=lambda item: (Decimal(item[1]['job_submit_time']), item[0]))
+    fixture_schema = bool(indexed) and 'submit_time' in indexed[0][1]
+    submit_key = 'submit_time' if fixture_schema else 'job_submit_time'
+    indexed.sort(key=lambda item: (Decimal(item[1][submit_key]), item[0]))
     if limit:
         indexed = indexed[:limit]
-    origin = Decimal(indexed[0][1]['job_submit_time'])
+    origin = Decimal(0) if fixture_schema else Decimal(indexed[0][1][submit_key])
     jobs, rounded = [], 0
     for _, row in indexed:
-        arrival = Decimal(row['job_submit_time']) - origin
-        duration = Decimal(row['end_time']) - Decimal(row['begin_time'])
-        actual = math.ceil(duration)
-        rounded += actual != duration
-        nodes, walltime = int(row['num_nodes']), Decimal(row['time_limit'])
+        arrival = Decimal(row[submit_key]) - origin
+        if fixture_schema:
+            duration = Decimal(row['actual_runtime'])
+            actual = int(duration)
+            nodes = int(row['nodes'])
+        else:
+            duration = Decimal(row['end_time']) - Decimal(row['begin_time'])
+            actual = math.ceil(duration)
+            rounded += actual != duration
+            nodes = int(row['num_nodes'])
+        walltime = Decimal(row['time_limit'])
         if not (arrival % 1 == 0 and walltime % 60 == 0 and 0 < nodes <= capacity and 0 < actual <= walltime):
             raise ValueError(f'Unsupported workload row: {row}')
         jobs.append((int(arrival), nodes, int(walltime), actual))
     provenance = {'source_file': path.name, 'source_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                   'source_time_origin': str(origin), 'source_row_indices': [index for index, _ in indexed],
                   'selection': 'earliest arrivals, stable input order for ties', 'jobs': len(jobs),
-                  'duration_conversion': 'ceil to whole seconds in both scheduler inputs',
+                  'duration_conversion': ('checked-in integer-second fixture' if fixture_schema else
+                                          'ceil to whole seconds in both scheduler inputs'),
                   'rounded_durations': rounded, 'arrivals_and_time_limits': 'unchanged'}
     return jobs, provenance
 

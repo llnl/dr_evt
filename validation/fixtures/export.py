@@ -55,14 +55,18 @@ def main():
         if pbs_jobs != jobs:
             raise ValueError(f"{name} workload differs")
     args.outdir.mkdir(parents=True, exist_ok=True)
+    # Older audited reports store seconds from the first Lassen submission.
+    # Current fixtures and runners use Unix timestamps directly.
+    offset = 1597836579 if jobs and jobs[0][0] == 0 else 0
     write_csv(args.outdir / "jobs.csv",
               ("job_id", "submit_time", "nodes", "time_limit", "actual_runtime"),
-              ((index + 1, *job) for index, job in enumerate(jobs)))
+              ((index + 1, job[0] + offset, *job[1:])
+               for index, job in enumerate(jobs)))
 
     slurm = reports["slurm_placement"]
     write_csv(args.outdir / "slurm-placement.csv",
               ("job_id", "start", "end", "node_ids"),
-              ((index + 1, row["start"], row["end"],
+              ((index + 1, row["start"] + offset, row["end"] + offset,
                 ";".join(map(str, expand_slurm_nodes(row["assignment"]))))
                for index, row in enumerate(slurm["slurm_schedule"])))
 
@@ -71,14 +75,15 @@ def main():
         nodes = report.get("openpbs_node_ids", [[] for _ in jobs])
         write_csv(args.outdir / f"openpbs-{model}.csv",
                   ("job_id", "start", "end", "node_ids"),
-                  ((index + 1, row[0], row[1], ";".join(map(str, nodes[index])))
+                  ((index + 1, row[0] + offset, row[1] + offset,
+                    ";".join(map(str, nodes[index])))
                    for index, row in enumerate(report["openpbs_schedule"])))
 
     capacity = reports["slurm_capacity"]
     write_csv(args.outdir / "slurm-capacity.csv",
               ("job_id", "slurm_start", "slurm_end", "dr_evt_start", "dr_evt_end"),
-              ((index + 1, native["start"], native["end"],
-                drevt["start"], drevt["end"])
+              ((index + 1, native["start"] + offset, native["end"] + offset,
+                drevt["start"] + offset, drevt["end"] + offset)
                for index, (native, drevt) in enumerate(zip(
                    capacity["slurm_schedule"], capacity["dr_evt_schedule"]))))
 

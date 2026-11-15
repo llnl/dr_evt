@@ -19,9 +19,6 @@ from placement_comparison import audit_schedule, run_dr_evt_placement
 PREFIX = Path('/workspace/slurm-modern-install')
 EVENT = Path('/workspace/slurm-event')
 CLIENT = EVENT / ('client_state' if os.environ.get('SLURM_LICENSE_STATE_ONLY') == '1' else 'client')
-EPOCH = 1597836579
-
-
 def expand_nodes(expression):
     """Expand the n0001/n[0001-0003,0005] forms used by this harness."""
     import re
@@ -63,9 +60,10 @@ def run_case(directory, jobs, capacity, enabled=True, batch_main_dispatch=False,
     does not force Slurm main dispatch to precede its independently triggered backfill.
     """
     directory.mkdir(parents=True, exist_ok=True)
+    origin = jobs[0][0] if jobs else 0
     (directory / 'state').mkdir()
     clock_file = directory / 'clock.bin'
-    clock_file.write_bytes(struct.pack('qQI', EPOCH - 120, 0, 0) + bytes(12))
+    clock_file.write_bytes(struct.pack('qQI', origin - 120, 0, 0) + bytes(12))
     params = ('sched_min_interval=0,batch_sched_delay=0,sched_interval=60,'
               'bf_interval=30,bf_resolution=1,bf_window=4320,bf_max_job_test=4096,'
               'bf_max_job_part=64,bf_job_part_count_reserve=32,default_queue_depth=100000')
@@ -195,7 +193,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
 
         # Finish the controller's mandatory startup probe before registering
         # virtual nodes.
-        command(f'TIME {EPOCH}')
+        command(f'TIME {origin}')
         time.sleep(1)
         # Register each virtual node through the same RPC as a compute daemon.
         for index in range(node_count):
@@ -203,12 +201,12 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
         command('RELEASE')
 
         ids, schedule, completed = {}, {}, set()
-        cursor, now, frames, idle_since = 0, 0, 0, None
+        cursor, now, frames, idle_since = 0, origin, 0, None
         snapshot_stream = (directory / 'snapshots.jsonl').open('w')
         while len(completed) < len(jobs):
             # TIME holds the backfill gate and, with batch_main_dispatch, the
             # main-dispatch gate. RELEASE opens them after every event at now.
-            command(f'TIME {EPOCH + now}')
+            command(f'TIME {now}')
             dispatch_before = command('DISPATCH')['generation'] if batch_main_dispatch else 0
             state_changed = False
             for index, row in list(schedule.items()):
@@ -255,12 +253,12 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                     assert not owned_nodes.intersection(assigned)
                     owned_nodes.update(assigned)
                     if index not in schedule:
-                        begin = row['start'] - EPOCH
+                        begin = row['start']
                         assert begin == now, (now, row)
                         schedule[index] = {'start': begin, 'end': begin + jobs[index][3],
                                            'nodes': jobs[index][1], 'assignment': row['assignment']}
                 if index in completed:
-                    assert state == 3 and row['end'] == EPOCH + schedule[index]['end'], row
+                    assert state == 3 and row['end'] == schedule[index]['end'], row
             assert allocated <= capacity
             if placement:
                 assert snapshot['license_total'] == snapshot['license_used'] == 0
@@ -286,27 +284,22 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                 print(directory.name, 'time', now, 'submitted', cursor, 'completed', len(completed), flush=True)
             if len(completed) == len(jobs):
                 break
-            future = [((now // 30) + 1) * 30]
+            future = [origin + ((now - origin) // 30 + 1) * 30]
             if cursor < len(jobs):
                 future.append(jobs[cursor][0])
             future.extend(row['end'] for i, row in schedule.items() if i not in completed)
             now = min(t for t in future if t > now)
-            if now > 1000000:
+            if now - origin > 1000000:
                 raise TimeoutError('Simulation made no scheduling progress')
         snapshot_stream.close()
         native_elapsed = time.monotonic() - started
         native = [schedule[i] for i in range(len(jobs))]
         if placement:
-            # Slurm groups releases on the absolute clock, so DR_EVT plans on
-            # absolute timestamps and the results are shifted back.
-            absolute = [(submit + EPOCH, *rest) for submit, *rest in jobs]
             dr, _, dr_elapsed = run_dr_evt_placement(
-                directory / 'dr_evt', absolute,
+                directory / 'dr_evt', jobs,
                 Path('/workspace/dr_evt-placement-driver').read_text().strip(),
                 capacity, 'hybrid', 32, 'low', backfill_interval=30,
                 queue_depth=64)
-            dr = [dict(row, start=row['start'] - EPOCH, end=row['end'] - EPOCH)
-                  for row in dr]
         else:
             dr, dr_elapsed = run_dr_evt(directory / 'dr_evt', jobs,
                                         Path('/workspace/dr_evt-simulator').read_text().strip(),
@@ -424,10 +417,11 @@ def main():
         parser.error('--trace and --liveness-smoke are mutually exclusive')
     if args.liveness_smoke:
         directory = args.outdir / 'node-liveness-smoke'
-        jobs = [(0, 4, 900, 600), (0, 4, 60, 60)]
+        origin = 1700000040
+        jobs = [(origin, 4, 900, 600), (origin, 4, 60, 60)]
         report = run_case(directory, jobs, 4, enabled=True,
                           batch_main_dispatch=True, resource_model='placement')
-        assert [row['start'] for row in report['slurm_schedule']] == [0, 600]
+        assert [row['start'] for row in report['slurm_schedule']] == [origin, origin + 600]
         log = (directory / 'controller.log').read_text()
         assert 'not responding' not in log.lower(), 'Virtual node ping was not suppressed'
         (args.outdir / 'liveness-smoke.complete').write_text('passed\n')
@@ -440,18 +434,25 @@ def main():
                           batch_main_dispatch=args.batch_main_dispatch,
                           resource_model=args.resource_model)
     else:
+        origin = 1700000040
         cases = [
-            ('four-job-pooled', [(0, 2, 120, 120), (0, 2, 180, 180),
-                                 (0, 3, 60, 60), (0, 1, 120, 120)], True, [0, 0, 180, 120]),
-            ('four-job-pooled-off', [(0, 2, 120, 120), (0, 2, 180, 180),
-                                     (0, 3, 60, 60), (0, 1, 120, 120)], False, [0, 0, 180, 120]),
-            ('reservation-protection-on', [(0, 2, 120, 120), (0, 2, 180, 180),
-                                           (0, 4, 60, 60), (0, 1, 120, 120)], True, [0, 0, 180, 240]),
-            ('reservation-protection-off', [(0, 2, 120, 120), (0, 2, 180, 180),
-                                            (0, 4, 60, 60), (0, 1, 120, 120)], False, [0, 0, 240, 120]),
-            ('periodic-backfill', [(0, 3, 120, 120), (1, 4, 60, 60),
-                                   (1, 1, 60, 60)], True, [0, 120, 30]),
-            ('early-completion', [(0, 4, 120, 7), (1, 4, 60, 3)], True, [0, 7]),
+            ('four-job-pooled', [(origin, 2, 120, 120), (origin, 2, 180, 180),
+                                 (origin, 3, 60, 60), (origin, 1, 120, 120)], True,
+             [origin, origin, origin + 180, origin + 120]),
+            ('four-job-pooled-off', [(origin, 2, 120, 120), (origin, 2, 180, 180),
+                                     (origin, 3, 60, 60), (origin, 1, 120, 120)], False,
+             [origin, origin, origin + 180, origin + 120]),
+            ('reservation-protection-on', [(origin, 2, 120, 120), (origin, 2, 180, 180),
+                                           (origin, 4, 60, 60), (origin, 1, 120, 120)], True,
+             [origin, origin, origin + 180, origin + 240]),
+            ('reservation-protection-off', [(origin, 2, 120, 120), (origin, 2, 180, 180),
+                                            (origin, 4, 60, 60), (origin, 1, 120, 120)], False,
+             [origin, origin, origin + 240, origin + 120]),
+            ('periodic-backfill', [(origin, 3, 120, 120), (origin + 1, 4, 60, 60),
+                                   (origin + 1, 1, 60, 60)], True,
+             [origin, origin + 120, origin + 30]),
+            ('early-completion', [(origin, 4, 120, 7), (origin + 1, 4, 60, 3)], True,
+             [origin, origin + 7]),
         ]
         reports = []
         for name, jobs, enabled, expected in cases:
@@ -462,13 +463,16 @@ def main():
             reports.append(report)
         if args.batch_main_dispatch:
             # Both releases must be visible before a later one-license job starts.
-            jobs = [(0, 1, 120, 120), (0, 1, 120, 120),
-                    (1, 2, 60, 60), (1, 1, 60, 60), (1, 1, 60, 60)]
+            jobs = [(origin, 1, 120, 120), (origin, 1, 120, 120),
+                    (origin + 1, 2, 60, 60), (origin + 1, 1, 60, 60),
+                    (origin + 1, 1, 60, 60)]
             for enabled in (True, False):
                 report = run_case(args.outdir / ('simultaneous-releases-' + ('on' if enabled else 'off')),
                                   jobs, 2, enabled, batch_main_dispatch=True)
-                assert [row['start'] for row in report['slurm_schedule']] == [0, 0, 120, 180, 180]
-                assert [row['start'] for row in report['dr_evt_schedule']] == [0, 0, 120, 180, 180]
+                expected = [origin, origin, origin + 120, origin + 180,
+                            origin + 180]
+                assert [row['start'] for row in report['slurm_schedule']] == expected
+                assert [row['start'] for row in report['dr_evt_schedule']] == expected
                 reports.append(report)
         (args.outdir / 'controls.json').write_text(json.dumps(reports, indent=2) + '\n')
         for case in ('pooled', 'protection'):

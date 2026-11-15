@@ -3192,8 +3192,17 @@ void BasicSimulation<TraceType>::align_backfill_tick() {
         m_scheduler->get_next_arrival_time() ==
             std::numeric_limits<sim_time_t>::max())
       return;
-    m_next_backfill_evaluation =
-        m_current_time + m_params.scheduling_interval();
+    const auto next_arrival = m_scheduler->get_next_arrival_time();
+    // Separate periodic backfill follows the workload/controller origin.
+    // Fixed periodic dispatch intentionally retains its epoch-zero grid.
+    const auto origin =
+        m_params.m_dispatch_interval == 0.0 &&
+                m_scheduler->active_job_count() == 0 &&
+                m_running_jobs.empty() &&
+                next_arrival != std::numeric_limits<sim_time_t>::max()
+            ? std::max(m_current_time, next_arrival)
+            : m_current_time;
+    m_next_backfill_evaluation = origin + m_params.scheduling_interval();
   } else if (m_next_backfill_evaluation < m_current_time) {
     // Ticks are not consumed while nothing waits, and the clock may have
     // moved past one at the end of the previous call. Keep the cadence but

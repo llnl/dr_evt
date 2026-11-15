@@ -28,6 +28,9 @@ class ValidationFixtures(unittest.TestCase):
         jobs = rows("jobs.csv")
         self.assertEqual([int(row["job_id"]) for row in jobs],
                          list(range(1, 2001)))
+        self.assertEqual(int(jobs[0]["submit_time"]), 1597836579)
+        self.assertTrue(all(int(row["submit_time"]) >= 1597836579
+                            for row in jobs))
         pbs = rows("openpbs-capacity.csv")
         self.assertTrue(all(row["start"] and row["end"] for row in pbs))
         self.assertTrue(all(not row["node_ids"] for row in pbs))

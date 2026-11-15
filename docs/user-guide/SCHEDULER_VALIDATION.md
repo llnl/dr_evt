@@ -45,14 +45,10 @@ is **2020-08-20 21:06:09.138 PDT** (**1597982769.138**); simulated schedules
 can finish at different times. Calendar times use `America/Los_Angeles`
 (UTC−7 for this interval).
 
-The local input `lassen-756-01.csv` is an extraction from that dataset and is
-not checked into this repository. A normalized integer-second workload and the
-expected native schedules are checked in under `validation/fixtures/` for
-result verification. To rerun the native adapters, use the submission-time
-interval above to identify the 2,000 jobs in LAST and retain their arrivals,
-node counts, time limits, and recorded durations. The runners select the
-earliest 2,000 jobs from the supplied extraction in stable arrival order,
-retaining input order for ties.
+The checked-in `validation/fixtures/jobs.csv` is the integer-second, absolute
+Unix-time input used by the current native adapters. Expected native schedules
+use the same clock and are stored beside it. The original LAST extraction is not
+checked in; its interval and hash are retained for provenance and regeneration.
 The filename alone does not identify the workload, and `--max-jobs 0` selects
 the entire supplied CSV rather than the published 2,000-job workload.
 

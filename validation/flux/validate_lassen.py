@@ -41,11 +41,15 @@ def source_period(path, row_indices=None):
 def load_jobs(path, limit, capacity):
     rows = []
     with path.open() as stream:
-        for index, row in enumerate(csv.DictReader(stream)):
+        reader = csv.DictReader(stream)
+        fixture_schema = bool(reader.fieldnames) and 'actual_runtime' in reader.fieldnames
+        for index, row in enumerate(reader):
             arrival = Decimal(row.get('job_submit_time', row.get('submit_time')))
-            duration = (Decimal(row['duration']) if 'duration' in row else
+            duration = (Decimal(row['actual_runtime']) if 'actual_runtime' in row else
+                        Decimal(row['duration']) if 'duration' in row else
                         Decimal(row['end_time']) - Decimal(row['begin_time']))
-            nodes, walltime = int(row['num_nodes']), Decimal(row['time_limit'])
+            nodes = int(row.get('num_nodes', row.get('nodes')))
+            walltime = Decimal(row['time_limit'])
             if not (arrival.is_finite() and duration.is_finite() and walltime.is_finite()
                     and duration > 0 and walltime > 0 and 0 < nodes <= capacity):
                 raise ValueError(f'Invalid workload row {index + 2}: {row}')
@@ -58,7 +62,8 @@ def load_jobs(path, limit, capacity):
     origin = rows[0][0]
     if any(walltime != walltime.to_integral_value() for _, _, _, walltime, _ in rows):
         raise ValueError('DR_EVT simple CSV requires integer time limits')
-    jobs = [(float(arrival - origin), nodes, int(walltime), float(duration))
+    jobs = [(float(arrival if fixture_schema else arrival - origin), nodes,
+             int(walltime), float(duration))
             for arrival, _, nodes, walltime, duration in rows]
     # Fiction's trace parser currently formats submit times to whole seconds.
     if any(not job[0].is_integer() for job in jobs):
