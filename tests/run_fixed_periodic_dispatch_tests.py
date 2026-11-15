@@ -174,7 +174,8 @@ with tempfile.TemporaryDirectory(prefix="dr_evt_fixed_periodic_dispatch_") as di
         ["--dispatch_interval", "5junk"], ["--dispatch_queue_depth", "2"],
         ["--dispatch_interval", "5", "--backfill_interval", "5"],
         ["--dispatch_interval", "5", "--backfill_queue_depth", "2"],
-        ["--dispatch_interval", "5", "--queue_impl", "deque"],
+        ["--dispatch_interval", "5", "--queue_impl", "multimap"],
+        ["--dispatch_interval", "5", "--queue_impl", "block"],
         ["--dispatch_interval", "5", "--priority_policy", "sjf"],
         ["--dispatch_interval", "5", "--backfill_policy", "hybrid", "--reservation_depth", "0"],
     ):

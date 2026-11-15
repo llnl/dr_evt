@@ -12,7 +12,7 @@
  */
 
 #include "sim/sim.hpp"
-#include "sim/block_wait_queue.hpp"
+#include "sim/fcfs-alt-impl/block_wait_queue.hpp"
 #include "sim/forecast_1s_evt_group_timeline.hpp"
 #include "trace/epoch.hpp"
 #include "trace/job_io.hpp"

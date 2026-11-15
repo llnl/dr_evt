@@ -324,8 +324,8 @@ start or reservation are skipped without consuming Q or R until a state
 event permits reconsideration. Guarded retries can run at the same simulation
 timestamp; see [Per-pass Placement Accounting](SCHEDULER_LOOPS.md#per-pass-placement-accounting).
 
-Requires `--queue_impl circular`, `fcfs` or `fcfs_conservative` ordering,
-both intervals and `--dispatch_queue_depth` at zero, no `--dispatch_on_events`
+Requires `--queue_impl circular` or `deque`, `fcfs` or `fcfs_conservative`
+ordering, both intervals and `--dispatch_queue_depth` at zero, no `--dispatch_on_events`
 or `--diagnostic_no_reservations`, and an unlimited planning horizon (omit
 `--planning_horizon`). Supports `none`, `easy`, `hybrid`, and `conservative`;
 hybrid requires positive `--reservation_depth`. Use `--backfill_queue_depth`
@@ -373,8 +373,8 @@ with reservation depth fixed at 1, equivalent to `--backfill_policy hybrid
 Event-driven and separate periodic-backfill modes retain their dedicated EASY
 implementations.
 
-Requires a circular queue and `fcfs` or `fcfs_conservative` ordering. Supports
-`none`, `easy`, `hybrid`, and `conservative` backfill policies. A positive
+Requires a circular or deque queue and `fcfs` or `fcfs_conservative` ordering.
+Supports `none`, `easy`, `hybrid`, and `conservative` backfill policies. A positive
 `--dispatch_interval` cannot be combined with a positive `--backfill_interval`
 or a nonzero `--backfill_queue_depth`; use `--dispatch_queue_depth` for the
 combined FCFS/backfill cycle. A nonzero dispatch queue depth requires a positive dispatch
@@ -446,7 +446,7 @@ switch; see [Slurm Validation](SLURM_VALIDATION.md).
 Uses periodic EASY, conservative, or hybrid backfill while retaining
 event-driven FCFS dispatch. This separates the dispatch and backfill triggers
 and uses the opt-in circular scheduler; it requires an enabled
-`--backfill_policy` and `--queue_impl circular`. `0` retains the default
+`--backfill_policy` and `--queue_impl circular` or `deque`. `0` retains the default
 event-driven backfill behavior. An initially empty streaming simulation starts
 its cadence when work first exists; ordinary batch runs normally establish it
 at time 0, and warm starts establish it at the `--sim_start_time` boundary.
@@ -519,8 +519,8 @@ Job priority/ordering policy.
   queues. Protection is selected by `--backfill_policy`.
 - `fcfs_1s_evt_group` - Event-driven FCFS with one-second forecast event grouping,
   reproducing the tested OpenPBS 23.06 rule.
-  Requires a circular queue, zero dispatch/backfill intervals, and unlimited
-  planning horizon. It checks predicted capacity after an inclusive one-second
+  Requires a circular or deque queue, zero dispatch/backfill intervals, and
+  unlimited planning horizon. It checks predicted capacity after an inclusive one-second
   group of future events while preserving actual event timestamps. See the
   [historical forecast comparison](OPENPBS_FCFS_HISTORY.md).
   Supports `easy`, `hybrid`, `conservative`, and `none`; hybrid needs positive
@@ -550,11 +550,19 @@ Wait queue implementation (FCFS scheduler only).
 
 **Options:**
 - `circular` - circular-buffer implementation (default)
-- `deque` - sequential deque implementation
-- `multimap` - tree-based alternative FCFS implementation
-- `block` - block-based implementation; configured by `--block_size`
+- `deque` - `std::deque` implementation; shares the scheduling code with
+  `circular`, so it supports every feature `circular` does (periodic backfill,
+  fixed periodic dispatch, per-pass accounting, `fcfs_1s_evt_group`, and the
+  placement resource model). It is a little slower because indexing a deque
+  looks up a chunk first.
+- `multimap` - tree-based alternative FCFS implementation (EASY only)
+- `block` - block-based implementation (EASY only); configured by
+  `--block_size`
 
 **Default:** `circular`
+
+`--wait_queue_capacity` and `--wait_queue_overflow` apply to `circular` only;
+a `deque` has no capacity limit and ignores them.
 
 **Note:** This option only affects FCFS scheduler. SJF/LJF always use
 `std::multimap` (already efficient for priority-based scheduling). If `deque`,

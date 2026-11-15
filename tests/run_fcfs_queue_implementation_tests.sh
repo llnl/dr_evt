@@ -129,7 +129,7 @@ run_correctness_tests() {
         # Detect run_time_mode
         run_time_mode=$(detect_run_time_mode "$test_file")
 
-        # Run with scheduler_fcfs_easy_deque (priority_policy=fcfs)
+        # Run with scheduler_fcfs_easy over a deque (priority_policy=fcfs)
         if [ "$VERBOSE" = true ]; then
             echo "  Running fcfs: $test_name"
         fi

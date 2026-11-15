@@ -7,7 +7,7 @@
 
 // Minimal test for BlockWaitQueue - compiles with CMake
 
-#include "sim/block_wait_queue.hpp"
+#include "sim/fcfs-alt-impl/block_wait_queue.hpp"
 #include <cassert>
 #include <iostream>
 #include <stdexcept>

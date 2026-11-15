@@ -21,7 +21,7 @@
 #ifndef DR_EVT_SIM_SCHEDULER_FCFS_EASY_BLOCK_HPP
 #define DR_EVT_SIM_SCHEDULER_FCFS_EASY_BLOCK_HPP
 
-#include "sim/block_wait_queue.hpp"
+#include "sim/fcfs-alt-impl/block_wait_queue.hpp"
 #include "sim/scheduler_base.hpp"
 #include <deque>
 

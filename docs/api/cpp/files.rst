@@ -27,22 +27,30 @@ Top-level ``src``
 ``src/sim``
 -----------
 
-- `block_wait_queue.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/block_wait_queue.cpp>`_, `block_wait_queue.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/block_wait_queue.hpp>`_
 - `capacity_schedule.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/capacity_schedule.cpp>`_, `capacity_schedule.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/capacity_schedule.hpp>`_
+- `fcfs_wait_queue.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs_wait_queue.hpp>`_
 - `job_submit_common.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/job_submit_common.hpp>`_, `job_submit_model.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/job_submit_model.hpp>`_
 - `multi_platform_runs.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/multi_platform_runs.hpp>`_
 - `schedule_windows.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/schedule_windows.cpp>`_, `schedule_windows.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/schedule_windows.hpp>`_
 - `scheduler_base.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_base.cpp>`_, `scheduler_base.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_base.hpp>`_
-- `scheduler_fcfs_easy_block.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_block.cpp>`_, `scheduler_fcfs_easy_block.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_block.hpp>`_
-- `scheduler_fcfs_easy_circular.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_circular.cpp>`_, `scheduler_fcfs_easy_circular.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_circular.hpp>`_
+- `scheduler_fcfs_1s_evt_group.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_1s_evt_group.hpp>`_
+- `scheduler_fcfs_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy.cpp>`_, `scheduler_fcfs_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy.hpp>`_
 - `scheduler_fcfs_easy_custom.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_custom.cpp>`_, `scheduler_fcfs_easy_custom.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_custom.hpp>`_
-- `scheduler_fcfs_easy_deque.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_deque.cpp>`_, `scheduler_fcfs_easy_deque.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_deque.hpp>`_
-- `scheduler_fcfs_easy_multimap.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_multimap.cpp>`_, `scheduler_fcfs_easy_multimap.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_easy_multimap.hpp>`_
-- `scheduler_fcfs_hybrid_deque.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid_deque.cpp>`_, `scheduler_fcfs_hybrid_deque.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid_deque.hpp>`_
+- `scheduler_fcfs_hybrid.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid.cpp>`_, `scheduler_fcfs_hybrid.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid.hpp>`_, `scheduler_fcfs_hybrid.tpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_hybrid.tpp>`_
+- `scheduler_fcfs_pass_hybrid.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_pass_hybrid.cpp>`_, `scheduler_fcfs_pass_hybrid.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_pass_hybrid.hpp>`_
+- `scheduler_fcfs_periodic_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_periodic_easy.cpp>`_, `scheduler_fcfs_periodic_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_periodic_easy.hpp>`_
+- `scheduler_fcfs_periodic_hybrid.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_periodic_hybrid.cpp>`_, `scheduler_fcfs_periodic_hybrid.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_fcfs_periodic_hybrid.hpp>`_
 - `scheduler_ljf_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf_easy.cpp>`_, `scheduler_ljf_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_ljf_easy.hpp>`_
+- `scheduler_periodic_fcfs_hybrid.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_periodic_fcfs_hybrid.hpp>`_
+- `scheduler_placement.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_placement.hpp>`_
 - `scheduler_policies.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_policies.hpp>`_
 - `scheduler_sjf_easy.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf_easy.cpp>`_, `scheduler_sjf_easy.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/scheduler_sjf_easy.hpp>`_
 - `sim/sim.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.cpp>`_, `sim/sim.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/sim.hpp>`_
+
+``src/sim/fcfs-alt-impl``
+-------------------------
+
+- `block_wait_queue.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/block_wait_queue.cpp>`_, `block_wait_queue.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/block_wait_queue.hpp>`_, `scheduler_fcfs_easy_block.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/scheduler_fcfs_easy_block.cpp>`_, `scheduler_fcfs_easy_block.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/scheduler_fcfs_easy_block.hpp>`_, `scheduler_fcfs_easy_block_depth.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/scheduler_fcfs_easy_block_depth.cpp>`_, `scheduler_fcfs_easy_multimap.cpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/scheduler_fcfs_easy_multimap.cpp>`_, `scheduler_fcfs_easy_multimap.hpp <https://github.com/LLNL/dr_evt/blob/main/src/sim/fcfs-alt-impl/scheduler_fcfs_easy_multimap.hpp>`_
 
 ``src/trace``
 -------------

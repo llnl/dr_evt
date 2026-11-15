@@ -11,7 +11,7 @@
 
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/forecast_1s_evt_group_timeline.hpp"
-#include "sim/scheduler_fcfs_1s_evt_group_circular.hpp"
+#include "sim/scheduler_fcfs_1s_evt_group.hpp"
 #include "sim/sim.hpp"
 #include <chrono>
 #include <filesystem>

@@ -5,24 +5,26 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_easy_circular.cpp
- * @brief FCFS starts and EASY backfill using a circular waiting queue.
+/** @file scheduler_fcfs_easy.cpp
+ * @brief FCFS starts and EASY backfill over a circular or deque waiting
+ * queue.
  * @details Jobs are considered in arrival order. When the head must wait,
  * protect its predicted start and allow later jobs only when they do not
  * delay it. All resources are interchangeable capacity counts.
  * @note CLI: --priority_policy fcfs --backfill_policy easy --queue_impl
- * circular. Use --dispatch_interval 0 and --backfill_interval 0; omit
+ * circular or deque. Use --dispatch_interval 0 and --backfill_interval 0; omit
  * --per_pass_accounting. --backfill_policy none disables backfill.
  * Protobuf: Simulation_Params and InitRequest use the same field names
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#include "sim/scheduler_fcfs_easy_circular.hpp"
+#include "sim/scheduler_fcfs_easy.hpp"
 #include <algorithm>
 
 namespace dr_evt {
 
-void FCFSEasyCircularScheduler::sync_to(sim_time_t current_time) {
+template <typename Queue>
+void FCFSEasyScheduler<Queue>::sync_to(sim_time_t current_time) {
   if (current_time <= m_current_tracked_time) {
     return;
   }
@@ -34,7 +36,8 @@ void FCFSEasyCircularScheduler::sync_to(sim_time_t current_time) {
   m_current_tracked_time = current_time;
 }
 
-void FCFSEasyCircularScheduler::mark_removed(job_no_t job_id) {
+template <typename Queue>
+void FCFSEasyScheduler<Queue>::mark_removed(job_no_t job_id) {
   for (auto &entry : m_wait_queue) {
     if (entry.job_id == job_id && !entry.removed) {
       entry.removed = true;
@@ -44,15 +47,18 @@ void FCFSEasyCircularScheduler::mark_removed(job_no_t job_id) {
   }
 }
 
+template <typename Queue>
 std::vector<job_no_t>
-FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
-                                    const running_jobs_t &running_jobs,
-                                    sim_time_t current_time) {
+FCFSEasyScheduler<Queue>::schedule(num_nodes_t free_nodes,
+                                   const running_jobs_t &running_jobs,
+                                   sim_time_t current_time) {
   sync_to(current_time);
 
-  // Garbage collection: compact queue if >50% is garbage. Same
-  // approach as FCFSEasyDequeScheduler, but no pointer-subtraction pitfall to
-  // avoid here - operator[] is used throughout instead.
+  // Garbage collection: compact queue if >50% is garbage. The eligible
+  // removals are counted with indexed access: pointer subtraction between
+  // std::deque elements is undefined once they span more than one chunk, and
+  // it silently produced wrong indices when this was computed inside the
+  // remove_if predicate. remove_if itself is safe on either container.
   if (m_removed_count > 0 && m_removed_count * 2 > m_wait_queue.size()) {
     size_t eligible_removed = 0;
     for (size_t idx = 0; idx < m_eligible_end_idx && idx < m_wait_queue.size();
@@ -80,9 +86,17 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
   projected_starts_t projected_starts;
 
   // Step 1: consume the front of the eligible queue with pop_front()
-  // (O(1) on a circular_buffer, same as on a deque) instead of
-  // scanning by index. See FCFSEasyDequeScheduler::schedule() for the full
-  // reasoning - identical here.
+  // (O(1) on both a circular_buffer and a deque) instead of scanning by
+  // index. Two cases land here:
+  //  (a) a stale "removed" entry that reached the front because the
+  //      legitimate jobs ahead of it already got popped, in this loop or in
+  //      an earlier call -- they were marked removed by backfilling at some
+  //      non-front position and are just waiting to be physically dropped;
+  //  (b) a genuine, not-yet-removed head that fits right now.
+  // Both end in a pop_front(); only (b) also starts a job. The *new* front
+  // is re-checked the same way after each pop -- it must NOT be evaluated as
+  // a backfill candidate against a reservation computed before earlier heads
+  // started.
   while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
          (m_wait_queue.front().removed ||
           m_wait_queue.front().nodes_requested <= available_nodes)) {
@@ -109,8 +123,12 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
   }
 
   // FCFS head is now genuinely at the front and blocked - calculate
-  // reservation for backfilling. See FCFSEasyDequeScheduler::schedule() for
-  // why projected_starts must include jobs_to_run.
+  // reservation for backfilling. projected_starts must include jobs_to_run:
+  // running_jobs does not yet contain the jobs just started above, because
+  // Simulation records a job only after schedule() returns the full list, so
+  // their completion times would otherwise be invisible to the projection and
+  // could push the head's reservation later than the true one. Keep those
+  // starts in a small overlay rather than copying the caller's map.
   auto reservation_plan = reservation_timeline(available_nodes, running_jobs,
                                                current_time, projected_starts);
   m_fcfs_reservation_time =
@@ -123,8 +141,8 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
       reservation_within_horizon(m_fcfs_reservation_time, current_time);
   const bool head_has_projection =
       m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
-  record_estimated_start(m_wait_queue.front().job_id,
-                       m_fcfs_reservation_time, head_within_horizon);
+  record_estimated_start(m_wait_queue.front().job_id, m_fcfs_reservation_time,
+                         head_within_horizon);
   if (head_within_horizon) {
     reservation_plan.reserve(
         m_fcfs_reservation_time, m_wait_queue.front().nodes_requested,
@@ -153,9 +171,10 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
     if (job.nodes_requested > available_nodes)
       continue;
 
-    // IMPORTANT: strict < (not <=) - see FCFSEasyDequeScheduler::schedule()
-    // for why. Backfill jobs must complete BEFORE the reservation
-    // time, not at it.
+    // IMPORTANT: strict < (not <=). Resources do not become available
+    // instantly when a job completes: a backfill job ending exactly at the
+    // reservation time would delay the head until that completion event is
+    // processed, so backfill jobs must complete BEFORE the reservation time.
     const tdiff_t duration =
         release_estimate(current_time, job.run_time_estimate);
 #ifdef DR_EVT_LEGACY_RESERVATION_BARRIER
@@ -184,5 +203,8 @@ FCFSEasyCircularScheduler::schedule(num_nodes_t free_nodes,
 
   return jobs_to_run;
 }
+
+template class FCFSEasyScheduler<CircularWaitQueue>;
+template class FCFSEasyScheduler<DequeWaitQueue>;
 
 } // namespace dr_evt

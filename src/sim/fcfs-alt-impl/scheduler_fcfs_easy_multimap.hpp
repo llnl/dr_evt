@@ -35,12 +35,12 @@ namespace dr_evt {
  * @details Alternative implementation for differential testing.
  * Based on SJF scheduler framework but uses submit_time ordering instead of
  * run_time. This provides an independent implementation to verify
- * scheduler_fcfs_easy_deque correctness.
+ * scheduler_fcfs_easy (deque queue) correctness.
  *
- * Key difference from scheduler_fcfs_easy_deque:
+ * Key difference from scheduler_fcfs_easy over a deque:
  * - Uses std::multimap ordered by submit_time (not deque)
  * - Different internal data structure for queue management
- * - Should produce IDENTICAL results to scheduler_fcfs_easy_deque
+ * - Should produce IDENTICAL results to scheduler_fcfs_easy over a deque
  *
  * Purpose: Differential testing - if both implementations produce same results,
  * high confidence in correctness of both.

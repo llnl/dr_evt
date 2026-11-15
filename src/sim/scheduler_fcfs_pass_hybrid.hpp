@@ -5,7 +5,7 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_pass_hybrid_circular.hpp
+/** @file scheduler_fcfs_pass_hybrid.hpp
  * @brief Event-driven FCFS queue scans with limits reset for each scan.
  * @details A pass is one attempt to scan the waiting queue at the current
  * simulation time. Starts and successful reservations count toward Q; failed
@@ -14,7 +14,7 @@
  * stopped by a simulation guard. The OpenPBS subclass reuses this scan with
  * its own forecast.
  * @note CLI: --per_pass_accounting --priority_policy fcfs --queue_impl
- * circular. --backfill_queue_depth sets Q (0 is unlimited).
+ * circular or deque. --backfill_queue_depth sets Q (0 is unlimited).
  * --backfill_policy hybrid --reservation_depth R protects R jobs; easy
  * protects one and conservative protects all examined jobs. Keep both
  * intervals zero and omit --planning_horizon for unlimited look-ahead.
@@ -24,17 +24,19 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_CIRCULAR_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_CIRCULAR_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_HPP
+#define DR_EVT_SIM_SCHEDULER_FCFS_PASS_HYBRID_HPP
 
 #include "sim/resource/capacity_model.hpp"
-#include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_hybrid.hpp"
 #include <unordered_set>
 
 namespace dr_evt {
 
 /**
- * @brief FCFS allocation/reservation passes using a circular waiting queue.
+ * @brief FCFS allocation/reservation passes over a chosen waiting queue.
+ * @tparam Queue Wait-queue storage policy: CircularWaitQueue or
+ * DequeWaitQueue.
  * @details Immediate allocations and successful future reservations consume
  * Q. After R successful reservations, later jobs receive allocation-only tests;
  * failed allocation-only tests consume Q. Jobs with no allocation or future
@@ -43,16 +45,20 @@ namespace dr_evt {
  * plan. Reaching Q with remaining jobs and a successful action requests another
  * pass, including when the successful action was only a reservation.
  * @note Selected by --per_pass_accounting with FCFS ordering,
- * --queue_impl circular, and zero dispatch/backfill intervals. Q is supplied
- * by --backfill_queue_depth; R by --reservation_depth under hybrid, 1 under
- * EASY, and unlimited under conservative. This implementation always uses
+ * --queue_impl circular or deque, and zero dispatch/backfill intervals. Q is
+ * supplied by --backfill_queue_depth; R by --reservation_depth under hybrid, 1
+ * under EASY, and unlimited under conservative. This implementation always uses
  * resource-time protection, independently of DR_EVT_LEGACY_RESERVATION_BARRIER.
  * It models synchronous policy passes, not asynchronous RPC callback timing.
  * A tentative guard stops identical reservation-only passes so simulation
  * time can advance. Replace or confirm this guard after the native restart
  * handling is fully understood. Existing scheduler traversals are unused.
  */
-class FCFSPassHybridCircularScheduler : public FCFSHybridCircularScheduler {
+template <typename Queue>
+class FCFSPassHybridScheduler : public FCFSHybridScheduler<Queue> {
+  using Base = FCFSHybridScheduler<Queue>;
+  using typename Base::JobEntry;
+
   /// Jobs with no feasible start; retain queue order but skip further tests.
   std::unordered_set<job_no_t> m_blocked;
   sim_time_t m_state_time = std::numeric_limits<sim_time_t>::lowest();
@@ -87,20 +93,21 @@ public:
    * @param[in] initial_job_count Initially known jobs.
    * @param[in] policy EASY, hybrid, conservative, or strict FCFS.
    * @param[in] initial_capacity Circular queue capacity; zero uses job count.
-   * @param[in] overflow_policy Queue overflow behavior.
+   * Ignored by a deque.
+   * @param[in] overflow_policy Queue overflow behavior. Ignored by a deque.
    * @param[in] reservation_depth Hybrid reservation count R.
    * @param[in] queue_depth Counted placement actions Q; zero is unlimited.
    */
-  FCFSPassHybridCircularScheduler(
+  FCFSPassHybridScheduler(
       num_nodes_t total_nodes, size_t initial_job_count, BackfillPolicy policy,
       size_t initial_capacity = 0,
       CircularOverflowPolicy overflow_policy = CircularOverflowPolicy::GROW,
       size_t reservation_depth = 0, size_t queue_depth = 0)
-      : FCFSHybridCircularScheduler(
-            total_nodes, initial_job_count,
-            policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID : policy,
-            initial_capacity, overflow_policy, reservation_depth, queue_depth) {
-    m_backfill_policy = policy;
+      : Base(total_nodes, initial_job_count,
+             policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID : policy,
+             initial_capacity, overflow_policy, reservation_depth,
+             queue_depth) {
+    this->m_backfill_policy = policy;
     if (policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
@@ -116,7 +123,7 @@ public:
    */
   void insert_job(job_no_t id, sim_time_t submit, tdiff_t duration,
                   num_nodes_t nodes) override {
-    FCFSHybridCircularScheduler::insert_job(id, submit, duration, nodes);
+    Base::insert_job(id, submit, duration, nodes);
     m_blocked.clear();
   }
 
@@ -130,6 +137,16 @@ public:
   /** @brief Whether the most recent call stopped an unchanged retry plan. */
   bool last_retry_stopped() const { return m_last_retry_stopped; }
 };
+
+/** @brief Per-pass FCFS scheduler over a boost::circular_buffer queue. */
+using FCFSPassHybridCircularScheduler =
+    FCFSPassHybridScheduler<CircularWaitQueue>;
+/** @brief Per-pass FCFS scheduler over a std::deque queue. */
+using FCFSPassHybridDequeScheduler = FCFSPassHybridScheduler<DequeWaitQueue>;
+
+// Defined in scheduler_fcfs_pass_hybrid.cpp for both queues.
+extern template class FCFSPassHybridScheduler<CircularWaitQueue>;
+extern template class FCFSPassHybridScheduler<DequeWaitQueue>;
 
 } // namespace dr_evt
 #endif
