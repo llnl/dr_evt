@@ -10,6 +10,7 @@
  */
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/sim.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -17,6 +18,9 @@
 #include <ranges>
 #include <string>
 #include <unistd.h>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 using namespace dr_evt;
 
@@ -140,6 +144,18 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
   }
   sim_time_t time = jobs.empty() ? 0 : jobs.front().submit;
   size_t completed = 0;
+  // Only active jobs can change status: submitted, and not yet completed by
+  // the current time. Input submissions are ordered, so the first job not yet
+  // submitted is a cursor. A completed job stays active until its end is not
+  // after time, because the next-event search still considers it until then.
+  std::vector<size_t> active;
+  std::vector<job_no_t> active_ids;
+  size_t submitted = 0, retired = 0;
+  std::unordered_map<job_no_t, size_t> index_of;
+  index_of.reserve(ids.size());
+  for (size_t index = 0; index < ids.size(); ++index)
+    index_of.emplace(ids[index], index);
+  std::vector<std::pair<size_t, const PlacementInterval *>> reserved;
   while (completed < jobs.size()) {
     // Appended-job streaming may expose another same-time scheduling pass
     // after START events are committed. Settle those passes before borrowing
@@ -153,17 +169,23 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
       // short of the next distinct event.
       simulation.advance_to(time + 1e-6);
     } while (simulation.get_jobs_started() != previous_started);
-    const auto statuses = simulation.get_job_statuses(ids);
-    completed = 0;
-    for (size_t index = 0; index < jobs.size(); ++index) {
-      auto &job = jobs[index];
-      const auto &status = statuses[index];
+    // Jobs submitted after the advanced clock cannot have started.
+    while (submitted < jobs.size() && jobs[submitted].submit <= time + 1e-6)
+      active.push_back(submitted++);
+    active_ids.clear();
+    for (const auto index : active)
+      active_ids.push_back(ids[index]);
+    const auto statuses = simulation.get_job_statuses(active_ids);
+    completed = retired;
+    for (size_t slot = 0; slot < active.size(); ++slot) {
+      auto &job = jobs[active[slot]];
+      const auto &status = statuses[slot];
       if (status.state == Simulation::Job_State::COMPLETED)
         ++completed;
       if (!job.launched && status.start_time) {
         job.launched = true;
         job.finish = *status.end_time;
-        out << "{\"schedule\":{\"job\":" << index
+        out << "{\"schedule\":{\"job\":" << active[slot]
             << ",\"start\":" << *status.start_time
             << ",\"finish\":" << job.finish << ",\"node_ids\":";
         write_ids(status.node_ids, out);
@@ -181,19 +203,24 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
       out << '}';
     }
     out << "],\"reservations\":[";
+    // Job order, then plan order within a job, as one stable sort.
+    reserved.clear();
+    for (const auto &interval : simulation.placement_reservations())
+      if (interval.start > time)
+        if (const auto found = index_of.find(interval.job);
+            found != index_of.end())
+          reserved.emplace_back(found->second, &interval);
+    std::ranges::stable_sort(reserved, {},
+                             &decltype(reserved)::value_type::first);
     first = true;
-    for (size_t index = 0; index < jobs.size(); ++index) {
-      for (const auto &interval : simulation.placement_reservations()) {
-        if (interval.job != ids[index] || interval.start <= time)
-          continue;
-        if (!first)
-          out << ',';
-        first = false;
-        out << "{\"job\":" << index << ",\"start\":" << interval.start
-            << ",\"finish\":" << interval.finish << ",\"node_ids\":";
-        write_ids(interval.allocation(), out);
-        out << '}';
-      }
+    for (const auto &[index, interval] : reserved) {
+      if (!first)
+        out << ',';
+      first = false;
+      out << "{\"job\":" << index << ",\"start\":" << interval->start
+          << ",\"finish\":" << interval->finish << ",\"node_ids\":";
+      write_ids(interval->allocation(), out);
+      out << '}';
     }
     out << "]}}\n";
     if (completed == jobs.size())
@@ -207,12 +234,28 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
       if (tick > time)
         next = tick;
     }
-    for (size_t index = 0; index < jobs.size(); ++index) {
-      if (!jobs[index].launched && jobs[index].submit > time)
+    // The earliest unlaunched submission after time; ordered input makes the
+    // first such job the minimum.
+    for (size_t index = submitted; index-- > 0 && jobs[index].submit > time;)
+      if (!jobs[index].launched)
         next = std::min(next, jobs[index].submit);
-      if (statuses[index].end_time && *statuses[index].end_time > time)
-        next = std::min(next, *statuses[index].end_time);
+    if (submitted < jobs.size())
+      next = std::min(next, jobs[submitted].submit);
+    // Every job whose end is after time is active.
+    for (size_t slot = 0; slot < active.size(); ++slot)
+      if (statuses[slot].end_time && *statuses[slot].end_time > time)
+        next = std::min(next, *statuses[slot].end_time);
+    // Retire completed jobs the search can no longer consider.
+    size_t kept = 0;
+    for (size_t slot = 0; slot < active.size(); ++slot) {
+      const auto &status = statuses[slot];
+      if (status.state == Simulation::Job_State::COMPLETED &&
+          *status.end_time <= time)
+        ++retired;
+      else
+        active[kept++] = active[slot];
     }
+    active.resize(kept);
     if (!std::isfinite(next))
       throw std::runtime_error("pending jobs cannot progress");
     time = next;

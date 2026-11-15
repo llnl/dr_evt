@@ -259,7 +259,8 @@ public:
   }
 
 private:
-  /** @brief Empty the window at a segment index. */
+  /** @brief Empty the window at a segment index.
+   * @param[in] at Segment index where the empty window starts. */
   void reset(size_t at) {
     m_lo = m_mid = m_hi = at;
     m_back = m_profile.pool();
@@ -283,7 +284,10 @@ private:
     m_back = m_profile.pool();
   }
 
-  /** @brief Intersection of segments [index, m_mid) with the pool. */
+  /** @brief Borrow the suffix row for one segment.
+   * @param[in] index Segment index in [m_base, m_mid).
+   * @return Pool intersected with segments [index, m_mid); valid until the
+   * next rebuild. */
   std::span<const std::uint64_t> row(size_t index) const {
     const size_t width = m_profile.pool().words().size();
     return std::span(m_front).subspan((index - m_base) * width, width);

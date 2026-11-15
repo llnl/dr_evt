@@ -23,12 +23,18 @@ using dr_evt::tdiff_t;
 using dr_evt::operator-;
 using limits = std::numeric_limits<time_t>;
 
-/** @brief Compare two doubles bit for bit, so signed zeros also match. */
+/** @brief Compare two doubles bit for bit, so signed zeros also match.
+ * @param[in] a One value.
+ * @param[in] b Other value.
+ * @return true when both have the same bit pattern. */
 bool same_bits(tdiff_t a, tdiff_t b) {
   return std::memcmp(&a, &b, sizeof a) == 0;
 }
 
-/** @brief Whether t1 - t2 fits in time_t. */
+/** @brief Whether t1 - t2 fits in time_t.
+ * @param[in] t1 Minuend.
+ * @param[in] t2 Subtrahend.
+ * @return true when the exact difference is representable. */
 bool fits(time_t t1, time_t t2) {
   return t2 < 0 ? t1 <= limits::max() + t2 : t1 >= limits::min() + t2;
 }

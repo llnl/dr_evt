@@ -545,6 +545,9 @@ public:
    * allocated.
    * @details Availability can improve only at exact interval ends. Coarse
    * boundaries are never used as candidate starts or as final admission tests.
+   * After two exact checks, intervals beginning at or before start are
+   * combined into suffix unions, so later candidate starts do not rescan them.
+   * The unions are query-local derived state.
    */
   template <NodeOrder Order = NodeOrder::LowIdFirst, bool ReuseScratch = true>
   std::optional<BitmapPlacement>
