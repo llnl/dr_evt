@@ -688,6 +688,90 @@ static void best_fit_runs_oracle_checks() {
       }
 }
 
+/** @brief Compare ProfileWindow and the prefix-union release path with their
+ * direct counterparts on random profiles.
+ * @throws std::runtime_error if any result differs. */
+static void profile_window_oracle_checks() {
+  {
+    // Free sets only shrink: [0,50) all, [50,70) without 0, [70,100) without
+    // 0 and 1. A window ending at 10 finds no boundary, and the fallback past
+    // the window applies only when two segments follow it.
+    const Bitmap pool(4, true);
+    ReservationProfile profile(pool, 0, 100);
+    profile.book(50, 200, Bitmap::from_ids(4, std::vector<num_nodes_t>{0}));
+    profile.book(70, 200, Bitmap::from_ids(4, std::vector<num_nodes_t>{1}));
+    ProfileWindow window(profile);
+    const auto expected = profile.usable(0, 10);
+    const auto got = window.usable(0, 10);
+    require(profile.segments().size() == 3 && expected.second == 0 &&
+                got.first == expected.first && got.second == expected.second,
+            "ProfileWindow fallback boundary differs from usable");
+  }
+  std::mt19937 random(20261116);
+  for (const num_nodes_t capacity : {9u, 70u})
+    for (int trial = 0; trial < 40; ++trial) {
+      const Bitmap pool(capacity, true);
+      // A horizon just past the bookings lets windows reach the profile end.
+      ReservationProfile profile(pool, 0, 1600);
+      const auto random_set = [&] {
+        std::bernoulli_distribution member(0.3);
+        std::vector<num_nodes_t> ids;
+        for (num_nodes_t id = 0; id < capacity; ++id)
+          if (member(random))
+            ids.push_back(id);
+        return Bitmap::from_ids(capacity, ids);
+      };
+      std::uniform_int_distribution<int> when(0, 1200), length(0, 300),
+          booked_length(0, 600);
+      const int bookings = static_cast<int>(random() % 40);
+      for (int b = 0; b < bookings; ++b) {
+        // Some bookings run past the horizon, constraining the last segment.
+        const sim_time_t begin = when(random);
+        profile.book(begin, begin + booked_length(random), random_set());
+      }
+      // Mostly forward-moving windows, with occasional backward jumps.
+      ProfileWindow window(profile);
+      sim_time_t earliest = 0;
+      for (int step = 0; step < 60; ++step) {
+        if (random() % 10 == 0)
+          earliest = when(random);
+        else
+          earliest += static_cast<sim_time_t>(random() % 60);
+        const sim_time_t finish = earliest + length(random);
+        const auto expected = profile.usable(earliest, finish);
+        const auto got = window.usable(earliest, finish);
+        require(got.first == expected.first && got.second == expected.second,
+                "ProfileWindow differs from ReservationProfile::usable");
+      }
+      // Prefix unions give the same release fit as per-record unions.
+      std::vector<ReleaseRecord> running;
+      for (int r = 0; r < 12; ++r)
+        running.push_back(
+            {static_cast<sim_time_t>(when(random)), random_set()});
+      std::ranges::stable_sort(running, {}, &ReleaseRecord::limit_end);
+      const auto idle = random_set();
+      ReleasePrefix prefix(running, pool.words().size());
+      for (sim_time_t earliest_fit = 1; earliest_fit < 1200;
+           earliest_fit += static_cast<sim_time_t>(1 + random() % 150)) {
+        const auto usable = profile.usable(earliest_fit, earliest_fit + 100);
+        const auto quantity = static_cast<num_nodes_t>(1 + random() % capacity);
+        const auto pick = [quantity](const Bitmap &candidates) {
+          return *candidates.select_best_fit_runs(quantity);
+        };
+        const auto direct =
+            grouped_release_fit(running, idle, usable.first, quantity, 0,
+                                earliest_fit, usable.second, pick);
+        const auto shared =
+            grouped_release_fit(running, idle, usable.first, quantity, 0,
+                                earliest_fit, usable.second, pick, &prefix);
+        require(direct.has_value() == shared.has_value() &&
+                    (!direct || (direct->first == shared->first &&
+                                 direct->second == shared->second)),
+                "prefix-union release fit differs from per-record fit");
+      }
+    }
+}
+
 int main() {
   try {
     bitmap_checks();
@@ -704,7 +788,8 @@ int main() {
     timeline_oracle<NodeOrder::HighIdFirst, 129, EnableCoarseFilter>();
     lifecycle_checks<>();
     lifecycle_checks<EnableCoarseFilter>();
-  reservation_profile_checks();
+    reservation_profile_checks();
+    profile_window_oracle_checks();
     std::cout << "Placement model checks passed\n";
     return 0;
   } catch (const std::exception &e) {

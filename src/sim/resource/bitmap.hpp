@@ -273,9 +273,23 @@ public:
    * without allocating that copy. Domain validation precedes mutation. */
   void add_intersection(const Bitmap &first, const Bitmap &second) {
     same_domain(first);
-    same_domain(second);
+    add_intersection(first.words(), second);
+  }
+
+  /** @brief Union membership with a borrowed dense row intersected with a
+   * bitmap.
+   * @param[in] row Contiguous words with exactly this bitmap's word count.
+   * @param[in] mask Bitmap intersected with row.
+   * @throws std::invalid_argument if word counts or domains differ.
+   * @details The row is not retained. Validation precedes mutation. */
+  void add_intersection(std::span<const std::uint64_t> row,
+                        const Bitmap &mask) {
+    same_domain(mask);
+    if (row.size() != m_words.size()) {
+      throw std::invalid_argument("bitmap word counts differ");
+    }
     for (size_t i = 0; i < m_words.size(); ++i) {
-      m_words[i] |= first.m_words[i] & second.m_words[i];
+      m_words[i] |= row[i] & mask.m_words[i];
     }
   }
 

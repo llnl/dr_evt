@@ -204,7 +204,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
 **Timestamp subtraction:**
 ```bash
-# Use std::difftime instead of integer subtraction (default ON)
+# Use std::difftime instead of integer subtraction (the option defaults to ON)
 cmake -S . -B build -DDR_EVT_INTEGER_TIME_DIFF=OFF
 ```
 
