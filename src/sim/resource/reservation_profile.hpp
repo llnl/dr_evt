@@ -20,7 +20,10 @@
 namespace dr_evt {
 
 /** @brief Contiguous time segments [begin, end) holding identities still free
- * of bookings made during one backfill cycle. Running jobs are not held. */
+ * of bookings made during one backfill cycle.
+ * @details The profile stores only pass-local waiting-job bookings. Running
+ * allocations are represented separately by ReleaseRecord and contribute
+ * identities to grouped_release_fit() when their requested limits expire. */
 class ReservationProfile {
 public:
   /** @brief One profile segment. */
@@ -40,8 +43,15 @@ public:
   }
 
   /** @brief Remove identities from every segment within [begin, end).
+   * @param[in] begin Requested booking start; clipped to the profile origin.
+   * @param[in] end Requested booking end. An empty or reversed interval is
+   * normalized to one time unit after the clipped start.
+   * @param[in] nodes Identities to remove during the normalized interval.
+   * @throws std::invalid_argument if bitmap domains differ.
+   * @throws std::bad_alloc if splitting the profile requires allocation.
    * @details Splits at both endpoints, then coalesces at most one adjacent
-   * pair with identical free sets, starting just before the booking. */
+   * pair with identical free sets, starting just before the booking. A booking
+   * beginning beyond the represented profile has no effect. */
   void book(sim_time_t begin, sim_time_t end, const Bitmap &nodes) {
     auto &segs = m_segments;
     begin = std::max(begin, segs.front().begin);
@@ -96,7 +106,12 @@ public:
     }
   }
 
-  /** @brief Test whether a segment overlapping (begin, end) lacks a node. */
+  /** @brief Test whether a segment overlapping [begin, end) lacks a node.
+   * @param[in] nodes Identities whose availability is required.
+   * @param[in] begin Inclusive interval start.
+   * @param[in] end Exclusive interval end.
+   * @return true if any overlapping segment lacks a required identity.
+   * @throws std::invalid_argument if bitmap domains differ. */
   bool collides(const Bitmap &nodes, sim_time_t begin, sim_time_t end) const {
     return std::ranges::any_of(m_segments, [&](const Segment &seg) {
       return seg.end > begin && seg.begin < end && !seg.free.contains(nodes);
@@ -104,8 +119,12 @@ public:
   }
 
   /** @brief Intersect free sets over [earliest, finish], end inclusive.
-   * @return Usable identities and a retry point; zero means no later attempt
-   * can change the answer. */
+   * @param[in] earliest Earliest candidate start.
+   * @param[in] finish Requested endpoint, which participates in feasibility.
+   * @return Usable identities and the next profile transition worth retrying;
+   * zero means no later represented transition can improve the answer.
+   * @throws std::invalid_argument if internal bitmap domains differ.
+   * @throws std::bad_alloc if bitmap scratch allocation fails. */
   std::pair<Bitmap, sim_time_t> usable(sim_time_t earliest,
                                        sim_time_t finish) const {
     const auto &segs = m_segments;
@@ -134,12 +153,14 @@ public:
     return {std::move(result), retry_at};
   }
 
-  /** @brief Borrow segments for inspection. */
+  /** @brief Borrow segments for inspection.
+   * @return Reference valid until the next non-const operation or destruction.
+   */
   const std::vector<Segment> &segments() const noexcept { return m_segments; }
 
 private:
-  Bitmap m_pool;
-  std::vector<Segment> m_segments;
+  Bitmap m_pool;                   ///< Complete eligible identity domain.
+  std::vector<Segment> m_segments; ///< Ordered pass-local free profiles.
 };
 
 /** @brief A running job's limit end and identities, as seen by planning. */
@@ -148,19 +169,28 @@ struct ReleaseRecord {
   Bitmap nodes;         ///< Exact identities held.
 };
 
-/** @brief Release-grouping parameters. */
-inline constexpr tdiff_t release_group_initial = 30;           ///< seconds
-inline constexpr tdiff_t release_group_cap = 365.0 * 86400.0; ///< seconds
+/** @brief Initial clock-aligned release-group width in seconds. */
+inline constexpr tdiff_t release_group_initial = 30;
+/** @brief Widening threshold cap in seconds. */
+inline constexpr tdiff_t release_group_cap = 365.0 * 86400.0;
 
-/** @brief Earliest (start, nodes) by releasing running jobs in widening groups.
- * @tparam Select Callable mapping a candidate bitmap to a chosen allocation.
- * @param[in] running Running jobs sorted by limit end.
+/** @brief Select nodes by releasing running jobs in widening groups.
+ * @tparam Select Callable returning exactly quantity identities from a
+ * candidate bitmap known to contain enough identities.
+ * @param[in] running Running jobs sorted by nondecreasing limit end.
  * @param[in] idle Identities idle now.
  * @param[in] usable Identities free of bookings throughout the window.
  * @param[in] quantity Requested node count.
  * @param[in] now Cycle time.
- * @param[in] earliest Earliest permitted start.
- * @param[in] bound Nonzero stops releasing jobs whose limit ends after it.
+ * @param[in] earliest Release cutoff already available to this attempt.
+ * @param[in] bound Nonzero stops releasing jobs whose limit ends after it;
+ * zero is unbounded.
+ * @param[in] select Node-selection callable, invoked only after feasibility.
+ * @return Latest selected release time and allocation, or std::nullopt when
+ * the bounded releases cannot satisfy the request. The returned time may be
+ * before earliest and is clamped by plan_profile_job().
+ * @throws std::invalid_argument if bitmap domains differ.
+ * @throws std::bad_alloc if candidate or release storage cannot be allocated.
  * @details Groups are aligned to multiples of the initial width on the
  * caller's clock. The start is the latest limit end among released jobs whose
  * identities were chosen. */
@@ -202,8 +232,8 @@ grouped_release_fit(const std::vector<ReleaseRecord> &running,
       if (!record->nodes.intersects(usable))
         continue;
       if (!group_edge)
-        group_edge = record->limit_end +
-                     (width - std::fmod(record->limit_end, width));
+        group_edge =
+            record->limit_end + (width - std::fmod(record->limit_end, width));
       add_usable(record->nodes);
       released.push_back(record);
       took_any = true;
@@ -238,9 +268,24 @@ grouped_release_fit(const std::vector<ReleaseRecord> &running,
 }
 
 /** @brief Find (start, nodes) for one examined job.
+ * @tparam Select Callable returning exactly quantity identities from a
+ * feasible candidate bitmap.
+ * @param[in] profile Waiting-job bookings made during this cycle.
+ * @param[in] running Running allocations sorted by nondecreasing limit end.
+ * @param[in] idle Identities available at now.
+ * @param[in] quantity Requested whole-node count.
+ * @param[in] duration Requested planning duration.
+ * @param[in] now Current cycle time.
  * @param[in] now_only Whether the booking budget is spent, so only an
  * immediate start is allowed.
- * @return Planned start and identities, or std::nullopt. */
+ * @param[in] select Node-selection callable.
+ * @return Planned start and identities, or std::nullopt.
+ * @throws std::invalid_argument if bitmap domains differ.
+ * @throws std::bad_alloc if planning scratch allocation fails.
+ * @details Feasibility includes the requested endpoint. A collision retries
+ * at the next useful profile boundary; when a collision starts exactly at the
+ * attempted boundary, one time unit is added to guarantee progress. now_only
+ * suppresses every future retry and accepts only idle identities at now. */
 template <typename Select>
 std::optional<std::pair<sim_time_t, Bitmap>>
 plan_profile_job(const ReservationProfile &profile,

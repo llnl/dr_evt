@@ -978,6 +978,10 @@ if(DR_EVT_WITH_UNIT_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python_periodic_placement_reference.py
         $<TARGET_FILE:test_flux_placement_driver-bin>)
     add_test(
+      NAME test_validation_fixtures
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_validation_fixtures.py)
+    add_test(
       NAME test_read_build_config
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_read_build_config.py)
@@ -1107,6 +1111,21 @@ if(DR_EVT_WITH_UNIT_TESTING)
       LABELS "unit;native"
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       RUN_SERIAL TRUE)
+
+  set_tests_properties(
+    test_placement_pass_accounting test_placement_integration test_placement_model
+    PROPERTIES
+      LABELS "unit;placement"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  if(Python3_Interpreter_FOUND)
+    set_tests_properties(
+      test_placement_scripts test_python_periodic_placement_reference
+      test_validation_fixtures
+      test_placement_pass_integration test_flux_placement_model
+      PROPERTIES
+        LABELS "unit;placement"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  endif()
 
   if(MPI_CXX_FOUND AND MPIEXEC_EXECUTABLE)
     # Two ranks can exceed a small runner's slots (Open MPI 5 counts physical

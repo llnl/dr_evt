@@ -1120,10 +1120,12 @@ protected:
   /**
    * Bring the next periodic backfill tick up to date with the clock.
    *
-   * Initializes the first tick one interval after the current time and moves
-   * a tick left in the past (unconsumed while nothing waited) forward on the
-   * same cadence to the first grid point at or after the current time. No-op
-   * when periodic backfill is not configured.
+   * An initially empty streaming simulation establishes no cadence until work
+   * first exists; the first tick is then one interval after the current time.
+   * Once established, a tick left in the past (unconsumed while nothing
+   * waited) moves forward on the same cadence to the first grid point at or
+   * after the current time. Warm start establishes the cadence from its start
+   * boundary. No-op when periodic backfill is not configured.
    */
   void align_backfill_tick();
 

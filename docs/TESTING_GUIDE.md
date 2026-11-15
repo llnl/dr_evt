@@ -12,18 +12,19 @@ DR_EVT uses four complementary forms of validation:
   configuration, streaming, power traces, and gRPC behavior; and
 - [native scheduling comparisons](user-guide/SCHEDULER_VALIDATION.md) drive Flux
   through Fiction and Slurm through a virtual-time adapter under explicit
-  policy and resource assumptions. The 2,000-job FCFS and license-enabled Slurm
-  comparisons matched their recorded runs; reduced workloads isolate backfill
-  differences. The Slurm adapter controls simultaneous event batching and
-  verifies dispatch acknowledgements but leaves main-versus-backfill order
-  uncontrolled, so these matches do not establish general scheduler equivalence.
+  policy and resource assumptions. Default-Slurm placement matches all 2,000
+  starts and exact node allocations. The current license-enabled capacity run
+  has two order-dependent start differences. The adapter controls simultaneous
+  event batching and verifies dispatch acknowledgements but leaves
+  main-versus-backfill order uncontrolled, so these results do not establish
+  general scheduler equivalence.
 
-The native OpenPBS scheduler-library comparison uses private vnodes and shared
-server capacity. The `fcfs_1s_evt_group` policy matches every start and
-completion in the original converted 2,000-job Lassen input. Default `fcfs`
-has 1,433 differing schedules because it checks capacity between predicted
-releases that OpenPBS groups together. Both policies are shown separately in
-[OpenPBS validation](user-guide/OPENPBS_VALIDATION.md).
+The native OpenPBS scheduler-library comparison covers both private-vnode shared
+capacity and a shared exact-vnode pool. The `fcfs_1s_evt_group` policy matches
+every start and completion in both cases and every placement allocation in the
+original converted 2,000-job Lassen input. Historical default `fcfs` has 1,433
+differing schedules because it checks capacity between predicted releases that
+OpenPBS groups together. See [OpenPBS validation](user-guide/OPENPBS_VALIDATION.md).
 The [harness README](https://github.com/LLNL/dr_evt/blob/main/validation/openpbs/README.md)
 gives setup and commands.
 
@@ -40,8 +41,8 @@ now, an end-boundary shortage is excluded from a half-open interval, and an
 interior shortage blocks it. Point queries and grouped current-time checks
 are covered too.
 Placement-pass integration tests also exercise the command-line selector.
-Quick CI runs its native test binary; full CI runs it and the integration
-runner through CTest. The native OpenPBS comparison remains a separate replay.
+Quick CI runs its native test binary and the integration runner; full CI runs
+both through CTest. The native OpenPBS comparison remains a separate replay.
 
 Agreement between implementations is a regression and consistency check. It is
 not independent proof that an algorithm is correct. Small scheduling fixtures
@@ -117,8 +118,13 @@ Run the endpoint and periodic scheduling regressions with:
 
 ```bash
 ctest --test-dir build --output-on-failure \
-  -R '^(test_append_job_api|test_fixed_periodic_dispatch|test_periodic_backfill_reference|test_python_periodic_reference)$'
+  -R '^(test_append_job_api|test_fixed_periodic_dispatch|test_periodic_backfill_reference|test_python_periodic_reference|test_python_periodic_placement_reference)$'
 ```
+
+The placement-reference test supplies `test_flux_placement_driver` to an
+independent Python model and compares seeded random workloads. Portable native
+validation fixtures are checked without Slurm or OpenPBS by
+`test_validation_fixtures`.
 
 Quick CI runs the append API and both dispatch runners. Full CI runs all
 configured CTest registrations with GCC and Clang, including queue-depth,

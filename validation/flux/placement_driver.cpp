@@ -4,9 +4,9 @@
 /** @file placement_driver.cpp
  * @brief Native fixture protocol driving the actual Simulation scheduler and
  * event loop.
- * @details Whole nodes, equal priority, unlimited queue examination, no release
- * delay or dispatch latency. All scheduling and accounting use the main
- * simulator.
+ * @details Whole nodes, equal priority, queue examination unlimited by default
+ * and optionally bounded by --queue-depth, with no release delay or dispatch
+ * latency. All scheduling and accounting use the main simulator.
  */
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/sim.hpp"
@@ -80,6 +80,9 @@ static void write_ids(std::span<const num_nodes_t> ids, std::ostream &out) {
  * @throws std::runtime_error if scheduling makes no progress.
  * @throws std::invalid_argument if resource accounting or planning is invalid.
  * @throws std::bad_alloc if planner or allocation storage cannot be allocated.
+ * @details Positive-interval ticks are anchored to the first submission.
+ * Absolute input timestamps are retained so native-controller timer phase is
+ * preserved.
  */
 template <NodeOrder Order, auto CoarseFilter = DisableCoarseFilter>
 static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
@@ -199,9 +202,8 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     if (backfill_interval > 0) {
       const sim_time_t origin = jobs.empty() ? 0 : jobs.front().submit;
       const auto tick =
-          origin +
-          (std::floor((time - origin) / backfill_interval) + 1) *
-              backfill_interval;
+          origin + (std::floor((time - origin) / backfill_interval) + 1) *
+                       backfill_interval;
       if (tick > time)
         next = tick;
     }
@@ -224,7 +226,11 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
  * finite shared examination budget for diagnostic workload captures, and
  * --backfill-interval S selects periodic backfill at positive S seconds.
  * --priority-policy fcfs_1s_evt_group selects the OpenPBS grouped forecast.
- * @return Zero on success, one for invalid input or a scheduling error. */
+ * @return Zero on success, one for invalid input or a scheduling error.
+ * @details Standard input begins with `capacity slots strict low|high count`,
+ * followed by `submit quantity limit runtime` for each submission-ordered job.
+ * Output is JSON Lines containing schedule decisions and quiescent snapshots.
+ */
 int main(int argc, char **argv) {
   try {
     bool use_coarse_filter = false;

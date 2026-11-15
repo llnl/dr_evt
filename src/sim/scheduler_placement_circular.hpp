@@ -20,7 +20,11 @@ namespace dr_evt {
  * @details The existing queue owns pending metadata. Returned decisions own
  * selected masks until the simulation moves them into its running store. Vector
  * capacity is bounded before borrowing, so selected allocation addresses remain
- * stable throughout planning. Only owned future masks survive for reporting. */
+ * stable throughout planning. Only owned future masks survive for reporting.
+ * A positive backfill interval selects a default-Slurm-style timer pass whose
+ * profile contains only waiting-job bookings; running jobs contribute forecast
+ * releases in widening clock-aligned groups. Event dispatch does not reuse the
+ * retained timer plan's node identities. */
 template <typename Model, bool OneSecondEventGroups = false>
 class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
   std::optional<typename Model::Timeline>
@@ -51,6 +55,12 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
    * running jobs in widening, clock-aligned groups. Queue heads that fit on
    * idle nodes start first, as main dispatch would. One cycle runs per timer
    * time; repeated same-time calls return no further starts.
+   * @param[in] live Exact running allocations and eligible-node inventory.
+   * @param[in] current_time Timer-pass timestamp.
+   * @return Owning exact decisions selected for immediate execution.
+   * @throws std::invalid_argument if bitmap domains or planning intervals are
+   * inconsistent.
+   * @throws std::bad_alloc if queue, bitmap, or reservation storage fails.
    */
   std::vector<Placement_Decision>
   schedule_profile_cycle(const running_jobs_t::PlacementState &live,
@@ -367,7 +377,9 @@ public:
   std::pair<sim_time_t, size_t> placement_budget() const override {
     return {m_backfill_depth_time, m_backfill_depth_examined};
   }
-  /** @copydoc SchedulerBase::restore_placement_budget */
+  /** @copydoc SchedulerBase::restore_placement_budget
+   * @details Restoring a nonzero periodic budget also marks that timestamp's
+   * profile cycle consumed, preventing a duplicate pass after restart. */
   void restore_placement_budget(std::pair<sim_time_t, size_t> budget) override {
     m_backfill_depth_time = budget.first;
     m_backfill_depth_examined = budget.second;

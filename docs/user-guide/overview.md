@@ -7,6 +7,11 @@ EASY or conservative backfilling and FCFS, SJF, or LJF priority policies. It
 can schedule workload traces, replay recorded schedules, and accept jobs
 incrementally through its C++, Python, or gRPC interfaces.
 
+Simulation can use interchangeable capacity counts or exact exclusive
+whole-node identities in one homogeneous pool. See
+[Realism and Known Gaps](REALISM_AND_GAPS.md#resource-models) for the supported
+placement scope.
+
 ## Inputs and outputs
 
 DR_EVT accepts:

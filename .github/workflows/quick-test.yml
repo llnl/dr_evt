@@ -126,9 +126,16 @@ jobs:
         run: |
           $GITHUB_WORKSPACE/install/bin/tests/test_placement_model
           $GITHUB_WORKSPACE/install/bin/tests/test_placement_integration
+          $GITHUB_WORKSPACE/install/bin/tests/test_placement_pass_accounting
           python3 validation/flux/compare_placement_model.py \
             "$GITHUB_WORKSPACE/install/bin/tests/test_flux_placement_driver" --all-optimizations
           python3 -m unittest discover -s tests -p test_placement_scripts.py -v
+          python3 tests/test_python_periodic_placement_reference.py \
+            "$GITHUB_WORKSPACE/install/bin/tests/test_flux_placement_driver" -v
+          python3 tests/run_placement_pass_tests.py \
+            "$GITHUB_WORKSPACE/install/bin/simulator" \
+            --config-header "$GITHUB_WORKSPACE/install/include/dr_evt_config.hpp"
+          python3 tests/test_validation_fixtures.py -v
 
       - name: Run Flux Placement Oracle Audits
         id: flux-placement-audits
@@ -152,7 +159,7 @@ jobs:
           echo "Ser20 memory serialization: ${{ steps.serialization.outcome }}"
           echo "Trace schema / progressive-loading API: ${{ steps.trace-schema.outcome }}"
           echo "OpenPBS validation audits (5 tests): ${{ steps.openpbs-audits.outcome }}"
-          echo "Bitmap placement and native comparison: ${{ steps.bitmap-placement.outcome }}"
+          echo "Placement, periodic reference, and fixtures: ${{ steps.bitmap-placement.outcome }}"
           echo "Flux placement oracle audits: ${{ steps.flux-placement-audits.outcome }}"
           echo "OpenPBS forecast policy: ${{ steps.openpbs-forecast.outcome }}"
           echo "========================================"
