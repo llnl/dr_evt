@@ -16,7 +16,9 @@
 #include <array>
 #include <ctime>
 #include <iostream>
+#include <limits>
 #include <string>
+#include <type_traits>
 
 namespace dr_evt {
 /** \addtogroup dr_evt_trace
@@ -61,9 +63,29 @@ inline bool operator<(const period_t &t1, const period_t &t2) {
 /** @brief Return the signed time difference between two timestamps.
  * @param[in] t1 Timestamp serving as the minuend.
  * @param[in] t2 Timestamp serving as the subtrahend.
- * @return Difference `t1 - t2` in seconds as tdiff_t. */
+ * @return Difference `t1 - t2` in seconds as tdiff_t.
+ * @details With DR_EVT_INTEGER_TIME_DIFF (default), whole seconds are
+ * subtracted in integer arithmetic with __builtin_sub_overflow and converted
+ * once. The result equals std::difftime whenever the difference fits in
+ * time_t. A difference outside that range is clamped to the time_t limit with
+ * t1's sign, using a select rather than a branch. CMake disables the option
+ * when the compiler lacks __builtin_sub_overflow. Otherwise std::difftime is
+ * used; glibc computes it through long double, which is software-emulated on
+ * aarch64. */
 inline tdiff_t operator-(const epoch_t &t1, const epoch_t &t2) {
+#if DR_EVT_INTEGER_TIME_DIFF
+  static_assert(std::is_integral_v<time_t> && std::is_signed_v<time_t>,
+                "integer time difference requires a signed integral time_t");
+  time_t seconds;
+  const bool overflow = __builtin_sub_overflow(t1.first, t2.first, &seconds);
+  // Overflow requires opposite signs, so the true difference has t1's sign.
+  const time_t limit = t1.first < 0 ? std::numeric_limits<time_t>::min()
+                                    : std::numeric_limits<time_t>::max();
+  seconds = overflow ? limit : seconds;
+  return static_cast<tdiff_t>(seconds) + (t1.second - t2.second);
+#else
   return std::difftime(t1.first, t2.first) + (t1.second - t2.second);
+#endif
 }
 
 /** @brief Format an epoch timestamp. @param[in] t Timestamp to format. @return

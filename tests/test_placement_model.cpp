@@ -142,6 +142,30 @@ static void bitmap_checks() {
   rejects<std::invalid_argument>([&] { Bitmap::from_ids(2, duplicates); });
   const std::array<num_nodes_t, 1> outside{2};
   rejects<std::out_of_range>([&] { Bitmap::from_ids(2, outside); });
+  {
+    // Fused helpers match their copy-based equivalents across words.
+    const auto ids = [](std::initializer_list<num_nodes_t> list) {
+      return Bitmap::from_ids(130, std::vector<num_nodes_t>(list));
+    };
+    const auto first = ids({0, 1, 64, 65, 129});
+    const auto second = ids({1, 2, 65, 128, 129});
+    auto fused = ids({3, 127});
+    auto copied = fused;
+    fused.add_intersection(first, second);
+    auto part = first;
+    part.intersect_with(second);
+    copied.add(part);
+    require(fused == copied && fused == ids({1, 3, 65, 127, 129}),
+            "add_intersection differs from copy, intersect, and add");
+    require(first.intersection_contains(second, ids({1, 65, 129})) &&
+                !first.intersection_contains(second, ids({1, 64})) &&
+                first.intersection_contains(second, Bitmap(130)),
+            "intersection_contains differs from copy, intersect, and contains");
+    rejects<std::invalid_argument>(
+        [&] { fused.add_intersection(first, Bitmap(64)); });
+    rejects<std::invalid_argument>(
+        [&] { (void)first.intersection_contains(Bitmap(64), second); });
+  }
   std::vector<num_nodes_t> fragmented_ids{3, 4, 5, 6};
   for (num_nodes_t id = 12; id <= 21; ++id)
     fragmented_ids.push_back(id);
@@ -570,9 +594,188 @@ static void reservation_profile_checks() {
   }
 }
 
+/** @brief Bit-by-bit flat-topology run best fit kept as an oracle.
+ * @tparam Order Tie and within-run identity order.
+ * @param[in] free Candidate identities.
+ * @param[in] quantity Requested count.
+ * @return Selected identities, or std::nullopt when insufficient. */
+template <NodeOrder Order>
+static std::optional<std::vector<num_nodes_t>>
+best_fit_runs_oracle(const Bitmap &free, num_nodes_t quantity) {
+  const auto capacity = free.capacity();
+  std::vector<bool> available(capacity);
+  for (num_nodes_t id = 0; id < capacity; ++id)
+    available[id] = free.test(id);
+  if (free.count() < quantity)
+    return std::nullopt;
+  std::vector<num_nodes_t> selected;
+  size_t remaining = quantity;
+  while (remaining != 0) {
+    num_nodes_t best_begin = 0, best_end = 0;
+    bool have_best = false, best_sufficient = false;
+    for (num_nodes_t cursor = 0; cursor < capacity;) {
+      while (cursor < capacity && !available[cursor])
+        ++cursor;
+      const auto begin = cursor;
+      while (cursor < capacity && available[cursor])
+        ++cursor;
+      if (begin == cursor)
+        continue;
+      const auto length = static_cast<size_t>(cursor - begin);
+      const bool sufficient = length >= remaining;
+      const auto best_length = static_cast<size_t>(best_end - best_begin);
+      if (!have_best || (sufficient && !best_sufficient) ||
+          (sufficient == best_sufficient &&
+           ((sufficient && length < best_length) ||
+            (!sufficient && length > best_length))) ||
+          (sufficient == best_sufficient && length == best_length &&
+           Order == NodeOrder::HighIdFirst)) {
+        best_begin = begin;
+        best_end = cursor;
+        best_sufficient = sufficient;
+        have_best = true;
+      }
+    }
+    if (!have_best)
+      return std::nullopt;
+    const auto take = static_cast<num_nodes_t>(
+        std::min(remaining, static_cast<size_t>(best_end - best_begin)));
+    const auto first =
+        Order == NodeOrder::LowIdFirst ? best_begin : best_end - take;
+    for (num_nodes_t id = first; id < first + take; ++id) {
+      selected.push_back(id);
+      available[id] = false;
+    }
+    remaining -= take;
+  }
+  std::sort(selected.begin(), selected.end());
+  return selected;
+}
+
+/** @brief Compare word-level run best fit with the bit-by-bit oracle.
+ * @throws std::runtime_error if any selection differs. */
+static void best_fit_runs_oracle_checks() {
+  std::mt19937 random(20261115);
+  for (const num_nodes_t capacity : {1u, 2u, 63u, 64u, 65u, 128u, 130u, 756u})
+    for (const double density : {0.1, 0.5, 0.9, 1.0})
+      for (int trial = 0; trial < 20; ++trial) {
+        std::bernoulli_distribution member(density);
+        std::vector<num_nodes_t> ids;
+        for (num_nodes_t id = 0; id < capacity; ++id)
+          if (member(random))
+            ids.push_back(id);
+        const auto free = Bitmap::from_ids(capacity, ids);
+        const auto check = [&](auto order, num_nodes_t quantity) {
+          constexpr NodeOrder Order = decltype(order)::value;
+          const auto fast = free.select_best_fit_runs<Order>(quantity);
+          const auto slow = best_fit_runs_oracle<Order>(free, quantity);
+          require(fast.has_value() == slow.has_value() &&
+                      (!fast || fast->ids() == *slow),
+                  "word-level run best fit differs from bit-by-bit oracle");
+        };
+        // Include the insufficient request top on every stride.
+        const auto top = static_cast<num_nodes_t>(ids.size() + 1);
+        const auto step = capacity > 130 ? 7u : 1u;
+        for (num_nodes_t quantity = 0;;
+             quantity = std::min(quantity + step, top)) {
+          check(std::integral_constant<NodeOrder, NodeOrder::LowIdFirst>{},
+                quantity);
+          check(std::integral_constant<NodeOrder, NodeOrder::HighIdFirst>{},
+                quantity);
+          if (quantity == top)
+            break;
+        }
+      }
+}
+
+/** @brief Compare ProfileWindow and the prefix-union release path with their
+ * direct counterparts on random profiles.
+ * @throws std::runtime_error if any result differs. */
+static void profile_window_oracle_checks() {
+  {
+    // Free sets only shrink: [0,50) all, [50,70) without 0, [70,100) without
+    // 0 and 1. A window ending at 10 finds no boundary, and the fallback past
+    // the window applies only when two segments follow it.
+    const Bitmap pool(4, true);
+    ReservationProfile profile(pool, 0, 100);
+    profile.book(50, 200, Bitmap::from_ids(4, std::vector<num_nodes_t>{0}));
+    profile.book(70, 200, Bitmap::from_ids(4, std::vector<num_nodes_t>{1}));
+    ProfileWindow window(profile);
+    const auto expected = profile.usable(0, 10);
+    const auto got = window.usable(0, 10);
+    require(profile.segments().size() == 3 && expected.second == 0 &&
+                got.first == expected.first && got.second == expected.second,
+            "ProfileWindow fallback boundary differs from usable");
+  }
+  std::mt19937 random(20261116);
+  for (const num_nodes_t capacity : {9u, 70u})
+    for (int trial = 0; trial < 40; ++trial) {
+      const Bitmap pool(capacity, true);
+      // A horizon just past the bookings lets windows reach the profile end.
+      ReservationProfile profile(pool, 0, 1600);
+      const auto random_set = [&] {
+        std::bernoulli_distribution member(0.3);
+        std::vector<num_nodes_t> ids;
+        for (num_nodes_t id = 0; id < capacity; ++id)
+          if (member(random))
+            ids.push_back(id);
+        return Bitmap::from_ids(capacity, ids);
+      };
+      std::uniform_int_distribution<int> when(0, 1200), length(0, 300),
+          booked_length(0, 600);
+      const int bookings = static_cast<int>(random() % 40);
+      for (int b = 0; b < bookings; ++b) {
+        // Some bookings run past the horizon, constraining the last segment.
+        const sim_time_t begin = when(random);
+        profile.book(begin, begin + booked_length(random), random_set());
+      }
+      // Mostly forward-moving windows, with occasional backward jumps.
+      ProfileWindow window(profile);
+      sim_time_t earliest = 0;
+      for (int step = 0; step < 60; ++step) {
+        if (random() % 10 == 0)
+          earliest = when(random);
+        else
+          earliest += static_cast<sim_time_t>(random() % 60);
+        const sim_time_t finish = earliest + length(random);
+        const auto expected = profile.usable(earliest, finish);
+        const auto got = window.usable(earliest, finish);
+        require(got.first == expected.first && got.second == expected.second,
+                "ProfileWindow differs from ReservationProfile::usable");
+      }
+      // Prefix unions give the same release fit as per-record unions.
+      std::vector<ReleaseRecord> running;
+      for (int r = 0; r < 12; ++r)
+        running.push_back(
+            {static_cast<sim_time_t>(when(random)), random_set()});
+      std::ranges::stable_sort(running, {}, &ReleaseRecord::limit_end);
+      const auto idle = random_set();
+      ReleasePrefix prefix(running, pool.words().size());
+      for (sim_time_t earliest_fit = 1; earliest_fit < 1200;
+           earliest_fit += static_cast<sim_time_t>(1 + random() % 150)) {
+        const auto usable = profile.usable(earliest_fit, earliest_fit + 100);
+        const auto quantity = static_cast<num_nodes_t>(1 + random() % capacity);
+        const auto pick = [quantity](const Bitmap &candidates) {
+          return *candidates.select_best_fit_runs(quantity);
+        };
+        const auto direct =
+            grouped_release_fit(running, idle, usable.first, quantity, 0,
+                                earliest_fit, usable.second, pick);
+        const auto shared =
+            grouped_release_fit(running, idle, usable.first, quantity, 0,
+                                earliest_fit, usable.second, pick, &prefix);
+        require(direct.has_value() == shared.has_value() &&
+                    (!direct || (direct->first == shared->first &&
+                                 direct->second == shared->second)),
+                "prefix-union release fit differs from per-record fit");
+      }
+    }
+}
+
 int main() {
   try {
     bitmap_checks();
+    best_fit_runs_oracle_checks();
     optimized_lifecycle_checks<>();
     optimized_lifecycle_checks<EnableCoarseFilter>();
     timeline_oracle<NodeOrder::LowIdFirst>();
@@ -585,7 +788,8 @@ int main() {
     timeline_oracle<NodeOrder::HighIdFirst, 129, EnableCoarseFilter>();
     lifecycle_checks<>();
     lifecycle_checks<EnableCoarseFilter>();
-  reservation_profile_checks();
+    reservation_profile_checks();
+    profile_window_oracle_checks();
     std::cout << "Placement model checks passed\n";
     return 0;
   } catch (const std::exception &e) {

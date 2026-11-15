@@ -237,6 +237,27 @@ option(DR_EVT_INSTALL_FETCHED_GRPC
 option(DR_EVT_LEGACY_QUEUE_INPUT "Read legacy queue-name trace columns instead of q_id" OFF)
 option(DR_EVT_LEGACY_RESERVATION_BARRIER
   "Require backfill jobs to finish before protected reservations" OFF)
+# Integer epoch subtraction avoids glibc difftime's long double arithmetic,
+# which is software-emulated on aarch64. OFF restores std::difftime.
+option(DR_EVT_INTEGER_TIME_DIFF
+  "Subtract epoch timestamps in integer seconds instead of std::difftime" ON)
+# The integer path needs __builtin_sub_overflow; disable it when unavailable.
+if (DR_EVT_INTEGER_TIME_DIFF)
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles("
+    #include <ctime>
+    int main() {
+      std::time_t a = 1, b = 2, d;
+      return __builtin_sub_overflow(a, b, &d) ? 1 : 0;
+    }" DR_EVT_HAS_BUILTIN_SUB_OVERFLOW)
+  if (NOT DR_EVT_HAS_BUILTIN_SUB_OVERFLOW)
+    message(STATUS "DR_EVT_INTEGER_TIME_DIFF=OFF: __builtin_sub_overflow is "
+                   "unavailable with ${CMAKE_CXX_COMPILER_ID}")
+    set(DR_EVT_INTEGER_TIME_DIFF OFF CACHE BOOL
+        "Subtract epoch timestamps in integer seconds instead of std::difftime"
+        FORCE)
+  endif()
+endif()
 
 if (DR_EVT_ENABLE_GRPC)
   if (NOT DR_EVT_ENABLE_PROTOBUF)
@@ -760,6 +781,14 @@ set_target_properties(test_block_queue-bin PROPERTIES CMAKE_INSTALL_RPATH
 
 list(APPEND DR_EVT_UNIT_TEST_TARGETS test_block_queue-bin)
 
+# epoch_t subtraction in the configured DR_EVT_INTEGER_TIME_DIFF mode.
+add_executable(test_epoch_diff-bin tests/test_epoch_diff.cpp)
+target_include_directories(test_epoch_diff-bin PRIVATE
+  ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_epoch_diff-bin PRIVATE dr_evt)
+set_target_properties(test_epoch_diff-bin PROPERTIES OUTPUT_NAME test_epoch_diff)
+list(APPEND DR_EVT_UNIT_TEST_TARGETS test_epoch_diff-bin)
+
 # Scalar capacity model, observers, and event accounting validation.
 add_executable(test_capacity_model-bin tests/test_capacity_model.cpp)
 target_include_directories(test_capacity_model-bin PRIVATE
@@ -934,6 +963,7 @@ if(DR_EVT_WITH_UNIT_TESTING)
   add_test(
     NAME test_block_queue
     COMMAND $<TARGET_FILE:test_block_queue-bin>)
+  add_test(NAME test_epoch_diff COMMAND $<TARGET_FILE:test_epoch_diff-bin>)
   add_test(NAME test_placement_pass_accounting
     COMMAND $<TARGET_FILE:test_placement_pass_accounting-bin>)
   add_test(NAME test_capacity_model COMMAND $<TARGET_FILE:test_capacity_model-bin>)
@@ -1105,6 +1135,7 @@ if(DR_EVT_WITH_UNIT_TESTING)
     test_append_job_api test_custom_scheduler test_progressive_load
     test_queue_input
     test_batch_vs_streaming test_block_queue test_capacity_schedule
+    test_epoch_diff
     test_warm_start test_warm_start_validation test_max_time test_cli_input
     test_swf test_node_release_delay test_node_release_delay_reference
     PROPERTIES
@@ -1456,6 +1487,7 @@ append_str_tf(_str
   DR_EVT_HAS_PROTOBUF
   DR_EVT_INSTALL_FETCHED_GRPC
   DR_EVT_LEGACY_RESERVATION_BARRIER
+  DR_EVT_INTEGER_TIME_DIFF
   DR_EVT_GPROF)
 string(APPEND _str
   "\n== End DR_EVT Configuration Summary ==\n")

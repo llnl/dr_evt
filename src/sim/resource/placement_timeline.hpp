@@ -545,6 +545,9 @@ public:
    * allocated.
    * @details Availability can improve only at exact interval ends. Coarse
    * boundaries are never used as candidate starts or as final admission tests.
+   * After two exact checks, intervals beginning at or before start are
+   * combined into suffix unions, so later candidate starts do not rescan them.
+   * The unions are query-local derived state.
    */
   template <NodeOrder Order = NodeOrder::LowIdFirst, bool ReuseScratch = true>
   std::optional<BitmapPlacement>
@@ -563,13 +566,75 @@ public:
     };
     if (auto result = attempt(start))
       return result;
+    // Later attempts start at T >= start. An interval beginning at or before
+    // start overlaps [T, end) exactly when it finishes after T, so its
+    // contribution is a suffix union over the finish-ordered intervals.
+    // Intervals beginning later are tested individually, as refine() does.
+    const size_t width = m_pool.words().size();
+    const size_t count = m_intervals.size();
+    // early: ascending indices of intervals beginning at or before start;
+    // row e of blocked_after is the union of allocations early[e..], and the
+    // final row is empty. later: ascending indices of the remaining intervals.
+    std::vector<size_t> early, later;
+    std::vector<std::uint64_t> blocked_after;
+    // The unions are built for the second exact check after start, because the
+    // first one often succeeds. Without the coarse filter, the attempt at
+    // start was already an exact check.
+    bool built = false, refined_once = !coarse_filter_enabled;
+    const auto build_blocked_after = [&] {
+      for (size_t index = 0; index < count; ++index)
+        (m_intervals[index].start <= start ? early : later).push_back(index);
+      blocked_after.assign((early.size() + 1) * width, 0);
+      for (size_t e = early.size(); e-- > 0;) {
+        const auto row =
+            blocked_after.begin() + static_cast<std::ptrdiff_t>(e * width);
+        const auto words = m_intervals[early[e]].allocation().words();
+        for (size_t word = 0; word < width; ++word)
+          row[static_cast<std::ptrdiff_t>(word)] =
+              row[static_cast<std::ptrdiff_t>(width + word)] | words[word];
+      }
+    };
     sim_time_t previous = start;
-    for (const auto &interval : m_intervals) {
-      if (interval.finish <= previous)
+    for (size_t index = 0; index < count; ++index) {
+      if (m_intervals[index].finish <= previous)
         continue;
-      previous = interval.finish;
-      if (auto result = attempt(previous))
-        return result;
+      previous = m_intervals[index].finish;
+      const auto end = endpoint(previous, duration);
+      candidates = m_pool;
+      if constexpr (coarse_filter_enabled)
+        filter(candidates, previous, end);
+      if (candidates.count() < quantity)
+        continue;
+      if (!refined_once) {
+        refined_once = true;
+        refine(candidates, previous, end);
+      } else {
+        if (!built) {
+          build_blocked_after();
+          built = true;
+        }
+        // First interval finishing after previous; earlier ones cannot
+        // overlap.
+        size_t first = index + 1;
+        while (first < count && m_intervals[first].finish <= previous)
+          ++first;
+        const auto e = static_cast<size_t>(
+            std::lower_bound(early.begin(), early.end(), first) -
+            early.begin());
+        candidates.remove_words(
+            std::span(blocked_after).subspan(e * width, width));
+        for (auto it = std::lower_bound(later.begin(), later.end(), first);
+             it != later.end(); ++it)
+          if (overlaps(m_intervals[*it], previous, end, m_inclusive_end))
+            candidates.remove(m_intervals[*it].allocation());
+      }
+      if constexpr (ReuseScratch) {
+        if (candidates.template retain_first<Order>(quantity))
+          return BitmapPlacement{previous, std::move(candidates)};
+      } else if (auto allocation =
+                     candidates.template select<Order>(quantity)) {
+        return BitmapPlacement{previous, std::move(*allocation)};
+      }
     }
     return std::nullopt;
   }

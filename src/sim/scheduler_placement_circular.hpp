@@ -137,7 +137,13 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
         profile.book(current_time, current_time + duration, plan->second);
         // Keep the sorted release order for later candidates.
         start_now(job, std::move(plan->second), duration);
-        std::ranges::stable_sort(running, {}, &ReleaseRecord::limit_end);
+        // Insert the appended release after equal limit ends, matching a
+        // stable sort of the otherwise sorted records.
+        const auto last = std::prev(running.end());
+        std::rotate(std::ranges::upper_bound(running.begin(), last,
+                                             last->limit_end, {},
+                                             &ReleaseRecord::limit_end),
+                    last, running.end());
         continue;
       }
       const bool was_first = first_waiter;
