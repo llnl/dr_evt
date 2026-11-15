@@ -216,7 +216,9 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                     state_changed = True
             while cursor < len(jobs) and jobs[cursor][0] <= now:
                 _, tokens, limit, _ = jobs[cursor]
-                ids[cursor] = command(f'SUBMIT {tokens} {limit // 60} job{cursor:04d}')['id']
+                # Capacity mode also requires this name as the private node.
+                name = f'job{cursor:04d}' if placement else f'n{cursor:04d}'
+                ids[cursor] = command(f'SUBMIT {tokens} {limit // 60} {name}')['id']
                 cursor += 1
                 state_changed = True
             command('RELEASE')
