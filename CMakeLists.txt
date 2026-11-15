@@ -973,6 +973,11 @@ if(DR_EVT_WITH_UNIT_TESTING)
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python_periodic_reference.py)
     add_test(
+      NAME test_python_periodic_placement_reference
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_python_periodic_placement_reference.py
+        $<TARGET_FILE:test_flux_placement_driver-bin>)
+    add_test(
       NAME test_read_build_config
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_read_build_config.py)

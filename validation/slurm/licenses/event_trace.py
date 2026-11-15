@@ -69,7 +69,9 @@ def run_case(directory, jobs, capacity, enabled=True, batch_main_dispatch=False,
     params = ('sched_min_interval=0,batch_sched_delay=0,sched_interval=60,'
               'bf_interval=30,bf_resolution=1,bf_window=4320,bf_max_job_test=4096,'
               'bf_max_job_part=64,bf_job_part_count_reserve=32,default_queue_depth=100000')
-    if enabled:
+    if enabled and resource_model != 'placement':
+        # Placement validates default Slurm: no licenses exist, and
+        # bf_licenses would imply bf_running_job_reserve.
         params += ',bf_licenses'
     if batch_main_dispatch:
         # Queue submissions until the complete equal-time event batch is applied.
@@ -135,7 +137,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
             shutil.copyfile(source, directory / name)
     manifest = {'scheduler': 'Slurm 26.11.0-0rc2, select/cons_tres',
                 'resource_model': resource_model,
-                'bf_licenses': enabled,
+                'bf_licenses': enabled and resource_model != 'placement',
                 'clock': 'virtual integer seconds; monotonic/RPC time remains real',
                 'compute_adapter': 'native allocation requests, node registration, '
                                    'completion and epilog RPCs; no actual compute daemons',
@@ -295,11 +297,16 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
         native_elapsed = time.monotonic() - started
         native = [schedule[i] for i in range(len(jobs))]
         if placement:
+            # Slurm groups releases on the absolute clock, so DR_EVT plans on
+            # absolute timestamps and the results are shifted back.
+            absolute = [(submit + EPOCH, *rest) for submit, *rest in jobs]
             dr, _, dr_elapsed = run_dr_evt_placement(
-                directory / 'dr_evt', jobs,
+                directory / 'dr_evt', absolute,
                 Path('/workspace/dr_evt-placement-driver').read_text().strip(),
                 capacity, 'hybrid', 32, 'low', backfill_interval=30,
                 queue_depth=64)
+            dr = [dict(row, start=row['start'] - EPOCH, end=row['end'] - EPOCH)
+                  for row in dr]
         else:
             dr, dr_elapsed = run_dr_evt(directory / 'dr_evt', jobs,
                                         Path('/workspace/dr_evt-simulator').read_text().strip(),
@@ -341,7 +348,7 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                   'comparison_loop_note': ('DR_EVT placement and native Slurm use 30-second periodic '
                                            'backfill with R=32 and Q=64' if placement else None),
                   'plot_note': 'Native scheduling; trace-driven virtual time and completion RPCs',
-                  'bf_licenses': enabled, 'resource_curves': {'slurm': profile(native), 'dr_evt': profile(dr)},
+                  'bf_licenses': enabled and not placement, 'resource_curves': {'slurm': profile(native), 'dr_evt': profile(dr)},
                   'slurm_metrics': metrics(jobs, native, capacity, native_elapsed),
                   'dr_evt_metrics': metrics(jobs, dr, capacity, dr_elapsed),
                   'different_start_times': sum(a['start'] != b['start'] for a, b in zip(native, dr)),
@@ -407,7 +414,8 @@ def main():
     parser.add_argument('--batch-main-dispatch', action='store_true',
                         help='Defer submissions and gate main dispatch until the equal-time RPC batch is complete')
     parser.add_argument('--bf-licenses', choices=('on', 'off'), default='on',
-                        help='License reservation planning for the Lassen run; controls exercise both settings')
+                        help='Capacity mode: license reservation planning (bf_licenses). '
+                             'Placement mode always runs default Slurm without it')
     parser.add_argument('--resource-model', choices=('capacity', 'placement'), default='capacity')
     parser.add_argument('--liveness-smoke', action='store_true',
                         help='Run a short placement case beyond the native node-ping threshold')

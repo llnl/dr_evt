@@ -10,6 +10,7 @@ set_full_path(THIS_DIR_HEADERS
     resource/bitmap.hpp
     resource/placement_timeline.hpp
     resource/placement_model.hpp
+    resource/reservation_profile.hpp
     scheduler_policies.hpp
     schedule_windows.hpp
     scheduler_base.hpp

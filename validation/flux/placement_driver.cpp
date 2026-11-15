@@ -120,6 +120,10 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
   if (one_second_event_groups)
     params.m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
   Simulation simulation(params);
+  // Start the clock, and so the periodic timer, at the first submission.
+  // Absolute input timestamps then keep a native controller's timer phase.
+  if (!jobs.empty() && jobs.front().submit > 0)
+    simulation.advance_to(jobs.front().submit);
   std::vector<job_no_t> ids;
   ids.reserve(jobs.size());
   for (const auto &job : jobs) {
@@ -193,8 +197,11 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
       break;
     auto next = std::numeric_limits<sim_time_t>::infinity();
     if (backfill_interval > 0) {
+      const sim_time_t origin = jobs.empty() ? 0 : jobs.front().submit;
       const auto tick =
-          (std::floor(time / backfill_interval) + 1) * backfill_interval;
+          origin +
+          (std::floor((time - origin) / backfill_interval) + 1) *
+              backfill_interval;
       if (tick > time)
         next = tick;
     }

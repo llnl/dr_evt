@@ -3186,6 +3186,12 @@ void BasicSimulation<TraceType>::align_backfill_tick() {
     return;
   }
   if (m_next_backfill_evaluation == std::numeric_limits<sim_time_t>::max()) {
+    // An empty simulation has no cadence yet: the timer starts with the
+    // first advance that holds work, as a controller starts with its system.
+    if (m_scheduler->active_job_count() == 0 && m_running_jobs.empty() &&
+        m_scheduler->get_next_arrival_time() ==
+            std::numeric_limits<sim_time_t>::max())
+      return;
     m_next_backfill_evaluation =
         m_current_time + m_params.scheduling_interval();
   } else if (m_next_backfill_evaluation < m_current_time) {

@@ -7,6 +7,7 @@
  */
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/resource/placement_model.hpp"
+#include "sim/resource/reservation_profile.hpp"
 #include <array>
 #include <iostream>
 #include <random>
@@ -487,6 +488,88 @@ static void optimized_lifecycle_checks() {
 
 /** @brief Run the focused placement checks.
  * @return Zero on success, one on failure. */
+/** @brief Check waiting-jobs-only planning for periodic placement backfill.
+ * @throws std::runtime_error if grouping, start choice, or retry changes. */
+static void reservation_profile_checks() {
+  const auto set = [](std::initializer_list<num_nodes_t> ids) {
+    std::vector<num_nodes_t> list(ids);
+    return Bitmap::from_ids(8, list);
+  };
+  const auto pick = [](num_nodes_t quantity) {
+    return [quantity](const Bitmap &candidates) {
+      return *candidates.select_best_fit_runs(quantity);
+    };
+  };
+  const Bitmap pool(8, true);
+  // Grouping: releases at 31 and 59 share the first window (edge 60, width
+  // 30, so anything up to 90 joins it). The latest picked release sets start.
+  {
+    std::vector<ReleaseRecord> running{
+        {31, set({0, 1})}, {59, set({2, 3})}, {200, set({4, 5, 6, 7})}};
+    auto fit = grouped_release_fit(running, Bitmap(8), pool, 4, 0, 0, 0,
+                                   pick(4));
+    require(fit && fit->first == 59 && fit->second == set({0, 1, 2, 3}),
+            "grouped release did not start at the latest picked release");
+    // A two-node job picks {0,1} by best fit, so the start is 31, not 59.
+    fit = grouped_release_fit(running, Bitmap(8), pool, 2, 0, 0, 0, pick(2));
+    require(fit && fit->first == 31 && fit->second == set({0, 1}),
+            "start ignored the picked identities' releases");
+  }
+  // Grouping is clock aligned: a release at 29 has edge 30, so a release
+  // at 61 lies beyond edge + width and the window doubles before taking it.
+  {
+    std::vector<ReleaseRecord> running{{29, set({0})}, {61, set({1})}};
+    auto fit = grouped_release_fit(running, Bitmap(8), set({0, 1}), 2, 0, 0, 0,
+                                   pick(2));
+    require(fit && fit->first == 61, "widened group lost a release");
+    // Bounding releases at 30 leaves only one node: no fit.
+    fit = grouped_release_fit(running, Bitmap(8), set({0, 1}), 2, 0, 0, 30,
+                              pick(2));
+    require(!fit, "bounded release used a job ending after the bound");
+  }
+  // Idle usable nodes start now; running-job nodes are not held by the
+  // profile, so a later booking only removes the booked identities.
+  {
+    ReservationProfile profile(pool, 0, 1000);
+    profile.book(100, 200, set({0, 1, 2, 3}));
+    auto [usable, retry] = profile.usable(0, 150);
+    require(usable == set({4, 5, 6, 7}) && retry == 200,
+            "profile usable set or retry point is wrong");
+    // The end is inclusive: a window ending exactly at 100 overlaps it.
+    std::tie(usable, retry) = profile.usable(0, 100);
+    require(usable == set({4, 5, 6, 7}), "profile end was not inclusive");
+    std::tie(usable, retry) = profile.usable(0, 99);
+    require(usable == pool, "profile window before booking lost nodes");
+    require(profile.collides(set({0}), 150, 160) &&
+                !profile.collides(set({0}), 200, 300),
+            "profile collision test is wrong");
+    // Booking an adjacent identical interval merges one segment pair.
+    profile.book(200, 300, set({0, 1, 2, 3}));
+    require(profile.segments().size() == 3, "profile did not merge segments");
+  }
+  // Retry: the only candidate collides with a booking, so planning moves
+  // past it and starts after the booked window.
+  {
+    ReservationProfile profile(pool, 0, 10000);
+    profile.book(50, 150, set({0, 1, 2, 3, 4, 5, 6, 7}));
+    std::vector<ReleaseRecord> running{{40, pool}};
+    auto plan = plan_profile_job(profile, running, Bitmap(8), 8, 20, 0, false,
+                                 pick(8));
+    require(plan && plan->first == 150, "planning did not retry past booking");
+    // Once the booking budget is spent, only immediate starts are allowed.
+    plan = plan_profile_job(profile, running, Bitmap(8), 8, 20, 0, true,
+                            pick(8));
+    require(!plan, "now-only planning returned a future start");
+    plan = plan_profile_job(profile, running, set({6, 7}), 2, 60, 0, true,
+                            pick(2));
+    require(!plan, "now-only start crossed a booked window");
+    plan = plan_profile_job(profile, running, set({6, 7}), 2, 20, 160, true,
+                            pick(2));
+    require(plan && plan->first == 160 && plan->second == set({6, 7}),
+            "now-only planning missed an idle fit");
+  }
+}
+
 int main() {
   try {
     bitmap_checks();
@@ -502,6 +585,7 @@ int main() {
     timeline_oracle<NodeOrder::HighIdFirst, 129, EnableCoarseFilter>();
     lifecycle_checks<>();
     lifecycle_checks<EnableCoarseFilter>();
+  reservation_profile_checks();
     std::cout << "Placement model checks passed\n";
     return 0;
   } catch (const std::exception &e) {

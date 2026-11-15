@@ -7,6 +7,7 @@
  */
 #ifndef DR_EVT_SIM_SCHEDULER_PLACEMENT_CIRCULAR_HPP
 #define DR_EVT_SIM_SCHEDULER_PLACEMENT_CIRCULAR_HPP
+#include "sim/resource/reservation_profile.hpp"
 #include "sim/scheduler_fcfs_hybrid_circular.hpp"
 #include <ranges>
 namespace dr_evt {
@@ -29,6 +30,125 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
                             ///< best fit, inclusive backfill endpoints, and a
                             ///< reported plan kept until the next timer pass.
 
+  sim_time_t m_profile_cycle_time =
+      std::numeric_limits<sim_time_t>::quiet_NaN(); ///< Last timer cycle.
+
+  /** @brief Remove queue entries started by an earlier pass. */
+  void compact_queue() {
+    if (m_removed_count == 0)
+      return;
+    m_eligible_end_idx -= m_removed_count;
+    auto end = std::remove_if(m_wait_queue.begin(), m_wait_queue.end(),
+                              [](const JobEntry &job) { return job.removed; });
+    m_wait_queue.erase(end, m_wait_queue.end());
+    m_removed_count = 0;
+  }
+
+  /**
+   * @brief One periodic backfill cycle with a waiting-jobs-only profile.
+   * @details Matches default Slurm (no bf_running_job_reserve): the profile
+   * holds only bookings made this cycle; future starts come from releasing
+   * running jobs in widening, clock-aligned groups. Queue heads that fit on
+   * idle nodes start first, as main dispatch would. One cycle runs per timer
+   * time; repeated same-time calls return no further starts.
+   */
+  std::vector<Placement_Decision>
+  schedule_profile_cycle(const running_jobs_t::PlacementState &live,
+                         sim_time_t current_time) {
+    std::vector<Placement_Decision> starts;
+    if (m_profile_cycle_time == current_time)
+      return starts;
+    m_profile_cycle_time = current_time;
+    m_backfill_depth_time = current_time;
+    m_backfill_depth_examined = 0;
+    m_backfill_depth_head_accounted = false;
+    m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
+    m_last_plan.reset();
+    constexpr auto order = Model::order;
+    const auto select = [](const Bitmap &candidates, num_nodes_t quantity) {
+      return *candidates.template select_best_fit_runs<order>(quantity);
+    };
+    Bitmap idle = live.eligible;
+    idle.remove(live.occupied);
+    std::vector<ReleaseRecord> running;
+    running.reserve(live.jobs.size());
+    for (const auto &[id, record] : live.jobs) {
+      (void)id;
+      const auto limit_end = record.timing.start_time + record.timing.run_time;
+      // Past-forecast jobs keep their nodes until an observed release.
+      if (limit_end > current_time)
+        running.push_back({limit_end, record.allocation});
+    }
+    const auto start_now = [&](JobEntry &job, Bitmap nodes, tdiff_t duration) {
+      idle.remove(nodes);
+      running.push_back({current_time + duration, nodes});
+      starts.push_back({job.job_id, current_time + duration, std::move(nodes)});
+      job.removed = true;
+      ++m_removed_count;
+    };
+    // Main-dispatch heads first, by best fit over idle nodes.
+    size_t cursor = 0;
+    for (; cursor < m_eligible_end_idx; ++cursor) {
+      auto &job = m_wait_queue[cursor];
+      if (job.nodes_requested > idle.count())
+        break;
+      start_now(job, select(idle, job.nodes_requested),
+                release_estimate(current_time, job.run_time_estimate));
+    }
+    std::ranges::stable_sort(running, {}, &ReleaseRecord::limit_end);
+    const sim_time_t until =
+        m_planning_horizon == std::numeric_limits<tdiff_t>::max()
+            ? std::numeric_limits<sim_time_t>::infinity()
+            : current_time + m_planning_horizon;
+    ReservationProfile profile(live.eligible, current_time, until);
+    typename Model::Timeline report(live.eligible, current_time);
+    const size_t reservation_limit =
+        m_backfill_policy == BackfillPolicy::CONSERVATIVE
+            ? std::numeric_limits<size_t>::max()
+        : m_backfill_policy == BackfillPolicy::EASY ? 1
+                                                    : m_reservation_depth;
+    size_t booked = 0;
+    bool first_waiter = true;
+    for (; cursor < m_eligible_end_idx; ++cursor) {
+      if (m_backfill_queue_depth != 0 &&
+          m_backfill_depth_examined >= m_backfill_queue_depth)
+        break;
+      auto &job = m_wait_queue[cursor];
+      ++m_backfill_depth_examined;
+      const auto duration =
+          release_estimate(current_time, job.run_time_estimate);
+      const bool now_only = booked >= reservation_limit;
+      const auto pick = [&](const Bitmap &candidates) {
+        return select(candidates, job.nodes_requested);
+      };
+      auto plan = plan_profile_job(profile, running, idle, job.nodes_requested,
+                                   duration, current_time, now_only, pick);
+      if (plan && plan->first <= current_time) {
+        profile.book(current_time, current_time + duration, plan->second);
+        // Keep the sorted release order for later candidates.
+        start_now(job, std::move(plan->second), duration);
+        std::ranges::stable_sort(running, {}, &ReleaseRecord::limit_end);
+        continue;
+      }
+      const bool was_first = first_waiter;
+      first_waiter = false;
+      if (!plan || now_only)
+        continue;
+      if (was_first)
+        m_fcfs_reservation_time = plan->first;
+      record_estimated_start(
+          job.job_id, plan->first,
+          reservation_within_horizon(plan->first, current_time));
+      profile.book(plan->first, plan->first + duration, plan->second);
+      report.reserve(BitmapPlacement{plan->first, std::move(plan->second)},
+                     duration, job.job_id);
+      ++booked;
+    }
+    m_backfill_depth_head_accounted = m_backfill_depth_examined != 0;
+    m_last_plan.emplace(std::move(report));
+    return starts;
+  }
+
   /**
    * @brief Run the shared exact-placement traversal.
    * @param[in] free_nodes Nodes currently available for allocation.
@@ -44,12 +164,16 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     const auto *live = running_jobs.placement();
     if (!live || free_nodes != live->eligible.count() - live->occupied.count())
       throw std::invalid_argument("placement and trace availability disagree");
+    sync_to(current_time);
+    if (m_periodic_backfill && backfill) {
+      compact_queue();
+      return schedule_profile_cycle(*live, current_time);
+    }
     // Event dispatch between timer passes keeps the last backfill plan for
     // status reporting only; selection never consults its identities.
     const bool retain_periodic_plan = m_periodic_backfill && !backfill;
     if (!retain_periodic_plan)
       m_last_plan.reset();
-    sync_to(current_time);
     if (m_removed_count != 0) {
       m_eligible_end_idx -= m_removed_count;
       auto end =
@@ -248,6 +372,8 @@ public:
     m_backfill_depth_time = budget.first;
     m_backfill_depth_examined = budget.second;
     m_backfill_depth_head_accounted = budget.second != 0;
+    if (m_periodic_backfill && budget.second != 0)
+      m_profile_cycle_time = budget.first;
   }
   /** @copydoc SchedulerBase::schedule_placements
    * @throws std::invalid_argument if live bitmap and quantity accounting
