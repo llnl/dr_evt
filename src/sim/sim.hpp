@@ -677,6 +677,13 @@ public:
   num_nodes_t get_nodes_in_use() const;
 
   /**
+   * @brief Get the number of jobs that have begun execution.
+   * @return Same value as get_statistics().jobs_started, without scanning the
+   * trace.
+   */
+  num_jobs_t get_jobs_started() const noexcept { return m_jobs_started; }
+
+  /**
    * @brief Return instantaneous node utilization.
    * @return Nodes currently used divided by effective current capacity.
    * @details Effective capacity is the scheduled capacity, raised to current

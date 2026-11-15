@@ -782,6 +782,7 @@ void test_exclusive_vs_inclusive() {
   // Two jobs accepted, one started so far: the counters must differ here.
   assert(sim.get_statistics().jobs_submitted == 2);
   assert(sim.get_statistics().jobs_started == 1);
+  assert(sim.get_jobs_started() == 1);
   sim.run_until_exclusive(10.0);
   assert(sim.get_current_time() == 5.0);
   assert(sim.get_nodes_in_use() == 10);

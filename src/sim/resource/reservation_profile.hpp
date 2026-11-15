@@ -130,18 +130,17 @@ public:
     const auto &segs = m_segments;
     Bitmap result = m_pool;
     sim_time_t retry_at = 0;
-    for (size_t k = 0; k < segs.size(); ++k) {
+    // Segment ends are ordered; those ending by earliest contribute nothing.
+    const auto first = std::ranges::partition_point(
+        segs, [earliest](const Segment &seg) { return seg.end <= earliest; });
+    for (auto k = static_cast<size_t>(first - segs.begin()); k < segs.size();
+         ++k) {
       const auto &seg = segs[k];
-      if (seg.end > earliest && k + 1 < segs.size() && retry_at == 0) {
-        Bitmap current = result;
-        current.intersect_with(seg.free);
-        Bitmap next = m_pool;
-        next.intersect_with(segs[k + 1].free);
-        if (!current.contains(next))
-          retry_at = seg.end;
-      }
-      if (seg.end <= earliest)
-        continue;
+      // Every free set is a subset of m_pool, so the next segment's usable
+      // identities are exactly its free set.
+      if (k + 1 < segs.size() && retry_at == 0 &&
+          !result.intersection_contains(seg.free, segs[k + 1].free))
+        retry_at = seg.end;
       if (seg.begin <= finish) {
         result.intersect_with(seg.free);
       } else {
@@ -204,42 +203,43 @@ grouped_release_fit(const std::vector<ReleaseRecord> &running,
   candidates.intersect_with(idle);
   if (earliest <= now && candidates.count() >= quantity)
     return std::pair{now, select(candidates)};
-  std::vector<const ReleaseRecord *> pending;
-  pending.reserve(running.size());
   const auto add_usable = [&](const Bitmap &nodes) {
-    Bitmap part = nodes;
-    part.intersect_with(usable);
-    candidates.add(part);
+    candidates.add_intersection(nodes, usable);
   };
-  for (const auto &record : running) {
-    if (earliest > now && record.limit_end <= earliest)
-      add_usable(record.nodes);
-    else
-      pending.push_back(&record);
+  // Releases by earliest form a prefix of the sorted records; the rest are
+  // pending, scanned from index first.
+  size_t first = 0;
+  if (earliest > now) {
+    first = static_cast<size_t>(
+        std::ranges::partition_point(running,
+                                     [earliest](const ReleaseRecord &record) {
+                                       return record.limit_end <= earliest;
+                                     }) -
+        running.begin());
+    for (size_t index = 0; index < first; ++index)
+      add_usable(running[index].nodes);
+    if (candidates.count() >= quantity)
+      return std::pair{now, select(candidates)};
   }
-  if (earliest > now && candidates.count() >= quantity)
-    return std::pair{now, select(candidates)};
   tdiff_t width = release_group_initial;
   std::optional<sim_time_t> group_edge;
-  std::vector<const ReleaseRecord *> released;
-  size_t k = 0;
+  size_t k = first;
   while (true) {
     bool took_any = false, exhausted = true;
     while (true) {
-      if (k >= pending.size() || (bound != 0 && pending[k]->limit_end > bound))
+      if (k >= running.size() || (bound != 0 && running[k].limit_end > bound))
         break;
-      const auto *record = pending[k++];
-      if (!record->nodes.intersects(usable))
+      const auto &record = running[k++];
+      if (!record.nodes.intersects(usable))
         continue;
       if (!group_edge)
         group_edge =
-            record->limit_end + (width - std::fmod(record->limit_end, width));
-      add_usable(record->nodes);
-      released.push_back(record);
+            record.limit_end + (width - std::fmod(record.limit_end, width));
+      add_usable(record.nodes);
       took_any = true;
-      if (k >= pending.size())
+      if (k >= running.size())
         break;
-      if (pending[k]->limit_end > *group_edge + width) {
+      if (running[k].limit_end > *group_edge + width) {
         exhausted = false;
         break;
       }
@@ -248,17 +248,19 @@ grouped_release_fit(const std::vector<ReleaseRecord> &running,
       return std::nullopt;
     if (candidates.count() >= quantity) {
       auto picked = select(candidates);
+      // picked lies within usable, so only released records can intersect
+      // it; the latest such release sets the start.
       sim_time_t start = now;
-      for (auto it = released.rbegin(); it != released.rend(); ++it)
-        if ((*it)->nodes.intersects(picked)) {
-          start = std::max(now, (*it)->limit_end);
+      for (size_t index = k; index-- > first;)
+        if (running[index].nodes.intersects(picked)) {
+          start = std::max(now, running[index].limit_end);
           break;
         }
       return std::pair{start, std::move(picked)};
     }
     if (exhausted)
       return std::nullopt;
-    const auto upcoming = pending[k]->limit_end;
+    const auto upcoming = running[k].limit_end;
     while (width <= release_group_cap) {
       width *= 2;
       if (!(upcoming > *group_edge + width))

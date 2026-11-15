@@ -202,6 +202,21 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 ```
 
+**Timestamp subtraction:**
+```bash
+# Use std::difftime instead of integer subtraction (default ON)
+cmake -S . -B build -DDR_EVT_INTEGER_TIME_DIFF=OFF
+```
+
+With `DR_EVT_INTEGER_TIME_DIFF=ON`, the difference between two trace
+timestamps is computed in integer seconds and converted to `double` once. The
+result equals `std::difftime` whenever the difference fits in `time_t`. A
+larger difference, possible only between the unscheduled-job sentinel and a
+negative timestamp, is clamped to the `time_t` limit. glibc's `difftime` uses
+`long double`, which is software-emulated on aarch64, so the integer path is
+faster there. CMake checks that the compiler supports `__builtin_sub_overflow`
+and forces the option `OFF` when it does not.
+
 ### Linux `perf` profiling (recommended)
 
 `perf` profiles the default shared-library build and does not require `-pg` or

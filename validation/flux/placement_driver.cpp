@@ -146,13 +146,13 @@ static void run(std::vector<Job> &jobs, num_nodes_t capacity, size_t slots,
     // live allocation owners or the latest reservation plan.
     num_jobs_t previous_started;
     do {
-      previous_started = simulation.get_statistics().jobs_started;
+      previous_started = simulation.get_jobs_started();
       // The Lassen adapter subtracts a large epoch from millisecond event
       // times, which can differ from the public status value by several ULPs.
       // Its 1 ms input resolution leaves this 1 us inclusive tolerance safely
       // short of the next distinct event.
       simulation.advance_to(time + 1e-6);
-    } while (simulation.get_statistics().jobs_started != previous_started);
+    } while (simulation.get_jobs_started() != previous_started);
     const auto statuses = simulation.get_job_statuses(ids);
     completed = 0;
     for (size_t index = 0; index < jobs.size(); ++index) {

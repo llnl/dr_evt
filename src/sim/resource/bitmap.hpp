@@ -52,6 +52,29 @@ class Bitmap {
     }
   }
 
+  /** @brief Find the next ID whose membership equals a value.
+   * @param[in] from First ID to examine.
+   * @param[in] member Membership value to find.
+   * @return First matching ID at or after from, or the capacity when none.
+   * @details Scans whole words. Padding bits are clear, so a run of members
+   * ends no later than the capacity. */
+  num_nodes_t next_bit(num_nodes_t from, bool member) const noexcept {
+    size_t index = from / 64;
+    if (index >= m_words.size())
+      return m_capacity;
+    const auto word = [&](size_t at) {
+      return member ? m_words[at] : ~m_words[at];
+    };
+    auto bits = word(index) & (~std::uint64_t{0} << (from % 64));
+    while (bits == 0) {
+      if (++index == m_words.size())
+        return m_capacity;
+      bits = word(index);
+    }
+    return std::min(m_capacity, static_cast<num_nodes_t>(
+                                    index * 64 + std::countr_zero(bits)));
+  }
+
   /** @brief Select part of a nonempty word without modifying it.
    * @tparam Order Compile-time low-ID or high-ID selection.
    * @param[in] bits Available membership bits.
@@ -242,6 +265,39 @@ public:
     }
   }
 
+  /** @brief Union membership with the intersection of two bitmaps.
+   * @param[in] first One intersection operand.
+   * @param[in] second Other intersection operand.
+   * @throws std::invalid_argument if domains differ.
+   * @details Equivalent to adding a copy of first intersected with second,
+   * without allocating that copy. Domain validation precedes mutation. */
+  void add_intersection(const Bitmap &first, const Bitmap &second) {
+    same_domain(first);
+    same_domain(second);
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      m_words[i] |= first.m_words[i] & second.m_words[i];
+    }
+  }
+
+  /** @brief Test whether the intersection with another bitmap contains a set.
+   * @param[in] mask Bitmap intersected with this set.
+   * @param[in] other Membership to test.
+   * @return true when all of other's bits belong to both this set and mask.
+   * @throws std::invalid_argument if domains differ.
+   * @details Equivalent to intersecting a copy with mask and calling
+   * contains(other), without allocating that copy. */
+  bool intersection_contains(const Bitmap &mask, const Bitmap &other) const {
+    same_domain(mask);
+    same_domain(other);
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      if ((m_words[i] & mask.m_words[i] & other.m_words[i]) !=
+          other.m_words[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** @brief Clear membership using contiguous word-wise AND-NOT operations.
    * @param[in] other Membership to remove; absent members remain clear.
    * @throws std::invalid_argument if domains differ.
@@ -283,6 +339,19 @@ public:
     }
     for (size_t i = 0; i < m_words.size(); ++i) {
       m_words[i] &= row[i];
+    }
+  }
+
+  /** @brief Clear membership found in a borrowed dense row.
+   * @param[in] row Contiguous words with exactly this bitmap's word count.
+   * @throws std::invalid_argument if word counts differ.
+   * @details The row is not retained. AND-NOT cannot introduce padding bits. */
+  void remove_words(std::span<const std::uint64_t> row) {
+    if (row.size() != m_words.size()) {
+      throw std::invalid_argument("bitmap word counts differ");
+    }
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      m_words[i] &= ~row[i];
     }
   }
 
@@ -330,48 +399,48 @@ public:
   std::optional<Bitmap> select_best_fit_runs(num_nodes_t quantity) const {
     if (count() < quantity)
       return std::nullopt;
-    Bitmap available(*this), selected(m_capacity);
+    Bitmap selected(m_capacity);
+    // A run is consumed whole unless it satisfies the remainder, which ends
+    // selection, so the remaining runs never merge or split.
+    std::vector<std::pair<num_nodes_t, num_nodes_t>> runs;
+    for (auto begin = next_bit(0, true); begin < m_capacity;) {
+      const auto end = next_bit(begin, false);
+      runs.emplace_back(begin, end);
+      begin = next_bit(end, true);
+    }
     size_t remaining = quantity;
     while (remaining != 0) {
-      num_nodes_t best_begin = 0, best_end = 0;
-      bool have_best = false, best_sufficient = false;
-      for (num_nodes_t cursor = 0; cursor < m_capacity;) {
-        while (cursor < m_capacity && !available.test(cursor))
-          ++cursor;
-        const auto begin = cursor;
-        while (cursor < m_capacity && available.test(cursor))
-          ++cursor;
-        const auto end = cursor;
-        if (begin == end)
-          continue;
-        const auto length = static_cast<size_t>(end - begin);
+      size_t best = runs.size();
+      bool best_sufficient = false;
+      size_t best_length = 0;
+      for (size_t index = 0; index < runs.size(); ++index) {
+        const auto length =
+            static_cast<size_t>(runs[index].second - runs[index].first);
         const bool sufficient = length >= remaining;
-        const auto best_length = static_cast<size_t>(best_end - best_begin);
         const bool better =
-            !have_best || (sufficient && !best_sufficient) ||
+            best == runs.size() || (sufficient && !best_sufficient) ||
             (sufficient == best_sufficient &&
              ((sufficient && length < best_length) ||
               (!sufficient && length > best_length))) ||
             (sufficient == best_sufficient && length == best_length &&
              Order == NodeOrder::HighIdFirst);
         if (better) {
-          best_begin = begin;
-          best_end = end;
+          best = index;
           best_sufficient = sufficient;
-          have_best = true;
+          best_length = length;
         }
       }
-      if (!have_best)
+      if (best == runs.size())
         return std::nullopt;
-      const auto take = static_cast<num_nodes_t>(
-          std::min(remaining, static_cast<size_t>(best_end - best_begin)));
+      const auto [best_begin, best_end] = runs[best];
+      const auto take =
+          static_cast<num_nodes_t>(std::min(remaining, best_length));
       const auto first =
           Order == NodeOrder::LowIdFirst ? best_begin : best_end - take;
-      for (num_nodes_t id = first; id < first + take; ++id) {
+      for (num_nodes_t id = first; id < first + take; ++id)
         selected.m_words[id / 64] |= std::uint64_t{1} << (id % 64);
-        available.m_words[id / 64] &= ~(std::uint64_t{1} << (id % 64));
-      }
       remaining -= take;
+      runs.erase(runs.begin() + static_cast<std::ptrdiff_t>(best));
     }
     return selected;
   }

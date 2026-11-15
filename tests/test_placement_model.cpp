@@ -142,6 +142,30 @@ static void bitmap_checks() {
   rejects<std::invalid_argument>([&] { Bitmap::from_ids(2, duplicates); });
   const std::array<num_nodes_t, 1> outside{2};
   rejects<std::out_of_range>([&] { Bitmap::from_ids(2, outside); });
+  {
+    // Fused helpers match their copy-based equivalents across words.
+    const auto ids = [](std::initializer_list<num_nodes_t> list) {
+      return Bitmap::from_ids(130, std::vector<num_nodes_t>(list));
+    };
+    const auto first = ids({0, 1, 64, 65, 129});
+    const auto second = ids({1, 2, 65, 128, 129});
+    auto fused = ids({3, 127});
+    auto copied = fused;
+    fused.add_intersection(first, second);
+    auto part = first;
+    part.intersect_with(second);
+    copied.add(part);
+    require(fused == copied && fused == ids({1, 3, 65, 127, 129}),
+            "add_intersection differs from copy, intersect, and add");
+    require(first.intersection_contains(second, ids({1, 65, 129})) &&
+                !first.intersection_contains(second, ids({1, 64})) &&
+                first.intersection_contains(second, Bitmap(130)),
+            "intersection_contains differs from copy, intersect, and contains");
+    rejects<std::invalid_argument>(
+        [&] { fused.add_intersection(first, Bitmap(64)); });
+    rejects<std::invalid_argument>(
+        [&] { (void)first.intersection_contains(Bitmap(64), second); });
+  }
   std::vector<num_nodes_t> fragmented_ids{3, 4, 5, 6};
   for (num_nodes_t id = 12; id <= 21; ++id)
     fragmented_ids.push_back(id);
@@ -570,9 +594,104 @@ static void reservation_profile_checks() {
   }
 }
 
+/** @brief Bit-by-bit flat-topology run best fit kept as an oracle.
+ * @tparam Order Tie and within-run identity order.
+ * @param[in] free Candidate identities.
+ * @param[in] quantity Requested count.
+ * @return Selected identities, or std::nullopt when insufficient. */
+template <NodeOrder Order>
+static std::optional<std::vector<num_nodes_t>>
+best_fit_runs_oracle(const Bitmap &free, num_nodes_t quantity) {
+  const auto capacity = free.capacity();
+  std::vector<bool> available(capacity);
+  for (num_nodes_t id = 0; id < capacity; ++id)
+    available[id] = free.test(id);
+  if (free.count() < quantity)
+    return std::nullopt;
+  std::vector<num_nodes_t> selected;
+  size_t remaining = quantity;
+  while (remaining != 0) {
+    num_nodes_t best_begin = 0, best_end = 0;
+    bool have_best = false, best_sufficient = false;
+    for (num_nodes_t cursor = 0; cursor < capacity;) {
+      while (cursor < capacity && !available[cursor])
+        ++cursor;
+      const auto begin = cursor;
+      while (cursor < capacity && available[cursor])
+        ++cursor;
+      if (begin == cursor)
+        continue;
+      const auto length = static_cast<size_t>(cursor - begin);
+      const bool sufficient = length >= remaining;
+      const auto best_length = static_cast<size_t>(best_end - best_begin);
+      if (!have_best || (sufficient && !best_sufficient) ||
+          (sufficient == best_sufficient &&
+           ((sufficient && length < best_length) ||
+            (!sufficient && length > best_length))) ||
+          (sufficient == best_sufficient && length == best_length &&
+           Order == NodeOrder::HighIdFirst)) {
+        best_begin = begin;
+        best_end = cursor;
+        best_sufficient = sufficient;
+        have_best = true;
+      }
+    }
+    if (!have_best)
+      return std::nullopt;
+    const auto take = static_cast<num_nodes_t>(
+        std::min(remaining, static_cast<size_t>(best_end - best_begin)));
+    const auto first =
+        Order == NodeOrder::LowIdFirst ? best_begin : best_end - take;
+    for (num_nodes_t id = first; id < first + take; ++id) {
+      selected.push_back(id);
+      available[id] = false;
+    }
+    remaining -= take;
+  }
+  std::sort(selected.begin(), selected.end());
+  return selected;
+}
+
+/** @brief Compare word-level run best fit with the bit-by-bit oracle.
+ * @throws std::runtime_error if any selection differs. */
+static void best_fit_runs_oracle_checks() {
+  std::mt19937 random(20261115);
+  for (const num_nodes_t capacity : {1u, 2u, 63u, 64u, 65u, 128u, 130u, 756u})
+    for (const double density : {0.1, 0.5, 0.9, 1.0})
+      for (int trial = 0; trial < 20; ++trial) {
+        std::bernoulli_distribution member(density);
+        std::vector<num_nodes_t> ids;
+        for (num_nodes_t id = 0; id < capacity; ++id)
+          if (member(random))
+            ids.push_back(id);
+        const auto free = Bitmap::from_ids(capacity, ids);
+        const auto check = [&](auto order, num_nodes_t quantity) {
+          constexpr NodeOrder Order = decltype(order)::value;
+          const auto fast = free.select_best_fit_runs<Order>(quantity);
+          const auto slow = best_fit_runs_oracle<Order>(free, quantity);
+          require(fast.has_value() == slow.has_value() &&
+                      (!fast || fast->ids() == *slow),
+                  "word-level run best fit differs from bit-by-bit oracle");
+        };
+        // Include the insufficient request top on every stride.
+        const auto top = static_cast<num_nodes_t>(ids.size() + 1);
+        const auto step = capacity > 130 ? 7u : 1u;
+        for (num_nodes_t quantity = 0;;
+             quantity = std::min(quantity + step, top)) {
+          check(std::integral_constant<NodeOrder, NodeOrder::LowIdFirst>{},
+                quantity);
+          check(std::integral_constant<NodeOrder, NodeOrder::HighIdFirst>{},
+                quantity);
+          if (quantity == top)
+            break;
+        }
+      }
+}
+
 int main() {
   try {
     bitmap_checks();
+    best_fit_runs_oracle_checks();
     optimized_lifecycle_checks<>();
     optimized_lifecycle_checks<EnableCoarseFilter>();
     timeline_oracle<NodeOrder::LowIdFirst>();
