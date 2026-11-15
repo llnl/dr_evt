@@ -209,15 +209,19 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
 def lassen(path, count):
     with path.open() as stream:
         rows = list(csv.DictReader(stream))
-    rows = sorted(enumerate(rows), key=lambda pair: (float(pair[1]['job_submit_time']), pair[0]))
+    fixture_schema = bool(rows) and 'submit_time' in rows[0]
+    submit_key = 'submit_time' if fixture_schema else 'job_submit_time'
+    rows = sorted(enumerate(rows), key=lambda pair: (float(pair[1][submit_key]), pair[0]))
     if count: rows = rows[:count]
-    origin = float(rows[0][1]['job_submit_time'])
+    origin = 0 if fixture_schema else float(rows[0][1][submit_key])
     jobs = []
     for _, row in rows:
-        submit = math.ceil(float(row['job_submit_time']) - origin)
-        duration = max(1, math.ceil(float(row['end_time']) - float(row['begin_time'])))
+        submit = int(row[submit_key]) if fixture_schema else math.ceil(float(row[submit_key]) - origin)
+        duration = (int(row['actual_runtime']) if fixture_schema else
+                    max(1, math.ceil(float(row['end_time']) - float(row['begin_time']))))
         limit = max(duration, math.ceil(float(row['time_limit'])))
-        jobs.append((submit, int(row['num_nodes']), limit, duration))
+        nodes = int(row['nodes'] if fixture_schema else row['num_nodes'])
+        jobs.append((submit, nodes, limit, duration))
     return jobs
 
 

@@ -1786,6 +1786,22 @@ void test_periodic_backfill_idle_ticks() {
     assert(approx_equal(*status.start_time, 20.0));
   }
 
+  // When every loaded/appended job begins at an absolute future timestamp,
+  // establish the periodic cadence from the first arrival rather than epoch
+  // zero. The origin is deliberately not divisible by ten.
+  {
+    constexpr sim_time_t origin = 1009.0;
+    Simulation sim(params);
+    sim.get_trace().load_data(0);
+    (void)sim.append_job(origin, 90, kTestQueueInput, 30.0);
+    (void)sim.append_job(origin + 1, 100, kTestQueueInput, 1.0);
+    const auto candidate = sim.append_job(origin + 1, 10, kTestQueueInput, 1.0);
+    sim.advance_to(origin + 15.0);
+    const auto status = sim.get_job_statuses({candidate}).front();
+    assert(status.start_time.has_value());
+    assert(approx_equal(*status.start_time, origin + 10.0));
+  }
+
   std::cout << "  PASSED" << std::endl;
 }
 

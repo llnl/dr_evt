@@ -1120,8 +1120,10 @@ protected:
   /**
    * Bring the next periodic backfill tick up to date with the clock.
    *
-   * An initially empty streaming simulation establishes no cadence until work
-   * first exists; the first tick is then one interval after the current time.
+   * An initially empty separate-backfill simulation establishes no cadence
+   * until work first exists; when only future arrivals are known, its first
+   * tick is one interval after the first arrival rather than after epoch zero.
+   * Fixed periodic dispatch retains its epoch-zero grid.
    * Once established, a tick left in the past (unconsumed while nothing
    * waited) moves forward on the same cadence to the first grid point at or
    * after the current time. Warm start establishes the cadence from its start

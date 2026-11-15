@@ -37,14 +37,16 @@ configuration, hooks, and binary hashes are saved with each run.
 From the repository root:
 
 ```sh
-mkdir -p external lassen_traces
+mkdir -p external
 git clone https://github.com/SchedMD/slurm.git external/slurm
 git -C external/slurm checkout --detach 17abb848e20054009d136a2c504a23e5462f26c8
-cp /path/to/lassen-756-01.csv lassen_traces/lassen-756-01.csv
 
 SLURM_LICENSE_RESULTS="$PWD/validation/slurm/results/reproduction" \
   bash validation/slurm/run.sh
 ```
+
+The runner uses the checked-in `validation/fixtures/jobs.csv`. Pass another
+path with `event_trace.py --trace` only when validating a different workload.
 
 The runner builds `dr-evt-slurm-validation`, executes small controls, and writes
 these result trees:

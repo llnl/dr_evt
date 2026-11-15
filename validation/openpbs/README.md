@@ -39,14 +39,16 @@ converted inputs, event records, schedules, and audits.
 From the repository root:
 
 ```sh
-mkdir -p external lassen_traces
+mkdir -p external
 git clone https://github.com/openpbs/openpbs.git external/openpbs
 git -C external/openpbs checkout --detach cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a
-cp /path/to/lassen-756-01.csv lassen_traces/lassen-756-01.csv
 
 OPENPBS_VALIDATION_RESULTS="$PWD/validation/openpbs/results/reproduction" \
   bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group
 ```
+
+The runner uses the checked-in `validation/fixtures/jobs.csv`. Pass `--trace`
+to `compare.py` only when validating a different workload.
 
 One invocation writes separate `capacity/` and `placement/` result trees. Use a
 fresh output directory for each campaign. The default reusable build volume is

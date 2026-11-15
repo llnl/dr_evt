@@ -75,7 +75,7 @@ Run only the placement comparison inside the prepared validation container:
 SLURM_LICENSE_STATE_ONLY=1 \
 python3 validation/slurm/licenses/event_trace.py \
   --batch-main-dispatch --resource-model placement \
-  --trace lassen_traces/lassen-756-01.csv \
+  --trace validation/fixtures/jobs.csv \
   --outdir /results/placement
 ```
 

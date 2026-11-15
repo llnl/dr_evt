@@ -35,7 +35,7 @@ Include the same chronological 2,000-job Lassen prefix used by the Fiction
 validation:
 
 ```sh
-SLURM_VALIDATION_TRACE=/dr_evt_source/lassen_traces/lassen-756-01.csv \
+SLURM_VALIDATION_TRACE=/dr_evt_source/validation/fixtures/jobs.csv \
     bash validation/slurm/run_epfl.sh
 ```
 
