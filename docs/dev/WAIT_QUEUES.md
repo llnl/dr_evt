@@ -14,8 +14,14 @@ benchmark says otherwise:
 ${CMAKE_INSTALL_PREFIX}/bin/simulator trace.csv --priority_policy fcfs
 ```
 
-`deque` remains the simplest fallback. The `block` and `multimap` queues remain available
-for comparison, testing, and research.
+`deque` is the other primary queue. It and `circular` are two storage choices
+for one shared implementation: the FCFS schedulers are templates over the queue
+(`CircularWaitQueue` or `DequeWaitQueue` in `src/sim/fcfs_wait_queue.hpp`), so
+every scheduling feature and optimization applies to both, and they produce
+identical schedules. Choose between them on speed and memory only.
+
+The `block` and `multimap` queues are alternative EASY-only implementations kept
+in `src/sim/fcfs-alt-impl/` for comparison, testing, and research.
 
 ## Benchmark record
 

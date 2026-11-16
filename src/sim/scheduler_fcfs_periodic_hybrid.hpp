@@ -5,14 +5,14 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_periodic_hybrid_circular.hpp
+/** @file scheduler_fcfs_periodic_hybrid.hpp
  * @brief FCFS starts after events and hybrid/conservative backfill on timer
  * ticks.
  * @details State events start fitting FCFS heads; timer ticks examine later
  * jobs. Admission and forecast searches also check capacity at the requested
  * end timestamp, as in the tested Slurm rule. Normal mode protects earlier
  * capacity reservations; the diagnostic mode omits that protection.
- * @note CLI: --priority_policy fcfs --queue_impl circular
+ * @note CLI: --priority_policy fcfs --queue_impl circular or deque
  * --backfill_interval I, with I > 0 and --dispatch_interval 0. Use
  * --backfill_policy hybrid --reservation_depth R (R > 0), or
  * --backfill_policy conservative. Omit --per_pass_accounting.
@@ -22,10 +22,10 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#ifndef DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_CIRCULAR_HPP
-#define DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_CIRCULAR_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_HPP
+#define DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_HPP
 
-#include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_hybrid.hpp"
 
 #include <limits>
 
@@ -33,7 +33,9 @@ namespace dr_evt {
 
 /**
  * @brief Event-driven FCFS dispatch and periodic hybrid/conservative backfill
- * using a circular queue.
+ * over a chosen queue.
+ * @tparam Queue Wait-queue storage policy: CircularWaitQueue or
+ * DequeWaitQueue.
  * @details State events run FCFS through schedule_event(); timer ticks run
  * backfill through schedule(). Both admission and protected-reservation
  * searches include capacity changes at the requested interval's endpoint,
@@ -46,12 +48,15 @@ namespace dr_evt {
  * False selects the diagnostic license-off model: consider later jobs when
  * an earlier job cannot fit now, without reserving future capacity.
  * @note Selected by --backfill_interval I (I > 0), --dispatch_interval 0,
- * --queue_impl circular, and FCFS ordering, with --backfill_policy hybrid
- * --reservation_depth N (N > 0), or --backfill_policy conservative.
+ * --queue_impl circular or deque, and FCFS ordering, with --backfill_policy
+ * hybrid --reservation_depth N (N > 0), or --backfill_policy conservative.
  */
-template <bool ProtectReservations>
-class FCFSPeriodicHybridCircularSchedulerImpl final
-    : public FCFSHybridCircularScheduler {
+template <typename Queue, bool ProtectReservations>
+class FCFSPeriodicHybridSchedulerImpl final
+    : public FCFSHybridScheduler<Queue> {
+  using Base = FCFSHybridScheduler<Queue>;
+  using typename Base::JobEntry;
+
 public:
   /**
    * @brief Run protected periodic backfill or a diagnostic current-capacity
@@ -81,14 +86,15 @@ public:
    * @param[in] backfill_queue_depth Eligible jobs examined per backfill cycle,
    * that is per tick; zero is unlimited.
    */
-  FCFSPeriodicHybridCircularSchedulerImpl(
-      num_nodes_t total_nodes, size_t initial_job_count,
-      size_t initial_capacity, CircularOverflowPolicy overflow_policy,
-      BackfillPolicy backfill_policy, size_t reservation_depth,
-      size_t backfill_queue_depth)
-      : FCFSHybridCircularScheduler(
-            total_nodes, initial_job_count, backfill_policy, initial_capacity,
-            overflow_policy, reservation_depth, backfill_queue_depth) {}
+  FCFSPeriodicHybridSchedulerImpl(num_nodes_t total_nodes,
+                                  size_t initial_job_count,
+                                  size_t initial_capacity,
+                                  CircularOverflowPolicy overflow_policy,
+                                  BackfillPolicy backfill_policy,
+                                  size_t reservation_depth,
+                                  size_t backfill_queue_depth)
+      : Base(total_nodes, initial_job_count, backfill_policy, initial_capacity,
+             overflow_policy, reservation_depth, backfill_queue_depth) {}
 
   /**
    * @brief Perform event dispatch, stopping at the head only when protected.
@@ -114,12 +120,33 @@ protected:
 };
 
 /// Abstract-capacity comparison model with protected future capacity.
-using FCFSPeriodicHybridCircularScheduler =
-    FCFSPeriodicHybridCircularSchedulerImpl<true>;
+template <typename Queue>
+using FCFSPeriodicHybridScheduler =
+    FCFSPeriodicHybridSchedulerImpl<Queue, true>;
 /// Diagnostic license-off model with no future capacity reservations.
+template <typename Queue>
+using FCFSPeriodicNoReservationScheduler =
+    FCFSPeriodicHybridSchedulerImpl<Queue, false>;
+
+/// Periodic hybrid scheduler over a boost::circular_buffer queue.
+using FCFSPeriodicHybridCircularScheduler =
+    FCFSPeriodicHybridScheduler<CircularWaitQueue>;
+/// Periodic hybrid scheduler over a std::deque queue.
+using FCFSPeriodicHybridDequeScheduler =
+    FCFSPeriodicHybridScheduler<DequeWaitQueue>;
+/// Diagnostic license-off scheduler over a boost::circular_buffer queue.
 using FCFSPeriodicNoReservationCircularScheduler =
-    FCFSPeriodicHybridCircularSchedulerImpl<false>;
+    FCFSPeriodicNoReservationScheduler<CircularWaitQueue>;
+/// Diagnostic license-off scheduler over a std::deque queue.
+using FCFSPeriodicNoReservationDequeScheduler =
+    FCFSPeriodicNoReservationScheduler<DequeWaitQueue>;
+
+// Defined in scheduler_fcfs_periodic_hybrid.cpp for every combination.
+extern template class FCFSPeriodicHybridSchedulerImpl<CircularWaitQueue, true>;
+extern template class FCFSPeriodicHybridSchedulerImpl<CircularWaitQueue, false>;
+extern template class FCFSPeriodicHybridSchedulerImpl<DequeWaitQueue, true>;
+extern template class FCFSPeriodicHybridSchedulerImpl<DequeWaitQueue, false>;
 
 } // namespace dr_evt
 
-#endif // DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_CIRCULAR_HPP
+#endif // DR_EVT_SIM_SCHEDULER_FCFS_PERIODIC_HYBRID_HPP

@@ -33,9 +33,12 @@ The corresponding flags are
 
 ## Implementation
 
-The scheduler is implemented in
-`src/sim/scheduler_fcfs_easy_circular.{hpp,cpp}` and constructed by the scheduler
-factory in `src/sim/scheduler_base.cpp`. Configuration parsing lives in
+The FCFS schedulers are templates over the queue storage policy
+(`CircularWaitQueue` or `DequeWaitQueue`, defined in
+`src/sim/fcfs_wait_queue.hpp`), so the circular and deque queues share all of
+their scheduling code. The EASY scheduler is in
+`src/sim/scheduler_fcfs_easy.{hpp,cpp}`; the factory in
+`src/sim/scheduler_base.cpp` selects the instantiation. Configuration parsing lives in
 `src/params/sim_params.{hpp,cpp}`.
 
 ## Related documentation

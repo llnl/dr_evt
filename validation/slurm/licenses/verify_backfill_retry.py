@@ -106,9 +106,9 @@ def main():
     provenance['scheduler_source_sha256'] = {
         name: hashlib.sha256((repo / name).read_bytes()).hexdigest()
         for name in ('src/sim/scheduler_base.hpp',
-                     'src/sim/scheduler_fcfs_periodic_hybrid_circular.hpp',
-                     'src/sim/scheduler_fcfs_periodic_hybrid_circular.cpp',
-                     'src/sim/scheduler_fcfs_hybrid_circular.tpp')}
+                     'src/sim/scheduler_fcfs_periodic_hybrid.hpp',
+                     'src/sim/scheduler_fcfs_periodic_hybrid.cpp',
+                     'src/sim/scheduler_fcfs_hybrid.tpp')}
     (output / 'provenance.json').write_text(json.dumps(provenance, indent=2) + '\n')
     (output / 'source.diff').write_text(subprocess.check_output(
         ['git', 'diff', 'HEAD', '--', 'src/sim'], cwd=repo, text=True))

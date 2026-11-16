@@ -5,14 +5,14 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_periodic_fcfs_hybrid_circular.hpp
+/** @file scheduler_periodic_fcfs_hybrid.hpp
  * @brief FCFS dispatch and backfill together at fixed timer ticks.
  * @details Each wake scans the waiting queue, counting both immediate starts
  * and waiting candidates toward its examination limit. EASY protects one
  * job; hybrid protects R; conservative protects all examined jobs. Optional
  * arrival wakes leave the timer phase unchanged. This models dispatch timing
  * and capacity counts, not a production resource graph.
- * @note CLI: --priority_policy fcfs --queue_impl circular
+ * @note CLI: --priority_policy fcfs --queue_impl circular or deque
  * --dispatch_interval I (I > 0), with --backfill_interval 0 and no
  * --per_pass_accounting. --dispatch_queue_depth Q sets the examination limit
  * (0 is unlimited); keep --backfill_queue_depth 0. --dispatch_on_events adds
@@ -22,18 +22,20 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#ifndef DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_CIRCULAR_HPP
-#define DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_CIRCULAR_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_HPP
+#define DR_EVT_SIM_SCHEDULER_PERIODIC_FCFS_HYBRID_HPP
 
 #include "sim/reservation_search_cache.hpp"
-#include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_hybrid.hpp"
 #include <algorithm>
 #include <array>
 #include <functional>
 
 namespace dr_evt {
 
-/** @brief Periodic FCFS dispatch and hybrid backfill using a circular queue.
+/** @brief Periodic FCFS dispatch and hybrid backfill over a chosen queue.
+ * @tparam Queue Wait-queue storage policy: CircularWaitQueue or
+ * DequeWaitQueue.
  * @details Selected by create_scheduler() only when dispatch_interval > 0.
  * Used for fixed periodic dispatch and, with dispatch_on_events enabled,
  * arrival-triggered FCFS/backfill passes. Ordinary event-driven scheduling and
@@ -43,38 +45,45 @@ namespace dr_evt {
  * job. Every candidate in the prefix counts, including immediate FCFS starts
  * and jobs whose projected starts fall outside the planning horizon.
  * @note Selected by --dispatch_interval I (I > 0), --backfill_interval 0,
- * --queue_impl circular, and FCFS ordering. Supports --backfill_policy none,
+ * --queue_impl circular or deque, and FCFS ordering. Supports
+ * --backfill_policy none,
  * easy, hybrid, or conservative. EASY maps to hybrid with depth 1; hybrid
  * requires --reservation_depth N (N > 0). --dispatch_queue_depth Q bounds the
  * full pass; --dispatch_on_events also requests passes on job arrivals.
  */
-class PeriodicFCFSHybridCircularScheduler : public FCFSHybridCircularScheduler {
+template <typename Queue>
+class PeriodicFCFSHybridScheduler : public FCFSHybridScheduler<Queue> {
+  using Base = FCFSHybridScheduler<Queue>;
+  using typename Base::JobEntry;
+
   /// Maximum live candidates per wake; zero leaves the prefix unlimited.
   size_t m_dispatch_queue_depth;
 
 public:
   /**
    * @brief Construct a periodic FCFS dispatch and hybrid backfill scheduler
-   * using a circular queue.
+   * over the chosen queue.
    * @param[in] total_nodes Cluster capacity available for allocations.
    * @param[in] initial_job_count Initially known jobs, used when capacity is
    * zero.
    * @param[in] policy Backfill policy; EASY protects one waiting job.
-   * @param[in] initial_capacity Initial circular queue capacity.
-   * @param[in] overflow_policy Action when the circular queue is full.
+   * @param[in] initial_capacity Initial circular queue capacity. Ignored by a
+   * deque.
+   * @param[in] overflow_policy Action when a circular queue is full. Ignored
+   * by a deque.
    * @param[in] reservation_depth Waiting jobs protected by hybrid backfill.
    * @param[in] dispatch_queue_depth Live candidates examined per wake; zero
    * leaves the prefix unlimited.
    */
-  PeriodicFCFSHybridCircularScheduler(
-      num_nodes_t total_nodes, size_t initial_job_count, BackfillPolicy policy,
-      size_t initial_capacity, CircularOverflowPolicy overflow_policy,
-      size_t reservation_depth, size_t dispatch_queue_depth)
-      : FCFSHybridCircularScheduler(
-            total_nodes, initial_job_count,
-            policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID : policy,
-            initial_capacity, overflow_policy,
-            policy == BackfillPolicy::EASY ? 1 : reservation_depth, 0),
+  PeriodicFCFSHybridScheduler(num_nodes_t total_nodes, size_t initial_job_count,
+                              BackfillPolicy policy, size_t initial_capacity,
+                              CircularOverflowPolicy overflow_policy,
+                              size_t reservation_depth,
+                              size_t dispatch_queue_depth)
+      : Base(total_nodes, initial_job_count,
+             policy == BackfillPolicy::EASY ? BackfillPolicy::HYBRID : policy,
+             initial_capacity, overflow_policy,
+             policy == BackfillPolicy::EASY ? 1 : reservation_depth, 0),
         m_dispatch_queue_depth(dispatch_queue_depth) {}
 
   /**
@@ -89,31 +98,33 @@ public:
   std::vector<job_no_t> schedule(num_nodes_t free_nodes,
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override {
-    sync_to(current_time);
+    this->sync_to(current_time);
     if (m_dispatch_queue_depth == 0 ||
-        active_job_count() <= m_dispatch_queue_depth) {
+        this->active_job_count() <= m_dispatch_queue_depth) {
       return schedule_dispatch_pass(free_nodes, running_jobs, current_time);
     }
     // Preserve the existing amortized compaction threshold. Compact before
     // bounding eligibility so the base pass cannot remove a withheld entry.
-    if (m_removed_count > 0 && m_removed_count * 2 > m_wait_queue.size()) {
-      m_eligible_end_idx -= m_removed_count;
+    if (this->m_removed_count > 0 &&
+        this->m_removed_count * 2 > this->m_wait_queue.size()) {
+      this->m_eligible_end_idx -= this->m_removed_count;
       const auto end =
-          std::remove_if(m_wait_queue.begin(), m_wait_queue.end(),
+          std::remove_if(this->m_wait_queue.begin(), this->m_wait_queue.end(),
                          [](const JobEntry &entry) { return entry.removed; });
-      m_wait_queue.erase(end, m_wait_queue.end());
-      m_removed_count = 0;
+      this->m_wait_queue.erase(end, this->m_wait_queue.end());
+      this->m_removed_count = 0;
     }
-    size_t prefix_end = std::min(m_eligible_end_idx, m_dispatch_queue_depth);
+    size_t prefix_end =
+        std::min(this->m_eligible_end_idx, m_dispatch_queue_depth);
     size_t prefix_removed = 0;
     // With no removed entries, queue indices already count live candidates.
     // Only holes require walking the prefix to enforce the candidate limit.
-    if (m_removed_count != 0) {
+    if (this->m_removed_count != 0) {
       prefix_end = 0;
       size_t candidates = 0;
-      while (prefix_end < m_eligible_end_idx &&
+      while (prefix_end < this->m_eligible_end_idx &&
              candidates < m_dispatch_queue_depth) {
-        if (m_wait_queue[prefix_end].removed) {
+        if (this->m_wait_queue[prefix_end].removed) {
           ++prefix_removed;
         } else {
           ++candidates;
@@ -121,19 +132,19 @@ public:
         ++prefix_end;
       }
     }
-    const size_t withheld = m_eligible_end_idx - prefix_end;
-    const size_t withheld_removed = m_removed_count - prefix_removed;
-    m_eligible_end_idx = prefix_end;
-    m_removed_count = prefix_removed;
+    const size_t withheld = this->m_eligible_end_idx - prefix_end;
+    const size_t withheld_removed = this->m_removed_count - prefix_removed;
+    this->m_eligible_end_idx = prefix_end;
+    this->m_removed_count = prefix_removed;
     try {
       auto result =
           schedule_dispatch_pass(free_nodes, running_jobs, current_time);
-      m_eligible_end_idx += withheld;
-      m_removed_count += withheld_removed;
+      this->m_eligible_end_idx += withheld;
+      this->m_removed_count += withheld_removed;
       return result;
     } catch (...) {
-      m_eligible_end_idx += withheld;
-      m_removed_count += withheld_removed;
+      this->m_eligible_end_idx += withheld;
+      this->m_removed_count += withheld_removed;
       throw;
     }
   }
@@ -151,7 +162,7 @@ private:
   schedule_cached_pass(num_nodes_t free_nodes,
                        const running_jobs_t &running_jobs,
                        sim_time_t current_time) {
-    return schedule_with_protection<Reservation_Search_Cache>(
+    return this->template schedule_with_protection<Reservation_Search_Cache>(
         free_nodes, running_jobs, current_time);
   }
 
@@ -166,8 +177,8 @@ private:
     std::array<const JobEntry *, 256> shapes{};
     size_t count = 0;
     size_t distinct = 0;
-    for (size_t i = 0; i < m_eligible_end_idx && count < 128; ++i) {
-      const auto &job = m_wait_queue[i];
+    for (size_t i = 0; i < this->m_eligible_end_idx && count < 128; ++i) {
+      const auto &job = this->m_wait_queue[i];
       if (job.removed) {
         continue;
       }
@@ -206,14 +217,13 @@ private:
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
     // Small scans cannot amortize caching. Exact conservative plans retain
     // bounds across commits and repeat interval shapes throughout the prefix.
-    if (m_backfill_policy == BackfillPolicy::CONSERVATIVE && free_nodes != 0 &&
-        m_planning_time_resolution == 0.0 && active_job_count() >= 128 &&
-        prefix_reuses_interval_shapes()) {
+    if (this->m_backfill_policy == BackfillPolicy::CONSERVATIVE &&
+        free_nodes != 0 && this->m_planning_time_resolution == 0.0 &&
+        this->active_job_count() >= 128 && prefix_reuses_interval_shapes()) {
       return schedule_cached_pass(free_nodes, running_jobs, current_time);
     }
 #endif
-    return FCFSHybridCircularScheduler::schedule(free_nodes, running_jobs,
-                                                 current_time);
+    return Base::schedule(free_nodes, running_jobs, current_time);
   }
 
 protected:
@@ -223,6 +233,13 @@ protected:
    */
   bool horizon_skipped_job_uses_depth_slot() const override { return true; }
 };
+
+/** @brief Fixed periodic dispatch over a boost::circular_buffer queue. */
+using PeriodicFCFSHybridCircularScheduler =
+    PeriodicFCFSHybridScheduler<CircularWaitQueue>;
+/** @brief Fixed periodic dispatch over a std::deque queue. */
+using PeriodicFCFSHybridDequeScheduler =
+    PeriodicFCFSHybridScheduler<DequeWaitQueue>;
 
 } // namespace dr_evt
 #endif

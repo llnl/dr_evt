@@ -5,14 +5,14 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_periodic_hybrid_circular.cpp
+/** @file scheduler_fcfs_periodic_hybrid.cpp
  * @brief FCFS starts after events and hybrid/conservative backfill on timer
  * ticks.
  * @details State events start fitting FCFS heads; timer ticks examine later
  * jobs. Admission and forecast searches also check capacity at the requested
  * end timestamp, as in the tested Slurm rule. Normal mode protects earlier
  * capacity reservations; the diagnostic mode omits that protection.
- * @note CLI: --priority_policy fcfs --queue_impl circular
+ * @note CLI: --priority_policy fcfs --queue_impl circular or deque
  * --backfill_interval I, with I > 0 and --dispatch_interval 0. Use
  * --backfill_policy hybrid --reservation_depth R (R > 0), or
  * --backfill_policy conservative. Omit --per_pass_accounting.
@@ -22,7 +22,7 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid.hpp"
 #include <algorithm>
 
 namespace dr_evt {
@@ -56,14 +56,14 @@ public:
 };
 } // namespace
 
-template <bool ProtectReservations>
+template <typename Queue, bool ProtectReservations>
 std::vector<job_no_t>
-FCFSPeriodicHybridCircularSchedulerImpl<ProtectReservations>::schedule(
+FCFSPeriodicHybridSchedulerImpl<Queue, ProtectReservations>::schedule(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
   if constexpr (ProtectReservations) {
     // Slurm includes the endpoint in both admission and reservation placement.
-    return schedule_with_protection<EndpointInclusiveTimeline>(
+    return this->template schedule_with_protection<EndpointInclusiveTimeline>(
         free_nodes, running_jobs, current_time);
   } else {
     // Private dummy nodes do not constrain this diagnostic capacity pool.
@@ -71,82 +71,87 @@ FCFSPeriodicHybridCircularSchedulerImpl<ProtectReservations>::schedule(
   }
 }
 
-template <bool ProtectReservations>
+template <typename Queue, bool ProtectReservations>
 std::vector<job_no_t>
-FCFSPeriodicHybridCircularSchedulerImpl<ProtectReservations>::schedule_event(
+FCFSPeriodicHybridSchedulerImpl<Queue, ProtectReservations>::schedule_event(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
-  sync_to(current_time);
+  this->sync_to(current_time);
 
-  if (m_removed_count > 0 && m_removed_count * 2 > m_wait_queue.size()) {
+  if (this->m_removed_count > 0 &&
+      this->m_removed_count * 2 > this->m_wait_queue.size()) {
     size_t eligible_removed = 0;
-    for (size_t idx = 0; idx < m_eligible_end_idx && idx < m_wait_queue.size();
+    for (size_t idx = 0;
+         idx < this->m_eligible_end_idx && idx < this->m_wait_queue.size();
          ++idx) {
-      if (m_wait_queue[idx].removed) {
+      if (this->m_wait_queue[idx].removed) {
         ++eligible_removed;
       }
     }
     auto new_end =
-        std::remove_if(m_wait_queue.begin(), m_wait_queue.end(),
+        std::remove_if(this->m_wait_queue.begin(), this->m_wait_queue.end(),
                        [](const JobEntry &entry) { return entry.removed; });
-    m_wait_queue.erase(new_end, m_wait_queue.end());
-    m_eligible_end_idx -= eligible_removed;
-    m_removed_count = 0;
+    this->m_wait_queue.erase(new_end, this->m_wait_queue.end());
+    this->m_eligible_end_idx -= eligible_removed;
+    this->m_removed_count = 0;
   }
 
   std::vector<job_no_t> jobs_to_run;
-  if (m_eligible_end_idx == 0) {
+  if (this->m_eligible_end_idx == 0) {
     return jobs_to_run;
   }
 
   num_nodes_t available_nodes = free_nodes;
   if constexpr (!ProtectReservations) {
     // Slurm with bf_licenses off continues past jobs lacking current capacity.
-    for (size_t idx = 0; idx < m_eligible_end_idx; ++idx) {
-      auto &job = m_wait_queue[idx];
+    for (size_t idx = 0; idx < this->m_eligible_end_idx; ++idx) {
+      auto &job = this->m_wait_queue[idx];
       if (job.removed || job.nodes_requested > available_nodes) {
         continue;
       }
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
       job.removed = true;
-      ++m_removed_count;
+      ++this->m_removed_count;
     }
-    while (m_eligible_end_idx > 0 && m_wait_queue.front().removed) {
-      m_wait_queue.pop_front();
-      --m_eligible_end_idx;
-      --m_removed_count;
+    while (this->m_eligible_end_idx > 0 && this->m_wait_queue.front().removed) {
+      this->m_wait_queue.pop_front();
+      --this->m_eligible_end_idx;
+      --this->m_removed_count;
     }
-    m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
+    this->m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
     return jobs_to_run;
   }
   projected_starts_t projected_starts;
-  while (m_eligible_end_idx > 0 && !m_wait_queue.empty() &&
-         (m_wait_queue.front().removed ||
-          m_wait_queue.front().nodes_requested <= available_nodes)) {
-    if (!m_wait_queue.front().removed) {
-      const auto &job = m_wait_queue.front();
+  while (this->m_eligible_end_idx > 0 && !this->m_wait_queue.empty() &&
+         (this->m_wait_queue.front().removed ||
+          this->m_wait_queue.front().nodes_requested <= available_nodes)) {
+    if (!this->m_wait_queue.front().removed) {
+      const auto &job = this->m_wait_queue.front();
       jobs_to_run.push_back(job.job_id);
       available_nodes -= job.nodes_requested;
       projected_starts.push_back(
-          {current_time, release_estimate(current_time, job.run_time_estimate),
+          {current_time,
+           this->release_estimate(current_time, job.run_time_estimate),
            job.nodes_requested});
     } else {
-      --m_removed_count;
+      --this->m_removed_count;
     }
-    m_wait_queue.pop_front();
-    --m_eligible_end_idx;
+    this->m_wait_queue.pop_front();
+    --this->m_eligible_end_idx;
   }
 
-  if (active_job_count() != 0) {
-    m_fcfs_reservation_time = calculate_fcfs_reservation(
-        m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
-        current_time, projected_starts);
+  if (this->active_job_count() != 0) {
+    this->m_fcfs_reservation_time = this->calculate_fcfs_reservation(
+        this->m_wait_queue.front().nodes_requested, available_nodes,
+        running_jobs, current_time, projected_starts);
   }
   return jobs_to_run;
 }
 
-template class FCFSPeriodicHybridCircularSchedulerImpl<true>;
-template class FCFSPeriodicHybridCircularSchedulerImpl<false>;
+template class FCFSPeriodicHybridSchedulerImpl<CircularWaitQueue, true>;
+template class FCFSPeriodicHybridSchedulerImpl<CircularWaitQueue, false>;
+template class FCFSPeriodicHybridSchedulerImpl<DequeWaitQueue, true>;
+template class FCFSPeriodicHybridSchedulerImpl<DequeWaitQueue, false>;
 
 } // namespace dr_evt

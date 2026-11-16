@@ -12,25 +12,25 @@ package dr_evt_proto;
 message DR_EVT_Params {
     // Scheduler selection (the same rules as the CLI):
     // - Ordinary event-driven FCFS/EASY: priority_policy: "fcfs",
-    //   backfill_policy: "easy", queue_impl: "circular"; both intervals zero.
+    //   backfill_policy: "easy", queue_impl: "circular" or "deque"; both intervals zero.
     // - Event-driven hybrid: backfill_policy: "hybrid", reservation_depth: R
     //   with R > 0. Use FCFS ordering.
     // - Per-scan accounting: per_pass_accounting: true, FCFS ordering,
-    //   queue_impl: "circular", both intervals zero, planning_horizon omitted.
+    //   queue_impl: "circular" or "deque", both intervals zero, planning_horizon omitted.
     //   A pass is one attempt to scan the waiting queue at the current time.
     //   Starts and successful reservations count toward Q; after R reservations,
     //   failed start-only tests also count. Q/R reset on each attempt; simulation
     //   time does not advance between attempts. Q is backfill_queue_depth.
-    // - OpenPBS forecast: priority_policy: "fcfs_1s_evt_group", queue_impl: "circular",
+    // - OpenPBS forecast: priority_policy: "fcfs_1s_evt_group", queue_impl: "circular" or "deque",
     //   both intervals zero, planning_horizon omitted. per_pass_accounting is
     //   not required. Group predicted events through T+1 after the earliest event
     //   T, inclusive, then check fit at the last actual event in the group.
     //   A lone release at T is checked at T, without an automatic extra delay.
     // - Separate periodic backfill: backfill_interval: I > 0, FCFS ordering,
-    //   queue_impl: "circular", dispatch_interval: 0. Queue-head starts remain
+    //   queue_impl: "circular" or "deque", dispatch_interval: 0. Queue-head starts remain
     //   event driven; backfill uses timer ticks.
     // - Fixed periodic dispatch: dispatch_interval: I > 0, FCFS ordering,
-    //   queue_impl: "circular", backfill_interval: 0, backfill_queue_depth: 0.
+    //   queue_impl: "circular" or "deque", backfill_interval: 0, backfill_queue_depth: 0.
     //   dispatch_queue_depth bounds all examined jobs, including immediate starts.
     //   dispatch_on_events additionally wakes on arrival batches.
     // - Diagnostic unprotected backfill: diagnostic_no_reservations: true with

@@ -5,7 +5,7 @@
  *         SPDX-License-Identifier: MIT                                       *
  ******************************************************************************/
 
-/** @file scheduler_fcfs_hybrid_circular.tpp
+/** @file scheduler_fcfs_hybrid.tpp
  * @brief Shared FCFS queue scan with a supplied capacity-reservation
  * planner.
  * @details Used by event-driven hybrid/conservative backfill, separate
@@ -13,7 +13,8 @@
  * capacity counts, not particular nodes. The calling scheduler supplies its
  * forecast and examination rules.
  * @note CLI: No option selects this helper directly. Callers use
- * --queue_impl circular with --backfill_policy hybrid or conservative;
+ * --queue_impl circular or deque with --backfill_policy hybrid or
+ * conservative;
  * --backfill_interval I selects separate periodic backfill and
  * --dispatch_interval I selects periodic dispatch. Both intervals zero
  * selects event-driven scheduling.
@@ -21,8 +22,9 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
+template <typename Queue>
 template <typename ProtectionTimeline>
-std::vector<job_no_t> FCFSHybridCircularScheduler::schedule_with_protection(
+std::vector<job_no_t> FCFSHybridScheduler<Queue>::schedule_with_protection(
     num_nodes_t free_nodes, const running_jobs_t &running_jobs,
     sim_time_t current_time) {
   sync_to(current_time);
@@ -73,8 +75,8 @@ std::vector<job_no_t> FCFSHybridCircularScheduler::schedule_with_protection(
       m_wait_queue.front().nodes_requested, available_nodes, running_jobs,
       current_time, projected_starts);
 
-  record_estimated_start(m_wait_queue.front().job_id,
-                       m_fcfs_reservation_time, false);
+  record_estimated_start(m_wait_queue.front().job_id, m_fcfs_reservation_time,
+                         false);
   if (available_nodes == 0) {
     return jobs_to_run;
   }

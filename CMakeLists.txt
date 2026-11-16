@@ -1028,6 +1028,15 @@ if(DR_EVT_WITH_UNIT_TESTING)
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_fixed_periodic_dispatch_tests.py
         $<TARGET_FILE:sim-bin>)
+    add_test(
+      NAME test_fcfs_queue_parity
+      COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_fcfs_queue_parity.py
+        $<TARGET_FILE:sim-bin>)
+    set_tests_properties(test_fcfs_queue_parity PROPERTIES
+      LABELS "unit;scripts"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      TIMEOUT 300)
     add_test(NAME test_placement_pass_integration
       COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_placement_pass_tests.py

@@ -21,10 +21,10 @@ function, enum, or file name.
    :protected-members:
    :private-members:
 
-.. doxygenfile:: scheduler_fcfs_periodic_hybrid_circular.hpp
+.. doxygenfile:: scheduler_fcfs_periodic_hybrid.hpp
    :project: dr_evt
 
-.. doxygenfile:: scheduler_placement_circular.hpp
+.. doxygenfile:: scheduler_placement.hpp
    :project: dr_evt
 
 Resource models

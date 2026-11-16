@@ -17,7 +17,7 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#include "sim/scheduler_fcfs_easy_block.hpp"
+#include "sim/fcfs-alt-impl/scheduler_fcfs_easy_block.hpp"
 #include <stdexcept>
 
 namespace dr_evt {

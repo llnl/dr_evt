@@ -21,20 +21,19 @@
  */
 
 #include "sim/scheduler_base.hpp"
+#include "sim/fcfs-alt-impl/scheduler_fcfs_easy_block.hpp"
+#include "sim/fcfs-alt-impl/scheduler_fcfs_easy_multimap.hpp"
+#include "sim/fcfs_wait_queue.hpp"
 #include "sim/forecast_1s_evt_group_timeline.hpp"
-#include "sim/scheduler_fcfs_1s_evt_group_circular.hpp"
-#include "sim/scheduler_fcfs_easy_block.hpp"
-#include "sim/scheduler_fcfs_easy_circular.hpp"
-#include "sim/scheduler_fcfs_easy_deque.hpp"
-#include "sim/scheduler_fcfs_easy_multimap.hpp"
-#include "sim/scheduler_fcfs_hybrid_circular.hpp"
-#include "sim/scheduler_fcfs_hybrid_deque.hpp"
-#include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
-#include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
-#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_1s_evt_group.hpp"
+#include "sim/scheduler_fcfs_easy.hpp"
+#include "sim/scheduler_fcfs_hybrid.hpp"
+#include "sim/scheduler_fcfs_pass_hybrid.hpp"
+#include "sim/scheduler_fcfs_periodic_easy.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid.hpp"
 #include "sim/scheduler_ljf_easy.hpp"
-#include "sim/scheduler_periodic_fcfs_hybrid_circular.hpp"
-#include "sim/scheduler_placement_circular.hpp"
+#include "sim/scheduler_periodic_fcfs_hybrid.hpp"
+#include "sim/scheduler_placement.hpp"
 #include "sim/scheduler_sjf_easy.hpp"
 #include <algorithm>
 #include <cmath>
@@ -194,30 +193,56 @@ const char *queue_impl_name(QueueImplementation impl) {
   }
 }
 
+/** @brief Whether the FCFS scheduler templates support a queue choice.
+ * @param[in] impl Queue implementation value.
+ * @return true for the circular buffer and the deque; the multimap and block
+ * queues have their own EASY-only schedulers. */
+bool is_templated_fcfs_queue(QueueImplementation impl) {
+  return impl == QueueImplementation::CIRCULAR ||
+         impl == QueueImplementation::DEQUE;
+}
+
+/** @brief Construct an FCFS scheduler over the selected wait queue.
+ * @tparam Scheduler Scheduler class template taking a wait-queue policy.
+ * @tparam Args Constructor argument types.
+ * @param[in] queue_impl DEQUE selects std::deque; any other value selects the
+ * circular buffer.
+ * @param[in] args Arguments forwarded to the scheduler constructor.
+ * @return Owning scheduler.
+ * @throws Whatever the scheduler constructor throws. */
+template <template <typename> class Scheduler, typename... Args>
+std::unique_ptr<SchedulerBase>
+make_fcfs_scheduler(QueueImplementation queue_impl, Args &&...args) {
+  if (queue_impl == QueueImplementation::DEQUE) {
+    return std::make_unique<Scheduler<DequeWaitQueue>>(
+        std::forward<Args>(args)...);
+  }
+  return std::make_unique<Scheduler<CircularWaitQueue>>(
+      std::forward<Args>(args)...);
+}
+
 std::unique_ptr<SchedulerBase> create_hybrid_scheduler(
     num_nodes_t total_nodes, size_t initial_job_count,
     BackfillPolicy backfill_policy, QueueImplementation queue_impl,
     size_t wait_queue_capacity, CircularOverflowPolicy wait_queue_overflow,
     size_t reservation_depth, size_t backfill_queue_depth) {
-  if (queue_impl == QueueImplementation::DEQUE) {
-    return std::make_unique<FCFSHybridDequeScheduler>(
-        total_nodes, backfill_policy, reservation_depth, backfill_queue_depth);
-  }
-  if (queue_impl != QueueImplementation::CIRCULAR) {
+  if (!is_templated_fcfs_queue(queue_impl)) {
     std::cerr << "Warning: queue_impl '" << queue_impl_name(queue_impl)
               << "' not supported for FCFS_CONSERVATIVE, using circular\n";
   }
-  return std::make_unique<FCFSHybridCircularScheduler>(
-      total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
-      wait_queue_overflow, reservation_depth, backfill_queue_depth);
+  return make_fcfs_scheduler<FCFSHybridScheduler>(
+      queue_impl, total_nodes, initial_job_count, backfill_policy,
+      wait_queue_capacity, wait_queue_overflow, reservation_depth,
+      backfill_queue_depth);
 }
 } // anonymous namespace
 
 namespace {
 /** @brief Placement passes observing counters owned by the simulation trace.
+ * @tparam Queue Wait-queue storage policy.
  * @tparam Forecast Timeline used for the policy's reservation timing. */
-template <typename Forecast>
-class ObservedPassScheduler final : public FCFSPassHybridCircularScheduler {
+template <typename Queue, typename Forecast>
+class ObservedPassScheduler final : public FCFSPassHybridScheduler<Queue> {
   ResourceDiagnostics &m_diagnostics;
 
 public:
@@ -227,7 +252,7 @@ public:
    * @param[in] args Arguments forwarded to the shared scheduler. */
   template <typename... Args>
   ObservedPassScheduler(ResourceDiagnostics &diagnostics, Args &&...args)
-      : FCFSPassHybridCircularScheduler(std::forward<Args>(args)...),
+      : FCFSPassHybridScheduler<Queue>(std::forward<Args>(args)...),
         m_diagnostics(diagnostics) {}
   /**
    * @brief Run placement passes with simulation-owned resource observation.
@@ -242,11 +267,31 @@ public:
   std::vector<job_no_t> schedule(num_nodes_t free_nodes,
                                  const running_jobs_t &running_jobs,
                                  sim_time_t current_time) override {
-    return schedule_with_forecast<Forecast,
-                                  CapacityModel<SimulationResourceObserver>>(
+    return this->template schedule_with_forecast<
+        Forecast, CapacityModel<SimulationResourceObserver>>(
         free_nodes, running_jobs, current_time, &m_diagnostics);
   }
 };
+
+/** @brief Construct an observed pass scheduler over the selected wait queue.
+ * @tparam Forecast Timeline used for the policy's reservation timing.
+ * @tparam Args Shared placement-scheduler constructor argument types.
+ * @param[in] queue_impl DEQUE selects std::deque; any other value selects the
+ * circular buffer.
+ * @param[in,out] diagnostics Counter owner, which outlives the scheduler.
+ * @param[in] args Arguments forwarded to the scheduler.
+ * @return Owning scheduler. */
+template <typename Forecast, typename... Args>
+std::unique_ptr<SchedulerBase>
+make_observed_pass_scheduler(QueueImplementation queue_impl,
+                             ResourceDiagnostics &diagnostics, Args &&...args) {
+  if (queue_impl == QueueImplementation::DEQUE) {
+    return std::make_unique<ObservedPassScheduler<DequeWaitQueue, Forecast>>(
+        diagnostics, std::forward<Args>(args)...);
+  }
+  return std::make_unique<ObservedPassScheduler<CircularWaitQueue, Forecast>>(
+      diagnostics, std::forward<Args>(args)...);
+}
 } // namespace
 
 std::unique_ptr<SchedulerBase>
@@ -263,28 +308,27 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
   if (priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP) {
     if (dispatch_interval != 0.0 || backfill_interval != 0.0 ||
         dispatch_queue_depth != 0 || dispatch_on_events ||
-        diagnostic_no_reservations ||
-        queue_impl != QueueImplementation::CIRCULAR) {
+        diagnostic_no_reservations || !is_templated_fcfs_queue(queue_impl)) {
       throw std::invalid_argument("fcfs_1s_evt_group requires event-driven "
-                                  "scheduling, queue_impl=circular, "
+                                  "scheduling, queue_impl=circular or deque, "
                                   "and protected reservations");
     }
     if (resource_diagnostics != nullptr) {
-      return std::make_unique<
-          ObservedPassScheduler<OneSecondEventGroupTimeline>>(
-          *resource_diagnostics, total_nodes, initial_job_count,
+      return make_observed_pass_scheduler<OneSecondEventGroupTimeline>(
+          queue_impl, *resource_diagnostics, total_nodes, initial_job_count,
           backfill_policy, wait_queue_capacity, wait_queue_overflow,
           reservation_depth, backfill_queue_depth);
     }
-    return std::make_unique<FCFSOneSecondEventGroupCircularScheduler>(
-        total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
-        wait_queue_overflow, reservation_depth, backfill_queue_depth);
+    return make_fcfs_scheduler<FCFSOneSecondEventGroupScheduler>(
+        queue_impl, total_nodes, initial_job_count, backfill_policy,
+        wait_queue_capacity, wait_queue_overflow, reservation_depth,
+        backfill_queue_depth);
   }
   if (diagnostic_no_reservations) {
     if (backfill_interval <= 0.0 || !std::isfinite(backfill_interval) ||
         dispatch_interval != 0.0 || dispatch_queue_depth != 0 ||
         dispatch_on_events || per_pass_accounting ||
-        queue_impl != QueueImplementation::CIRCULAR ||
+        !is_templated_fcfs_queue(queue_impl) ||
         (priority_policy != PriorityPolicy::FCFS &&
          priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) ||
         (backfill_policy != BackfillPolicy::HYBRID &&
@@ -292,10 +336,11 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
         (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0)) {
       throw std::invalid_argument(
           "diagnostic_no_reservations requires event-driven FCFS dispatch "
-          "with periodic hybrid/conservative backfill and queue_impl=circular");
+          "with periodic hybrid/conservative backfill and queue_impl=circular "
+          "or deque");
     }
-    return std::make_unique<FCFSPeriodicNoReservationCircularScheduler>(
-        total_nodes, initial_job_count, wait_queue_capacity,
+    return make_fcfs_scheduler<FCFSPeriodicNoReservationScheduler>(
+        queue_impl, total_nodes, initial_job_count, wait_queue_capacity,
         wait_queue_overflow, backfill_policy, reservation_depth,
         backfill_queue_depth);
   }
@@ -307,23 +352,24 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
     }
     if ((priority_policy != PriorityPolicy::FCFS &&
          priority_policy != PriorityPolicy::FCFS_CONSERVATIVE) ||
-        queue_impl != QueueImplementation::CIRCULAR) {
-      throw std::invalid_argument(
-          "per_pass_accounting requires FCFS ordering and queue_impl=circular");
+        !is_templated_fcfs_queue(queue_impl)) {
+      throw std::invalid_argument("per_pass_accounting requires FCFS ordering "
+                                  "and queue_impl=circular or deque");
     }
     if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
     }
     if (resource_diagnostics != nullptr) {
-      return std::make_unique<ObservedPassScheduler<CountTimeline>>(
-          *resource_diagnostics, total_nodes, initial_job_count,
+      return make_observed_pass_scheduler<CountTimeline>(
+          queue_impl, *resource_diagnostics, total_nodes, initial_job_count,
           backfill_policy, wait_queue_capacity, wait_queue_overflow,
           reservation_depth, backfill_queue_depth);
     }
-    return std::make_unique<FCFSPassHybridCircularScheduler>(
-        total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
-        wait_queue_overflow, reservation_depth, backfill_queue_depth);
+    return make_fcfs_scheduler<FCFSPassHybridScheduler>(
+        queue_impl, total_nodes, initial_job_count, backfill_policy,
+        wait_queue_capacity, wait_queue_overflow, reservation_depth,
+        backfill_queue_depth);
   }
   if (dispatch_on_events && dispatch_interval <= 0.0) {
     throw std::invalid_argument(
@@ -343,9 +389,9 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument(
           "fixed periodic dispatch requires FCFS ordering");
     }
-    if (queue_impl != QueueImplementation::CIRCULAR) {
+    if (!is_templated_fcfs_queue(queue_impl)) {
       throw std::invalid_argument(
-          "fixed periodic dispatch requires queue_impl=circular");
+          "fixed periodic dispatch requires queue_impl=circular or deque");
     }
     if (backfill_queue_depth != 0) {
       throw std::invalid_argument(
@@ -356,9 +402,10 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
     }
-    return std::make_unique<PeriodicFCFSHybridCircularScheduler>(
-        total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
-        wait_queue_overflow, reservation_depth, dispatch_queue_depth);
+    return make_fcfs_scheduler<PeriodicFCFSHybridScheduler>(
+        queue_impl, total_nodes, initial_job_count, backfill_policy,
+        wait_queue_capacity, wait_queue_overflow, reservation_depth,
+        dispatch_queue_depth);
   }
   if (dispatch_queue_depth != 0) {
     throw std::invalid_argument(
@@ -378,23 +425,23 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       throw std::invalid_argument(
           "periodic backfilling is supported with FCFS ordering only");
     }
-    if (queue_impl != QueueImplementation::CIRCULAR) {
+    if (!is_templated_fcfs_queue(queue_impl)) {
       throw std::invalid_argument(
-          "periodic backfilling requires queue_impl=circular");
+          "periodic backfilling requires queue_impl=circular or deque");
     }
     if (backfill_policy == BackfillPolicy::HYBRID && reservation_depth == 0) {
       throw std::invalid_argument(
           "hybrid backfilling requires reservation_depth > 0");
     }
     if (backfill_policy == BackfillPolicy::EASY) {
-      return std::make_unique<FCFSPeriodicEasyCircularScheduler>(
-          total_nodes, initial_job_count, wait_queue_capacity,
+      return make_fcfs_scheduler<FCFSPeriodicEasyScheduler>(
+          queue_impl, total_nodes, initial_job_count, wait_queue_capacity,
           wait_queue_overflow, backfill_queue_depth);
     }
     // Periodic hybrid reserves a fixed number of jobs; conservative uses an
     // unlimited protected prefix.
-    return std::make_unique<FCFSPeriodicHybridCircularScheduler>(
-        total_nodes, initial_job_count, wait_queue_capacity,
+    return make_fcfs_scheduler<FCFSPeriodicHybridScheduler>(
+        queue_impl, total_nodes, initial_job_count, wait_queue_capacity,
         wait_queue_overflow, backfill_policy, reservation_depth,
         backfill_queue_depth);
   }
@@ -483,13 +530,10 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
     } else if (queue_impl == QueueImplementation::MULTIMAP) {
       return std::make_unique<FCFSEasyMultimapScheduler>(
           total_nodes, backfill_policy, backfill_queue_depth);
-    } else if (queue_impl == QueueImplementation::DEQUE) {
-      return std::make_unique<FCFSEasyDequeScheduler>(
-          total_nodes, backfill_policy, backfill_queue_depth);
-    } else if (queue_impl == QueueImplementation::CIRCULAR) {
-      return std::make_unique<FCFSEasyCircularScheduler>(
-          total_nodes, initial_job_count, backfill_policy, wait_queue_capacity,
-          wait_queue_overflow, backfill_queue_depth);
+    } else if (is_templated_fcfs_queue(queue_impl)) {
+      return make_fcfs_scheduler<FCFSEasyScheduler>(
+          queue_impl, total_nodes, initial_job_count, backfill_policy,
+          wait_queue_capacity, wait_queue_overflow, backfill_queue_depth);
     } else {
       // Defensive: QueueImplementation is a 4-value enum and every
       // value is explicitly handled above - this is only reachable
@@ -538,12 +582,14 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
   default:
     // Default to FCFS with deque
     return std::make_unique<FCFSEasyDequeScheduler>(
-        total_nodes, backfill_policy, backfill_queue_depth);
+        total_nodes, initial_job_count, backfill_policy, 0,
+        CircularOverflowPolicy::GROW, backfill_queue_depth);
   }
 }
 
 namespace {
 /** @brief Construct the compile-time resource/observer specialization.
+ * @tparam Queue Wait-queue storage policy.
  * @tparam Features Compile-time placement optimization mask.
  * @tparam Order Compile-time node ordering.
  * @tparam Filter Compile-time coarse-filter selector.
@@ -553,7 +599,7 @@ namespace {
  * @param[in,out] diagnostics Optional simulation-owned observer counters.
  * @return Owning concrete placement scheduler.
  * @throws std::bad_alloc if scheduler or queue storage cannot be allocated. */
-template <unsigned Features, NodeOrder Order, auto Filter>
+template <typename Queue, unsigned Features, NodeOrder Order, auto Filter>
 std::unique_ptr<SchedulerBase>
 placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
                     ResourceDiagnostics *diagnostics) {
@@ -562,22 +608,54 @@ placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
       params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP;
   if (diagnostics) {
     if (grouped)
-      return std::make_unique<PlacementCircularScheduler<
+      return std::make_unique<PlacementScheduler<
+          Queue,
           PlacementModel<SimulationResourceObserver, Order, Filter, features>,
           true>>(nodes, jobs, params, diagnostics);
-    return std::make_unique<PlacementCircularScheduler<
-        PlacementModel<SimulationResourceObserver, Order, Filter, features>>>(
+    return std::make_unique<
+        PlacementScheduler<Queue, PlacementModel<SimulationResourceObserver,
+                                                 Order, Filter, features>>>(
         nodes, jobs, params, diagnostics);
   }
   if (grouped)
-    return std::make_unique<PlacementCircularScheduler<
-        PlacementModel<NoResourceObserver, Order, Filter, features>, true>>(
-        nodes, jobs, params, nullptr);
-  return std::make_unique<PlacementCircularScheduler<
-      PlacementModel<NoResourceObserver, Order, Filter, features>>>(
+    return std::make_unique<PlacementScheduler<
+        Queue, PlacementModel<NoResourceObserver, Order, Filter, features>,
+        true>>(nodes, jobs, params, nullptr);
+  return std::make_unique<PlacementScheduler<
+      Queue, PlacementModel<NoResourceObserver, Order, Filter, features>>>(
       nodes, jobs, params, nullptr);
 }
 /** @brief Select node order and filtering once, without hot-path flags.
+ * @tparam Queue Wait-queue storage policy.
+ * @tparam Features Compile-time placement optimization mask.
+ * @param[in] nodes Physical inventory size.
+ * @param[in] jobs Initial queue sizing hint.
+ * @param[in] params Resource and scheduling configuration.
+ * @param[in,out] diagnostics Optional observer owner.
+ * @return Owning scheduler using the selected template specialization.
+ * @throws std::bad_alloc if scheduler storage cannot be allocated. */
+template <typename Queue, unsigned Features>
+std::unique_ptr<SchedulerBase>
+placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
+                    ResourceDiagnostics *diagnostics) {
+  if (params.m_placement_order == "high") {
+    if (params.m_placement_coarse_filter)
+      return placement_scheduler<Queue, Features, NodeOrder::HighIdFirst,
+                                 EnableCoarseFilter>(nodes, jobs, params,
+                                                     diagnostics);
+    return placement_scheduler<Queue, Features, NodeOrder::HighIdFirst,
+                               DisableCoarseFilter>(nodes, jobs, params,
+                                                    diagnostics);
+  }
+  if (params.m_placement_coarse_filter)
+    return placement_scheduler<Queue, Features, NodeOrder::LowIdFirst,
+                               EnableCoarseFilter>(nodes, jobs, params,
+                                                   diagnostics);
+  return placement_scheduler<Queue, Features, NodeOrder::LowIdFirst,
+                             DisableCoarseFilter>(nodes, jobs, params,
+                                                  diagnostics);
+}
+/** @brief Select the wait queue once for a placement optimization mask.
  * @tparam Features Compile-time placement optimization mask.
  * @param[in] nodes Physical inventory size.
  * @param[in] jobs Initial queue sizing hint.
@@ -589,22 +667,11 @@ template <unsigned Features>
 std::unique_ptr<SchedulerBase>
 placement_scheduler(num_nodes_t nodes, size_t jobs, const Sim_Params &params,
                     ResourceDiagnostics *diagnostics) {
-  if (params.m_placement_order == "high") {
-    if (params.m_placement_coarse_filter)
-      return placement_scheduler<Features, NodeOrder::HighIdFirst,
-                                 EnableCoarseFilter>(nodes, jobs, params,
-                                                     diagnostics);
-    return placement_scheduler<Features, NodeOrder::HighIdFirst,
-                               DisableCoarseFilter>(nodes, jobs, params,
-                                                    diagnostics);
-  }
-  if (params.m_placement_coarse_filter)
-    return placement_scheduler<Features, NodeOrder::LowIdFirst,
-                               EnableCoarseFilter>(nodes, jobs, params,
-                                                   diagnostics);
-  return placement_scheduler<Features, NodeOrder::LowIdFirst,
-                             DisableCoarseFilter>(nodes, jobs, params,
-                                                  diagnostics);
+  if (params.m_queue_impl == QueueImplementation::DEQUE)
+    return placement_scheduler<DequeWaitQueue, Features>(nodes, jobs, params,
+                                                         diagnostics);
+  return placement_scheduler<CircularWaitQueue, Features>(nodes, jobs, params,
+                                                          diagnostics);
 }
 } // namespace
 
@@ -634,7 +701,7 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
   if ((params.m_priority_policy != PriorityPolicy::FCFS &&
        params.m_priority_policy != PriorityPolicy::FCFS_CONSERVATIVE &&
        params.m_priority_policy != PriorityPolicy::FCFS_1S_EVT_GROUP) ||
-      params.m_queue_impl != QueueImplementation::CIRCULAR ||
+      !is_templated_fcfs_queue(params.m_queue_impl) ||
       !std::isfinite(params.m_backfill_interval) ||
       params.m_backfill_interval < 0 || params.m_dispatch_interval != 0 ||
       params.m_dispatch_on_events || params.m_dispatch_queue_depth != 0 ||
@@ -642,9 +709,9 @@ create_scheduler(num_nodes_t total_nodes, size_t initial_job_count,
       !params.m_capacity_schedule.empty() || params.m_sim_start_time != 0 ||
       params.m_planning_time_resolution != 0)
     throw std::invalid_argument(
-        "placement requires FCFS, queue_impl=circular, static capacity, exact "
-        "planning times, and no fixed dispatch, replay warm start, or per-pass "
-        "accounting");
+        "placement requires FCFS, queue_impl=circular or deque, static "
+        "capacity, exact planning times, and no fixed dispatch, replay warm "
+        "start, or per-pass accounting");
   if (params.m_priority_policy == PriorityPolicy::FCFS_1S_EVT_GROUP &&
       params.m_backfill_interval != 0)
     throw std::invalid_argument(

@@ -139,7 +139,7 @@ def diagnose(directory, output):
               'source_evidence': {
                   'dr_evt': 'src/sim/sim.cpp: periodic_evaluation uses m_periodic_backfill_dirty; it is cleared before the pass and is not set by starts in that pass',
                   'slurm': 'src/plugins/sched/backfill/backfill.c: _more_work accepts last_job_update >= last_backfill_time',
-                  'replay_rule': 'src/sim/scheduler_fcfs_hybrid_circular.tpp: bounded Q scan with resource-time protection'},
+                  'replay_rule': 'src/sim/scheduler_fcfs_hybrid.tpp: bounded Q scan with resource-time protection'},
               'conclusion': 'Starts at the previous tick move the candidate into Q, but DR_EVT skips the next tick until an arrival or completion marks the state dirty',
               'limit': 'This identifies the first chronological divergence; it does not isolate every later difference'}
     output.mkdir(parents=True, exist_ok=True)

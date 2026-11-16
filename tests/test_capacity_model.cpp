@@ -10,7 +10,7 @@
  */
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/resource/capacity_model.hpp"
-#include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_pass_hybrid.hpp"
 #include "sim/sim.hpp"
 #include <filesystem>
 #include <fstream>

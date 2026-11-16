@@ -18,7 +18,7 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#include "sim/scheduler_fcfs_easy_multimap.hpp"
+#include "sim/fcfs-alt-impl/scheduler_fcfs_easy_multimap.hpp"
 #include <algorithm>
 
 namespace dr_evt {
@@ -142,7 +142,7 @@ FCFSEasyMultimapScheduler::schedule(num_nodes_t free_nodes,
   const bool head_has_projection =
       m_fcfs_reservation_time != std::numeric_limits<sim_time_t>::max();
   record_estimated_start(head_job_id, m_fcfs_reservation_time,
-                       head_within_horizon);
+                         head_within_horizon);
   if (head_within_horizon) {
     reservation_plan.reserve(m_fcfs_reservation_time, head_nodes,
                              release_estimate(m_fcfs_reservation_time,

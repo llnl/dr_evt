@@ -14,7 +14,7 @@
  * size. Protobuf uses queue_impl: "block" and block_size.
  */
 
-#include "sim/block_wait_queue.hpp"
+#include "sim/fcfs-alt-impl/block_wait_queue.hpp"
 
 namespace dr_evt {
 

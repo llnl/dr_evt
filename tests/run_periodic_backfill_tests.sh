@@ -264,13 +264,13 @@ else
     ((FAILED++))
 fi
 
-# Invalid values, a disabled backfill policy, and the non-circular queue
-# implementations are rejected.
+# Invalid values, a disabled backfill policy, and the queue implementations
+# without periodic backfill (everything except circular and deque) are rejected.
 REJECTED=0
 for BAD in "--backfill_policy hybrid --backfill_interval -1" \
            "--backfill_policy hybrid --backfill_interval nope" \
            "--backfill_policy none --backfill_interval 5" \
-           "--backfill_policy hybrid --queue_impl deque --backfill_interval 5"; do
+           "--backfill_policy hybrid --queue_impl multimap --backfill_interval 5"; do
     # shellcheck disable=SC2086
     if "$SIMULATOR" "$BASE_IN" --total_nodes "$TOTAL_NODES" --trace_format simple \
            --timestamp_format epoch $BAD \

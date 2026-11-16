@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 #define DR_EVT_HAS_CONFIG 1
-#include "sim/scheduler_fcfs_pass_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_pass_hybrid.hpp"
 #include "sim/sim.hpp"
 #include <chrono>
 #include <filesystem>

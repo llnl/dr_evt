@@ -442,8 +442,13 @@ void invalid_options(const std::string &input) {
   params.m_per_pass_accounting = true;
   rejects([&] { Simulation simulation(params); });
   params.m_per_pass_accounting = false;
-  params.m_queue_impl = QueueImplementation::DEQUE;
+  // Only the circular and deque queues support exact placement.
+  params.m_queue_impl = QueueImplementation::MULTIMAP;
   rejects([&] { Simulation simulation(params); });
+  params.m_queue_impl = QueueImplementation::BLOCK;
+  rejects([&] { Simulation simulation(params); });
+  params.m_queue_impl = QueueImplementation::DEQUE;
+  Simulation deque_simulation(params);
   params.m_queue_impl = QueueImplementation::CIRCULAR;
   params.m_priority_policy = PriorityPolicy::FCFS_1S_EVT_GROUP;
   params.m_backfill_policy = BackfillPolicy::EASY;

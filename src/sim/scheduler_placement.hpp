@@ -1,18 +1,20 @@
 /******************************************************************************
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
-/** @file scheduler_placement_circular.hpp
- * @brief Exact placement through the main simulator's existing circular FCFS
- * queue.
+/** @file scheduler_placement.hpp
+ * @brief Exact placement through the main simulator's existing circular or
+ * deque FCFS queue.
  */
-#ifndef DR_EVT_SIM_SCHEDULER_PLACEMENT_CIRCULAR_HPP
-#define DR_EVT_SIM_SCHEDULER_PLACEMENT_CIRCULAR_HPP
+#ifndef DR_EVT_SIM_SCHEDULER_PLACEMENT_HPP
+#define DR_EVT_SIM_SCHEDULER_PLACEMENT_HPP
 #include "sim/resource/reservation_profile.hpp"
-#include "sim/scheduler_fcfs_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_hybrid.hpp"
 #include <ranges>
 namespace dr_evt {
 /** @brief FCFS allocation and exact reservation traversal selected at
  * construction.
+ * @tparam Queue Wait-queue storage policy: CircularWaitQueue or
+ * DequeWaitQueue.
  * @tparam Model Stateless placement operations, observer, and compile-time
  * optimizations.
  * @tparam OneSecondEventGroups Whether future fits use inclusive OpenPBS
@@ -25,8 +27,10 @@ namespace dr_evt {
  * profile contains only waiting-job bookings; running jobs contribute forecast
  * releases in widening clock-aligned groups. Event dispatch does not reuse the
  * retained timer plan's node identities. */
-template <typename Model, bool OneSecondEventGroups = false>
-class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
+template <typename Queue, typename Model, bool OneSecondEventGroups = false>
+class PlacementScheduler : public FCFSHybridScheduler<Queue> {
+  using Base = FCFSHybridScheduler<Queue>;
+  using typename Base::JobEntry;
   std::optional<typename Model::Timeline>
       m_last_plan;                    ///< Latest owned reservation snapshot.
   ResourceDiagnostics *m_diagnostics; ///< Borrowed simulation-owned counters.
@@ -39,13 +43,14 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
 
   /** @brief Remove queue entries started by an earlier pass. */
   void compact_queue() {
-    if (m_removed_count == 0)
+    if (this->m_removed_count == 0)
       return;
-    m_eligible_end_idx -= m_removed_count;
-    auto end = std::remove_if(m_wait_queue.begin(), m_wait_queue.end(),
-                              [](const JobEntry &job) { return job.removed; });
-    m_wait_queue.erase(end, m_wait_queue.end());
-    m_removed_count = 0;
+    this->m_eligible_end_idx -= this->m_removed_count;
+    auto end =
+        std::remove_if(this->m_wait_queue.begin(), this->m_wait_queue.end(),
+                       [](const JobEntry &job) { return job.removed; });
+    this->m_wait_queue.erase(end, this->m_wait_queue.end());
+    this->m_removed_count = 0;
   }
 
   /**
@@ -69,10 +74,10 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     if (m_profile_cycle_time == current_time)
       return starts;
     m_profile_cycle_time = current_time;
-    m_backfill_depth_time = current_time;
-    m_backfill_depth_examined = 0;
-    m_backfill_depth_head_accounted = false;
-    m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
+    this->m_backfill_depth_time = current_time;
+    this->m_backfill_depth_examined = 0;
+    this->m_backfill_depth_head_accounted = false;
+    this->m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
     m_last_plan.reset();
     constexpr auto order = Model::order;
     const auto select = [](const Bitmap &candidates, num_nodes_t quantity) {
@@ -94,39 +99,40 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
       running.push_back({current_time + duration, nodes});
       starts.push_back({job.job_id, current_time + duration, std::move(nodes)});
       job.removed = true;
-      ++m_removed_count;
+      ++this->m_removed_count;
     };
     // Main-dispatch heads first, by best fit over idle nodes.
     size_t cursor = 0;
-    for (; cursor < m_eligible_end_idx; ++cursor) {
-      auto &job = m_wait_queue[cursor];
+    for (; cursor < this->m_eligible_end_idx; ++cursor) {
+      auto &job = this->m_wait_queue[cursor];
       if (job.nodes_requested > idle.count())
         break;
       start_now(job, select(idle, job.nodes_requested),
-                release_estimate(current_time, job.run_time_estimate));
+                this->release_estimate(current_time, job.run_time_estimate));
     }
     std::ranges::stable_sort(running, {}, &ReleaseRecord::limit_end);
     const sim_time_t until =
-        m_planning_horizon == std::numeric_limits<tdiff_t>::max()
+        this->m_planning_horizon == std::numeric_limits<tdiff_t>::max()
             ? std::numeric_limits<sim_time_t>::infinity()
-            : current_time + m_planning_horizon;
+            : current_time + this->m_planning_horizon;
     ReservationProfile profile(live.eligible, current_time, until);
     typename Model::Timeline report(live.eligible, current_time);
     const size_t reservation_limit =
-        m_backfill_policy == BackfillPolicy::CONSERVATIVE
+        this->m_backfill_policy == BackfillPolicy::CONSERVATIVE
             ? std::numeric_limits<size_t>::max()
-        : m_backfill_policy == BackfillPolicy::EASY ? 1
-                                                    : m_reservation_depth;
+        : this->m_backfill_policy == BackfillPolicy::EASY
+            ? 1
+            : this->m_reservation_depth;
     size_t booked = 0;
     bool first_waiter = true;
-    for (; cursor < m_eligible_end_idx; ++cursor) {
-      if (m_backfill_queue_depth != 0 &&
-          m_backfill_depth_examined >= m_backfill_queue_depth)
+    for (; cursor < this->m_eligible_end_idx; ++cursor) {
+      if (this->m_backfill_queue_depth != 0 &&
+          this->m_backfill_depth_examined >= this->m_backfill_queue_depth)
         break;
-      auto &job = m_wait_queue[cursor];
-      ++m_backfill_depth_examined;
+      auto &job = this->m_wait_queue[cursor];
+      ++this->m_backfill_depth_examined;
       const auto duration =
-          release_estimate(current_time, job.run_time_estimate);
+          this->release_estimate(current_time, job.run_time_estimate);
       const bool now_only = booked >= reservation_limit;
       const auto pick = [&](const Bitmap &candidates) {
         return select(candidates, job.nodes_requested);
@@ -151,16 +157,17 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
       if (!plan || now_only)
         continue;
       if (was_first)
-        m_fcfs_reservation_time = plan->first;
-      record_estimated_start(
+        this->m_fcfs_reservation_time = plan->first;
+      this->record_estimated_start(
           job.job_id, plan->first,
-          reservation_within_horizon(plan->first, current_time));
+          this->reservation_within_horizon(plan->first, current_time));
       profile.book(plan->first, plan->first + duration, plan->second);
       report.reserve(BitmapPlacement{plan->first, std::move(plan->second)},
                      duration, job.job_id);
       ++booked;
     }
-    m_backfill_depth_head_accounted = m_backfill_depth_examined != 0;
+    this->m_backfill_depth_head_accounted =
+        this->m_backfill_depth_examined != 0;
     m_last_plan.emplace(std::move(report));
     return starts;
   }
@@ -180,7 +187,7 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     const auto *live = running_jobs.placement();
     if (!live || free_nodes != live->eligible.count() - live->occupied.count())
       throw std::invalid_argument("placement and trace availability disagree");
-    sync_to(current_time);
+    this->sync_to(current_time);
     if (m_periodic_backfill && backfill) {
       compact_queue();
       return schedule_profile_cycle(*live, current_time);
@@ -190,17 +197,17 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     const bool retain_periodic_plan = m_periodic_backfill && !backfill;
     if (!retain_periodic_plan)
       m_last_plan.reset();
-    if (m_removed_count != 0) {
-      m_eligible_end_idx -= m_removed_count;
+    if (this->m_removed_count != 0) {
+      this->m_eligible_end_idx -= this->m_removed_count;
       auto end =
-          std::remove_if(m_wait_queue.begin(), m_wait_queue.end(),
+          std::remove_if(this->m_wait_queue.begin(), this->m_wait_queue.end(),
                          [](const JobEntry &job) { return job.removed; });
-      m_wait_queue.erase(end, m_wait_queue.end());
-      m_removed_count = 0;
+      this->m_wait_queue.erase(end, this->m_wait_queue.end());
+      this->m_removed_count = 0;
     }
     std::vector<Placement_Decision> starts;
     starts.reserve(
-        std::min(active_job_count(), static_cast<size_t>(free_nodes)));
+        std::min(this->active_job_count(), static_cast<size_t>(free_nodes)));
     Bitmap projected_occupied = live->occupied;
     std::optional<typename Model::Timeline> plan;
     const auto ensure_plan = [&] {
@@ -243,26 +250,27 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
     if constexpr (!Model::immediate_fast_path)
       ensure_plan();
     const size_t reservation_limit =
-        m_backfill_policy == BackfillPolicy::CONSERVATIVE
+        this->m_backfill_policy == BackfillPolicy::CONSERVATIVE
             ? std::numeric_limits<size_t>::max()
-        : m_backfill_policy == BackfillPolicy::EASY   ? 1
-        : m_backfill_policy == BackfillPolicy::HYBRID ? m_reservation_depth
-                                                      : 0;
+        : this->m_backfill_policy == BackfillPolicy::EASY ? 1
+        : this->m_backfill_policy == BackfillPolicy::HYBRID
+            ? this->m_reservation_depth
+            : 0;
     size_t reserved = 0;
-    if (backfill && m_backfill_depth_time != current_time) {
-      m_backfill_depth_time = current_time;
-      m_backfill_depth_examined = 0;
-      m_backfill_depth_head_accounted = false;
+    if (backfill && this->m_backfill_depth_time != current_time) {
+      this->m_backfill_depth_time = current_time;
+      this->m_backfill_depth_examined = 0;
+      this->m_backfill_depth_head_accounted = false;
     }
-    m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
+    this->m_fcfs_reservation_time = std::numeric_limits<sim_time_t>::max();
     bool waiting_head = false;
-    for (size_t cursor = 0; cursor < m_eligible_end_idx; ++cursor) {
-      auto &job = m_wait_queue[cursor];
-      if (backfill && m_backfill_queue_depth != 0 && waiting_head &&
-          m_backfill_depth_examined >= m_backfill_queue_depth)
+    for (size_t cursor = 0; cursor < this->m_eligible_end_idx; ++cursor) {
+      auto &job = this->m_wait_queue[cursor];
+      if (backfill && this->m_backfill_queue_depth != 0 && waiting_head &&
+          this->m_backfill_depth_examined >= this->m_backfill_queue_depth)
         break;
       const auto duration =
-          release_estimate(current_time, job.run_time_estimate);
+          this->release_estimate(current_time, job.run_time_estimate);
       ResourceContext context{job.job_id, current_time, 0, nullptr,
                               m_diagnostics};
       std::optional<typename Model::Placement> placement;
@@ -313,29 +321,31 @@ class PlacementCircularScheduler : public FCFSHybridCircularScheduler {
           plan->borrow_running(starts.back().allocation,
                                starts.back().forecast_finish, job.job_id);
         job.removed = true;
-        ++m_removed_count;
+        ++this->m_removed_count;
         if (backfill && waiting_head)
-          ++m_backfill_depth_examined;
+          ++this->m_backfill_depth_examined;
       } else {
         const bool first_waiter = !waiting_head;
         waiting_head = true;
         if (placement) {
           if (first_waiter)
-            m_fcfs_reservation_time = placement->start;
+            this->m_fcfs_reservation_time = placement->start;
           const bool protected_start =
-              reservation_within_horizon(placement->start, current_time);
-          record_estimated_start(job.job_id, placement->start, protected_start);
+              this->reservation_within_horizon(placement->start, current_time);
+          this->record_estimated_start(job.job_id, placement->start,
+                                       protected_start);
           if (protected_start) {
             Model::reserve(*plan, std::move(*placement), job.nodes_requested,
                            duration, context);
             ++reserved;
           }
         }
-        if (backfill && (!first_waiter || !m_backfill_depth_head_accounted)) {
-          ++m_backfill_depth_examined;
-          m_backfill_depth_head_accounted = true;
+        if (backfill &&
+            (!first_waiter || !this->m_backfill_depth_head_accounted)) {
+          ++this->m_backfill_depth_examined;
+          this->m_backfill_depth_head_accounted = true;
         }
-        if (!backfill || m_backfill_policy == BackfillPolicy::NONE)
+        if (!backfill || this->m_backfill_policy == BackfillPolicy::NONE)
           break;
       }
     }
@@ -353,26 +363,24 @@ public:
    * @param[in] params Queue, backfill, and examination settings.
    * @param[in,out] diagnostics Optional observer owner, which outlives this
    * scheduler. */
-  PlacementCircularScheduler(num_nodes_t total_nodes, size_t initial_jobs,
-                             const Sim_Params &params,
-                             ResourceDiagnostics *diagnostics)
-      : FCFSHybridCircularScheduler(
-            total_nodes, initial_jobs,
-            params.m_backfill_policy == BackfillPolicy::EASY
-                ? BackfillPolicy::HYBRID
-                : params.m_backfill_policy,
-            params.m_wait_queue_capacity, params.m_wait_queue_overflow,
-            params.m_reservation_depth, params.m_backfill_queue_depth),
+  PlacementScheduler(num_nodes_t total_nodes, size_t initial_jobs,
+                     const Sim_Params &params, ResourceDiagnostics *diagnostics)
+      : Base(total_nodes, initial_jobs,
+             params.m_backfill_policy == BackfillPolicy::EASY
+                 ? BackfillPolicy::HYBRID
+                 : params.m_backfill_policy,
+             params.m_wait_queue_capacity, params.m_wait_queue_overflow,
+             params.m_reservation_depth, params.m_backfill_queue_depth),
         m_diagnostics(diagnostics),
         m_periodic_backfill(params.m_backfill_interval > 0) {
-    m_backfill_policy = params.m_backfill_policy;
+    this->m_backfill_policy = params.m_backfill_policy;
   }
   /** @brief Reject empty and oversized whole-node requests before queue
    * admission.
    * @param[in] nodes_requested Requested exclusive node count.
    * @return True for a positive quantity within the static inventory. */
   bool can_ever_run(num_nodes_t nodes_requested) const override {
-    return nodes_requested > 0 && nodes_requested <= m_total_nodes;
+    return nodes_requested > 0 && nodes_requested <= this->m_total_nodes;
   }
   /** @copydoc SchedulerBase::placement_reservations */
   std::span<const PlacementInterval> placement_reservations() const override {
@@ -381,15 +389,15 @@ public:
   }
   /** @copydoc SchedulerBase::placement_budget */
   std::pair<sim_time_t, size_t> placement_budget() const override {
-    return {m_backfill_depth_time, m_backfill_depth_examined};
+    return {this->m_backfill_depth_time, this->m_backfill_depth_examined};
   }
   /** @copydoc SchedulerBase::restore_placement_budget
    * @details Restoring a nonzero periodic budget also marks that timestamp's
    * profile cycle consumed, preventing a duplicate pass after restart. */
   void restore_placement_budget(std::pair<sim_time_t, size_t> budget) override {
-    m_backfill_depth_time = budget.first;
-    m_backfill_depth_examined = budget.second;
-    m_backfill_depth_head_accounted = budget.second != 0;
+    this->m_backfill_depth_time = budget.first;
+    this->m_backfill_depth_examined = budget.second;
+    this->m_backfill_depth_head_accounted = budget.second != 0;
     if (m_periodic_backfill && budget.second != 0)
       m_profile_cycle_time = budget.first;
   }
@@ -415,5 +423,13 @@ public:
                                     false);
   }
 };
+/** @brief Exact-placement scheduler over a boost::circular_buffer queue. */
+template <typename Model, bool OneSecondEventGroups = false>
+using PlacementCircularScheduler =
+    PlacementScheduler<CircularWaitQueue, Model, OneSecondEventGroups>;
+/** @brief Exact-placement scheduler over a std::deque queue. */
+template <typename Model, bool OneSecondEventGroups = false>
+using PlacementDequeScheduler =
+    PlacementScheduler<DequeWaitQueue, Model, OneSecondEventGroups>;
 } // namespace dr_evt
 #endif

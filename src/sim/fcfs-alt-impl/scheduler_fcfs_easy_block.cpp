@@ -18,7 +18,7 @@
  * without the leading --; see dr_evt_params.proto and dr_evt_service.proto.
  */
 
-#include "sim/scheduler_fcfs_easy_block.hpp"
+#include "sim/fcfs-alt-impl/scheduler_fcfs_easy_block.hpp"
 #include <algorithm>
 #include <utility>
 
@@ -149,7 +149,8 @@ FCFSEasyBlockScheduler<BlockSize>::schedule(num_nodes_t free_nodes,
           ? m_fcfs_reservation_time
           : std::numeric_limits<sim_time_t>::max();
   record_estimated_start(fcfs_head, m_fcfs_reservation_time,
-                       planned_reservation != std::numeric_limits<sim_time_t>::max());
+                         planned_reservation !=
+                             std::numeric_limits<sim_time_t>::max());
 #ifndef DR_EVT_LEGACY_RESERVATION_BARRIER
   if (planned_reservation != std::numeric_limits<sim_time_t>::max()) {
     reservation_plan.reserve(

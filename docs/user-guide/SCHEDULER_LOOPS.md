@@ -394,7 +394,7 @@ of fixed, startup-phased evaluation ticks.
 ## Per-pass placement accounting
 
 `--per_pass_accounting` selects a dedicated event-driven FCFS subclass
-with a circular queue. It supports EASY (R=1), hybrid (configured R),
+with a circular or deque queue. It supports EASY (R=1), hybrid (configured R),
 conservative (unlimited R), and strict FCFS. `--backfill_queue_depth` supplies
 Q for the entire placement pass, including ordinary starts and the blocked
 head. Use zero dispatch/backfill intervals and an unlimited planning horizon.

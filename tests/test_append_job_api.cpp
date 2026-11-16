@@ -28,8 +28,8 @@
 
 #define DR_EVT_HAS_CONFIG 1
 #include "sim/reservation_search_cache.hpp"
-#include "sim/scheduler_fcfs_periodic_easy_circular.hpp"
-#include "sim/scheduler_fcfs_periodic_hybrid_circular.hpp"
+#include "sim/scheduler_fcfs_periodic_easy.hpp"
+#include "sim/scheduler_fcfs_periodic_hybrid.hpp"
 #include "sim/sim.hpp"
 #include <algorithm>
 #include <cassert>

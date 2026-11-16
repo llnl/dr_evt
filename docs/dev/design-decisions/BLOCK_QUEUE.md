@@ -51,8 +51,8 @@ is kept in [Wait Queues](../WAIT_QUEUES.md).
 
 ## Implementation
 
-- `src/sim/block_wait_queue.{hpp,cpp}` — block storage and search
-- `src/sim/scheduler_fcfs_easy_block.{hpp,cpp}` — FCFS scheduler integration
+- `src/sim/fcfs-alt-impl/block_wait_queue.{hpp,cpp}` — block storage and search
+- `src/sim/fcfs-alt-impl/scheduler_fcfs_easy_block.{hpp,cpp}` — FCFS scheduler integration
 - `src/sim/scheduler_base.cpp` — scheduler factory
 
 Test commands and fixtures are maintained in the
