@@ -54,15 +54,27 @@ def metrics(jobs, schedule, capacity):
             'utilization': sum(j[1] * j[3] for j in jobs) / (capacity * makespan)}
 
 
+def write_native_input(path, jobs):
+    """Write the native adapter input relative to the first submission.
+
+    The adapter adds its own fixed epoch to every input time, so absolute
+    timestamps would move native OpenPBS decades into the future. Returns the
+    origin that must be added back to native output times.
+    """
+    origin = min(job[0] for job in jobs)
+    with path.open('w') as stream:
+        writer = csv.writer(stream)
+        for index, (submit, units, limit, duration) in enumerate(jobs, 1):
+            writer.writerow([index, submit - origin, units, duration, limit])
+    return origin
+
+
 def experiment(args, name, jobs, capacity, reservations, expected=None):
     directory = args.outdir / name
     directory.mkdir(parents=True, exist_ok=True)
     dump(directory / 'workload.json', jobs)
     native_input = directory / 'native-input.csv'
-    with native_input.open('w') as stream:
-        writer = csv.writer(stream)
-        for index, (submit, units, limit, duration) in enumerate(jobs, 1):
-            writer.writerow([index, submit, units, duration, limit])
+    origin = write_native_input(native_input, jobs)
     (directory / 'sched_config').write_text(
         'strict_ordering: true ALL\n'
         'fair_share: false ALL\npreemptive_sched: false ALL\n'
@@ -95,7 +107,7 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
     with (native_directory / 'native.csv').open() as stream:
         rows = list(csv.DictReader(stream))
     assert [int(r['job_id']) for r in rows] == list(range(1, len(jobs) + 1))
-    native = [[int(r['start']), int(r['end'])] for r in rows]
+    native = [[int(r['start']) + origin, int(r['end']) + origin] for r in rows]
     native_nodes = ([sorted(int(node) for node in r['assignment'].split(';'))
                      for r in rows] if args.resource_model == 'placement' else None)
     if native_nodes is not None:
@@ -153,10 +165,11 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
                 dr_observed.append([timestamp, used])
         assert dr_observed == dr_profile
     # Verify adapter observations independently of the reconstructed schedule.
-    active, snapshots = {}, {}
+    # Seed time 0 as curve() does; shifted native times can start later.
+    active, snapshots = {}, {0: 0}
     with (native_directory / 'native-events.csv').open() as stream:
         for kind, timestamp, identity, value in csv.reader(stream):
-            timestamp, value = int(timestamp), int(value)
+            timestamp, value = int(timestamp) + origin, int(value)
             if kind in ('start', 'end'):
                 index = int(identity) - 1
                 if kind == 'start':
@@ -187,7 +200,8 @@ def experiment(args, name, jobs, capacity, reservations, expected=None):
     report = {'name': name, 'jobs': len(jobs), 'capacity': capacity,
               'resource_model': args.resource_model,
               'priority_policy': args.priority_policy,
-              'reservation_depth': reservations, 'exact_match': not differences,
+              'reservation_depth': reservations, 'native_time_origin': origin,
+              'exact_match': not differences,
               'different_jobs': len(differences), 'differences': differences,
               'openpbs_schedule': native, 'dr_evt_schedule': dr_evt,
               'openpbs_profile': native_profile, 'dr_evt_profile': dr_profile,
@@ -287,7 +301,10 @@ def main():
         dump(args.outdir / 'trace-conversion.json', {
             'source_sha256': hashlib.sha256(args.trace.read_bytes()).hexdigest(),
             'selected_jobs': len(jobs), 'selection': 'earliest jobs in stable arrival order',
-            'conversion': 'Relative arrivals, actual runtimes and walltime limits rounded up to integer seconds; runtime >= 1; limit >= runtime.',
+            'conversion': ('Fixture timestamps are kept; raw traces are rebased to the first arrival. '
+                           'Actual runtimes and walltime limits rounded up to integer seconds; '
+                           'runtime >= 1; limit >= runtime. The native adapter receives arrivals '
+                           'relative to the first arrival, and its times are shifted back.'),
             'initial_state': 'empty', 'capacity': 756})
         name = f'lassen-prefix{len(jobs)}-r32'
         reports.append(experiment(args, name, jobs, 756, 32))

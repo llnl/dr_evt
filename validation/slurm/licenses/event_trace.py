@@ -63,7 +63,7 @@ def run_case(directory, jobs, capacity, enabled=True, batch_main_dispatch=False,
     origin = jobs[0][0] if jobs else 0
     (directory / 'state').mkdir()
     clock_file = directory / 'clock.bin'
-    clock_file.write_bytes(struct.pack('qQI', origin - 120, 0, 0) + bytes(12))
+    clock_file.write_bytes(struct.pack('qQI', origin - 120, 0, 0) + bytes(20))
     params = ('sched_min_interval=0,batch_sched_delay=0,sched_interval=60,'
               'bf_interval=30,bf_resolution=1,bf_window=4320,bf_max_job_test=4096,'
               'bf_max_job_part=64,bf_job_part_count_reserve=32,default_queue_depth=100000')
@@ -222,19 +222,27 @@ PartitionName=pbatch Nodes=ALL Default=YES MaxTime=INFINITE State=UP OverSubscri
                 cursor += 1
                 state_changed = True
             command('RELEASE')
+            # The backfill agent runs on its own timer. Two new finished checks
+            # mean one whole check began after RELEASE, so any backfill cycle
+            # it started has finished before the state is recorded.
+            backfill_target = command('BACKFILL')['checks'] + 2
             # Observe a stable native state while virtual time remains fixed.
             previous, stable = None, 0
             deadline = time.monotonic() + 10
             dispatch_after = dispatch_before
+            backfill_checks = backfill_target - 2
             # RPC responses can precede the queued scheduler pass. Unchanged
             # snapshots alone do not acknowledge dispatch, especially at t=0.
-            while stable < 3 or (batch_main_dispatch and state_changed and
-                                 dispatch_after <= dispatch_before):
+            while (stable < 3 or backfill_checks < backfill_target or
+                   (batch_main_dispatch and state_changed and
+                    dispatch_after <= dispatch_before)):
                 time.sleep(.01)
                 snapshot = command('DUMP')
                 if batch_main_dispatch:
                     dispatch_after = command('DISPATCH')['generation']
-                signature = [(row['id'], row['state'], row['start']) for row in snapshot['jobs']]
+                backfill_checks = command('BACKFILL')['checks']
+                signature = ([(row['id'], row['state'], row['start']) for row in snapshot['jobs']],
+                             snapshot['license_used'])
                 stable = stable + 1 if signature == previous else 0
                 previous = signature
                 if time.monotonic() >= deadline:

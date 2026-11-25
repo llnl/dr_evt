@@ -10,17 +10,22 @@ from pathlib import Path
 import subprocess, json
 name='src/plugins/sched/backfill/backfill.c'
 before=subprocess.check_output(['git','-c','safe.directory=/slurm-modern-source','-C','/slurm-modern-source','show','HEAD:'+name],text=True)
-after=before.replace('extern void *backfill_agent(void *args)', 'extern void validation_enter_backfill(void);\nextern void validation_leave_backfill(void);\n\nextern void *backfill_agent(void *args)',1)
+after=before.replace('extern void *backfill_agent(void *args)', 'extern void validation_enter_backfill(void);\nextern void validation_leave_backfill(void);\nextern void validation_backfill_checked(void);\n\nextern void *backfill_agent(void *args)',1)
 old='\t\tlock_slurmctld(all_locks);\n\t\tvalidate_all_reservations(true, false);'
 assert after.count(old)==1
 after=after.replace(old,'\t\tvalidation_enter_backfill();\n'+old,1)
 old='\t\tunlock_slurmctld(all_locks);\n\n\t\tslurm_mutex_lock(&check_bf_running_lock);'
 assert after.count(old)==1
-after=after.replace(old,'\t\tunlock_slurmctld(all_locks);\n\t\tvalidation_leave_backfill();\n\n\t\tslurm_mutex_lock(&check_bf_running_lock);',1)
+after=after.replace(old,'\t\tunlock_slurmctld(all_locks);\n\t\tvalidation_leave_backfill();\n\t\tvalidation_backfill_checked();\n\n\t\tslurm_mutex_lock(&check_bf_running_lock);',1)
+# Count skipped checks too, so the driver can tell when the agent has seen
+# the current virtual time and either skipped or finished its cycle.
+old='\t\t    !_more_work(last_backfill_time)) {\n\t\t\tshort_sleep = true;\n\t\t\tcontinue;\n\t\t}'
+assert after.count(old)==1
+after=after.replace(old,'\t\t    !_more_work(last_backfill_time)) {\n\t\t\tvalidation_backfill_checked();\n\t\t\tshort_sleep = true;\n\t\t\tcontinue;\n\t\t}',1)
 path = Path('/workspace/slurm-modern-source/'+name)
 if path.read_text() != after:
     path.write_text(after)
-Path('/results/event-overlay.json').write_text(json.dumps({'file':name,'reason':'Serialize virtual event batches with native backfill cycles; no allocation or reservation algorithm changes.','before':before,'after':after},indent=2)+'\n')
+Path('/results/event-overlay.json').write_text(json.dumps({'file':name,'reason':'Serialize virtual event batches with native backfill cycles and count finished backfill checks; no allocation or reservation algorithm changes.','before':before,'after':after},indent=2)+'\n')
 # Backfill gating alone allows main dispatch between simultaneous completion
 # RPCs. Gate _schedule before it acquires controller locks so every release and
 # arrival in the batch is visible first. The clock library makes this opt-in;

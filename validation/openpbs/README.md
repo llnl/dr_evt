@@ -48,7 +48,10 @@ OPENPBS_VALIDATION_RESULTS="$PWD/validation/openpbs/results/reproduction" \
 ```
 
 The runner uses the checked-in `validation/fixtures/jobs.csv`. Pass `--trace`
-to `compare.py` only when validating a different workload.
+to `compare.py` only when validating a different workload. The native adapter
+adds its own fixed epoch to input times, so `compare.py` gives it arrivals
+relative to the first submission and shifts native results back to absolute
+time; reports record the shift as `native_time_origin`.
 
 One invocation writes separate `capacity/` and `placement/` result trees. Use a
 fresh output directory for each campaign. The default reusable build volume is
