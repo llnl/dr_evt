@@ -24,6 +24,7 @@ struct validation_clock {
   _Atomic uint64_t microticks;
   _Atomic uint32_t phase; /* 0 idle, 1 event batch, 2 backfill, 3 dispatch */
   _Atomic uint64_t dispatch_generation; /* completed main-dispatch passes */
+  _Atomic uint64_t backfill_checks;     /* finished backfill-agent checks */
 };
 static struct validation_clock *shared;
 static int batch_dispatch;
@@ -110,6 +111,19 @@ void validation_leave_dispatch(void) {
  */
 uint64_t validation_dispatch_generation(void) {
   return atomic_load(&shared->dispatch_generation);
+}
+/**
+ * @brief Count one finished backfill-agent check.
+ * @details Called when the agent skips a cycle and after a cycle finishes. A
+ * driver that sees two new checks after releasing a batch knows that one whole
+ * check began after the release, so any backfill it started has finished.
+ */
+void validation_backfill_checked(void) {
+  atomic_fetch_add(&shared->backfill_checks, 1);
+}
+/** @brief Read the number of finished backfill-agent checks. */
+uint64_t validation_backfill_checks(void) {
+  return atomic_load(&shared->backfill_checks);
 }
 /**
  * @brief Hold both schedulers while applying events at the supplied timestamp.

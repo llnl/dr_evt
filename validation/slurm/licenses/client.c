@@ -4,6 +4,7 @@
  * @details TIME holds the event batch; RELEASE lets native schedulers proceed.
  * DISPATCH reports completed main passes so the driver can acknowledge an event
  * batch before advancing time. It does not impose main-before-backfill order.
+ * BACKFILL reports finished backfill-agent checks for the same purpose.
  */
 #include "config.h"
 #include "slurm/slurm.h"
@@ -20,6 +21,7 @@
 extern void validation_set_time(int64_t);
 extern void validation_release_batch(void);
 extern uint64_t validation_dispatch_generation(void);
+extern uint64_t validation_backfill_checks(void);
 
 #ifdef VALIDATION_STATE_CACHE
 struct cached_job {
@@ -56,6 +58,8 @@ int main(int argc, char **argv) {
     } else if (!strcmp(command, "DISPATCH")) {
       printf("{\"generation\":%" PRIu64 "}\n",
              validation_dispatch_generation());
+    } else if (!strcmp(command, "BACKFILL")) {
+      printf("{\"checks\":%" PRIu64 "}\n", validation_backfill_checks());
     } else if (!strcmp(command, "REGISTER")) {
       sscanf(line, "%*s %63s", node);
       acct_gather_energy_t energy = {0};
