@@ -46,8 +46,10 @@ can finish at different times. Calendar times use `America/Los_Angeles`
 (UTC−7 for this interval).
 
 The checked-in `validation/fixtures/jobs.csv` is the integer-second, absolute
-Unix-time input used by the current native adapters. Expected native schedules
-use the same clock and are stored beside it. The original LAST extraction is not
+Unix-time input used by the current Slurm and Flux adapters. The OpenPBS
+comparison instead receives the same jobs shifted so the first submission is at
+time 0; see [OpenPBS](OPENPBS_VALIDATION.md). Expected native schedules use
+absolute time and are stored beside it. The original LAST extraction is not
 checked in; its interval and hash are retained for provenance and regeneration.
 The filename alone does not identify the workload, and `--max-jobs 0` selects
 the entire supplied CSV rather than the published 2,000-job workload.

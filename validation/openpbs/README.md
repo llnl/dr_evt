@@ -43,12 +43,23 @@ mkdir -p external
 git clone https://github.com/openpbs/openpbs.git external/openpbs
 git -C external/openpbs checkout --detach cd7ab5edaf03dcac2f1cb9e2f42d75eb117d468a
 
+mkdir -p validation/openpbs/results
+python3 -c 'import csv; r=list(csv.DictReader(open("validation/fixtures/jobs.csv"))); o=int(r[0]["submit_time"]); w=csv.DictWriter(open("validation/openpbs/results/jobs-relative.csv","w",newline=""),fieldnames=r[0].keys()); w.writeheader(); [w.writerow({**x,"submit_time":int(x["submit_time"])-o}) for x in r]'
+
 OPENPBS_VALIDATION_RESULTS="$PWD/validation/openpbs/results/reproduction" \
-  bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group
+  bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group \
+  --trace /dr_evt_source/validation/openpbs/results/jobs-relative.csv
 ```
 
-The runner uses the checked-in `validation/fixtures/jobs.csv`. Pass `--trace`
-to `compare.py` only when validating a different workload.
+Native OpenPBS has been validated only with submission times that start at
+zero. The checked-in `validation/fixtures/jobs.csv` uses absolute Unix
+timestamps; given that file directly, native OpenPBS produced 1,943 capacity
+start times that differ from the published schedule, while DR_EVT matched the
+published schedule.
+The commands above therefore write the same 2,000 jobs with the first
+submission at time 0 and pass that file with `--trace`, which overrides the
+runner's default fixture path. Expected schedules in `validation/fixtures/`
+remain in absolute time: add `1597836579` to compare them with these results.
 
 One invocation writes separate `capacity/` and `placement/` result trees. Use a
 fresh output directory for each campaign. The default reusable build volume is
@@ -60,7 +71,8 @@ Run a short smoke campaign:
 
 ```sh
 OPENPBS_VALIDATION_MAX_JOBS=50 bash validation/openpbs/run.sh \
-  --priority_policy fcfs_1s_evt_group
+  --priority_policy fcfs_1s_evt_group \
+  --trace /dr_evt_source/validation/openpbs/results/jobs-relative.csv
 ```
 
 Run harness audit tests without native OpenPBS:
