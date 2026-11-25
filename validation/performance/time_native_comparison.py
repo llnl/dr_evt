@@ -7,9 +7,12 @@ warmup and N timed runs.
 Capacity cases rerun the simulator command saved by the first completed run;
 each output must match the saved schedule byte for byte. The harnesses ran
 placement through a test driver that also writes reservation snapshots, so
-placement cases instead run the same simulator command with
-``--resource_model placement``; each schedule's start and end times must match
-the DR_EVT schedule in the placement report.
+placement cases instead run the saved capacity command of the same scheduler
+with the driver's settings: ``--resource_model placement --placement_order
+low``, without the capacity-only planning and per-pass options. Each schedule's
+start and end times must match the DR_EVT schedule in the placement report.
+The simulator does not write node IDs, so those are not compared here; the
+harness reports already compare them with the native scheduler.
 
 Writes OUT/summary.json and prints one line per case.
 
@@ -38,6 +41,26 @@ def schedule_times(path):
                 for row in csv.DictReader(stream)]
 
 
+# Capacity options that placement rejects. The placement driver leaves the
+# corresponding settings at their defaults: exact planning times and no
+# per-pass accounting.
+CAPACITY_ONLY = {'--per_pass_accounting': 0, '--planning_time_resolution': 1,
+                 '--planning_horizon': 1}
+
+
+def placement_command(command):
+    """Convert a saved capacity command to the placement driver's settings."""
+    result, skip = [], 0
+    for arg in command:
+        if skip:
+            skip -= 1
+        elif arg in CAPACITY_ONLY:
+            skip = CAPACITY_ONLY[arg]
+        else:
+            result.append(arg)
+    return result + ['--resource_model', 'placement', '--placement_order', 'low']
+
+
 def time_simulator(out, command, saved_in, tag, runs, model='capacity', expected=None):
     """Time one simulator command and check every output.
 
@@ -55,7 +78,7 @@ def time_simulator(out, command, saved_in, tag, runs, model='capacity', expected
     command[command.index('--outfile') + 1] = str(output)
     command[command.index('--resource_trace') + 1] = str(folder / 'resources.csv')
     if model == 'placement':
-        command += ['--resource_model', 'placement', '--placement_order', 'low']
+        command = placement_command(command)
     (folder / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
     times, same = [], True
     for run in range(runs + 1):
