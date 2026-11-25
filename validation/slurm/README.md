@@ -1,6 +1,6 @@
 # Native Slurm validation
 
-This harness compares DR_EVT with native Slurm using virtual time and native
+This harness compares DR_EVT with native Slurm using [virtual time](VIRTUAL_TIME.md) and native
 allocation, completion, selection, and backfill paths. It runs two distinct
 resource models on the 2,000-job Lassen workload.
 

@@ -2,7 +2,7 @@
 
 This harness compares DR_EVT with the unmodified OpenPBS 23.06.06 scheduler
 library. It emulates server snapshots, launch acknowledgements, completions, and
-virtual time; it does not run `pbs_server`, a database, or MOM daemons.
+[virtual time](VIRTUAL_TIME.md); it does not run `pbs_server`, a database, or MOM daemons.
 
 ## Results
 

@@ -1,8 +1,17 @@
 """Time DR_EVT against completed native Slurm and OpenPBS comparison runs.
 
-Reads report.json files under OUT/{slurm,openpbs}-{capacity,placement}-*/ and
-times the DR_EVT simulator on the same workload and settings, with one untimed
-warmup and N timed runs.
+Two steps, both reading OUT/{slurm,openpbs}-{capacity,placement}-*/:
+
+``run`` times the DR_EVT simulator on the same workload and settings as the
+native runs, with one untimed warmup and N timed runs per case, and writes
+OUT/dr_evt-timing.json. It does not read native times.
+
+``summarize`` reads every completed report and prints one line per case with
+native and DR_EVT times; it runs nothing and writes OUT/summary.json. Each
+report records one DR_EVT time; for placement that time comes from the test
+driver, which also writes reservation snapshots. When OUT/dr_evt-timing.json
+exists, ``summarize`` uses its plain-simulator times instead. The ``dr_evt[...]``
+label shows the source: ``harness``, ``driver``, or ``simulator``.
 
 Capacity cases rerun the simulator command saved by the first completed run;
 each output must match the saved schedule byte for byte. The harnesses ran
@@ -14,16 +23,16 @@ start and end times must match the DR_EVT schedule in the placement report.
 The simulator does not write node IDs, so those are not compared here; the
 harness reports already compare them with the native scheduler.
 
-Writes OUT/summary.json and prints one line per case.
-
-Usage: python3 time_native_comparison.py OUT [N]
+Usage:
+  python3 time_native_comparison.py run OUT [--runs N]
+  python3 time_native_comparison.py summarize OUT
 """
+import argparse
 import csv
 import glob
 import json
 import statistics as st
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -102,47 +111,104 @@ def report_schedule(path):
 
 
 def native(out, case):
-    seconds, differences = [], []
+    """Return native times, schedule differences, and harness DR_EVT times."""
+    seconds, differences, dr_evt = [], [], []
     for path in sorted(glob.glob(str(out / f'{case}-*/lassen-*/report.json'))):
         report = json.loads(Path(path).read_text())
         if 'slurm_metrics' in report:
             seconds.append(report['slurm_metrics']['process_elapsed_seconds'])
             differences.append(report['different_start_times'])
+            dr_evt.append(report['dr_evt_metrics']['process_elapsed_seconds'])
         else:
             seconds.append(report['openpbs_wall_seconds'])
             differences.append(report['different_jobs'])
-    return seconds, differences
+            dr_evt.append(report['dr_evt_wall_seconds'])
+    return seconds, differences, dr_evt
 
 
-def main():
-    out = Path(sys.argv[1])
-    runs = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+TIMING = 'dr_evt-timing.json'
+
+
+def run(out, runs):
+    """Time DR_EVT for every case and write OUT/dr_evt-timing.json."""
     # The first completed capacity run of each scheduler supplies the command.
     slurm = first(out, 'slurm-capacity-*/lassen-*/dr_evt/command.json')
     openpbs = first(out, 'openpbs-capacity-*/lassen-*/commands.json')
     slurm_command = json.loads(slurm.read_text())
     openpbs_command = json.loads(openpbs.read_text())['dr_evt']
-    dr_evt = {
-        'slurm-capacity': time_simulator(
+    cases = {
+        'slurm-capacity': lambda: time_simulator(
             out, slurm_command, slurm.parent, 'slurm-capacity', runs),
-        'slurm-placement': time_simulator(
+        'slurm-placement': lambda: time_simulator(
             out, slurm_command, slurm.parent, 'slurm-placement', runs, 'placement',
             report_schedule(first(out, 'slurm-placement-*/lassen-*/report.json'))),
-        'openpbs-capacity': time_simulator(
+        'openpbs-capacity': lambda: time_simulator(
             out, openpbs_command, openpbs.parent, 'openpbs-capacity', runs),
-        'openpbs-placement': time_simulator(
+        'openpbs-placement': lambda: time_simulator(
             out, openpbs_command, openpbs.parent, 'openpbs-placement', runs, 'placement',
             report_schedule(first(out, 'openpbs-placement-*/lassen-*/report.json'))),
     }
+    timing = {}
+    for case, measure in cases.items():
+        times, same = measure()
+        timing[case] = {'dr_evt_seconds': times, 'dr_evt_schedule_matches': same,
+                        'command': str(out / 'dr_evt-reruns' / case / 'command.json')}
+        print(f'{case:18s} dr_evt n={len(times)} median={st.median(times):.4f}s '
+              f'schedule_match={same}', flush=True)
+    (out / TIMING).write_text(json.dumps(timing, indent=2) + '\n')
+
+
+CASES = ('slurm-capacity', 'slurm-placement', 'openpbs-capacity', 'openpbs-placement')
+
+
+def summarize(out):
+    """Summarize completed runs; prefer DR_EVT times from the run step.
+
+    Every harness report already records one DR_EVT time. For placement that
+    time comes from the test driver, which also writes reservation snapshots.
+    When OUT/dr_evt-timing.json exists, its plain-simulator times are used
+    instead and the source column says so.
+    """
+    path = out / TIMING
+    timing = json.loads(path.read_text()) if path.is_file() else {}
     summary = {}
-    for case, (times, same) in dr_evt.items():
-        seconds, differences = native(out, case)
+    for case in CASES:
+        seconds, differences, harness = native(out, case)
+        if not seconds:
+            print(f'{case:18s} no completed native runs')
+            continue
+        if case in timing:
+            times, source = timing[case]['dr_evt_seconds'], 'simulator'
+            same = timing[case]['dr_evt_schedule_matches']
+        else:
+            times, same = harness, None
+            source = 'driver' if case.endswith('placement') else 'harness'
         summary[case] = {'native_seconds': seconds, 'schedule_differences': differences,
-                         'dr_evt_seconds': times, 'dr_evt_schedule_matches': same}
+                         'dr_evt_seconds': times, 'dr_evt_source': source,
+                         'dr_evt_schedule_matches': same}
         print(f'{case:18s} native n={len(seconds)} mean={st.mean(seconds):8.2f}s '
-              f'diffs={differences} | dr_evt n={len(times)} median={st.median(times):.4f}s | '
-              f'speedup={st.mean(seconds) / st.median(times):,.0f}x | schedule_match={same}')
+              f'diffs={differences} | dr_evt[{source}] n={len(times)} '
+              f'median={st.median(times):.4f}s | '
+              f'speedup={st.mean(seconds) / st.median(times):,.0f}x')
     (out / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    steps = parser.add_subparsers(dest='step', required=True)
+    timed = steps.add_parser('run', help='time DR_EVT and write dr_evt-timing.json')
+    timed.add_argument('out', type=Path)
+    timed.add_argument('--runs', type=int, default=10, help='timed runs per case')
+    steps.add_parser('summarize', help='combine native and DR_EVT times').add_argument(
+        'out', type=Path)
+    args = parser.parse_args()
+    if args.step == 'run':
+        if args.runs < 1:
+            parser.error('--runs must be positive')
+        run(args.out, args.runs)
+    else:
+        summarize(args.out)
 
 
 if __name__ == '__main__':
