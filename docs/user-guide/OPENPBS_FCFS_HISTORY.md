@@ -39,8 +39,7 @@ After preparing the pinned OpenPBS source and Lassen input as described on the
 
 ```sh
 OPENPBS_VALIDATION_RESULTS="$PWD/validation/openpbs/results/fcfs-history" \
-  bash validation/openpbs/run.sh --priority_policy fcfs \
-  --trace /dr_evt_source/validation/openpbs/results/jobs-relative.csv
+  bash validation/openpbs/run.sh --priority_policy fcfs
 ```
 
 The native source locations for this rule are `simulate_events()` and

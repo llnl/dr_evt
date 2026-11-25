@@ -34,12 +34,14 @@ def diagnose(path):
     started = set(active) | completed
     intervals = list(active.values())
     native_plan = {}
+    # Native event times and planned starts are relative to the adapter input.
+    origin = report.get('native_time_origin', 0)
     with (path.parent / 'native-events.csv').open() as stream:
         for kind, at, identity, value in csv.reader(stream):
-            if int(at) > timestamp:
+            if int(at) + origin > timestamp:
                 break
-            if kind == 'plan' and int(at) == timestamp:
-                native_plan[int(identity.split('.')[0])] = int(value)
+            if kind == 'plan' and int(at) + origin == timestamp:
+                native_plan[int(identity.split('.')[0])] = int(value) + origin
     reconstructed = {}
     selected = []
     for identity, (submit, units, limit, _) in enumerate(jobs, 1):

@@ -62,15 +62,8 @@ capacity and placement validation together:
 
 ```sh
 OPENPBS_VALIDATION_RESULTS="$PWD/validation/openpbs/results/reproduction" \
-  bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group \
-  --trace /dr_evt_source/validation/openpbs/results/jobs-relative.csv
+  bash validation/openpbs/run.sh --priority_policy fcfs_1s_evt_group
 ```
-
-The workload setup writes `jobs-relative.csv`, the checked-in 2,000 jobs with
-the first submission at time 0. Native OpenPBS has been validated only with
-such relative times; given the absolute timestamps of
-`validation/fixtures/jobs.csv` directly, its capacity schedule differs from the
-published result.
 
 The harness README describes the short smoke run, outputs, audits, and
 build-volume controls. Compact expected schedules are checked in under

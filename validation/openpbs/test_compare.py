@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from compare import audit, audit_schedule, lassen
+from compare import audit, audit_schedule, lassen, write_native_input
 from diagnose import feasible
 
 
@@ -47,6 +47,14 @@ class ValidationAuditTests(unittest.TestCase):
                             '2,1597836580,2,120,12\n')
             self.assertEqual(lassen(path, 0), [(1597836579, 3, 60, 11),
                                                (1597836580, 2, 120, 12)])
+
+    def test_native_input_is_relative_to_first_submission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'native-input.csv'
+            jobs = [(1597836579, 3, 60, 11), (1597836585, 2, 120, 12)]
+            self.assertEqual(write_native_input(path, jobs), 1597836579)
+            self.assertEqual(path.read_text().splitlines(),
+                             ['1,0,3,11,60', '2,6,2,12,120'])
 
     def test_exact_placement_audit_rejects_overlap_and_wrong_count(self):
         jobs = [(0, 2, 10, 10), (0, 1, 20, 20)]
